@@ -47,7 +47,7 @@ def get_requirements() -> List[str]:
     return _read_requirements("requirements.txt")
 
 
-name, version = get_project_name_and_version("budsim/__about__.py")
+name, version = get_project_name_and_version("budapp/__about__.py")
 version_range_max = max(sys.version_info[1], 10) + 1
 
 setup(
@@ -69,7 +69,7 @@ setup(
     package_dir={"": "./"},
     packages=find_packages(
         where=".",
-        include=["budsim*"],
+        include=["budapp*"],
         exclude=(
             "docs",
             "examples",
@@ -83,7 +83,7 @@ setup(
             "requirements*.txt",
         ),
     ),
-    package_data={"budsim": ["py.typed"]},
+    package_data={"budapp": ["py.typed"]},
     include_package_data=True,
     python_requires=">=3.8.0",
     install_requires=get_requirements(),
