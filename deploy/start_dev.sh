@@ -63,7 +63,7 @@ set +a
 
 export REDIS_PORT=$(echo "${SECRETS_REDIS_URI:-redis:6379}" | cut -d':' -f2)
 
-: ${APP_NAME:?Application name is required, use --app-name flag to specify the name.}
+: ${APP_NAME:?Application name is required, use APP_NAME in env to specify the name.}
 
 # Print the environment variables
 echo "****************************************************"
