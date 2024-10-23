@@ -12,5 +12,3 @@ aiohttp>=3.10.5
 structlog >= 24.4.0
 cachetools >= 5.4.0
 ujson >= 5.10.0
-
-
