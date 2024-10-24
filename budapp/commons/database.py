@@ -16,10 +16,18 @@
 
 """Provides utility functions for managing the database."""
 
+import os
+
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import Engine, MetaData, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from budapp.commons.config import app_settings
+from . import logging
+from .config import app_settings
+
+
+logger = logging.get_logger(__name__)
 
 
 def get_engine() -> Engine:
@@ -58,3 +66,41 @@ metadata_obj = MetaData(naming_convention=convention)
 
 # Create base class for creating models
 Base = declarative_base(metadata=metadata_obj)
+
+
+def run_migrations() -> None:
+    """Run Alembic migrations on application startup.
+
+    This function executes Alembic database migrations to bring the database
+    schema up to the latest version. It uses the configuration file specified
+    in the application settings.
+
+    The function performs the following steps:
+    1. Constructs the path to the Alembic configuration file.
+    2. Creates an Alembic Config object with the configuration file.
+    3. Runs the upgrade command to apply all pending migrations.
+
+    Raises:
+        FileNotFoundError: If the Alembic configuration file is not found.
+        alembic.util.exc.CommandError: If there's an error during migration.
+
+    Note:
+        This function should be called during application startup to ensure
+        the database schema is up to date before the application begins
+        serving requests.
+    """
+    logger.info("Starting database migrations")
+
+    alembic_cfg_file = os.path.join(app_settings.base_dir, "budapp", "alembic.ini")
+
+    if not os.path.exists(alembic_cfg_file):
+        logger.error(f"Alembic configuration file not found: {alembic_cfg_file}")
+        raise FileNotFoundError(f"Alembic configuration file not found: {alembic_cfg_file}")
+
+    try:
+        alembic_cfg = Config(alembic_cfg_file)
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Database migrations completed successfully")
+    except Exception as e:
+        logger.error(f"Error occurred during database migration: {str(e)}")
+        raise

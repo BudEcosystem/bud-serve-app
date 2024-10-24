@@ -39,3 +39,12 @@ To run the tests, make sure the Dapr API token is available in the environment. 
 ```bash
 pytest --dapr-http-port 3510 --dapr-api-token <YOUR_DAPR_API_TOKEN>
 ```
+
+## Migrations
+
+execute budapp container
+
+``` bash
+cd app/
+alembic -c ./budapp/alembic.ini upgrade head
+```
