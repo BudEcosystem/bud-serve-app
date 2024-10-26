@@ -194,6 +194,10 @@ class AppConfig(BaseConfig):
     superuser_email: str = Field(alias="SUPER_USER_EMAIL")
     superuser_password: str = Field(alias="SUPER_USER_PASSWORD")
 
+    # Token
+    access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
+    refresh_token_expire_minutes: int = Field(60 * 24 * 7, alias="REFRESH_TOKEN_EXPIRE_MINUTES")
+
     @computed_field
     def postgres_url(self) -> str:
         """Construct and returns a PostgreSQL connection URL.
@@ -302,7 +306,8 @@ class SecretsConfig(BaseConfig):
     """
 
     dapr_api_token: Optional[str] = Field(None, alias="DAPR_API_TOKEN")
-    password_salt: str = Field(alias="PASSWORD_SALT")
+    password_salt: str = Field("bud_password_salt", alias="PASSWORD_SALT")
+    jwt_secret_key: str = Field(alias="JWT_SECRET_KEY")
 
 
 app_settings = AppConfig()

@@ -399,3 +399,7 @@ class TokenTypeEnum(Enum):
 
     ACCESS = "access"
     REFRESH = "refresh"
+
+
+# Algorithm used for signing tokens
+JWT_ALGORITHM = "HS256"
