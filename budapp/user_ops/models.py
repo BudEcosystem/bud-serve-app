@@ -7,7 +7,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from budapp.commons.constants import UserRoleEnum, UserStatusEnum
 from budapp.commons.database import Base
 from budapp.model_ops.models import Model
-from budapp.permissions.models import Permission
 
 
 class User(Base):
@@ -44,7 +43,8 @@ class User(Base):
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_subscriber: Mapped[bool] = mapped_column(Boolean, default=False)
     reset_password_attempt: Mapped[int] = mapped_column(Integer, default=0)
-    permission: Mapped[Permission] = relationship(back_populates="user")  # one-to-one
+
+    permission: Mapped["Permission"] = relationship(back_populates="user")  # one-to-one
     created_models: Mapped[list[Model]] = relationship(back_populates="created_user")
 
     # TODO: uncomment when implement individual fields
