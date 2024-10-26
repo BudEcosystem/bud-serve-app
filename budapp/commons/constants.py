@@ -16,7 +16,9 @@
 
 """Defines constant values used throughout the project, including application-specific constants."""
 
+import random
 from enum import Enum, StrEnum, auto
+from typing import List
 
 from .helpers import create_dynamic_enum
 
@@ -263,3 +265,122 @@ class UserStatusEnum(StrEnum):
     ACTIVE = auto()
     INACTIVE = auto()
     INVITED = auto()
+
+
+class UserColorEnum(Enum):
+    """Enumeration of predefined user colors.
+
+    This enum defines a set of color options that can be assigned to users.
+    Each color is represented by its hexadecimal code.
+
+    Attributes:
+        COLOR_1 (str): color (#E57333).
+        COLOR_2 (str): color (#FFC442).
+        COLOR_3 (str): color (#61A560).
+        COLOR_4 (str): color (#3F8EF7).
+        COLOR_5 (str): color (#C64C9C).
+        COLOR_6 (str): color (#95E0FB).
+    """
+
+    COLOR_1 = "#E57333"
+    COLOR_2 = "#FFC442"
+    COLOR_3 = "#61A560"
+    COLOR_4 = "#3F8EF7"
+    COLOR_5 = "#C64C9C"
+    COLOR_6 = "#95E0FB"
+
+    @classmethod
+    def get_random_color(cls) -> str:
+        """Get a random color."""
+        colors = list(cls)
+        return random.choice(colors).value
+
+
+class PermissionEnum(Enum):
+    """Enumeration of system permissions.
+
+    This enum defines various permission levels for different aspects of the system,
+    including models, projects, endpoints, clusters, and user management.
+
+    Attributes:
+        MODEL_VIEW (str): Permission to view models.
+        MODEL_MANAGE (str): Permission to manage models.
+        MODEL_BENCHMARK (str): Permission to benchmark models.
+        PROJECT_VIEW (str): Permission to view projects.
+        PROJECT_MANAGE (str): Permission to manage projects.
+        ENDPOINT_VIEW (str): Permission to view endpoints.
+        ENDPOINT_MANAGE (str): Permission to manage endpoints.
+        CLUSTER_VIEW (str): Permission to view clusters.
+        CLUSTER_MANAGE (str): Permission to manage clusters.
+        USER_MANAGE (str): Permission to manage users.
+    """
+
+    MODEL_VIEW = "model:view"
+    MODEL_MANAGE = "model:manage"
+    MODEL_BENCHMARK = "model:benchmark"
+
+    PROJECT_VIEW = "project:view"
+    PROJECT_MANAGE = "project:manage"
+
+    ENDPOINT_VIEW = "endpoint:view"
+    ENDPOINT_MANAGE = "endpoint:manage"
+
+    CLUSTER_VIEW = "cluster:view"
+    CLUSTER_MANAGE = "cluster:manage"
+
+    USER_MANAGE = "user:manage"
+
+    @classmethod
+    def get_global_permissions(cls) -> List[str]:
+        """Return all permission values in a list."""
+        return [
+            cls.MODEL_VIEW.value,
+            cls.MODEL_MANAGE.value,
+            cls.MODEL_BENCHMARK.value,
+            cls.PROJECT_VIEW.value,
+            cls.PROJECT_MANAGE.value,
+            cls.CLUSTER_VIEW.value,
+            cls.CLUSTER_MANAGE.value,
+            cls.USER_MANAGE.value,
+        ]
+
+    @classmethod
+    def get_default_permissions(cls) -> List[str]:
+        """Return default permission values in a list."""
+        return [
+            cls.MODEL_VIEW.value,
+            cls.MODEL_MANAGE.value,
+            cls.PROJECT_VIEW.value,
+            cls.CLUSTER_VIEW.value,
+        ]
+
+    @classmethod
+    def get_protected_permissions(cls) -> List[str]:
+        """Return restrictive permission values in a list."""
+        return [
+            cls.MODEL_VIEW.value,
+            cls.PROJECT_VIEW.value,
+            cls.CLUSTER_VIEW.value,
+        ]
+
+    @classmethod
+    def get_project_default_permissions(cls) -> List[str]:
+        """Return default permission values in a list."""
+        return [
+            cls.ENDPOINT_VIEW.value,
+        ]
+
+    @classmethod
+    def get_project_level_scopes(cls) -> List[str]:
+        """Return project-level scope values in a list."""
+        return [
+            cls.ENDPOINT_VIEW.value,
+            cls.ENDPOINT_MANAGE.value,
+        ]
+
+    @classmethod
+    def get_project_protected_scopes(cls) -> List[str]:
+        """Return project-level protected scope values in a list."""
+        return [
+            cls.ENDPOINT_VIEW.value,
+        ]
