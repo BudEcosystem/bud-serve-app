@@ -47,4 +47,5 @@ execute budapp container
 ``` bash
 cd app/
 alembic -c ./budapp/alembic.ini upgrade head
+alembic -c ./budapp/alembic.ini revision --autogenerate -m "message"
 ```
