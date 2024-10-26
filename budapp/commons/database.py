@@ -43,7 +43,7 @@ def get_engine() -> Engine:
     Raises:
         SQLAlchemyError: If there's an error creating the engine or connecting to the database.
     """
-    return create_engine(app_settings.postgres_url, echo=True)
+    return create_engine(app_settings.postgres_url)
 
 
 # Create sqlalchemy engine
