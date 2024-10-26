@@ -15,3 +15,7 @@
 #  -----------------------------------------------------------------------------
 
 """Initialization module for the `commons` subpackage. Contains common utilities, configurations, constants, and helper functions that are shared across the project."""
+
+from budapp.model_ops.models import Model
+
+from .database import Base
