@@ -384,3 +384,18 @@ class PermissionEnum(Enum):
         return [
             cls.ENDPOINT_VIEW.value,
         ]
+
+
+class TokenTypeEnum(Enum):
+    """Enumeration of token types used in the application.
+
+    This enum defines the different types of authentication tokens
+    that can be used within the application.
+
+    Attributes:
+        ACCESS (str): Represents an access token.
+        REFRESH (str): Represents a refresh token.
+    """
+
+    ACCESS = "access"
+    REFRESH = "refresh"
