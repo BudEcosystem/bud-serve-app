@@ -16,7 +16,9 @@
 
 """Defines constant values used throughout the project, including application-specific constants."""
 
-from enum import Enum
+from enum import Enum, StrEnum, auto
+
+from .helpers import create_dynamic_enum
 
 
 class LogLevel(Enum):
@@ -109,3 +111,155 @@ class Environment(str, Enum):
             bool: `True` if debugging is enabled, `False` otherwise.
         """
         return {"PRODUCTION": False}.get(self.value, True)
+
+
+class ModalityEnum(Enum):
+    """Enumeration of model modalities.
+
+    This enum represents different types of AI model modalities or capabilities.
+
+    Attributes:
+        LLM (str): Represents Large Language Models for text generation and processing.
+        IMAGE (str): Represents image-related models for tasks like generation or analysis.
+        EMBEDDING (str): Represents models that create vector embeddings of input data.
+        TEXT_TO_SPEECH (str): Represents models that convert text to spoken audio.
+        SPEECH_TO_TEXT (str): Represents models that transcribe spoken audio to text.
+    """
+
+    LLM = "llm"
+    IMAGE = "image"
+    EMBEDDING = "embedding"
+    TEXT_TO_SPEECH = "text_to_speech"
+    SPEECH_TO_TEXT = "speech_to_text"
+
+
+class ModelTypeEnum(Enum):
+    """Enumeration of model types.
+
+    This enum represents different categories or types of AI models based on their primary function or training approach.
+
+    Attributes:
+        PRETRAINED (str): Represents models that have been pre-trained on large datasets and can be fine-tuned for specific tasks.
+        CHAT (str): Represents models specifically designed or fine-tuned for conversational AI and chat applications.
+        CODEGEN (str): Represents models specialized in code generation tasks.
+    """
+
+    PRETRAINED = "pretrained"
+    CHAT = "chat"
+    CODEGEN = "codegen"
+
+
+ModelSourceEnum = create_dynamic_enum(
+    "ModelSourceEnum",
+    [
+        "local",
+        "nlp_cloud",
+        "deepinfra",
+        "anthropic",
+        "vertex_ai-vision-models",
+        "replicate",
+        "vertex_ai-chat-models",
+        "azure_ai",
+        "perplexity",
+        "vertex_ai-code-text-models",
+        "vertex_ai-text-models",
+        "palm",
+        "cohere_chat",
+        "vertex_ai-embedding-models",
+        "text-completion-openai",
+        "groq",
+        "openai",
+        "aleph_alpha",
+        "sagemaker",
+        "databricks",
+        "fireworks_ai",
+        "vertex_ai-anthropic_models",
+        "vertex_ai-mistral_models",
+        "voyage",
+        "vertex_ai-language-models",
+        "anyscale",
+        "deepseek",
+        "vertex_ai-image-models",
+        "mistral",
+        "ollama",
+        "cohere",
+        "gemini",
+        "friendliai",
+        "vertex_ai-code-chat-models",
+        "azure",
+        "codestral",
+        "vertex_ai-llama_models",
+        "together_ai",
+        "cloudflare",
+        "ai21",
+        "openrouter",
+        "bedrock",
+        "text-completion-codestral",
+        "huggingface",
+    ],
+)
+
+CredentialTypeEnum = Enum(
+    "CredentialTypeEnum",
+    {
+        name: member.value
+        for name, member in ModelSourceEnum.__members__.items()
+        if member not in [ModelSourceEnum.LOCAL]
+    },
+)
+
+
+class ModelProviderTypeEnum(Enum):
+    """Enumeration of model provider types.
+
+    This enum represents different types of model providers or sources.
+
+    Attributes:
+        CLOUD_MODEL (str): Represents cloud-based model providers.
+        HUGGING_FACE (str): Represents models from the Hugging Face platform.
+        URL (str): Represents models accessible via a URL.
+        DISK (str): Represents locally stored models on disk.
+    """
+
+    CLOUD_MODEL = "cloud_model"
+    HUGGING_FACE = "hugging_face"
+    URL = "url"
+    DISK = "disk"
+
+
+class UserRoleEnum(Enum):
+    """Enumeration of user roles in the system.
+
+    This enum defines the various roles that a user can have in the application.
+    Each role represents a different level of access and permissions.
+
+    Attributes:
+        ADMIN (str): Administrator role with high-level permissions.
+        SUPER_ADMIN (str): Super administrator role with the highest level of permissions.
+        DEVELOPER (str): Role for software developers.
+        DEVOPS (str): Role for DevOps engineers.
+        TESTER (str): Role for quality assurance testers.
+    """
+
+    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
+    DEVELOPER = "developer"
+    DEVOPS = "devops"
+    TESTER = "tester"
+
+
+class UserStatusEnum(StrEnum):
+    """Enumeration of user statuses in the system.
+
+    This enum defines the possible statuses that a user account can have.
+    It uses auto() to automatically assign string values equal to the member names.
+
+    Attributes:
+        ACTIVE: Represents an active user account.
+        INACTIVE: Represents an inactive or disabled user account.
+        INVITED: Represents a user who has been invited but hasn't yet activated their account.
+    """
+
+    ACTIVE = auto()
+    INACTIVE = auto()
+    INVITED = auto()
