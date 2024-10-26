@@ -2,9 +2,9 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Enum, String, Uuid
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, String, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.constants import ModalityEnum, ModelProviderTypeEnum, ModelTypeEnum
 from budapp.commons.database import Base
@@ -53,5 +53,12 @@ class Model(Base):
         nullable=False,
     )
     uri: Mapped[str] = mapped_column(String, nullable=False)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # TODO: uncomment when implement individual fields
+    # endpoints: Mapped[list["Endpoint"]] = relationship(back_populates="model")
+    # benchmarks: Mapped[list["Benchmark"]] = relationship(back_populates="model")
+
+    created_user: Mapped["User"] = relationship(back_populates="created_models", foreign_keys=[created_by])
