@@ -42,6 +42,8 @@ class SessionMixin:
 
 
 class SQLAlchemyMixin(SessionMixin):
+    """A mixin class that provides methods for database operations."""
+
     def add_one(self, model: object) -> object:
         """Add a single model instance to the database.
 
@@ -132,7 +134,25 @@ class DataManagerUtils(SQLAlchemyMixin):
                 logger.error(f"Invalid field: '{field}' not found in {model.__name__} model")
                 raise DatabaseException(f"Invalid field: '{field}' not found in {model.__name__} model")
 
-    async def retrieve_model_by_fields(
+    async def insert_one(self, model: object) -> object:
+        """Insert a single model instance into the database.
+
+        This method is an alias for the `add_one` method, providing a more
+        intuitive name for the insertion operation.
+
+        Args:
+            model (object): The model instance to be inserted into the database.
+
+        Returns:
+            object: The inserted model instance, potentially with updated
+                attributes (e.g., auto-generated ID).
+
+        Raises:
+            Any exceptions that may be raised by the underlying `add_one` method.
+        """
+        return self.add_one(model)
+
+    async def retrieve_by_fields(
         self, model: Type[DeclarativeBase], fields: Dict[str, Any], missing_ok: bool = False
     ) -> Optional[DeclarativeBase]:
         """Retrieve a model instance from the database based on given fields.
@@ -164,7 +184,7 @@ class DataManagerUtils(SQLAlchemyMixin):
 
         return db_model if db_model else None
 
-    async def update_model_by_fields(self, model: Type[DeclarativeBase], fields: Dict[str, Any]) -> object:
+    async def update_by_fields(self, model: Type[DeclarativeBase], fields: Dict[str, Any]) -> object:
         """Update a model instance with the given fields.
 
         This method updates the attributes of the provided model instance with the values
