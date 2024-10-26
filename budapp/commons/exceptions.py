@@ -112,3 +112,25 @@ class SuppressAndLog:
             return result
 
         return wrapper
+
+
+class DatabaseException(Exception):
+    """A custom exception class for database-related errors.
+
+    This exception can be raised when database operations fail or encounter issues.
+
+    Attributes:
+        message (str): A human-readable string describing the database error.
+
+    Args:
+        message (str): The error message describing the database issue.
+    """
+
+    def __init__(self, message: str):
+        """Initialize the DatabaseException with a message."""
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        """Return a string representation of the database exception."""
+        return f"DatabaseException: {self.message}"
