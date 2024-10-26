@@ -27,6 +27,7 @@ from .commons import logging
 from .commons.config import app_settings
 from .commons.constants import Environment
 from .core import meta_routes
+from .initializers.seeder import seeders
 
 
 logger = logging.get_logger(__name__)
@@ -69,6 +70,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         task = asyncio.create_task(schedule_secrets_and_config_sync())
     else:
         task = None
+
+    for seeder_name, seeder in seeders.items():
+        try:
+            await seeder().seed()
+            logger.info(f"Seeded {seeder_name} seeder successfully.")
+        except Exception as e:
+            logger.error(f"Failed to seed {seeder_name}. Error: {e}")
 
     yield
 

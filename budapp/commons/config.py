@@ -302,7 +302,7 @@ class SecretsConfig(BaseConfig):
     """
 
     dapr_api_token: Optional[str] = Field(None, alias="DAPR_API_TOKEN")
-    password_salt: Optional[str] = Field(None, alias="PASSWORD_SALT")
+    password_salt: str = Field(alias="PASSWORD_SALT")
 
 
 app_settings = AppConfig()
