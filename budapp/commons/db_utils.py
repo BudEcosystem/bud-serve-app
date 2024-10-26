@@ -1,6 +1,5 @@
 from typing import Any, Dict, Optional, Type
 
-from commons.exceptions import DatabaseException
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -8,6 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Session
 from sqlalchemy.sql import Executable
 
 from . import logging
+from .exceptions import DatabaseException
 
 
 logger = logging.get_logger(__name__)
@@ -85,7 +85,7 @@ class SQLAlchemyMixin(SessionMixin):
             DatabaseException: If there's an error during the database operation.
         """
         try:
-            return self.session.scalar_one_or_none(stmt)
+            return self.session.execute(stmt).scalar_one_or_none()
         except (Exception, SQLAlchemyError) as e:
             logger.exception(f"Failed to get one model from database: {e}")
             raise DatabaseException("Unable to get model from database") from e
