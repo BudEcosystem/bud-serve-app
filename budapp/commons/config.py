@@ -190,6 +190,10 @@ class AppConfig(BaseConfig):
     postgres_password: str = Field(alias="POSTGRES_PASSWORD")
     postgres_db: str = Field(alias="POSTGRES_DB")
 
+    # Superuser
+    superuser_email: str = Field(alias="SUPER_USER_EMAIL")
+    superuser_password: str = Field(alias="SUPER_USER_PASSWORD")
+
     @computed_field
     def postgres_url(self) -> str:
         """Construct and returns a PostgreSQL connection URL.
@@ -298,6 +302,7 @@ class SecretsConfig(BaseConfig):
     """
 
     dapr_api_token: Optional[str] = Field(None, alias="DAPR_API_TOKEN")
+    password_salt: Optional[str] = Field(None, alias="PASSWORD_SALT")
 
 
 app_settings = AppConfig()
