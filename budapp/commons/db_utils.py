@@ -1,7 +1,10 @@
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import BigInteger as SqlAlchemyBigInteger
+from sqlalchemy import String as SqlAlchemyString
+from sqlalchemy import cast, func, inspect, select
+from sqlalchemy.dialects.postgresql import ARRAY as PostgresArray
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Session
 from sqlalchemy.sql import Executable
@@ -158,6 +161,26 @@ class SQLAlchemyMixin(SessionMixin):
             logger.exception(f"Failed to execute statement: {e}")
             raise DatabaseException("Unable to execute statement") from e
 
+    def execute_scalar(self, stmt: Executable) -> object:
+        """Execute a SQL statement and return a single result or None.
+
+        This method executes the given SQL statement and returns the result.
+
+        Args:
+            stmt (Executable): The SQLAlchemy statement to be executed.
+
+        Returns:
+            Any: The result of the executed statement.
+
+        Raises:
+            DatabaseException: If there's an error during the database operation.
+        """
+        try:
+            return self.session.scalar(stmt)
+        except (Exception, SQLAlchemyError) as e:
+            logger.exception(f"Failed to execute scalar statement: {e}")
+            raise DatabaseException("Unable to execute scalar statement") from e
+
 
 class DataManagerUtils(SQLAlchemyMixin):
     """Utility class for data management operations."""
@@ -177,6 +200,68 @@ class DataManagerUtils(SQLAlchemyMixin):
             if not hasattr(model, field):
                 logger.error(f"Invalid field: '{field}' not found in {model.__name__} model")
                 raise DatabaseException(f"Invalid field: '{field}' not found in {model.__name__} model")
+
+    @staticmethod
+    async def generate_search_stmt(model: Type[DeclarativeBase], fields: Dict[str, Any]) -> List[Executable]:
+        """Generate search conditions for a SQLAlchemy model based on the provided fields.
+
+        Args:
+            model (Type[DeclarativeBase]): The SQLAlchemy model class to generate search conditions for.
+            fields (Dict): A dictionary of field names and their values to search by.
+
+        Returns:
+            List[Executable]: A list of SQLAlchemy search conditions.
+        """
+        # Inspect model columns
+        model_columns = inspect(model).columns
+
+        # Initialize list to store search conditions
+        search_conditions = []
+
+        # Iterate over search fields and generate conditions
+        for field, value in fields.items():
+            column = getattr(model, field)
+
+            # Check if column type is string like
+            if type(model_columns[field].type) is SqlAlchemyString:
+                search_conditions.append(func.lower(column).like(f"%{value.lower()}%"))
+            elif type(model_columns[field].type) is PostgresArray:
+                search_conditions.append(column.contains(value))
+            elif type(model_columns[field].type) is SqlAlchemyBigInteger:
+                search_conditions.append(cast(column, SqlAlchemyString).like(f"%{value}%"))
+            else:
+                search_conditions.append(column == value)
+
+        return search_conditions
+
+    @staticmethod
+    async def generate_sorting_stmt(
+        model: Type[DeclarativeBase], sort_details: List[Tuple[str, str]]
+    ) -> List[Executable]:
+        """Generate sorting conditions for a SQLAlchemy model based on the provided sort details.
+
+        Args:
+            model (Type[DeclarativeBase]): The SQLAlchemy model class to generate sorting conditions for.
+            sort_details (List[Tuple[str, str]]): A list of tuples, where each tuple contains a field name and a direction ('asc' or 'desc').
+
+        Returns:
+            List[Executable]: A list of SQLAlchemy sorting conditions.
+        """
+        sort_conditions = []
+
+        for field, direction in sort_details:
+            # Check if column exists, if not, skip
+            try:
+                column = getattr(model, field)
+            except AttributeError:
+                continue
+
+            if direction == "asc":
+                sort_conditions.append(getattr(model, field))
+            else:
+                sort_conditions.append(getattr(model, field).desc())
+
+        return sort_conditions
 
     async def insert_one(self, model: object) -> object:
         """Insert a single model instance into the database.
