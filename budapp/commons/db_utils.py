@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -69,6 +69,30 @@ class SQLAlchemyMixin(SessionMixin):
             logger.exception(f"Failed to add one model to database: {e}")
             raise DatabaseException("Unable to add model to database") from e
 
+    def add_all(self, models: List[object]) -> List[object]:
+        """Add a list of model instances to the database.
+
+        This method adds the given model to the session, commits the transaction,
+        and refreshes the model to ensure it reflects the current state in the database.
+
+        Args:
+            models (List[Any]): The SQLAlchemy model instances to be added to the database.
+
+        Returns:
+            Any: The added and refreshed model instance.
+
+        Raises:
+            DatabaseException: If there's an error during the database operation.
+        """
+        try:
+            self.session.add_all(models)
+            self.session.commit()
+            return models
+        except (Exception, SQLAlchemyError) as e:
+            self.session.rollback()
+            logger.exception(f"Failed to add all models to database: {e}")
+            raise DatabaseException("Unable to add models to database") from e
+
     def scalar_one_or_none(self, stmt: Executable) -> object:
         """Execute a SQL statement and return a single result or None.
 
@@ -114,6 +138,26 @@ class SQLAlchemyMixin(SessionMixin):
             logger.exception(f"Failed to update one model in database: {e}")
             raise DatabaseException("Unable to update model in database") from e
 
+    def scalars_all(self, stmt: Executable) -> object:
+        """Scalars a SQL statement and return a single result or None.
+
+        This method executes the given SQL statement and returns the result.
+
+        Args:
+            stmt (Executable): The SQLAlchemy statement to be executed.
+
+        Returns:
+            Any: The result of the executed statement.
+
+        Raises:
+            DatabaseException: If there's an error during the database operation.
+        """
+        try:
+            return self.session.scalars(stmt).all()
+        except (Exception, SQLAlchemyError) as e:
+            logger.exception(f"Failed to execute statement: {e}")
+            raise DatabaseException("Unable to execute statement") from e
+
 
 class DataManagerUtils(SQLAlchemyMixin):
     """Utility class for data management operations."""
@@ -151,6 +195,20 @@ class DataManagerUtils(SQLAlchemyMixin):
             Any exceptions that may be raised by the underlying `add_one` method.
         """
         return self.add_one(model)
+
+    async def insert_all(self, models: List[object]) -> List[object]:
+        """Insert a list of model instances into the database.
+
+        This method is an alias for the `add_all` method, providing a more
+        intuitive name for the insertion operation.
+
+        Args:
+            models (List[object]): The list of model instances to be inserted into the database.
+
+        Returns:
+            List[object]: The list of inserted model instances.
+        """
+        return self.add_all(models)
 
     async def retrieve_by_fields(
         self, model: Type[DeclarativeBase], fields: Dict[str, Any], missing_ok: bool = False
