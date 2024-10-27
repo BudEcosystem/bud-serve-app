@@ -23,6 +23,7 @@ from typing import Any, AsyncIterator
 from fastapi import APIRouter, FastAPI
 from fastapi.openapi.utils import get_openapi
 
+from .auth import auth_routes
 from .commons import logging
 from .commons.config import app_settings
 from .commons.constants import Environment
@@ -98,6 +99,7 @@ app = FastAPI(
 
 internal_router = APIRouter()
 internal_router.include_router(meta_routes.meta_router)
+internal_router.include_router(auth_routes.auth_router)
 
 app.include_router(internal_router)
 

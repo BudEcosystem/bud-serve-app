@@ -15,3 +15,28 @@
 #  -----------------------------------------------------------------------------
 
 """Contains dependency injection functions and utilities for the microservices, enabling modular and reusable components across the application."""
+
+from collections.abc import AsyncGenerator
+
+from sqlalchemy.orm import Session
+
+from budapp.commons.database import SessionLocal
+
+
+async def get_session() -> AsyncGenerator[Session, None]:
+    """Create and yield an Session for database operations.
+
+    This function is a dependency that provides an Session for use in FastAPI
+    route handlers. It ensures that the session is properly closed after use.
+
+    Yields:
+        Session: An asynchronous SQLAlchemy session.
+
+    Raises:
+        SQLAlchemyError: If there's an error creating or using the session.
+    """
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
