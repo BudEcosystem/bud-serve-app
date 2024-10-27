@@ -1,3 +1,5 @@
+from typing import Union
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
@@ -34,7 +36,9 @@ auth_router = APIRouter(prefix="/auth", tags=["auth"])
     },
     description="Login a user with email and password",
 )
-async def login_user(user: UserLogin, session: Annotated[Session, Depends(get_session)]) -> UserLoginResponse:
+async def login_user(
+    user: UserLogin, session: Annotated[Session, Depends(get_session)]
+) -> Union[UserLoginResponse, ErrorResponse]:
     """Login a user with email and password."""
     try:
         auth_token = await AuthService(session).login_user(user)
@@ -45,10 +49,12 @@ async def login_user(user: UserLogin, session: Annotated[Session, Depends(get_se
             first_login=auth_token.first_login,
             is_reset_password=auth_token.is_reset_password,
             object="auth_token",
-        )
+        ).to_http_response()
     except ClientException as e:
         logger.error(f"ClientException: {e}")
-        return ErrorResponse(status_code=status.HTTP_400_BAD_REQUEST, message=e.message)
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Exception: {e}")
-        return ErrorResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Something went wrong")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Something went wrong"
+        ).to_http_response()
