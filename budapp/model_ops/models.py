@@ -6,7 +6,12 @@ from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, String, 
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from budapp.commons.constants import ModalityEnum, ModelProviderTypeEnum, ModelTypeEnum
+from budapp.commons.constants import (
+    CredentialTypeEnum,
+    ModalityEnum,
+    ModelProviderTypeEnum,
+    ModelTypeEnum,
+)
 from budapp.commons.database import Base
 
 
@@ -62,3 +67,22 @@ class Model(Base):
     # benchmarks: Mapped[list["Benchmark"]] = relationship(back_populates="model")
 
     created_user: Mapped["User"] = relationship(back_populates="created_models", foreign_keys=[created_by])
+
+
+class Provider(Base):
+    """Model for a AI model provider."""
+
+    __tablename__ = "provider"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    type: Mapped[str] = mapped_column(
+        Enum(
+            CredentialTypeEnum,
+            name="credential_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+    )
+    description: Mapped[str] = mapped_column(String, nullable=True)
+    icon: Mapped[Optional[str]] = mapped_column(String, nullable=False)
