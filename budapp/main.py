@@ -29,6 +29,7 @@ from .commons.config import app_settings
 from .commons.constants import Environment
 from .core import meta_routes
 from .initializers.seeder import seeders
+from .model_ops import model_routes
 
 
 logger = logging.get_logger(__name__)
@@ -100,6 +101,7 @@ app = FastAPI(
 internal_router = APIRouter()
 internal_router.include_router(meta_routes.meta_router)
 internal_router.include_router(auth_routes.auth_router)
+internal_router.include_router(model_routes.model_router)
 
 app.include_router(internal_router)
 
