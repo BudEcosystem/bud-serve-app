@@ -1,151 +1,59 @@
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
-from uuid import UUID, uuid4
+from fastapi import HTTPException, status
 
-from jose import jwt
-
-from budapp.auth.schemas import AccessTokenData, AuthToken
 from budapp.commons import logging
-from budapp.commons.config import app_settings, secrets_settings
-from budapp.commons.constants import JWT_ALGORITHM, TokenTypeEnum
+from budapp.commons.config import secrets_settings
+from budapp.commons.constants import UserStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.security import HashManager
+from budapp.user_ops.crud import UserDataManager
+from budapp.user_ops.models import User as UserModel
 
-from .crud import TokenDataManager
-from .models import Token as TokenModel
-from .schemas import RefreshTokenData, TokenCreate
+from .schemas import UserLogin, UserLoginData
+from .token import TokenService
 
 
 logger = logging.get_logger(__name__)
 
 
-class TokenService(SessionMixin):
-    async def create_auth_token(self, auth_id: str) -> AuthToken:
-        """Create an authentication token for a given auth ID.
-
-        This method generates both an access token and a refresh token
-        for the provided auth ID and returns them wrapped in an AuthToken object.
-
-        Args:
-            auth_id (str): The unique identifier for the authentication entity.
-
-        Returns:
-            AuthToken: An object containing the access token, refresh token,
-                and token type.
-
-        Raises:
-            ValueError: If the auth_id is empty or invalid.
-            TokenCreationError: If there's an error during token creation.
-        """
-        # Create and return the Token instance
-        auth_token = AuthToken(
-            access_token=await self._create_access_token(auth_id),
-            refresh_token=await self._create_refresh_token(auth_id),
-            token_type="Bearer",
+class AuthService(SessionMixin):
+    async def login_user(self, user: UserLogin) -> UserLoginData:
+        """Login a user with email and password."""
+        # Get user
+        db_user = await UserDataManager(self.session).retrieve_by_fields(
+            UserModel, {"email": user.email}, missing_ok=True
         )
 
-        return auth_token
+        # Check if user exists
+        if not db_user:
+            logger.debug(f"User not found in database: {user.email}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This email is not registered",
+            )
 
-    async def _create_access_token(self, auth_id: str) -> str:
-        """Create an access token for the given auth ID.
+        # Check if password is correct
+        salted_password = user.password + secrets_settings.password_salt
+        if not await HashManager().verify_hash(salted_password, db_user.password):
+            logger.debug(f"Password incorrect for {user.email}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Incorrect email or password",
+            )
 
-        This method generates an access token using the provided auth ID. The token
-        includes the auth ID as the subject and has an expiration time set according
-        to the application settings.
+        if db_user.status == UserStatusEnum.INACTIVE:
+            logger.debug(f"User account is not active: {user.email}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User account is not active",
+            )
 
-        Args:
-            auth_id (str): The unique identifier for the authentication entity.
+        logger.debug(f"User Retrieved: {user.email}")
 
-        Returns:
-            str: A JWT access token as a string.
+        # Create auth token
+        token = await TokenService(self.session).create_auth_token(str(db_user.auth_id))
 
-        Raises:
-            ValueError: If the auth_id is empty or invalid.
-            JWTError: If there's an error during JWT token creation.
-        """
-        access_token_data = AccessTokenData(sub=auth_id)
-
-        # Generate access token
-        access_token = await self._create_jwt_token(
-            access_token_data.model_dump(),
-            expires_delta=timedelta(minutes=app_settings.access_token_expire_minutes),
+        return UserLoginData(
+            token=token,
+            first_login=db_user.first_login,
+            is_reset_password=db_user.is_reset_password,
         )
-        logger.debug("Access token generated")
-
-        return access_token
-
-    async def _create_refresh_token(self, auth_id: str) -> str:
-        """Create a refresh token for the given auth ID and stores its information in the database.
-
-        This method generates a refresh token using the provided auth ID and a dynamically
-        generated secret key. The token is then stored in the database along with its hash
-        and other relevant information.
-
-        Args:
-            auth_id (str): The unique identifier for the authentication entity.
-
-        Returns:
-            str: A JWT refresh token as a string.
-
-        Raises:
-            ValueError: If the auth_id is empty or invalid.
-            JWTError: If there's an error during JWT token creation.
-            DatabaseError: If there's an error storing the token information in the database.
-        """
-        # Generate a dynamic secret key for the refresh token
-        dynamic_secret_key = uuid4().hex
-        refresh_token_data = RefreshTokenData(sub=auth_id, secret_key=dynamic_secret_key)
-
-        refresh_token = await self._create_jwt_token(
-            refresh_token_data.model_dump(),
-            expires_delta=timedelta(minutes=app_settings.refresh_token_expire_minutes),
-        )
-        logger.debug("Refresh token generated")
-
-        # Store refresh token info in the database
-        token_data = TokenCreate(
-            auth_id=UUID(auth_id),
-            secret_key=await HashManager().get_hash(refresh_token_data.secret_key),
-            token_hash=await HashManager().create_sha_256_hash(refresh_token),
-            type=TokenTypeEnum.REFRESH.value,
-        )
-
-        token_model = TokenModel(**token_data.model_dump())
-
-        _ = await TokenDataManager(self.session).insert_one(token_model)
-        logger.debug("Refresh token info stored in the database")
-
-        return refresh_token
-
-    async def _create_jwt_token(self, data: Dict[str, Any], expires_delta: timedelta | None = None) -> str:
-        """Create a JWT token with the given data and expiration time.
-
-        This method generates a JWT token using the provided data and expiration time.
-        If no expiration time is provided, it defaults to 15 minutes from the current time.
-
-        Args:
-            data (Dict[str, Any]): A dictionary containing the data to be encoded in the token.
-            expires_delta (timedelta | None, optional): The time delta for token expiration.
-                If None, defaults to 15 minutes. Defaults to None.
-
-        Returns:
-            str: A JWT token as a string.
-
-        Raises:
-            JWTError: If there's an error during JWT token creation.
-        """
-        # Make a copy of the data to encode
-        to_encode = data.copy()
-
-        # Default token expiration time if expires_delta is not provided
-        if expires_delta:
-            expire = datetime.now(timezone.utc) + expires_delta
-        else:
-            expire = datetime.now(timezone.utc) + timedelta(minutes=15)
-
-        to_encode.update({"exp": expire})
-
-        # Encode and return the token
-        encoded_jwt = jwt.encode(to_encode, secrets_settings.jwt_secret_key, algorithm=JWT_ALGORITHM)
-
-        return encoded_jwt
