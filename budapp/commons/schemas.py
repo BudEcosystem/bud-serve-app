@@ -16,6 +16,7 @@
 
 """Contains Pydantic schemas used for data validation and serialization within the microservices."""
 
+import math
 import re
 from http import HTTPStatus
 from typing import Any, ClassVar, Dict, Optional, Set, Tuple, Type, Union
@@ -26,6 +27,7 @@ from pydantic import (
     ConfigDict,
     Field,
     StringConstraints,
+    computed_field,
     create_model,
     model_validator,
 )
@@ -225,7 +227,7 @@ class ResponseBase(BaseModel):
             JSONResponse: The serialized JSON response with the appropriate status code.
         """
         if getattr(self, "object", "") == "error":
-            details = self.model_dump()
+            details = self.model_dump(mode="json")
             status_code = details["code"]
         else:
             details = self.model_dump(
@@ -234,6 +236,7 @@ class ResponseBase(BaseModel):
                 exclude_unset=exclude_unset,
                 exclude_defaults=exclude_defaults,
                 exclude_none=exclude_none,
+                mode="json",
             )
             status_code = self.code
 
@@ -280,10 +283,28 @@ class PaginatedSuccessResponse(SuccessResponse):
     Attributes:
         page (int): The current page number.
         limit (int): The number of items per page.
+        total_record (int): The total number of records.
     """
 
     page: int
     limit: int
+    total_record: int = 0
+
+    @computed_field
+    @property
+    def total_pages(self) -> int:
+        """Calculate the total number of pages based on the total number of records and the limit.
+
+        Args:
+            self (PaginatedSuccessResponse): The paginated success response instance.
+
+        Returns:
+            int: The total number of pages.
+        """
+        if self.limit > 0:
+            return math.ceil(self.total_record / self.limit) or 1
+        else:
+            return 1
 
 
 class ErrorResponse(ResponseBase):
