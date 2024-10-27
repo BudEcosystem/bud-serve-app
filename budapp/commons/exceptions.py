@@ -134,3 +134,25 @@ class DatabaseException(Exception):
     def __str__(self):
         """Return a string representation of the database exception."""
         return f"DatabaseException: {self.message}"
+
+
+class ClientException(Exception):
+    """A custom exception class for client-related errors.
+
+    This exception can be raised when client requests fail or encounter issues.
+
+    Attributes:
+        message (str): A human-readable string describing the database error.
+
+    Args:
+        message (str): The error message describing the database issue.
+    """
+
+    def __init__(self, message: str):
+        """Initialize the ClientException with a message."""
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        """Return a string representation of the database exception."""
+        return f"ClientException: {self.message}"
