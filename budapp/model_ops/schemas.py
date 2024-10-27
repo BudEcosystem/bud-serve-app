@@ -16,3 +16,34 @@
 
 
 """Contains core Pydantic schemas used for data validation and serialization within the model ops services."""
+
+from pydantic import UUID4, BaseModel, ConfigDict
+
+from budapp.commons.constants import CredentialTypeEnum
+from budapp.commons.schemas import PaginatedSuccessResponse
+
+
+class ProviderFilter(BaseModel):
+    """Provider filter schema."""
+
+    name: str | None = None
+
+
+class Provider(BaseModel):
+    """Provider schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    description: str
+    type: CredentialTypeEnum
+    icon: str
+
+
+class ProviderResponse(PaginatedSuccessResponse):
+    """Provider response schema."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    providers: list[Provider] = []
