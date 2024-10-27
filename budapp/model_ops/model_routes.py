@@ -16,6 +16,7 @@ from budapp.user_ops.schemas import User
 from .schemas import ProviderFilter, ProviderResponse
 from .services import ProviderService
 
+
 logger = logging.get_logger(__name__)
 
 model_router = APIRouter(prefix="/models", tags=["model"])
