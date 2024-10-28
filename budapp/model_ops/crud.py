@@ -4,6 +4,7 @@ from sqlalchemy import and_, func, or_, select
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
+from budapp.model_ops.models import Model
 from budapp.model_ops.models import Provider as ProviderModel
 
 
@@ -52,3 +53,12 @@ class ProviderDataManager(DataManagerUtils):
         result = self.scalars_all(stmt)
 
         return result, count
+
+
+class ModelDataManager(DataManagerUtils):
+    """Data manager for the Model model."""
+
+    async def get_all_models_by_source_uris(self, provider: str, uris: List[str]) -> List[Model]:
+        """Get all models from the database."""
+        stmt = select(Model).filter(Model.uri.in_(uris), Model.source == provider)
+        return self.scalars_all(stmt)
