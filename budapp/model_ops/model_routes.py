@@ -20,6 +20,7 @@ from .schemas import (
     CloudModelResponse,
     ProviderFilter,
     ProviderResponse,
+    RecommendedTagsResponse,
 )
 from .services import CloudModelService, ModelService, ProviderService
 
@@ -194,5 +195,51 @@ async def list_cloud_models(
         page=page,
         limit=limit,
         object="cloud_models.list",
+        code=status.HTTP_200_OK,
+    ).to_http_response()
+
+
+@model_router.get(
+    "/cloud-models/recommended-tags",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RecommendedTagsResponse,
+            "description": "Successfully list all recommended tags",
+        },
+    },
+    description="List all cloud model recommended tags",
+)
+async def list_cloud_model_recommended_tags(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+) -> Union[RecommendedTagsResponse, ErrorResponse]:
+    """List all most used tags."""
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    try:
+        db_tags, count = await CloudModelService(session).get_all_recommended_tags(offset, limit)
+    except Exception as e:
+        logger.exception(f"Failed to get all recommended tags: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all recommended tags"
+        ).to_http_response()
+
+    return RecommendedTagsResponse(
+        tags=db_tags,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="recommended_tags.list",
         code=status.HTTP_200_OK,
     ).to_http_response()

@@ -18,6 +18,7 @@
 """Contains core Pydantic schemas used for data validation and serialization within the model ops services."""
 
 import re
+from typing import List, Tuple
 
 from pydantic import (
     UUID4,
@@ -191,3 +192,29 @@ class CloudModelResponse(PaginatedSuccessResponse):
     model_config = ConfigDict(extra="ignore")
 
     cloud_models: list[CloudModel] = []
+
+
+class TagWithCount(BaseModel):
+    """Tag with count schema."""
+
+    name: str
+    color: str = Field(..., pattern="^#[0-9A-Fa-f]{6}$")
+    count: int
+
+    @field_validator("color")
+    def validate_hex_color(cls, v: str) -> str:
+        """Validate that color is a valid hex color code."""
+        if not re.match(r"^#[0-9A-Fa-f]{6}$", v):
+            raise ValueError("Color must be a valid hex color code (e.g., #FF0000)")
+        return v.upper()  # Normalize to uppercase
+
+
+class RecommendedTagsResponse(PaginatedSuccessResponse):
+    """Recommended tags response schema."""
+
+    tags: List[TagWithCount] = []
+
+    @field_validator("tags", mode="before")
+    def validate_tags(cls, v: List[Tuple[str, str, int]]) -> List[TagWithCount]:
+        """Convert tuples to TagWithCount objects."""
+        return [TagWithCount(name=tag[0], color=tag[1], count=tag[2]) for tag in v]

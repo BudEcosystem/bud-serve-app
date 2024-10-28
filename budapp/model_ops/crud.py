@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Tuple
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 
 from budapp.commons import logging
@@ -119,5 +119,51 @@ class CloudModelDataManager(DataManagerUtils):
             stmt = stmt.order_by(*sort_conditions)
 
         result = self.scalars_all(stmt)
+
+        return result, count
+
+    async def get_all_recommended_tags(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+    ) -> Tuple[List[CloudModel], int]:
+        """Get all recommended tags from the database."""
+        stmt = (
+            (
+                select(
+                    func.jsonb_array_elements(CloudModel.tags).op("->>")("name").label("name"),
+                    func.jsonb_array_elements(CloudModel.tags).op("->>")("color").label("color"),
+                    func.count().label("count"),
+                )
+                .select_from(CloudModel)
+                .where(CloudModel.tags.is_not(None))
+                .group_by(
+                    func.jsonb_array_elements(CloudModel.tags).op("->>")("name"),
+                    func.jsonb_array_elements(CloudModel.tags).op("->>")("color"),
+                )
+            )
+            .union_all(
+                select(
+                    func.jsonb_array_elements(CloudModel.tasks).op("->>")("name").label("name"),
+                    func.jsonb_array_elements(CloudModel.tasks).op("->>")("color").label("color"),
+                    func.count().label("count"),
+                )
+                .select_from(CloudModel)
+                .where(CloudModel.tasks.is_not(None))
+                .group_by(
+                    func.jsonb_array_elements(CloudModel.tasks).op("->>")("name"),
+                    func.jsonb_array_elements(CloudModel.tasks).op("->>")("color"),
+                )
+            )
+            .order_by(desc("count"), "name")
+            .offset(offset)
+            .limit(limit)
+        )
+
+        count_stmt = select(func.count()).select_from(stmt)
+
+        count = self.execute_scalar(count_stmt)
+
+        result = self.execute_all(stmt)
 
         return result, count

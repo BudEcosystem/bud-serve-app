@@ -235,3 +235,11 @@ class CloudModelService(SessionMixin):
     ) -> Tuple[List[CloudModel], int]:
         """Get all cloud models."""
         return await CloudModelDataManager(self.session).get_all_cloud_models(offset, limit, filters, order_by, search)
+
+    async def get_all_recommended_tags(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+    ) -> Tuple[List[CloudModel], int]:
+        """Get all cloud models."""
+        return await CloudModelDataManager(self.session).get_all_recommended_tags(offset, limit)

@@ -161,6 +161,26 @@ class SQLAlchemyMixin(SessionMixin):
             logger.exception(f"Failed to execute statement: {e}")
             raise DatabaseException("Unable to execute statement") from e
 
+    def execute_all(self, stmt: Executable) -> object:
+        """Execute a SQL statement and return a single result or None.
+
+        This method executes the given SQL statement and returns the result.
+
+        Args:
+            stmt (Executable): The SQLAlchemy statement to be executed.
+
+        Returns:
+            Any: The result of the executed statement.
+
+        Raises:
+            DatabaseException: If there's an error during the database operation.
+        """
+        try:
+            return self.session.execute(stmt).all()
+        except (Exception, SQLAlchemyError) as e:
+            logger.exception(f"Failed to execute statement: {e}")
+            raise DatabaseException("Unable to execute statement") from e
+
     def execute_scalar(self, stmt: Executable) -> object:
         """Execute a SQL statement and return a single result or None.
 
