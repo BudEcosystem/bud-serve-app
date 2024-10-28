@@ -413,3 +413,11 @@ class TokenTypeEnum(Enum):
 
 # Algorithm used for signing tokens
 JWT_ALGORITHM = "HS256"
+
+
+class WorkflowStatusEnum(StrEnum):
+    """Enumeration of workflow statuses."""
+
+    IN_PROGRESS = auto()
+    COMPLETED = auto()
+    FAILED = auto()
