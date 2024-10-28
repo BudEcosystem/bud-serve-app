@@ -4,15 +4,13 @@
             {
                 "name": "gpt-4",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4",
-                "icon": "dummy_icon2.png"
+                "icon": "dummy_icon.png"
             },
             {
                 "name": "gpt-4o",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4o",
                 "icon": "dummy_icon.png"
@@ -20,7 +18,6 @@
             {
                 "name": "gpt-4o-audio-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4o-audio-preview",
                 "icon": "dummy_icon.png"
@@ -28,7 +25,6 @@
             {
                 "name": "gpt-4o-audio-preview-2024-10-01",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4o-audio-preview-2024-10-01",
                 "icon": "dummy_icon.png"
@@ -36,7 +32,6 @@
             {
                 "name": "gpt-4o-mini",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4o-mini",
                 "icon": "dummy_icon.png"
@@ -44,7 +39,6 @@
             {
                 "name": "gpt-4o-mini-2024-07-18",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4o-mini-2024-07-18",
                 "icon": "dummy_icon.png"
@@ -52,7 +46,6 @@
             {
                 "name": "o1-mini",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "o1-mini",
                 "icon": "dummy_icon.png"
@@ -60,7 +53,6 @@
             {
                 "name": "o1-mini-2024-09-12",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "o1-mini-2024-09-12",
                 "icon": "dummy_icon.png"
@@ -68,7 +60,6 @@
             {
                 "name": "o1-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "o1-preview",
                 "icon": "dummy_icon.png"
@@ -76,7 +67,6 @@
             {
                 "name": "o1-preview-2024-09-12",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "o1-preview-2024-09-12",
                 "icon": "dummy_icon.png"
@@ -84,7 +74,6 @@
             {
                 "name": "chatgpt-4o-latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "chatgpt-4o-latest",
                 "icon": "dummy_icon.png"
@@ -92,7 +81,6 @@
             {
                 "name": "gpt-4o-2024-05-13",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4o-2024-05-13",
                 "icon": "dummy_icon.png"
@@ -100,7 +88,6 @@
             {
                 "name": "gpt-4o-2024-08-06",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4o-2024-08-06",
                 "icon": "dummy_icon.png"
@@ -108,7 +95,6 @@
             {
                 "name": "gpt-4-turbo-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4-turbo-preview",
                 "icon": "dummy_icon.png"
@@ -116,7 +102,6 @@
             {
                 "name": "gpt-4-0314",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4-0314",
                 "icon": "dummy_icon.png"
@@ -124,7 +109,6 @@
             {
                 "name": "gpt-4-0613",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4-0613",
                 "icon": "dummy_icon.png"
@@ -132,7 +116,6 @@
             {
                 "name": "gpt-4-32k",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4-32k",
                 "icon": "dummy_icon.png"
@@ -140,7 +123,6 @@
             {
                 "name": "gpt-4-32k-0314",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4-32k-0314",
                 "icon": "dummy_icon.png"
@@ -148,7 +130,6 @@
             {
                 "name": "gpt-4-32k-0613",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4-32k-0613",
                 "icon": "dummy_icon.png"
@@ -156,7 +137,6 @@
             {
                 "name": "gpt-4-turbo",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4-turbo",
                 "icon": "dummy_icon.png"
@@ -164,7 +144,6 @@
             {
                 "name": "gpt-4-turbo-2024-04-09",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4-turbo-2024-04-09",
                 "icon": "dummy_icon.png"
@@ -172,7 +151,6 @@
             {
                 "name": "gpt-4-1106-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4-1106-preview",
                 "icon": "dummy_icon.png"
@@ -180,7 +158,6 @@
             {
                 "name": "gpt-4-0125-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4-0125-preview",
                 "icon": "dummy_icon.png"
@@ -188,7 +165,6 @@
             {
                 "name": "gpt-4-vision-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4-vision-preview",
                 "icon": "dummy_icon.png"
@@ -196,7 +172,6 @@
             {
                 "name": "gpt-4-1106-vision-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-4-1106-vision-preview",
                 "icon": "dummy_icon.png"
@@ -204,7 +179,6 @@
             {
                 "name": "gpt-3.5-turbo",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-3.5-turbo",
                 "icon": "dummy_icon.png"
@@ -212,7 +186,6 @@
             {
                 "name": "gpt-3.5-turbo-0301",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-3.5-turbo-0301",
                 "icon": "dummy_icon.png"
@@ -220,7 +193,6 @@
             {
                 "name": "gpt-3.5-turbo-0613",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-3.5-turbo-0613",
                 "icon": "dummy_icon.png"
@@ -228,7 +200,6 @@
             {
                 "name": "gpt-3.5-turbo-1106",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-3.5-turbo-1106",
                 "icon": "dummy_icon.png"
@@ -236,7 +207,6 @@
             {
                 "name": "gpt-3.5-turbo-0125",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-3.5-turbo-0125",
                 "icon": "dummy_icon.png"
@@ -244,7 +214,6 @@
             {
                 "name": "gpt-3.5-turbo-16k",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-3.5-turbo-16k",
                 "icon": "dummy_icon.png"
@@ -252,7 +221,6 @@
             {
                 "name": "gpt-3.5-turbo-16k-0613",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "gpt-3.5-turbo-16k-0613",
                 "icon": "dummy_icon.png"
@@ -260,7 +228,6 @@
             {
                 "name": "ft:gpt-3.5-turbo",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "ft:gpt-3.5-turbo",
                 "icon": "dummy_icon.png"
@@ -268,7 +235,6 @@
             {
                 "name": "ft:gpt-3.5-turbo-0125",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "ft:gpt-3.5-turbo-0125",
                 "icon": "dummy_icon.png"
@@ -276,7 +242,6 @@
             {
                 "name": "ft:gpt-3.5-turbo-1106",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "ft:gpt-3.5-turbo-1106",
                 "icon": "dummy_icon.png"
@@ -284,7 +249,6 @@
             {
                 "name": "ft:gpt-3.5-turbo-0613",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "ft:gpt-3.5-turbo-0613",
                 "icon": "dummy_icon.png"
@@ -292,7 +256,6 @@
             {
                 "name": "ft:gpt-4-0613",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "ft:gpt-4-0613",
                 "icon": "dummy_icon.png"
@@ -300,7 +263,6 @@
             {
                 "name": "ft:gpt-4o-2024-08-06",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "ft:gpt-4o-2024-08-06",
                 "icon": "dummy_icon.png"
@@ -308,7 +270,6 @@
             {
                 "name": "ft:gpt-4o-mini-2024-07-18",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "ft:gpt-4o-mini-2024-07-18",
                 "icon": "dummy_icon.png"
@@ -316,7 +277,6 @@
             {
                 "name": "text-embedding-3-large",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "text-embedding-3-large",
                 "icon": "dummy_icon.png"
@@ -324,7 +284,6 @@
             {
                 "name": "text-embedding-3-small",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "text-embedding-3-small",
                 "icon": "dummy_icon.png"
@@ -332,7 +291,6 @@
             {
                 "name": "text-embedding-ada-002",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "text-embedding-ada-002",
                 "icon": "dummy_icon.png"
@@ -340,7 +298,6 @@
             {
                 "name": "text-embedding-ada-002-v2",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "text-embedding-ada-002-v2",
                 "icon": "dummy_icon.png"
@@ -348,7 +305,6 @@
             {
                 "name": "256-x-256/dall-e-2",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "256-x-256/dall-e-2",
                 "icon": "dummy_icon.png"
@@ -356,7 +312,6 @@
             {
                 "name": "512-x-512/dall-e-2",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "512-x-512/dall-e-2",
                 "icon": "dummy_icon.png"
@@ -364,7 +319,6 @@
             {
                 "name": "1024-x-1024/dall-e-2",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "1024-x-1024/dall-e-2",
                 "icon": "dummy_icon.png"
@@ -372,7 +326,6 @@
             {
                 "name": "hd/1024-x-1792/dall-e-3",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "hd/1024-x-1792/dall-e-3",
                 "icon": "dummy_icon.png"
@@ -380,7 +333,6 @@
             {
                 "name": "hd/1792-x-1024/dall-e-3",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "hd/1792-x-1024/dall-e-3",
                 "icon": "dummy_icon.png"
@@ -388,7 +340,6 @@
             {
                 "name": "hd/1024-x-1024/dall-e-3",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "hd/1024-x-1024/dall-e-3",
                 "icon": "dummy_icon.png"
@@ -396,7 +347,6 @@
             {
                 "name": "standard/1024-x-1792/dall-e-3",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "standard/1024-x-1792/dall-e-3",
                 "icon": "dummy_icon.png"
@@ -404,7 +354,6 @@
             {
                 "name": "standard/1792-x-1024/dall-e-3",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "standard/1792-x-1024/dall-e-3",
                 "icon": "dummy_icon.png"
@@ -412,7 +361,6 @@
             {
                 "name": "standard/1024-x-1024/dall-e-3",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "standard/1024-x-1024/dall-e-3",
                 "icon": "dummy_icon.png"
@@ -420,7 +368,6 @@
             {
                 "name": "whisper-1",
                 "modality": "speech_to_text",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "whisper-1",
                 "icon": "dummy_icon.png"
@@ -428,7 +375,6 @@
             {
                 "name": "tts-1",
                 "modality": "text_to_speech",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "tts-1",
                 "icon": "dummy_icon.png"
@@ -436,7 +382,6 @@
             {
                 "name": "tts-1-hd",
                 "modality": "text_to_speech",
-                "type": "pretrained",
                 "source": "openai",
                 "uri": "tts-1-hd",
                 "icon": "dummy_icon.png"
@@ -448,7 +393,6 @@
             {
                 "name": "ft:davinci-002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "text-completion-openai",
                 "uri": "ft:davinci-002",
                 "icon": "dummy_icon.png"
@@ -456,7 +400,6 @@
             {
                 "name": "ft:babbage-002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "text-completion-openai",
                 "uri": "ft:babbage-002",
                 "icon": "dummy_icon.png"
@@ -464,7 +407,6 @@
             {
                 "name": "azure/gpt-3.5-turbo-instruct-0914",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "text-completion-openai",
                 "uri": "azure/gpt-3.5-turbo-instruct-0914",
                 "icon": "dummy_icon.png"
@@ -472,7 +414,6 @@
             {
                 "name": "azure/gpt-35-turbo-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "text-completion-openai",
                 "uri": "azure/gpt-35-turbo-instruct",
                 "icon": "dummy_icon.png"
@@ -480,7 +421,6 @@
             {
                 "name": "azure/gpt-35-turbo-instruct-0914",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "text-completion-openai",
                 "uri": "azure/gpt-35-turbo-instruct-0914",
                 "icon": "dummy_icon.png"
@@ -488,7 +428,6 @@
             {
                 "name": "babbage-002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "text-completion-openai",
                 "uri": "babbage-002",
                 "icon": "dummy_icon.png"
@@ -496,7 +435,6 @@
             {
                 "name": "davinci-002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "text-completion-openai",
                 "uri": "davinci-002",
                 "icon": "dummy_icon.png"
@@ -504,7 +442,6 @@
             {
                 "name": "gpt-3.5-turbo-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "text-completion-openai",
                 "uri": "gpt-3.5-turbo-instruct",
                 "icon": "dummy_icon.png"
@@ -512,7 +449,6 @@
             {
                 "name": "gpt-3.5-turbo-instruct-0914",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "text-completion-openai",
                 "uri": "gpt-3.5-turbo-instruct-0914",
                 "icon": "dummy_icon.png"
@@ -524,7 +460,6 @@
             {
                 "name": "azure/tts-1",
                 "modality": "text_to_speech",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/tts-1",
                 "icon": "dummy_icon.png"
@@ -532,7 +467,6 @@
             {
                 "name": "azure/tts-1-hd",
                 "modality": "text_to_speech",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/tts-1-hd",
                 "icon": "dummy_icon.png"
@@ -540,7 +474,6 @@
             {
                 "name": "azure/whisper-1",
                 "modality": "speech_to_text",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/whisper-1",
                 "icon": "dummy_icon.png"
@@ -548,7 +481,6 @@
             {
                 "name": "azure/o1-mini",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/o1-mini",
                 "icon": "dummy_icon.png"
@@ -556,7 +488,6 @@
             {
                 "name": "azure/o1-mini-2024-09-12",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/o1-mini-2024-09-12",
                 "icon": "dummy_icon.png"
@@ -564,7 +495,6 @@
             {
                 "name": "azure/o1-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/o1-preview",
                 "icon": "dummy_icon.png"
@@ -572,7 +502,6 @@
             {
                 "name": "azure/o1-preview-2024-09-12",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/o1-preview-2024-09-12",
                 "icon": "dummy_icon.png"
@@ -580,7 +509,6 @@
             {
                 "name": "azure/gpt-4o",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-4o",
                 "icon": "dummy_icon.png"
@@ -588,7 +516,6 @@
             {
                 "name": "azure/gpt-4o-2024-08-06",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-4o-2024-08-06",
                 "icon": "dummy_icon.png"
@@ -596,7 +523,6 @@
             {
                 "name": "azure/gpt-4o-2024-05-13",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-4o-2024-05-13",
                 "icon": "dummy_icon.png"
@@ -604,7 +530,6 @@
             {
                 "name": "azure/global-standard/gpt-4o-2024-08-06",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/global-standard/gpt-4o-2024-08-06",
                 "icon": "dummy_icon.png"
@@ -612,7 +537,6 @@
             {
                 "name": "azure/global-standard/gpt-4o-mini",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/global-standard/gpt-4o-mini",
                 "icon": "dummy_icon.png"
@@ -620,7 +544,6 @@
             {
                 "name": "azure/gpt-4o-mini",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-4o-mini",
                 "icon": "dummy_icon.png"
@@ -628,7 +551,6 @@
             {
                 "name": "azure/gpt-4-turbo-2024-04-09",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-4-turbo-2024-04-09",
                 "icon": "dummy_icon.png"
@@ -636,7 +558,6 @@
             {
                 "name": "azure/gpt-4-0125-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-4-0125-preview",
                 "icon": "dummy_icon.png"
@@ -644,7 +565,6 @@
             {
                 "name": "azure/gpt-4-1106-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-4-1106-preview",
                 "icon": "dummy_icon.png"
@@ -652,7 +572,6 @@
             {
                 "name": "azure/gpt-4-0613",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-4-0613",
                 "icon": "dummy_icon.png"
@@ -660,7 +579,6 @@
             {
                 "name": "azure/gpt-4-32k-0613",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-4-32k-0613",
                 "icon": "dummy_icon.png"
@@ -668,7 +586,6 @@
             {
                 "name": "azure/gpt-4-32k",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-4-32k",
                 "icon": "dummy_icon.png"
@@ -676,7 +593,6 @@
             {
                 "name": "azure/gpt-4",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-4",
                 "icon": "dummy_icon.png"
@@ -684,7 +600,6 @@
             {
                 "name": "azure/gpt-4-turbo",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-4-turbo",
                 "icon": "dummy_icon.png"
@@ -692,7 +607,6 @@
             {
                 "name": "azure/gpt-4-turbo-vision-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-4-turbo-vision-preview",
                 "icon": "dummy_icon.png"
@@ -700,7 +614,6 @@
             {
                 "name": "azure/gpt-35-turbo-16k-0613",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-35-turbo-16k-0613",
                 "icon": "dummy_icon.png"
@@ -708,7 +621,6 @@
             {
                 "name": "azure/gpt-35-turbo-1106",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-35-turbo-1106",
                 "icon": "dummy_icon.png"
@@ -716,7 +628,6 @@
             {
                 "name": "azure/gpt-35-turbo-0613",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-35-turbo-0613",
                 "icon": "dummy_icon.png"
@@ -724,7 +635,6 @@
             {
                 "name": "azure/gpt-35-turbo-0301",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-35-turbo-0301",
                 "icon": "dummy_icon.png"
@@ -732,7 +642,6 @@
             {
                 "name": "azure/gpt-35-turbo-0125",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-35-turbo-0125",
                 "icon": "dummy_icon.png"
@@ -740,7 +649,6 @@
             {
                 "name": "azure/gpt-35-turbo-16k",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-35-turbo-16k",
                 "icon": "dummy_icon.png"
@@ -748,7 +656,6 @@
             {
                 "name": "azure/gpt-35-turbo",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/gpt-35-turbo",
                 "icon": "dummy_icon.png"
@@ -756,7 +663,6 @@
             {
                 "name": "azure/mistral-large-latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/mistral-large-latest",
                 "icon": "dummy_icon.png"
@@ -764,7 +670,6 @@
             {
                 "name": "azure/mistral-large-2402",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/mistral-large-2402",
                 "icon": "dummy_icon.png"
@@ -772,7 +677,6 @@
             {
                 "name": "azure/command-r-plus",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/command-r-plus",
                 "icon": "dummy_icon.png"
@@ -780,7 +684,6 @@
             {
                 "name": "azure/ada",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/ada",
                 "icon": "dummy_icon.png"
@@ -788,7 +691,6 @@
             {
                 "name": "azure/text-embedding-ada-002",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/text-embedding-ada-002",
                 "icon": "dummy_icon.png"
@@ -796,7 +698,6 @@
             {
                 "name": "azure/text-embedding-3-large",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/text-embedding-3-large",
                 "icon": "dummy_icon.png"
@@ -804,7 +705,6 @@
             {
                 "name": "azure/text-embedding-3-small",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/text-embedding-3-small",
                 "icon": "dummy_icon.png"
@@ -812,7 +712,6 @@
             {
                 "name": "azure/standard/1024-x-1024/dall-e-3",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/standard/1024-x-1024/dall-e-3",
                 "icon": "dummy_icon.png"
@@ -820,7 +719,6 @@
             {
                 "name": "azure/hd/1024-x-1024/dall-e-3",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/hd/1024-x-1024/dall-e-3",
                 "icon": "dummy_icon.png"
@@ -828,7 +726,6 @@
             {
                 "name": "azure/standard/1024-x-1792/dall-e-3",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/standard/1024-x-1792/dall-e-3",
                 "icon": "dummy_icon.png"
@@ -836,7 +733,6 @@
             {
                 "name": "azure/standard/1792-x-1024/dall-e-3",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/standard/1792-x-1024/dall-e-3",
                 "icon": "dummy_icon.png"
@@ -844,7 +740,6 @@
             {
                 "name": "azure/hd/1024-x-1792/dall-e-3",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/hd/1024-x-1792/dall-e-3",
                 "icon": "dummy_icon.png"
@@ -852,7 +747,6 @@
             {
                 "name": "azure/hd/1792-x-1024/dall-e-3",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/hd/1792-x-1024/dall-e-3",
                 "icon": "dummy_icon.png"
@@ -860,7 +754,6 @@
             {
                 "name": "azure/standard/1024-x-1024/dall-e-2",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "azure",
                 "uri": "azure/standard/1024-x-1024/dall-e-2",
                 "icon": "dummy_icon.png"
@@ -872,7 +765,6 @@
             {
                 "name": "azure_ai/jamba-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure_ai",
                 "uri": "azure_ai/jamba-instruct",
                 "icon": "dummy_icon.png"
@@ -880,7 +772,6 @@
             {
                 "name": "azure_ai/mistral-large",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure_ai",
                 "uri": "azure_ai/mistral-large",
                 "icon": "dummy_icon.png"
@@ -888,7 +779,6 @@
             {
                 "name": "azure_ai/mistral-small",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure_ai",
                 "uri": "azure_ai/mistral-small",
                 "icon": "dummy_icon.png"
@@ -896,7 +786,6 @@
             {
                 "name": "azure_ai/Meta-Llama-3-70B-Instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure_ai",
                 "uri": "azure_ai/Meta-Llama-3-70B-Instruct",
                 "icon": "dummy_icon.png"
@@ -904,7 +793,6 @@
             {
                 "name": "azure_ai/Meta-Llama-3.1-8B-Instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure_ai",
                 "uri": "azure_ai/Meta-Llama-3.1-8B-Instruct",
                 "icon": "dummy_icon.png"
@@ -912,7 +800,6 @@
             {
                 "name": "azure_ai/Meta-Llama-3.1-70B-Instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure_ai",
                 "uri": "azure_ai/Meta-Llama-3.1-70B-Instruct",
                 "icon": "dummy_icon.png"
@@ -920,7 +807,6 @@
             {
                 "name": "azure_ai/Meta-Llama-3.1-405B-Instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "azure_ai",
                 "uri": "azure_ai/Meta-Llama-3.1-405B-Instruct",
                 "icon": "dummy_icon.png"
@@ -928,7 +814,6 @@
             {
                 "name": "azure_ai/Cohere-embed-v3-english",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "azure_ai",
                 "uri": "azure_ai/Cohere-embed-v3-english",
                 "icon": "dummy_icon.png"
@@ -936,7 +821,6 @@
             {
                 "name": "azure_ai/Cohere-embed-v3-multilingual",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "azure_ai",
                 "uri": "azure_ai/Cohere-embed-v3-multilingual",
                 "icon": "dummy_icon.png"
@@ -948,7 +832,6 @@
             {
                 "name": "mistral/mistral-tiny",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/mistral-tiny",
                 "icon": "dummy_icon.png"
@@ -956,7 +839,6 @@
             {
                 "name": "mistral/mistral-small",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/mistral-small",
                 "icon": "dummy_icon.png"
@@ -964,7 +846,6 @@
             {
                 "name": "mistral/mistral-small-latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/mistral-small-latest",
                 "icon": "dummy_icon.png"
@@ -972,7 +853,6 @@
             {
                 "name": "mistral/mistral-medium",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/mistral-medium",
                 "icon": "dummy_icon.png"
@@ -980,7 +860,6 @@
             {
                 "name": "mistral/mistral-medium-latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/mistral-medium-latest",
                 "icon": "dummy_icon.png"
@@ -988,7 +867,6 @@
             {
                 "name": "mistral/mistral-medium-2312",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/mistral-medium-2312",
                 "icon": "dummy_icon.png"
@@ -996,7 +874,6 @@
             {
                 "name": "mistral/mistral-large-latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/mistral-large-latest",
                 "icon": "dummy_icon.png"
@@ -1004,7 +881,6 @@
             {
                 "name": "mistral/mistral-large-2402",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/mistral-large-2402",
                 "icon": "dummy_icon.png"
@@ -1012,7 +888,6 @@
             {
                 "name": "mistral/mistral-large-2407",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/mistral-large-2407",
                 "icon": "dummy_icon.png"
@@ -1020,7 +895,6 @@
             {
                 "name": "mistral/pixtral-12b-2409",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/pixtral-12b-2409",
                 "icon": "dummy_icon.png"
@@ -1028,7 +902,6 @@
             {
                 "name": "mistral/open-mistral-7b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/open-mistral-7b",
                 "icon": "dummy_icon.png"
@@ -1036,7 +909,6 @@
             {
                 "name": "mistral/open-mixtral-8x7b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/open-mixtral-8x7b",
                 "icon": "dummy_icon.png"
@@ -1044,7 +916,6 @@
             {
                 "name": "mistral/open-mixtral-8x22b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/open-mixtral-8x22b",
                 "icon": "dummy_icon.png"
@@ -1052,7 +923,6 @@
             {
                 "name": "mistral/codestral-latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/codestral-latest",
                 "icon": "dummy_icon.png"
@@ -1060,7 +930,6 @@
             {
                 "name": "mistral/codestral-2405",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/codestral-2405",
                 "icon": "dummy_icon.png"
@@ -1068,7 +937,6 @@
             {
                 "name": "mistral/open-mistral-nemo",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/open-mistral-nemo",
                 "icon": "dummy_icon.png"
@@ -1076,7 +944,6 @@
             {
                 "name": "mistral/open-mistral-nemo-2407",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/open-mistral-nemo-2407",
                 "icon": "dummy_icon.png"
@@ -1084,7 +951,6 @@
             {
                 "name": "mistral/open-codestral-mamba",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/open-codestral-mamba",
                 "icon": "dummy_icon.png"
@@ -1092,7 +958,6 @@
             {
                 "name": "mistral/codestral-mamba-latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/codestral-mamba-latest",
                 "icon": "dummy_icon.png"
@@ -1100,7 +965,6 @@
             {
                 "name": "mistral/mistral-embed",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "mistral",
                 "uri": "mistral/mistral-embed",
                 "icon": "dummy_icon.png"
@@ -1112,7 +976,6 @@
             {
                 "name": "deepseek-chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepseek",
                 "uri": "deepseek-chat",
                 "icon": "dummy_icon.png"
@@ -1120,7 +983,6 @@
             {
                 "name": "deepseek-coder",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepseek",
                 "uri": "deepseek-coder",
                 "icon": "dummy_icon.png"
@@ -1132,7 +994,6 @@
             {
                 "name": "codestral/codestral-latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "codestral",
                 "uri": "codestral/codestral-latest",
                 "icon": "dummy_icon.png"
@@ -1140,7 +1001,6 @@
             {
                 "name": "codestral/codestral-2405",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "codestral",
                 "uri": "codestral/codestral-2405",
                 "icon": "dummy_icon.png"
@@ -1152,7 +1012,6 @@
             {
                 "name": "text-completion-codestral/codestral-latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "text-completion-codestral",
                 "uri": "text-completion-codestral/codestral-latest",
                 "icon": "dummy_icon.png"
@@ -1160,7 +1019,6 @@
             {
                 "name": "text-completion-codestral/codestral-2405",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "text-completion-codestral",
                 "uri": "text-completion-codestral/codestral-2405",
                 "icon": "dummy_icon.png"
@@ -1172,7 +1030,6 @@
             {
                 "name": "groq/llama2-70b-4096",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "groq",
                 "uri": "groq/llama2-70b-4096",
                 "icon": "dummy_icon.png"
@@ -1180,7 +1037,6 @@
             {
                 "name": "groq/llama3-8b-8192",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "groq",
                 "uri": "groq/llama3-8b-8192",
                 "icon": "dummy_icon.png"
@@ -1188,7 +1044,6 @@
             {
                 "name": "groq/llama3-70b-8192",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "groq",
                 "uri": "groq/llama3-70b-8192",
                 "icon": "dummy_icon.png"
@@ -1196,7 +1051,6 @@
             {
                 "name": "groq/llama-3.1-8b-instant",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "groq",
                 "uri": "groq/llama-3.1-8b-instant",
                 "icon": "dummy_icon.png"
@@ -1204,7 +1058,6 @@
             {
                 "name": "groq/llama-3.1-70b-versatile",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "groq",
                 "uri": "groq/llama-3.1-70b-versatile",
                 "icon": "dummy_icon.png"
@@ -1212,7 +1065,6 @@
             {
                 "name": "groq/llama-3.1-405b-reasoning",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "groq",
                 "uri": "groq/llama-3.1-405b-reasoning",
                 "icon": "dummy_icon.png"
@@ -1220,7 +1072,6 @@
             {
                 "name": "groq/mixtral-8x7b-32768",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "groq",
                 "uri": "groq/mixtral-8x7b-32768",
                 "icon": "dummy_icon.png"
@@ -1228,7 +1079,6 @@
             {
                 "name": "groq/gemma-7b-it",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "groq",
                 "uri": "groq/gemma-7b-it",
                 "icon": "dummy_icon.png"
@@ -1236,7 +1086,6 @@
             {
                 "name": "groq/gemma2-9b-it",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "groq",
                 "uri": "groq/gemma2-9b-it",
                 "icon": "dummy_icon.png"
@@ -1244,7 +1093,6 @@
             {
                 "name": "groq/llama3-groq-70b-8192-tool-use-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "groq",
                 "uri": "groq/llama3-groq-70b-8192-tool-use-preview",
                 "icon": "dummy_icon.png"
@@ -1252,7 +1100,6 @@
             {
                 "name": "groq/llama3-groq-8b-8192-tool-use-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "groq",
                 "uri": "groq/llama3-groq-8b-8192-tool-use-preview",
                 "icon": "dummy_icon.png"
@@ -1264,7 +1111,6 @@
             {
                 "name": "cerebras/llama3.1-8b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "cerebras",
                 "uri": "cerebras/llama3.1-8b",
                 "icon": "dummy_icon.png"
@@ -1272,7 +1118,6 @@
             {
                 "name": "cerebras/llama3.1-70b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "cerebras",
                 "uri": "cerebras/llama3.1-70b",
                 "icon": "dummy_icon.png"
@@ -1284,7 +1129,6 @@
             {
                 "name": "friendliai/mixtral-8x7b-instruct-v0-1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "friendliai",
                 "uri": "friendliai/mixtral-8x7b-instruct-v0-1",
                 "icon": "dummy_icon.png"
@@ -1292,7 +1136,6 @@
             {
                 "name": "friendliai/meta-llama-3-8b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "friendliai",
                 "uri": "friendliai/meta-llama-3-8b-instruct",
                 "icon": "dummy_icon.png"
@@ -1300,7 +1143,6 @@
             {
                 "name": "friendliai/meta-llama-3-70b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "friendliai",
                 "uri": "friendliai/meta-llama-3-70b-instruct",
                 "icon": "dummy_icon.png"
@@ -1312,7 +1154,6 @@
             {
                 "name": "text-bison",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-text-models",
                 "uri": "text-bison",
                 "icon": "dummy_icon.png"
@@ -1320,7 +1161,6 @@
             {
                 "name": "text-bison@001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-text-models",
                 "uri": "text-bison@001",
                 "icon": "dummy_icon.png"
@@ -1328,7 +1168,6 @@
             {
                 "name": "text-bison@002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-text-models",
                 "uri": "text-bison@002",
                 "icon": "dummy_icon.png"
@@ -1336,7 +1175,6 @@
             {
                 "name": "text-bison32k",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-text-models",
                 "uri": "text-bison32k",
                 "icon": "dummy_icon.png"
@@ -1344,7 +1182,6 @@
             {
                 "name": "text-bison32k@002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-text-models",
                 "uri": "text-bison32k@002",
                 "icon": "dummy_icon.png"
@@ -1352,7 +1189,6 @@
             {
                 "name": "text-unicorn",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-text-models",
                 "uri": "text-unicorn",
                 "icon": "dummy_icon.png"
@@ -1360,7 +1196,6 @@
             {
                 "name": "text-unicorn@001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-text-models",
                 "uri": "text-unicorn@001",
                 "icon": "dummy_icon.png"
@@ -1372,7 +1207,6 @@
             {
                 "name": "chat-bison",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-chat-models",
                 "uri": "chat-bison",
                 "icon": "dummy_icon.png"
@@ -1380,7 +1214,6 @@
             {
                 "name": "chat-bison@001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-chat-models",
                 "uri": "chat-bison@001",
                 "icon": "dummy_icon.png"
@@ -1388,7 +1221,6 @@
             {
                 "name": "chat-bison@002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-chat-models",
                 "uri": "chat-bison@002",
                 "icon": "dummy_icon.png"
@@ -1396,7 +1228,6 @@
             {
                 "name": "chat-bison-32k",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-chat-models",
                 "uri": "chat-bison-32k",
                 "icon": "dummy_icon.png"
@@ -1404,7 +1235,6 @@
             {
                 "name": "chat-bison-32k@002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-chat-models",
                 "uri": "chat-bison-32k@002",
                 "icon": "dummy_icon.png"
@@ -1416,7 +1246,6 @@
             {
                 "name": "code-bison",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-text-models",
                 "uri": "code-bison",
                 "icon": "dummy_icon.png"
@@ -1424,7 +1253,6 @@
             {
                 "name": "code-bison@001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-text-models",
                 "uri": "code-bison@001",
                 "icon": "dummy_icon.png"
@@ -1432,7 +1260,6 @@
             {
                 "name": "code-bison@002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-text-models",
                 "uri": "code-bison@002",
                 "icon": "dummy_icon.png"
@@ -1440,7 +1267,6 @@
             {
                 "name": "code-bison32k",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-text-models",
                 "uri": "code-bison32k",
                 "icon": "dummy_icon.png"
@@ -1448,7 +1274,6 @@
             {
                 "name": "code-bison-32k@002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-text-models",
                 "uri": "code-bison-32k@002",
                 "icon": "dummy_icon.png"
@@ -1456,7 +1281,6 @@
             {
                 "name": "code-gecko@001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-text-models",
                 "uri": "code-gecko@001",
                 "icon": "dummy_icon.png"
@@ -1464,7 +1288,6 @@
             {
                 "name": "code-gecko@002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-text-models",
                 "uri": "code-gecko@002",
                 "icon": "dummy_icon.png"
@@ -1472,7 +1295,6 @@
             {
                 "name": "code-gecko",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-text-models",
                 "uri": "code-gecko",
                 "icon": "dummy_icon.png"
@@ -1480,7 +1302,6 @@
             {
                 "name": "code-gecko-latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-text-models",
                 "uri": "code-gecko-latest",
                 "icon": "dummy_icon.png"
@@ -1492,7 +1313,6 @@
             {
                 "name": "codechat-bison@latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-chat-models",
                 "uri": "codechat-bison@latest",
                 "icon": "dummy_icon.png"
@@ -1500,7 +1320,6 @@
             {
                 "name": "codechat-bison",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-chat-models",
                 "uri": "codechat-bison",
                 "icon": "dummy_icon.png"
@@ -1508,7 +1327,6 @@
             {
                 "name": "codechat-bison@001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-chat-models",
                 "uri": "codechat-bison@001",
                 "icon": "dummy_icon.png"
@@ -1516,7 +1334,6 @@
             {
                 "name": "codechat-bison@002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-chat-models",
                 "uri": "codechat-bison@002",
                 "icon": "dummy_icon.png"
@@ -1524,7 +1341,6 @@
             {
                 "name": "codechat-bison-32k",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-chat-models",
                 "uri": "codechat-bison-32k",
                 "icon": "dummy_icon.png"
@@ -1532,7 +1348,6 @@
             {
                 "name": "codechat-bison-32k@002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-code-chat-models",
                 "uri": "codechat-bison-32k@002",
                 "icon": "dummy_icon.png"
@@ -1544,7 +1359,6 @@
             {
                 "name": "gemini-pro",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-pro",
                 "icon": "dummy_icon.png"
@@ -1552,7 +1366,6 @@
             {
                 "name": "gemini-1.0-pro",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.0-pro",
                 "icon": "dummy_icon.png"
@@ -1560,7 +1373,6 @@
             {
                 "name": "gemini-1.0-pro-001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.0-pro-001",
                 "icon": "dummy_icon.png"
@@ -1568,7 +1380,6 @@
             {
                 "name": "gemini-1.0-ultra",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.0-ultra",
                 "icon": "dummy_icon.png"
@@ -1576,7 +1387,6 @@
             {
                 "name": "gemini-1.0-ultra-001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.0-ultra-001",
                 "icon": "dummy_icon.png"
@@ -1584,7 +1394,6 @@
             {
                 "name": "gemini-1.0-pro-002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.0-pro-002",
                 "icon": "dummy_icon.png"
@@ -1592,7 +1401,6 @@
             {
                 "name": "gemini-1.5-pro",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.5-pro",
                 "icon": "dummy_icon.png"
@@ -1600,7 +1408,6 @@
             {
                 "name": "gemini-1.5-pro-002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.5-pro-002",
                 "icon": "dummy_icon.png"
@@ -1608,7 +1415,6 @@
             {
                 "name": "gemini-1.5-pro-001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.5-pro-001",
                 "icon": "dummy_icon.png"
@@ -1616,7 +1422,6 @@
             {
                 "name": "gemini-1.5-pro-preview-0514",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.5-pro-preview-0514",
                 "icon": "dummy_icon.png"
@@ -1624,7 +1429,6 @@
             {
                 "name": "gemini-1.5-pro-preview-0215",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.5-pro-preview-0215",
                 "icon": "dummy_icon.png"
@@ -1632,7 +1436,6 @@
             {
                 "name": "gemini-1.5-pro-preview-0409",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.5-pro-preview-0409",
                 "icon": "dummy_icon.png"
@@ -1640,7 +1443,6 @@
             {
                 "name": "gemini-1.5-flash",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.5-flash",
                 "icon": "dummy_icon.png"
@@ -1648,7 +1450,6 @@
             {
                 "name": "gemini-1.5-flash-exp-0827",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.5-flash-exp-0827",
                 "icon": "dummy_icon.png"
@@ -1656,7 +1457,6 @@
             {
                 "name": "gemini-1.5-flash-002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.5-flash-002",
                 "icon": "dummy_icon.png"
@@ -1664,7 +1464,6 @@
             {
                 "name": "gemini-1.5-flash-001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.5-flash-001",
                 "icon": "dummy_icon.png"
@@ -1672,7 +1471,6 @@
             {
                 "name": "gemini-1.5-flash-preview-0514",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-1.5-flash-preview-0514",
                 "icon": "dummy_icon.png"
@@ -1680,7 +1478,6 @@
             {
                 "name": "gemini-pro-experimental",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-pro-experimental",
                 "icon": "dummy_icon.png"
@@ -1688,7 +1485,6 @@
             {
                 "name": "gemini-flash-experimental",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "gemini-flash-experimental",
                 "icon": "dummy_icon.png"
@@ -1696,7 +1492,6 @@
             {
                 "name": "medlm-medium",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "medlm-medium",
                 "icon": "dummy_icon.png"
@@ -1704,7 +1499,6 @@
             {
                 "name": "medlm-large",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-language-models",
                 "uri": "medlm-large",
                 "icon": "dummy_icon.png"
@@ -1716,7 +1510,6 @@
             {
                 "name": "gemini-pro-vision",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-vision-models",
                 "uri": "gemini-pro-vision",
                 "icon": "dummy_icon.png"
@@ -1724,7 +1517,6 @@
             {
                 "name": "gemini-1.0-pro-vision",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-vision-models",
                 "uri": "gemini-1.0-pro-vision",
                 "icon": "dummy_icon.png"
@@ -1732,7 +1524,6 @@
             {
                 "name": "gemini-1.0-pro-vision-001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-vision-models",
                 "uri": "gemini-1.0-pro-vision-001",
                 "icon": "dummy_icon.png"
@@ -1744,7 +1535,6 @@
             {
                 "name": "vertex_ai/claude-3-sonnet@20240229",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-anthropic_models",
                 "uri": "vertex_ai/claude-3-sonnet@20240229",
                 "icon": "dummy_icon.png"
@@ -1752,7 +1542,6 @@
             {
                 "name": "vertex_ai/claude-3-5-sonnet@20240620",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-anthropic_models",
                 "uri": "vertex_ai/claude-3-5-sonnet@20240620",
                 "icon": "dummy_icon.png"
@@ -1760,7 +1549,6 @@
             {
                 "name": "vertex_ai/claude-3-5-sonnet-v2@20241022",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-anthropic_models",
                 "uri": "vertex_ai/claude-3-5-sonnet-v2@20241022",
                 "icon": "dummy_icon.png"
@@ -1768,7 +1556,6 @@
             {
                 "name": "vertex_ai/claude-3-haiku@20240307",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-anthropic_models",
                 "uri": "vertex_ai/claude-3-haiku@20240307",
                 "icon": "dummy_icon.png"
@@ -1776,7 +1563,6 @@
             {
                 "name": "vertex_ai/claude-3-opus@20240229",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-anthropic_models",
                 "uri": "vertex_ai/claude-3-opus@20240229",
                 "icon": "dummy_icon.png"
@@ -1788,7 +1574,6 @@
             {
                 "name": "vertex_ai/meta/llama3-405b-instruct-maas",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-llama_models",
                 "uri": "vertex_ai/meta/llama3-405b-instruct-maas",
                 "icon": "dummy_icon.png"
@@ -1796,7 +1581,6 @@
             {
                 "name": "vertex_ai/meta/llama3-70b-instruct-maas",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-llama_models",
                 "uri": "vertex_ai/meta/llama3-70b-instruct-maas",
                 "icon": "dummy_icon.png"
@@ -1804,7 +1588,6 @@
             {
                 "name": "vertex_ai/meta/llama3-8b-instruct-maas",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-llama_models",
                 "uri": "vertex_ai/meta/llama3-8b-instruct-maas",
                 "icon": "dummy_icon.png"
@@ -1812,7 +1595,6 @@
             {
                 "name": "vertex_ai/meta/llama-3.2-90b-vision-instruct-maas",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-llama_models",
                 "uri": "vertex_ai/meta/llama-3.2-90b-vision-instruct-maas",
                 "icon": "dummy_icon.png"
@@ -1824,7 +1606,6 @@
             {
                 "name": "vertex_ai/mistral-large@latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-mistral_models",
                 "uri": "vertex_ai/mistral-large@latest",
                 "icon": "dummy_icon.png"
@@ -1832,7 +1613,6 @@
             {
                 "name": "vertex_ai/mistral-large@2407",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-mistral_models",
                 "uri": "vertex_ai/mistral-large@2407",
                 "icon": "dummy_icon.png"
@@ -1840,7 +1620,6 @@
             {
                 "name": "vertex_ai/mistral-nemo@latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-mistral_models",
                 "uri": "vertex_ai/mistral-nemo@latest",
                 "icon": "dummy_icon.png"
@@ -1848,7 +1627,6 @@
             {
                 "name": "vertex_ai/mistral-nemo@2407",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-mistral_models",
                 "uri": "vertex_ai/mistral-nemo@2407",
                 "icon": "dummy_icon.png"
@@ -1856,7 +1634,6 @@
             {
                 "name": "vertex_ai/codestral@latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-mistral_models",
                 "uri": "vertex_ai/codestral@latest",
                 "icon": "dummy_icon.png"
@@ -1864,7 +1641,6 @@
             {
                 "name": "vertex_ai/codestral@2405",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-mistral_models",
                 "uri": "vertex_ai/codestral@2405",
                 "icon": "dummy_icon.png"
@@ -1876,7 +1652,6 @@
             {
                 "name": "vertex_ai/jamba-1.5-mini@001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-ai21_models",
                 "uri": "vertex_ai/jamba-1.5-mini@001",
                 "icon": "dummy_icon.png"
@@ -1884,7 +1659,6 @@
             {
                 "name": "vertex_ai/jamba-1.5-large@001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-ai21_models",
                 "uri": "vertex_ai/jamba-1.5-large@001",
                 "icon": "dummy_icon.png"
@@ -1892,7 +1666,6 @@
             {
                 "name": "vertex_ai/jamba-1.5",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-ai21_models",
                 "uri": "vertex_ai/jamba-1.5",
                 "icon": "dummy_icon.png"
@@ -1900,7 +1673,6 @@
             {
                 "name": "vertex_ai/jamba-1.5-mini",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-ai21_models",
                 "uri": "vertex_ai/jamba-1.5-mini",
                 "icon": "dummy_icon.png"
@@ -1908,7 +1680,6 @@
             {
                 "name": "vertex_ai/jamba-1.5-large",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "vertex_ai-ai21_models",
                 "uri": "vertex_ai/jamba-1.5-large",
                 "icon": "dummy_icon.png"
@@ -1920,7 +1691,6 @@
             {
                 "name": "vertex_ai/imagegeneration@006",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "vertex_ai-image-models",
                 "uri": "vertex_ai/imagegeneration@006",
                 "icon": "dummy_icon.png"
@@ -1928,7 +1698,6 @@
             {
                 "name": "vertex_ai/imagen-3.0-generate-001",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "vertex_ai-image-models",
                 "uri": "vertex_ai/imagen-3.0-generate-001",
                 "icon": "dummy_icon.png"
@@ -1936,7 +1705,6 @@
             {
                 "name": "vertex_ai/imagen-3.0-fast-generate-001",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "vertex_ai-image-models",
                 "uri": "vertex_ai/imagen-3.0-fast-generate-001",
                 "icon": "dummy_icon.png"
@@ -1948,7 +1716,6 @@
             {
                 "name": "text-embedding-004",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "vertex_ai-embedding-models",
                 "uri": "text-embedding-004",
                 "icon": "dummy_icon.png"
@@ -1956,7 +1723,6 @@
             {
                 "name": "text-multilingual-embedding-002",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "vertex_ai-embedding-models",
                 "uri": "text-multilingual-embedding-002",
                 "icon": "dummy_icon.png"
@@ -1964,7 +1730,6 @@
             {
                 "name": "textembedding-gecko",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "vertex_ai-embedding-models",
                 "uri": "textembedding-gecko",
                 "icon": "dummy_icon.png"
@@ -1972,7 +1737,6 @@
             {
                 "name": "textembedding-gecko-multilingual",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "vertex_ai-embedding-models",
                 "uri": "textembedding-gecko-multilingual",
                 "icon": "dummy_icon.png"
@@ -1980,7 +1744,6 @@
             {
                 "name": "textembedding-gecko-multilingual@001",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "vertex_ai-embedding-models",
                 "uri": "textembedding-gecko-multilingual@001",
                 "icon": "dummy_icon.png"
@@ -1988,7 +1751,6 @@
             {
                 "name": "textembedding-gecko@001",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "vertex_ai-embedding-models",
                 "uri": "textembedding-gecko@001",
                 "icon": "dummy_icon.png"
@@ -1996,7 +1758,6 @@
             {
                 "name": "textembedding-gecko@003",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "vertex_ai-embedding-models",
                 "uri": "textembedding-gecko@003",
                 "icon": "dummy_icon.png"
@@ -2004,7 +1765,6 @@
             {
                 "name": "text-embedding-preview-0409",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "vertex_ai-embedding-models",
                 "uri": "text-embedding-preview-0409",
                 "icon": "dummy_icon.png"
@@ -2012,7 +1772,6 @@
             {
                 "name": "text-multilingual-embedding-preview-0409",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "vertex_ai-embedding-models",
                 "uri": "text-multilingual-embedding-preview-0409",
                 "icon": "dummy_icon.png"
@@ -2024,7 +1783,6 @@
             {
                 "name": "palm/chat-bison",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "palm",
                 "uri": "palm/chat-bison",
                 "icon": "dummy_icon.png"
@@ -2032,7 +1790,6 @@
             {
                 "name": "palm/chat-bison-001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "palm",
                 "uri": "palm/chat-bison-001",
                 "icon": "dummy_icon.png"
@@ -2040,7 +1797,6 @@
             {
                 "name": "palm/text-bison",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "palm",
                 "uri": "palm/text-bison",
                 "icon": "dummy_icon.png"
@@ -2048,7 +1804,6 @@
             {
                 "name": "palm/text-bison-001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "palm",
                 "uri": "palm/text-bison-001",
                 "icon": "dummy_icon.png"
@@ -2056,7 +1811,6 @@
             {
                 "name": "palm/text-bison-safety-off",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "palm",
                 "uri": "palm/text-bison-safety-off",
                 "icon": "dummy_icon.png"
@@ -2064,7 +1818,6 @@
             {
                 "name": "palm/text-bison-safety-recitation-off",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "palm",
                 "uri": "palm/text-bison-safety-recitation-off",
                 "icon": "dummy_icon.png"
@@ -2076,7 +1829,6 @@
             {
                 "name": "gemini/gemini-1.5-flash-002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-1.5-flash-002",
                 "icon": "dummy_icon.png"
@@ -2084,7 +1836,6 @@
             {
                 "name": "gemini/gemini-1.5-flash-001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-1.5-flash-001",
                 "icon": "dummy_icon.png"
@@ -2092,7 +1843,6 @@
             {
                 "name": "gemini/gemini-1.5-flash",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-1.5-flash",
                 "icon": "dummy_icon.png"
@@ -2100,7 +1850,6 @@
             {
                 "name": "gemini/gemini-1.5-flash-latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-1.5-flash-latest",
                 "icon": "dummy_icon.png"
@@ -2108,7 +1857,6 @@
             {
                 "name": "gemini/gemini-1.5-flash-8b-exp-0924",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-1.5-flash-8b-exp-0924",
                 "icon": "dummy_icon.png"
@@ -2116,7 +1864,6 @@
             {
                 "name": "gemini/gemini-1.5-flash-exp-0827",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-1.5-flash-exp-0827",
                 "icon": "dummy_icon.png"
@@ -2124,7 +1871,6 @@
             {
                 "name": "gemini/gemini-1.5-flash-8b-exp-0827",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-1.5-flash-8b-exp-0827",
                 "icon": "dummy_icon.png"
@@ -2132,7 +1878,6 @@
             {
                 "name": "gemini/gemini-pro",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-pro",
                 "icon": "dummy_icon.png"
@@ -2140,7 +1885,6 @@
             {
                 "name": "gemini/gemini-1.5-pro",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-1.5-pro",
                 "icon": "dummy_icon.png"
@@ -2148,7 +1892,6 @@
             {
                 "name": "gemini/gemini-1.5-pro-002",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-1.5-pro-002",
                 "icon": "dummy_icon.png"
@@ -2156,7 +1899,6 @@
             {
                 "name": "gemini/gemini-1.5-pro-001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-1.5-pro-001",
                 "icon": "dummy_icon.png"
@@ -2164,7 +1906,6 @@
             {
                 "name": "gemini/gemini-1.5-pro-exp-0801",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-1.5-pro-exp-0801",
                 "icon": "dummy_icon.png"
@@ -2172,7 +1913,6 @@
             {
                 "name": "gemini/gemini-1.5-pro-exp-0827",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-1.5-pro-exp-0827",
                 "icon": "dummy_icon.png"
@@ -2180,7 +1920,6 @@
             {
                 "name": "gemini/gemini-1.5-pro-latest",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-1.5-pro-latest",
                 "icon": "dummy_icon.png"
@@ -2188,7 +1927,6 @@
             {
                 "name": "gemini/gemini-pro-vision",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-pro-vision",
                 "icon": "dummy_icon.png"
@@ -2196,7 +1934,6 @@
             {
                 "name": "gemini/gemini-gemma-2-27b-it",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-gemma-2-27b-it",
                 "icon": "dummy_icon.png"
@@ -2204,7 +1941,6 @@
             {
                 "name": "gemini/gemini-gemma-2-9b-it",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "gemini",
                 "uri": "gemini/gemini-gemma-2-9b-it",
                 "icon": "dummy_icon.png"
@@ -2216,7 +1952,6 @@
             {
                 "name": "command-r",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "cohere_chat",
                 "uri": "command-r",
                 "icon": "dummy_icon.png"
@@ -2224,7 +1959,6 @@
             {
                 "name": "command-r-08-2024",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "cohere_chat",
                 "uri": "command-r-08-2024",
                 "icon": "dummy_icon.png"
@@ -2232,7 +1966,6 @@
             {
                 "name": "command-light",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "cohere_chat",
                 "uri": "command-light",
                 "icon": "dummy_icon.png"
@@ -2240,7 +1973,6 @@
             {
                 "name": "command-r-plus",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "cohere_chat",
                 "uri": "command-r-plus",
                 "icon": "dummy_icon.png"
@@ -2248,7 +1980,6 @@
             {
                 "name": "command-r-plus-08-2024",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "cohere_chat",
                 "uri": "command-r-plus-08-2024",
                 "icon": "dummy_icon.png"
@@ -2260,7 +1991,6 @@
             {
                 "name": "command-nightly",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "cohere",
                 "uri": "command-nightly",
                 "icon": "dummy_icon.png"
@@ -2268,7 +1998,6 @@
             {
                 "name": "command",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "cohere",
                 "uri": "command",
                 "icon": "dummy_icon.png"
@@ -2276,7 +2005,6 @@
             {
                 "name": "embed-english-light-v3.0",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "cohere",
                 "uri": "embed-english-light-v3.0",
                 "icon": "dummy_icon.png"
@@ -2284,7 +2012,6 @@
             {
                 "name": "embed-multilingual-v3.0",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "cohere",
                 "uri": "embed-multilingual-v3.0",
                 "icon": "dummy_icon.png"
@@ -2292,7 +2019,6 @@
             {
                 "name": "embed-english-v2.0",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "cohere",
                 "uri": "embed-english-v2.0",
                 "icon": "dummy_icon.png"
@@ -2300,7 +2026,6 @@
             {
                 "name": "embed-english-light-v2.0",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "cohere",
                 "uri": "embed-english-light-v2.0",
                 "icon": "dummy_icon.png"
@@ -2308,7 +2033,6 @@
             {
                 "name": "embed-multilingual-v2.0",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "cohere",
                 "uri": "embed-multilingual-v2.0",
                 "icon": "dummy_icon.png"
@@ -2316,7 +2040,6 @@
             {
                 "name": "embed-english-v3.0",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "cohere",
                 "uri": "embed-english-v3.0",
                 "icon": "dummy_icon.png"
@@ -2328,7 +2051,6 @@
             {
                 "name": "replicate/meta/llama-2-13b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "replicate",
                 "uri": "replicate/meta/llama-2-13b",
                 "icon": "dummy_icon.png"
@@ -2336,7 +2058,6 @@
             {
                 "name": "replicate/meta/llama-2-13b-chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "replicate",
                 "uri": "replicate/meta/llama-2-13b-chat",
                 "icon": "dummy_icon.png"
@@ -2344,7 +2065,6 @@
             {
                 "name": "replicate/meta/llama-2-70b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "replicate",
                 "uri": "replicate/meta/llama-2-70b",
                 "icon": "dummy_icon.png"
@@ -2352,7 +2072,6 @@
             {
                 "name": "replicate/meta/llama-2-70b-chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "replicate",
                 "uri": "replicate/meta/llama-2-70b-chat",
                 "icon": "dummy_icon.png"
@@ -2360,7 +2079,6 @@
             {
                 "name": "replicate/meta/llama-2-7b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "replicate",
                 "uri": "replicate/meta/llama-2-7b",
                 "icon": "dummy_icon.png"
@@ -2368,7 +2086,6 @@
             {
                 "name": "replicate/meta/llama-2-7b-chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "replicate",
                 "uri": "replicate/meta/llama-2-7b-chat",
                 "icon": "dummy_icon.png"
@@ -2376,7 +2093,6 @@
             {
                 "name": "replicate/meta/llama-3-70b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "replicate",
                 "uri": "replicate/meta/llama-3-70b",
                 "icon": "dummy_icon.png"
@@ -2384,7 +2100,6 @@
             {
                 "name": "replicate/meta/llama-3-70b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "replicate",
                 "uri": "replicate/meta/llama-3-70b-instruct",
                 "icon": "dummy_icon.png"
@@ -2392,7 +2107,6 @@
             {
                 "name": "replicate/meta/llama-3-8b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "replicate",
                 "uri": "replicate/meta/llama-3-8b",
                 "icon": "dummy_icon.png"
@@ -2400,7 +2114,6 @@
             {
                 "name": "replicate/meta/llama-3-8b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "replicate",
                 "uri": "replicate/meta/llama-3-8b-instruct",
                 "icon": "dummy_icon.png"
@@ -2408,7 +2121,6 @@
             {
                 "name": "replicate/mistralai/mistral-7b-v0.1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "replicate",
                 "uri": "replicate/mistralai/mistral-7b-v0.1",
                 "icon": "dummy_icon.png"
@@ -2416,7 +2128,6 @@
             {
                 "name": "replicate/mistralai/mistral-7b-instruct-v0.2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "replicate",
                 "uri": "replicate/mistralai/mistral-7b-instruct-v0.2",
                 "icon": "dummy_icon.png"
@@ -2424,7 +2135,6 @@
             {
                 "name": "replicate/mistralai/mixtral-8x7b-instruct-v0.1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "replicate",
                 "uri": "replicate/mistralai/mixtral-8x7b-instruct-v0.1",
                 "icon": "dummy_icon.png"
@@ -2436,7 +2146,6 @@
             {
                 "name": "openrouter/deepseek/deepseek-coder",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/deepseek/deepseek-coder",
                 "icon": "dummy_icon.png"
@@ -2444,7 +2153,6 @@
             {
                 "name": "openrouter/microsoft/wizardlm-2-8x22b:nitro",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/microsoft/wizardlm-2-8x22b:nitro",
                 "icon": "dummy_icon.png"
@@ -2452,7 +2160,6 @@
             {
                 "name": "openrouter/google/gemini-pro-1.5",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/google/gemini-pro-1.5",
                 "icon": "dummy_icon.png"
@@ -2460,7 +2167,6 @@
             {
                 "name": "openrouter/mistralai/mixtral-8x22b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/mistralai/mixtral-8x22b-instruct",
                 "icon": "dummy_icon.png"
@@ -2468,7 +2174,6 @@
             {
                 "name": "openrouter/cohere/command-r-plus",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/cohere/command-r-plus",
                 "icon": "dummy_icon.png"
@@ -2476,7 +2181,6 @@
             {
                 "name": "openrouter/databricks/dbrx-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/databricks/dbrx-instruct",
                 "icon": "dummy_icon.png"
@@ -2484,7 +2188,6 @@
             {
                 "name": "openrouter/anthropic/claude-3-haiku",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/anthropic/claude-3-haiku",
                 "icon": "dummy_icon.png"
@@ -2492,7 +2195,6 @@
             {
                 "name": "openrouter/anthropic/claude-3-haiku-20240307",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/anthropic/claude-3-haiku-20240307",
                 "icon": "dummy_icon.png"
@@ -2500,7 +2202,6 @@
             {
                 "name": "openrouter/anthropic/claude-3.5-sonnet",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/anthropic/claude-3.5-sonnet",
                 "icon": "dummy_icon.png"
@@ -2508,7 +2209,6 @@
             {
                 "name": "openrouter/anthropic/claude-3.5-sonnet:beta",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/anthropic/claude-3.5-sonnet:beta",
                 "icon": "dummy_icon.png"
@@ -2516,7 +2216,6 @@
             {
                 "name": "openrouter/anthropic/claude-3-sonnet",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/anthropic/claude-3-sonnet",
                 "icon": "dummy_icon.png"
@@ -2524,7 +2223,6 @@
             {
                 "name": "openrouter/mistralai/mistral-large",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/mistralai/mistral-large",
                 "icon": "dummy_icon.png"
@@ -2532,7 +2230,6 @@
             {
                 "name": "openrouter/cognitivecomputations/dolphin-mixtral-8x7b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/cognitivecomputations/dolphin-mixtral-8x7b",
                 "icon": "dummy_icon.png"
@@ -2540,7 +2237,6 @@
             {
                 "name": "openrouter/google/gemini-pro-vision",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/google/gemini-pro-vision",
                 "icon": "dummy_icon.png"
@@ -2548,7 +2244,6 @@
             {
                 "name": "openrouter/fireworks/firellava-13b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/fireworks/firellava-13b",
                 "icon": "dummy_icon.png"
@@ -2556,7 +2251,6 @@
             {
                 "name": "openrouter/meta-llama/llama-3-8b-instruct:free",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/meta-llama/llama-3-8b-instruct:free",
                 "icon": "dummy_icon.png"
@@ -2564,7 +2258,6 @@
             {
                 "name": "openrouter/meta-llama/llama-3-8b-instruct:extended",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/meta-llama/llama-3-8b-instruct:extended",
                 "icon": "dummy_icon.png"
@@ -2572,7 +2265,6 @@
             {
                 "name": "openrouter/meta-llama/llama-3-70b-instruct:nitro",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/meta-llama/llama-3-70b-instruct:nitro",
                 "icon": "dummy_icon.png"
@@ -2580,7 +2272,6 @@
             {
                 "name": "openrouter/meta-llama/llama-3-70b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/meta-llama/llama-3-70b-instruct",
                 "icon": "dummy_icon.png"
@@ -2588,7 +2279,6 @@
             {
                 "name": "openrouter/openai/o1-mini",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/openai/o1-mini",
                 "icon": "dummy_icon.png"
@@ -2596,7 +2286,6 @@
             {
                 "name": "openrouter/openai/o1-mini-2024-09-12",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/openai/o1-mini-2024-09-12",
                 "icon": "dummy_icon.png"
@@ -2604,7 +2293,6 @@
             {
                 "name": "openrouter/openai/o1-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/openai/o1-preview",
                 "icon": "dummy_icon.png"
@@ -2612,7 +2300,6 @@
             {
                 "name": "openrouter/openai/o1-preview-2024-09-12",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/openai/o1-preview-2024-09-12",
                 "icon": "dummy_icon.png"
@@ -2620,7 +2307,6 @@
             {
                 "name": "openrouter/openai/gpt-4o",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/openai/gpt-4o",
                 "icon": "dummy_icon.png"
@@ -2628,7 +2314,6 @@
             {
                 "name": "openrouter/openai/gpt-4o-2024-05-13",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/openai/gpt-4o-2024-05-13",
                 "icon": "dummy_icon.png"
@@ -2636,7 +2321,6 @@
             {
                 "name": "openrouter/openai/gpt-4-vision-preview",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/openai/gpt-4-vision-preview",
                 "icon": "dummy_icon.png"
@@ -2644,7 +2328,6 @@
             {
                 "name": "openrouter/openai/gpt-3.5-turbo",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/openai/gpt-3.5-turbo",
                 "icon": "dummy_icon.png"
@@ -2652,7 +2335,6 @@
             {
                 "name": "openrouter/openai/gpt-3.5-turbo-16k",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/openai/gpt-3.5-turbo-16k",
                 "icon": "dummy_icon.png"
@@ -2660,7 +2342,6 @@
             {
                 "name": "openrouter/openai/gpt-4",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/openai/gpt-4",
                 "icon": "dummy_icon.png"
@@ -2668,7 +2349,6 @@
             {
                 "name": "openrouter/anthropic/claude-instant-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/anthropic/claude-instant-v1",
                 "icon": "dummy_icon.png"
@@ -2676,7 +2356,6 @@
             {
                 "name": "openrouter/anthropic/claude-2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/anthropic/claude-2",
                 "icon": "dummy_icon.png"
@@ -2684,7 +2363,6 @@
             {
                 "name": "openrouter/anthropic/claude-3-opus",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/anthropic/claude-3-opus",
                 "icon": "dummy_icon.png"
@@ -2692,7 +2370,6 @@
             {
                 "name": "openrouter/google/palm-2-chat-bison",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/google/palm-2-chat-bison",
                 "icon": "dummy_icon.png"
@@ -2700,7 +2377,6 @@
             {
                 "name": "openrouter/google/palm-2-codechat-bison",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/google/palm-2-codechat-bison",
                 "icon": "dummy_icon.png"
@@ -2708,7 +2384,6 @@
             {
                 "name": "openrouter/meta-llama/llama-2-13b-chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/meta-llama/llama-2-13b-chat",
                 "icon": "dummy_icon.png"
@@ -2716,7 +2391,6 @@
             {
                 "name": "openrouter/meta-llama/llama-2-70b-chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/meta-llama/llama-2-70b-chat",
                 "icon": "dummy_icon.png"
@@ -2724,7 +2398,6 @@
             {
                 "name": "openrouter/meta-llama/codellama-34b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/meta-llama/codellama-34b-instruct",
                 "icon": "dummy_icon.png"
@@ -2732,7 +2405,6 @@
             {
                 "name": "openrouter/nousresearch/nous-hermes-llama2-13b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/nousresearch/nous-hermes-llama2-13b",
                 "icon": "dummy_icon.png"
@@ -2740,7 +2412,6 @@
             {
                 "name": "openrouter/mancer/weaver",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/mancer/weaver",
                 "icon": "dummy_icon.png"
@@ -2748,7 +2419,6 @@
             {
                 "name": "openrouter/gryphe/mythomax-l2-13b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/gryphe/mythomax-l2-13b",
                 "icon": "dummy_icon.png"
@@ -2756,7 +2426,6 @@
             {
                 "name": "openrouter/jondurbin/airoboros-l2-70b-2.1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/jondurbin/airoboros-l2-70b-2.1",
                 "icon": "dummy_icon.png"
@@ -2764,7 +2433,6 @@
             {
                 "name": "openrouter/undi95/remm-slerp-l2-13b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/undi95/remm-slerp-l2-13b",
                 "icon": "dummy_icon.png"
@@ -2772,7 +2440,6 @@
             {
                 "name": "openrouter/pygmalionai/mythalion-13b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/pygmalionai/mythalion-13b",
                 "icon": "dummy_icon.png"
@@ -2780,7 +2447,6 @@
             {
                 "name": "openrouter/mistralai/mistral-7b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/mistralai/mistral-7b-instruct",
                 "icon": "dummy_icon.png"
@@ -2788,7 +2454,6 @@
             {
                 "name": "openrouter/mistralai/mistral-7b-instruct:free",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "openrouter",
                 "uri": "openrouter/mistralai/mistral-7b-instruct:free",
                 "icon": "dummy_icon.png"
@@ -2800,7 +2465,6 @@
             {
                 "name": "j2-ultra",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "ai21",
                 "uri": "j2-ultra",
                 "icon": "dummy_icon.png"
@@ -2808,7 +2472,6 @@
             {
                 "name": "jamba-1.5-mini@001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "ai21",
                 "uri": "jamba-1.5-mini@001",
                 "icon": "dummy_icon.png"
@@ -2816,7 +2479,6 @@
             {
                 "name": "jamba-1.5-large@001",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "ai21",
                 "uri": "jamba-1.5-large@001",
                 "icon": "dummy_icon.png"
@@ -2824,7 +2486,6 @@
             {
                 "name": "jamba-1.5",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "ai21",
                 "uri": "jamba-1.5",
                 "icon": "dummy_icon.png"
@@ -2832,7 +2493,6 @@
             {
                 "name": "jamba-1.5-mini",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "ai21",
                 "uri": "jamba-1.5-mini",
                 "icon": "dummy_icon.png"
@@ -2840,7 +2500,6 @@
             {
                 "name": "jamba-1.5-large",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "ai21",
                 "uri": "jamba-1.5-large",
                 "icon": "dummy_icon.png"
@@ -2848,7 +2507,6 @@
             {
                 "name": "j2-mid",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "ai21",
                 "uri": "j2-mid",
                 "icon": "dummy_icon.png"
@@ -2856,7 +2514,6 @@
             {
                 "name": "j2-light",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "ai21",
                 "uri": "j2-light",
                 "icon": "dummy_icon.png"
@@ -2868,7 +2525,6 @@
             {
                 "name": "dolphin",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "nlp_cloud",
                 "uri": "dolphin",
                 "icon": "dummy_icon.png"
@@ -2876,7 +2532,6 @@
             {
                 "name": "chatdolphin",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "nlp_cloud",
                 "uri": "chatdolphin",
                 "icon": "dummy_icon.png"
@@ -2888,7 +2543,6 @@
             {
                 "name": "luminous-base",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "aleph_alpha",
                 "uri": "luminous-base",
                 "icon": "dummy_icon.png"
@@ -2896,7 +2550,6 @@
             {
                 "name": "luminous-base-control",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "aleph_alpha",
                 "uri": "luminous-base-control",
                 "icon": "dummy_icon.png"
@@ -2904,7 +2557,6 @@
             {
                 "name": "luminous-extended",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "aleph_alpha",
                 "uri": "luminous-extended",
                 "icon": "dummy_icon.png"
@@ -2912,7 +2564,6 @@
             {
                 "name": "luminous-extended-control",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "aleph_alpha",
                 "uri": "luminous-extended-control",
                 "icon": "dummy_icon.png"
@@ -2920,7 +2571,6 @@
             {
                 "name": "luminous-supreme",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "aleph_alpha",
                 "uri": "luminous-supreme",
                 "icon": "dummy_icon.png"
@@ -2928,7 +2578,6 @@
             {
                 "name": "luminous-supreme-control",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "aleph_alpha",
                 "uri": "luminous-supreme-control",
                 "icon": "dummy_icon.png"
@@ -2940,7 +2589,6 @@
             {
                 "name": "ai21.j2-mid-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "ai21.j2-mid-v1",
                 "icon": "dummy_icon.png"
@@ -2948,7 +2596,6 @@
             {
                 "name": "ai21.j2-ultra-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "ai21.j2-ultra-v1",
                 "icon": "dummy_icon.png"
@@ -2956,7 +2603,6 @@
             {
                 "name": "ai21.jamba-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "ai21.jamba-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -2964,7 +2610,6 @@
             {
                 "name": "amazon.titan-text-lite-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "amazon.titan-text-lite-v1",
                 "icon": "dummy_icon.png"
@@ -2972,7 +2617,6 @@
             {
                 "name": "amazon.titan-text-express-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "amazon.titan-text-express-v1",
                 "icon": "dummy_icon.png"
@@ -2980,7 +2624,6 @@
             {
                 "name": "amazon.titan-text-premier-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "amazon.titan-text-premier-v1:0",
                 "icon": "dummy_icon.png"
@@ -2988,7 +2631,6 @@
             {
                 "name": "amazon.titan-embed-text-v1",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "amazon.titan-embed-text-v1",
                 "icon": "dummy_icon.png"
@@ -2996,7 +2638,6 @@
             {
                 "name": "amazon.titan-embed-text-v2:0",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "amazon.titan-embed-text-v2:0",
                 "icon": "dummy_icon.png"
@@ -3004,7 +2645,6 @@
             {
                 "name": "mistral.mistral-7b-instruct-v0:2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "mistral.mistral-7b-instruct-v0:2",
                 "icon": "dummy_icon.png"
@@ -3012,7 +2652,6 @@
             {
                 "name": "mistral.mixtral-8x7b-instruct-v0:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "mistral.mixtral-8x7b-instruct-v0:1",
                 "icon": "dummy_icon.png"
@@ -3020,7 +2659,6 @@
             {
                 "name": "mistral.mistral-large-2402-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "mistral.mistral-large-2402-v1:0",
                 "icon": "dummy_icon.png"
@@ -3028,7 +2666,6 @@
             {
                 "name": "mistral.mistral-large-2407-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "mistral.mistral-large-2407-v1:0",
                 "icon": "dummy_icon.png"
@@ -3036,7 +2673,6 @@
             {
                 "name": "mistral.mistral-small-2402-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "mistral.mistral-small-2402-v1:0",
                 "icon": "dummy_icon.png"
@@ -3044,7 +2680,6 @@
             {
                 "name": "bedrock/us-west-2/mistral.mixtral-8x7b-instruct-v0:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/mistral.mixtral-8x7b-instruct-v0:1",
                 "icon": "dummy_icon.png"
@@ -3052,7 +2687,6 @@
             {
                 "name": "bedrock/us-east-1/mistral.mixtral-8x7b-instruct-v0:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/mistral.mixtral-8x7b-instruct-v0:1",
                 "icon": "dummy_icon.png"
@@ -3060,7 +2694,6 @@
             {
                 "name": "bedrock/eu-west-3/mistral.mixtral-8x7b-instruct-v0:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-west-3/mistral.mixtral-8x7b-instruct-v0:1",
                 "icon": "dummy_icon.png"
@@ -3068,7 +2701,6 @@
             {
                 "name": "bedrock/us-west-2/mistral.mistral-7b-instruct-v0:2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/mistral.mistral-7b-instruct-v0:2",
                 "icon": "dummy_icon.png"
@@ -3076,7 +2708,6 @@
             {
                 "name": "bedrock/us-east-1/mistral.mistral-7b-instruct-v0:2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/mistral.mistral-7b-instruct-v0:2",
                 "icon": "dummy_icon.png"
@@ -3084,7 +2715,6 @@
             {
                 "name": "bedrock/eu-west-3/mistral.mistral-7b-instruct-v0:2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-west-3/mistral.mistral-7b-instruct-v0:2",
                 "icon": "dummy_icon.png"
@@ -3092,7 +2722,6 @@
             {
                 "name": "bedrock/us-east-1/mistral.mistral-large-2402-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/mistral.mistral-large-2402-v1:0",
                 "icon": "dummy_icon.png"
@@ -3100,7 +2729,6 @@
             {
                 "name": "bedrock/us-west-2/mistral.mistral-large-2402-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/mistral.mistral-large-2402-v1:0",
                 "icon": "dummy_icon.png"
@@ -3108,7 +2736,6 @@
             {
                 "name": "bedrock/eu-west-3/mistral.mistral-large-2402-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-west-3/mistral.mistral-large-2402-v1:0",
                 "icon": "dummy_icon.png"
@@ -3116,7 +2743,6 @@
             {
                 "name": "anthropic.claude-3-sonnet-20240229-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "anthropic.claude-3-sonnet-20240229-v1:0",
                 "icon": "dummy_icon.png"
@@ -3124,7 +2750,6 @@
             {
                 "name": "anthropic.claude-3-5-sonnet-20240620-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "anthropic.claude-3-5-sonnet-20240620-v1:0",
                 "icon": "dummy_icon.png"
@@ -3132,7 +2757,6 @@
             {
                 "name": "anthropic.claude-3-5-sonnet-20241022-v2:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "anthropic.claude-3-5-sonnet-20241022-v2:0",
                 "icon": "dummy_icon.png"
@@ -3140,7 +2764,6 @@
             {
                 "name": "anthropic.claude-3-haiku-20240307-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "anthropic.claude-3-haiku-20240307-v1:0",
                 "icon": "dummy_icon.png"
@@ -3148,7 +2771,6 @@
             {
                 "name": "anthropic.claude-3-opus-20240229-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "anthropic.claude-3-opus-20240229-v1:0",
                 "icon": "dummy_icon.png"
@@ -3156,7 +2778,6 @@
             {
                 "name": "us.anthropic.claude-3-sonnet-20240229-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "us.anthropic.claude-3-sonnet-20240229-v1:0",
                 "icon": "dummy_icon.png"
@@ -3164,7 +2785,6 @@
             {
                 "name": "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
                 "icon": "dummy_icon.png"
@@ -3172,7 +2792,6 @@
             {
                 "name": "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
                 "icon": "dummy_icon.png"
@@ -3180,7 +2799,6 @@
             {
                 "name": "us.anthropic.claude-3-haiku-20240307-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "us.anthropic.claude-3-haiku-20240307-v1:0",
                 "icon": "dummy_icon.png"
@@ -3188,7 +2806,6 @@
             {
                 "name": "us.anthropic.claude-3-opus-20240229-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "us.anthropic.claude-3-opus-20240229-v1:0",
                 "icon": "dummy_icon.png"
@@ -3196,7 +2813,6 @@
             {
                 "name": "eu.anthropic.claude-3-sonnet-20240229-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "eu.anthropic.claude-3-sonnet-20240229-v1:0",
                 "icon": "dummy_icon.png"
@@ -3204,7 +2820,6 @@
             {
                 "name": "eu.anthropic.claude-3-5-sonnet-20240620-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "eu.anthropic.claude-3-5-sonnet-20240620-v1:0",
                 "icon": "dummy_icon.png"
@@ -3212,7 +2827,6 @@
             {
                 "name": "eu.anthropic.claude-3-5-sonnet-20241022-v2:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "eu.anthropic.claude-3-5-sonnet-20241022-v2:0",
                 "icon": "dummy_icon.png"
@@ -3220,7 +2834,6 @@
             {
                 "name": "eu.anthropic.claude-3-haiku-20240307-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "eu.anthropic.claude-3-haiku-20240307-v1:0",
                 "icon": "dummy_icon.png"
@@ -3228,7 +2841,6 @@
             {
                 "name": "eu.anthropic.claude-3-opus-20240229-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "eu.anthropic.claude-3-opus-20240229-v1:0",
                 "icon": "dummy_icon.png"
@@ -3236,7 +2848,6 @@
             {
                 "name": "anthropic.claude-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "anthropic.claude-v1",
                 "icon": "dummy_icon.png"
@@ -3244,7 +2855,6 @@
             {
                 "name": "bedrock/us-east-1/anthropic.claude-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/anthropic.claude-v1",
                 "icon": "dummy_icon.png"
@@ -3252,7 +2862,6 @@
             {
                 "name": "bedrock/us-west-2/anthropic.claude-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/anthropic.claude-v1",
                 "icon": "dummy_icon.png"
@@ -3260,7 +2869,6 @@
             {
                 "name": "bedrock/ap-northeast-1/anthropic.claude-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ap-northeast-1/anthropic.claude-v1",
                 "icon": "dummy_icon.png"
@@ -3268,7 +2876,6 @@
             {
                 "name": "bedrock/ap-northeast-1/1-month-commitment/anthropic.claude-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ap-northeast-1/1-month-commitment/anthropic.claude-v1",
                 "icon": "dummy_icon.png"
@@ -3276,7 +2883,6 @@
             {
                 "name": "bedrock/ap-northeast-1/6-month-commitment/anthropic.claude-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ap-northeast-1/6-month-commitment/anthropic.claude-v1",
                 "icon": "dummy_icon.png"
@@ -3284,7 +2890,6 @@
             {
                 "name": "bedrock/eu-central-1/anthropic.claude-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-central-1/anthropic.claude-v1",
                 "icon": "dummy_icon.png"
@@ -3292,7 +2897,6 @@
             {
                 "name": "bedrock/eu-central-1/1-month-commitment/anthropic.claude-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-central-1/1-month-commitment/anthropic.claude-v1",
                 "icon": "dummy_icon.png"
@@ -3300,7 +2904,6 @@
             {
                 "name": "bedrock/eu-central-1/6-month-commitment/anthropic.claude-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-central-1/6-month-commitment/anthropic.claude-v1",
                 "icon": "dummy_icon.png"
@@ -3308,7 +2911,6 @@
             {
                 "name": "bedrock/us-east-1/1-month-commitment/anthropic.claude-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/1-month-commitment/anthropic.claude-v1",
                 "icon": "dummy_icon.png"
@@ -3316,7 +2918,6 @@
             {
                 "name": "bedrock/us-east-1/6-month-commitment/anthropic.claude-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/6-month-commitment/anthropic.claude-v1",
                 "icon": "dummy_icon.png"
@@ -3324,7 +2925,6 @@
             {
                 "name": "bedrock/us-west-2/1-month-commitment/anthropic.claude-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/1-month-commitment/anthropic.claude-v1",
                 "icon": "dummy_icon.png"
@@ -3332,7 +2932,6 @@
             {
                 "name": "bedrock/us-west-2/6-month-commitment/anthropic.claude-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/6-month-commitment/anthropic.claude-v1",
                 "icon": "dummy_icon.png"
@@ -3340,7 +2939,6 @@
             {
                 "name": "anthropic.claude-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "anthropic.claude-v2",
                 "icon": "dummy_icon.png"
@@ -3348,7 +2946,6 @@
             {
                 "name": "bedrock/us-east-1/anthropic.claude-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/anthropic.claude-v2",
                 "icon": "dummy_icon.png"
@@ -3356,7 +2953,6 @@
             {
                 "name": "bedrock/us-west-2/anthropic.claude-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/anthropic.claude-v2",
                 "icon": "dummy_icon.png"
@@ -3364,7 +2960,6 @@
             {
                 "name": "bedrock/ap-northeast-1/anthropic.claude-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ap-northeast-1/anthropic.claude-v2",
                 "icon": "dummy_icon.png"
@@ -3372,7 +2967,6 @@
             {
                 "name": "bedrock/ap-northeast-1/1-month-commitment/anthropic.claude-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ap-northeast-1/1-month-commitment/anthropic.claude-v2",
                 "icon": "dummy_icon.png"
@@ -3380,7 +2974,6 @@
             {
                 "name": "bedrock/ap-northeast-1/6-month-commitment/anthropic.claude-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ap-northeast-1/6-month-commitment/anthropic.claude-v2",
                 "icon": "dummy_icon.png"
@@ -3388,7 +2981,6 @@
             {
                 "name": "bedrock/eu-central-1/anthropic.claude-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-central-1/anthropic.claude-v2",
                 "icon": "dummy_icon.png"
@@ -3396,7 +2988,6 @@
             {
                 "name": "bedrock/eu-central-1/1-month-commitment/anthropic.claude-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-central-1/1-month-commitment/anthropic.claude-v2",
                 "icon": "dummy_icon.png"
@@ -3404,7 +2995,6 @@
             {
                 "name": "bedrock/eu-central-1/6-month-commitment/anthropic.claude-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-central-1/6-month-commitment/anthropic.claude-v2",
                 "icon": "dummy_icon.png"
@@ -3412,7 +3002,6 @@
             {
                 "name": "bedrock/us-east-1/1-month-commitment/anthropic.claude-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/1-month-commitment/anthropic.claude-v2",
                 "icon": "dummy_icon.png"
@@ -3420,7 +3009,6 @@
             {
                 "name": "bedrock/us-east-1/6-month-commitment/anthropic.claude-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/6-month-commitment/anthropic.claude-v2",
                 "icon": "dummy_icon.png"
@@ -3428,7 +3016,6 @@
             {
                 "name": "bedrock/us-west-2/1-month-commitment/anthropic.claude-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/1-month-commitment/anthropic.claude-v2",
                 "icon": "dummy_icon.png"
@@ -3436,7 +3023,6 @@
             {
                 "name": "bedrock/us-west-2/6-month-commitment/anthropic.claude-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/6-month-commitment/anthropic.claude-v2",
                 "icon": "dummy_icon.png"
@@ -3444,7 +3030,6 @@
             {
                 "name": "anthropic.claude-v2:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "anthropic.claude-v2:1",
                 "icon": "dummy_icon.png"
@@ -3452,7 +3037,6 @@
             {
                 "name": "bedrock/us-east-1/anthropic.claude-v2:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/anthropic.claude-v2:1",
                 "icon": "dummy_icon.png"
@@ -3460,7 +3044,6 @@
             {
                 "name": "bedrock/us-west-2/anthropic.claude-v2:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/anthropic.claude-v2:1",
                 "icon": "dummy_icon.png"
@@ -3468,7 +3051,6 @@
             {
                 "name": "bedrock/ap-northeast-1/anthropic.claude-v2:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ap-northeast-1/anthropic.claude-v2:1",
                 "icon": "dummy_icon.png"
@@ -3476,7 +3058,6 @@
             {
                 "name": "bedrock/ap-northeast-1/1-month-commitment/anthropic.claude-v2:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ap-northeast-1/1-month-commitment/anthropic.claude-v2:1",
                 "icon": "dummy_icon.png"
@@ -3484,7 +3065,6 @@
             {
                 "name": "bedrock/ap-northeast-1/6-month-commitment/anthropic.claude-v2:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ap-northeast-1/6-month-commitment/anthropic.claude-v2:1",
                 "icon": "dummy_icon.png"
@@ -3492,7 +3072,6 @@
             {
                 "name": "bedrock/eu-central-1/anthropic.claude-v2:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-central-1/anthropic.claude-v2:1",
                 "icon": "dummy_icon.png"
@@ -3500,7 +3079,6 @@
             {
                 "name": "bedrock/eu-central-1/1-month-commitment/anthropic.claude-v2:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-central-1/1-month-commitment/anthropic.claude-v2:1",
                 "icon": "dummy_icon.png"
@@ -3508,7 +3086,6 @@
             {
                 "name": "bedrock/eu-central-1/6-month-commitment/anthropic.claude-v2:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-central-1/6-month-commitment/anthropic.claude-v2:1",
                 "icon": "dummy_icon.png"
@@ -3516,7 +3093,6 @@
             {
                 "name": "bedrock/us-east-1/1-month-commitment/anthropic.claude-v2:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/1-month-commitment/anthropic.claude-v2:1",
                 "icon": "dummy_icon.png"
@@ -3524,7 +3100,6 @@
             {
                 "name": "bedrock/us-east-1/6-month-commitment/anthropic.claude-v2:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/6-month-commitment/anthropic.claude-v2:1",
                 "icon": "dummy_icon.png"
@@ -3532,7 +3107,6 @@
             {
                 "name": "bedrock/us-west-2/1-month-commitment/anthropic.claude-v2:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/1-month-commitment/anthropic.claude-v2:1",
                 "icon": "dummy_icon.png"
@@ -3540,7 +3114,6 @@
             {
                 "name": "bedrock/us-west-2/6-month-commitment/anthropic.claude-v2:1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/6-month-commitment/anthropic.claude-v2:1",
                 "icon": "dummy_icon.png"
@@ -3548,7 +3121,6 @@
             {
                 "name": "anthropic.claude-instant-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "anthropic.claude-instant-v1",
                 "icon": "dummy_icon.png"
@@ -3556,7 +3128,6 @@
             {
                 "name": "bedrock/us-east-1/anthropic.claude-instant-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/anthropic.claude-instant-v1",
                 "icon": "dummy_icon.png"
@@ -3564,7 +3135,6 @@
             {
                 "name": "bedrock/us-east-1/1-month-commitment/anthropic.claude-instant-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/1-month-commitment/anthropic.claude-instant-v1",
                 "icon": "dummy_icon.png"
@@ -3572,7 +3142,6 @@
             {
                 "name": "bedrock/us-east-1/6-month-commitment/anthropic.claude-instant-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/6-month-commitment/anthropic.claude-instant-v1",
                 "icon": "dummy_icon.png"
@@ -3580,7 +3149,6 @@
             {
                 "name": "bedrock/us-west-2/1-month-commitment/anthropic.claude-instant-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/1-month-commitment/anthropic.claude-instant-v1",
                 "icon": "dummy_icon.png"
@@ -3588,7 +3156,6 @@
             {
                 "name": "bedrock/us-west-2/6-month-commitment/anthropic.claude-instant-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/6-month-commitment/anthropic.claude-instant-v1",
                 "icon": "dummy_icon.png"
@@ -3596,7 +3163,6 @@
             {
                 "name": "bedrock/us-west-2/anthropic.claude-instant-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-2/anthropic.claude-instant-v1",
                 "icon": "dummy_icon.png"
@@ -3604,7 +3170,6 @@
             {
                 "name": "bedrock/ap-northeast-1/anthropic.claude-instant-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ap-northeast-1/anthropic.claude-instant-v1",
                 "icon": "dummy_icon.png"
@@ -3612,7 +3177,6 @@
             {
                 "name": "bedrock/ap-northeast-1/1-month-commitment/anthropic.claude-instant-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ap-northeast-1/1-month-commitment/anthropic.claude-instant-v1",
                 "icon": "dummy_icon.png"
@@ -3620,7 +3184,6 @@
             {
                 "name": "bedrock/ap-northeast-1/6-month-commitment/anthropic.claude-instant-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ap-northeast-1/6-month-commitment/anthropic.claude-instant-v1",
                 "icon": "dummy_icon.png"
@@ -3628,7 +3191,6 @@
             {
                 "name": "bedrock/eu-central-1/anthropic.claude-instant-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-central-1/anthropic.claude-instant-v1",
                 "icon": "dummy_icon.png"
@@ -3636,7 +3198,6 @@
             {
                 "name": "bedrock/eu-central-1/1-month-commitment/anthropic.claude-instant-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-central-1/1-month-commitment/anthropic.claude-instant-v1",
                 "icon": "dummy_icon.png"
@@ -3644,7 +3205,6 @@
             {
                 "name": "bedrock/eu-central-1/6-month-commitment/anthropic.claude-instant-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-central-1/6-month-commitment/anthropic.claude-instant-v1",
                 "icon": "dummy_icon.png"
@@ -3652,7 +3212,6 @@
             {
                 "name": "cohere.command-text-v14",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "cohere.command-text-v14",
                 "icon": "dummy_icon.png"
@@ -3660,7 +3219,6 @@
             {
                 "name": "bedrock/*/1-month-commitment/cohere.command-text-v14",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/*/1-month-commitment/cohere.command-text-v14",
                 "icon": "dummy_icon.png"
@@ -3668,7 +3226,6 @@
             {
                 "name": "bedrock/*/6-month-commitment/cohere.command-text-v14",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/*/6-month-commitment/cohere.command-text-v14",
                 "icon": "dummy_icon.png"
@@ -3676,7 +3233,6 @@
             {
                 "name": "cohere.command-light-text-v14",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "cohere.command-light-text-v14",
                 "icon": "dummy_icon.png"
@@ -3684,7 +3240,6 @@
             {
                 "name": "bedrock/*/1-month-commitment/cohere.command-light-text-v14",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/*/1-month-commitment/cohere.command-light-text-v14",
                 "icon": "dummy_icon.png"
@@ -3692,7 +3247,6 @@
             {
                 "name": "bedrock/*/6-month-commitment/cohere.command-light-text-v14",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/*/6-month-commitment/cohere.command-light-text-v14",
                 "icon": "dummy_icon.png"
@@ -3700,7 +3254,6 @@
             {
                 "name": "cohere.command-r-plus-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "cohere.command-r-plus-v1:0",
                 "icon": "dummy_icon.png"
@@ -3708,7 +3261,6 @@
             {
                 "name": "cohere.command-r-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "cohere.command-r-v1:0",
                 "icon": "dummy_icon.png"
@@ -3716,7 +3268,6 @@
             {
                 "name": "cohere.embed-english-v3",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "cohere.embed-english-v3",
                 "icon": "dummy_icon.png"
@@ -3724,7 +3275,6 @@
             {
                 "name": "cohere.embed-multilingual-v3",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "cohere.embed-multilingual-v3",
                 "icon": "dummy_icon.png"
@@ -3732,7 +3282,6 @@
             {
                 "name": "meta.llama2-13b-chat-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "meta.llama2-13b-chat-v1",
                 "icon": "dummy_icon.png"
@@ -3740,7 +3289,6 @@
             {
                 "name": "meta.llama2-70b-chat-v1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "meta.llama2-70b-chat-v1",
                 "icon": "dummy_icon.png"
@@ -3748,7 +3296,6 @@
             {
                 "name": "meta.llama3-8b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "meta.llama3-8b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3756,7 +3303,6 @@
             {
                 "name": "bedrock/us-east-1/meta.llama3-8b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/meta.llama3-8b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3764,7 +3310,6 @@
             {
                 "name": "bedrock/us-west-1/meta.llama3-8b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-1/meta.llama3-8b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3772,7 +3317,6 @@
             {
                 "name": "bedrock/ap-south-1/meta.llama3-8b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ap-south-1/meta.llama3-8b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3780,7 +3324,6 @@
             {
                 "name": "bedrock/ca-central-1/meta.llama3-8b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ca-central-1/meta.llama3-8b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3788,7 +3331,6 @@
             {
                 "name": "bedrock/eu-west-1/meta.llama3-8b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-west-1/meta.llama3-8b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3796,7 +3338,6 @@
             {
                 "name": "bedrock/eu-west-2/meta.llama3-8b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-west-2/meta.llama3-8b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3804,7 +3345,6 @@
             {
                 "name": "bedrock/sa-east-1/meta.llama3-8b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/sa-east-1/meta.llama3-8b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3812,7 +3352,6 @@
             {
                 "name": "meta.llama3-70b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "meta.llama3-70b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3820,7 +3359,6 @@
             {
                 "name": "bedrock/us-east-1/meta.llama3-70b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-east-1/meta.llama3-70b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3828,7 +3366,6 @@
             {
                 "name": "bedrock/us-west-1/meta.llama3-70b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/us-west-1/meta.llama3-70b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3836,7 +3373,6 @@
             {
                 "name": "bedrock/ap-south-1/meta.llama3-70b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ap-south-1/meta.llama3-70b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3844,7 +3380,6 @@
             {
                 "name": "bedrock/ca-central-1/meta.llama3-70b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/ca-central-1/meta.llama3-70b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3852,7 +3387,6 @@
             {
                 "name": "bedrock/eu-west-1/meta.llama3-70b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-west-1/meta.llama3-70b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3860,7 +3394,6 @@
             {
                 "name": "bedrock/eu-west-2/meta.llama3-70b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/eu-west-2/meta.llama3-70b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3868,7 +3401,6 @@
             {
                 "name": "bedrock/sa-east-1/meta.llama3-70b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "bedrock/sa-east-1/meta.llama3-70b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3876,7 +3408,6 @@
             {
                 "name": "meta.llama3-1-8b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "meta.llama3-1-8b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3884,7 +3415,6 @@
             {
                 "name": "meta.llama3-1-70b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "meta.llama3-1-70b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3892,7 +3422,6 @@
             {
                 "name": "meta.llama3-1-405b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "meta.llama3-1-405b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3900,7 +3429,6 @@
             {
                 "name": "meta.llama3-2-1b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "meta.llama3-2-1b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3908,7 +3436,6 @@
             {
                 "name": "us.meta.llama3-2-1b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "us.meta.llama3-2-1b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3916,7 +3443,6 @@
             {
                 "name": "eu.meta.llama3-2-1b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "eu.meta.llama3-2-1b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3924,7 +3450,6 @@
             {
                 "name": "meta.llama3-2-3b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "meta.llama3-2-3b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3932,7 +3457,6 @@
             {
                 "name": "us.meta.llama3-2-3b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "us.meta.llama3-2-3b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3940,7 +3464,6 @@
             {
                 "name": "eu.meta.llama3-2-3b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "eu.meta.llama3-2-3b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3948,7 +3471,6 @@
             {
                 "name": "meta.llama3-2-11b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "meta.llama3-2-11b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3956,7 +3478,6 @@
             {
                 "name": "us.meta.llama3-2-11b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "us.meta.llama3-2-11b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3964,7 +3485,6 @@
             {
                 "name": "meta.llama3-2-90b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "meta.llama3-2-90b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3972,7 +3492,6 @@
             {
                 "name": "us.meta.llama3-2-90b-instruct-v1:0",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "us.meta.llama3-2-90b-instruct-v1:0",
                 "icon": "dummy_icon.png"
@@ -3980,7 +3499,6 @@
             {
                 "name": "512-x-512/50-steps/stability.stable-diffusion-xl-v0",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "512-x-512/50-steps/stability.stable-diffusion-xl-v0",
                 "icon": "dummy_icon.png"
@@ -3988,7 +3506,6 @@
             {
                 "name": "512-x-512/max-steps/stability.stable-diffusion-xl-v0",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "512-x-512/max-steps/stability.stable-diffusion-xl-v0",
                 "icon": "dummy_icon.png"
@@ -3996,7 +3513,6 @@
             {
                 "name": "max-x-max/50-steps/stability.stable-diffusion-xl-v0",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "max-x-max/50-steps/stability.stable-diffusion-xl-v0",
                 "icon": "dummy_icon.png"
@@ -4004,7 +3520,6 @@
             {
                 "name": "max-x-max/max-steps/stability.stable-diffusion-xl-v0",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "max-x-max/max-steps/stability.stable-diffusion-xl-v0",
                 "icon": "dummy_icon.png"
@@ -4012,7 +3527,6 @@
             {
                 "name": "1024-x-1024/50-steps/stability.stable-diffusion-xl-v1",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "1024-x-1024/50-steps/stability.stable-diffusion-xl-v1",
                 "icon": "dummy_icon.png"
@@ -4020,7 +3534,6 @@
             {
                 "name": "1024-x-1024/max-steps/stability.stable-diffusion-xl-v1",
                 "modality": "image",
-                "type": "pretrained",
                 "source": "bedrock",
                 "uri": "1024-x-1024/max-steps/stability.stable-diffusion-xl-v1",
                 "icon": "dummy_icon.png"
@@ -4032,7 +3545,6 @@
             {
                 "name": "sagemaker/meta-textgeneration-llama-2-7b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "sagemaker",
                 "uri": "sagemaker/meta-textgeneration-llama-2-7b",
                 "icon": "dummy_icon.png"
@@ -4040,7 +3552,6 @@
             {
                 "name": "sagemaker/meta-textgeneration-llama-2-7b-f",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "sagemaker",
                 "uri": "sagemaker/meta-textgeneration-llama-2-7b-f",
                 "icon": "dummy_icon.png"
@@ -4048,7 +3559,6 @@
             {
                 "name": "sagemaker/meta-textgeneration-llama-2-13b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "sagemaker",
                 "uri": "sagemaker/meta-textgeneration-llama-2-13b",
                 "icon": "dummy_icon.png"
@@ -4056,7 +3566,6 @@
             {
                 "name": "sagemaker/meta-textgeneration-llama-2-13b-f",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "sagemaker",
                 "uri": "sagemaker/meta-textgeneration-llama-2-13b-f",
                 "icon": "dummy_icon.png"
@@ -4064,7 +3573,6 @@
             {
                 "name": "sagemaker/meta-textgeneration-llama-2-70b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "sagemaker",
                 "uri": "sagemaker/meta-textgeneration-llama-2-70b",
                 "icon": "dummy_icon.png"
@@ -4072,7 +3580,6 @@
             {
                 "name": "sagemaker/meta-textgeneration-llama-2-70b-b-f",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "sagemaker",
                 "uri": "sagemaker/meta-textgeneration-llama-2-70b-b-f",
                 "icon": "dummy_icon.png"
@@ -4084,7 +3591,6 @@
             {
                 "name": "together-ai-up-to-4b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "together_ai",
                 "uri": "together-ai-up-to-4b",
                 "icon": "dummy_icon.png"
@@ -4092,7 +3598,6 @@
             {
                 "name": "together-ai-4.1b-8b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "together_ai",
                 "uri": "together-ai-4.1b-8b",
                 "icon": "dummy_icon.png"
@@ -4100,7 +3605,6 @@
             {
                 "name": "together-ai-8.1b-21b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "together_ai",
                 "uri": "together-ai-8.1b-21b",
                 "icon": "dummy_icon.png"
@@ -4108,7 +3612,6 @@
             {
                 "name": "together-ai-21.1b-41b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "together_ai",
                 "uri": "together-ai-21.1b-41b",
                 "icon": "dummy_icon.png"
@@ -4116,7 +3619,6 @@
             {
                 "name": "together-ai-41.1b-80b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "together_ai",
                 "uri": "together-ai-41.1b-80b",
                 "icon": "dummy_icon.png"
@@ -4124,7 +3626,6 @@
             {
                 "name": "together-ai-81.1b-110b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "together_ai",
                 "uri": "together-ai-81.1b-110b",
                 "icon": "dummy_icon.png"
@@ -4132,7 +3633,6 @@
             {
                 "name": "together-ai-embedding-up-to-150m",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "together_ai",
                 "uri": "together-ai-embedding-up-to-150m",
                 "icon": "dummy_icon.png"
@@ -4140,7 +3640,6 @@
             {
                 "name": "together-ai-embedding-151m-to-350m",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "together_ai",
                 "uri": "together-ai-embedding-151m-to-350m",
                 "icon": "dummy_icon.png"
@@ -4148,7 +3647,6 @@
             {
                 "name": "together_ai/mistralai/Mixtral-8x7B-Instruct-v0.1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "together_ai",
                 "uri": "together_ai/mistralai/Mixtral-8x7B-Instruct-v0.1",
                 "icon": "dummy_icon.png"
@@ -4156,7 +3654,6 @@
             {
                 "name": "together_ai/mistralai/Mistral-7B-Instruct-v0.1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "together_ai",
                 "uri": "together_ai/mistralai/Mistral-7B-Instruct-v0.1",
                 "icon": "dummy_icon.png"
@@ -4164,7 +3661,6 @@
             {
                 "name": "together_ai/togethercomputer/CodeLlama-34b-Instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "together_ai",
                 "uri": "together_ai/togethercomputer/CodeLlama-34b-Instruct",
                 "icon": "dummy_icon.png"
@@ -4176,7 +3672,6 @@
             {
                 "name": "deepinfra/lizpreciatior/lzlv_70b_fp16_hf",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/lizpreciatior/lzlv_70b_fp16_hf",
                 "icon": "dummy_icon.png"
@@ -4184,7 +3679,6 @@
             {
                 "name": "deepinfra/Gryphe/MythoMax-L2-13b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/Gryphe/MythoMax-L2-13b",
                 "icon": "dummy_icon.png"
@@ -4192,7 +3686,6 @@
             {
                 "name": "deepinfra/mistralai/Mistral-7B-Instruct-v0.1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/mistralai/Mistral-7B-Instruct-v0.1",
                 "icon": "dummy_icon.png"
@@ -4200,7 +3693,6 @@
             {
                 "name": "deepinfra/meta-llama/Llama-2-70b-chat-hf",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/meta-llama/Llama-2-70b-chat-hf",
                 "icon": "dummy_icon.png"
@@ -4208,7 +3700,6 @@
             {
                 "name": "deepinfra/cognitivecomputations/dolphin-2.6-mixtral-8x7b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/cognitivecomputations/dolphin-2.6-mixtral-8x7b",
                 "icon": "dummy_icon.png"
@@ -4216,7 +3707,6 @@
             {
                 "name": "deepinfra/codellama/CodeLlama-34b-Instruct-hf",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/codellama/CodeLlama-34b-Instruct-hf",
                 "icon": "dummy_icon.png"
@@ -4224,7 +3714,6 @@
             {
                 "name": "deepinfra/deepinfra/mixtral",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/deepinfra/mixtral",
                 "icon": "dummy_icon.png"
@@ -4232,7 +3721,6 @@
             {
                 "name": "deepinfra/Phind/Phind-CodeLlama-34B-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/Phind/Phind-CodeLlama-34B-v2",
                 "icon": "dummy_icon.png"
@@ -4240,7 +3728,6 @@
             {
                 "name": "deepinfra/mistralai/Mixtral-8x7B-Instruct-v0.1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/mistralai/Mixtral-8x7B-Instruct-v0.1",
                 "icon": "dummy_icon.png"
@@ -4248,7 +3735,6 @@
             {
                 "name": "deepinfra/deepinfra/airoboros-70b",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/deepinfra/airoboros-70b",
                 "icon": "dummy_icon.png"
@@ -4256,7 +3742,6 @@
             {
                 "name": "deepinfra/01-ai/Yi-34B-Chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/01-ai/Yi-34B-Chat",
                 "icon": "dummy_icon.png"
@@ -4264,7 +3749,6 @@
             {
                 "name": "deepinfra/01-ai/Yi-6B-200K",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/01-ai/Yi-6B-200K",
                 "icon": "dummy_icon.png"
@@ -4272,7 +3756,6 @@
             {
                 "name": "deepinfra/jondurbin/airoboros-l2-70b-gpt4-1.4.1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/jondurbin/airoboros-l2-70b-gpt4-1.4.1",
                 "icon": "dummy_icon.png"
@@ -4280,7 +3763,6 @@
             {
                 "name": "deepinfra/meta-llama/Llama-2-13b-chat-hf",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/meta-llama/Llama-2-13b-chat-hf",
                 "icon": "dummy_icon.png"
@@ -4288,7 +3770,6 @@
             {
                 "name": "deepinfra/amazon/MistralLite",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/amazon/MistralLite",
                 "icon": "dummy_icon.png"
@@ -4296,7 +3777,6 @@
             {
                 "name": "deepinfra/meta-llama/Llama-2-7b-chat-hf",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/meta-llama/Llama-2-7b-chat-hf",
                 "icon": "dummy_icon.png"
@@ -4304,7 +3784,6 @@
             {
                 "name": "deepinfra/meta-llama/Meta-Llama-3-8B-Instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/meta-llama/Meta-Llama-3-8B-Instruct",
                 "icon": "dummy_icon.png"
@@ -4312,7 +3791,6 @@
             {
                 "name": "deepinfra/meta-llama/Meta-Llama-3-70B-Instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/meta-llama/Meta-Llama-3-70B-Instruct",
                 "icon": "dummy_icon.png"
@@ -4320,7 +3798,6 @@
             {
                 "name": "deepinfra/01-ai/Yi-34B-200K",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/01-ai/Yi-34B-200K",
                 "icon": "dummy_icon.png"
@@ -4328,7 +3805,6 @@
             {
                 "name": "deepinfra/openchat/openchat_3.5",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "deepinfra",
                 "uri": "deepinfra/openchat/openchat_3.5",
                 "icon": "dummy_icon.png"
@@ -4340,7 +3816,6 @@
             {
                 "name": "perplexity/codellama-34b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/codellama-34b-instruct",
                 "icon": "dummy_icon.png"
@@ -4348,7 +3823,6 @@
             {
                 "name": "perplexity/codellama-70b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/codellama-70b-instruct",
                 "icon": "dummy_icon.png"
@@ -4356,7 +3830,6 @@
             {
                 "name": "perplexity/llama-3.1-70b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/llama-3.1-70b-instruct",
                 "icon": "dummy_icon.png"
@@ -4364,7 +3837,6 @@
             {
                 "name": "perplexity/llama-3.1-8b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/llama-3.1-8b-instruct",
                 "icon": "dummy_icon.png"
@@ -4372,7 +3844,6 @@
             {
                 "name": "perplexity/llama-3.1-sonar-huge-128k-online",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/llama-3.1-sonar-huge-128k-online",
                 "icon": "dummy_icon.png"
@@ -4380,7 +3851,6 @@
             {
                 "name": "perplexity/llama-3.1-sonar-large-128k-online",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/llama-3.1-sonar-large-128k-online",
                 "icon": "dummy_icon.png"
@@ -4388,7 +3858,6 @@
             {
                 "name": "perplexity/llama-3.1-sonar-large-128k-chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/llama-3.1-sonar-large-128k-chat",
                 "icon": "dummy_icon.png"
@@ -4396,7 +3865,6 @@
             {
                 "name": "perplexity/llama-3.1-sonar-small-128k-chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/llama-3.1-sonar-small-128k-chat",
                 "icon": "dummy_icon.png"
@@ -4404,7 +3872,6 @@
             {
                 "name": "perplexity/llama-3.1-sonar-small-128k-online",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/llama-3.1-sonar-small-128k-online",
                 "icon": "dummy_icon.png"
@@ -4412,7 +3879,6 @@
             {
                 "name": "perplexity/pplx-7b-chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/pplx-7b-chat",
                 "icon": "dummy_icon.png"
@@ -4420,7 +3886,6 @@
             {
                 "name": "perplexity/pplx-70b-chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/pplx-70b-chat",
                 "icon": "dummy_icon.png"
@@ -4428,7 +3893,6 @@
             {
                 "name": "perplexity/pplx-7b-online",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/pplx-7b-online",
                 "icon": "dummy_icon.png"
@@ -4436,7 +3900,6 @@
             {
                 "name": "perplexity/pplx-70b-online",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/pplx-70b-online",
                 "icon": "dummy_icon.png"
@@ -4444,7 +3907,6 @@
             {
                 "name": "perplexity/llama-2-70b-chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/llama-2-70b-chat",
                 "icon": "dummy_icon.png"
@@ -4452,7 +3914,6 @@
             {
                 "name": "perplexity/mistral-7b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/mistral-7b-instruct",
                 "icon": "dummy_icon.png"
@@ -4460,7 +3921,6 @@
             {
                 "name": "perplexity/mixtral-8x7b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/mixtral-8x7b-instruct",
                 "icon": "dummy_icon.png"
@@ -4468,7 +3928,6 @@
             {
                 "name": "perplexity/sonar-small-chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/sonar-small-chat",
                 "icon": "dummy_icon.png"
@@ -4476,7 +3935,6 @@
             {
                 "name": "perplexity/sonar-small-online",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/sonar-small-online",
                 "icon": "dummy_icon.png"
@@ -4484,7 +3942,6 @@
             {
                 "name": "perplexity/sonar-medium-chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/sonar-medium-chat",
                 "icon": "dummy_icon.png"
@@ -4492,7 +3949,6 @@
             {
                 "name": "perplexity/sonar-medium-online",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "perplexity",
                 "uri": "perplexity/sonar-medium-online",
                 "icon": "dummy_icon.png"
@@ -4504,7 +3960,6 @@
             {
                 "name": "fireworks_ai/accounts/fireworks/models/llama-v3p2-1b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "fireworks_ai",
                 "uri": "fireworks_ai/accounts/fireworks/models/llama-v3p2-1b-instruct",
                 "icon": "dummy_icon.png"
@@ -4512,7 +3967,6 @@
             {
                 "name": "fireworks_ai/accounts/fireworks/models/llama-v3p2-3b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "fireworks_ai",
                 "uri": "fireworks_ai/accounts/fireworks/models/llama-v3p2-3b-instruct",
                 "icon": "dummy_icon.png"
@@ -4520,7 +3974,6 @@
             {
                 "name": "fireworks_ai/accounts/fireworks/models/llama-v3p2-11b-vision-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "fireworks_ai",
                 "uri": "fireworks_ai/accounts/fireworks/models/llama-v3p2-11b-vision-instruct",
                 "icon": "dummy_icon.png"
@@ -4528,7 +3981,6 @@
             {
                 "name": "accounts/fireworks/models/llama-v3p2-90b-vision-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "fireworks_ai",
                 "uri": "accounts/fireworks/models/llama-v3p2-90b-vision-instruct",
                 "icon": "dummy_icon.png"
@@ -4536,7 +3988,6 @@
             {
                 "name": "fireworks_ai/accounts/fireworks/models/firefunction-v2",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "fireworks_ai",
                 "uri": "fireworks_ai/accounts/fireworks/models/firefunction-v2",
                 "icon": "dummy_icon.png"
@@ -4544,7 +3995,6 @@
             {
                 "name": "fireworks_ai/accounts/fireworks/models/mixtral-8x22b-instruct-hf",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "fireworks_ai",
                 "uri": "fireworks_ai/accounts/fireworks/models/mixtral-8x22b-instruct-hf",
                 "icon": "dummy_icon.png"
@@ -4552,7 +4002,6 @@
             {
                 "name": "fireworks_ai/accounts/fireworks/models/qwen2-72b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "fireworks_ai",
                 "uri": "fireworks_ai/accounts/fireworks/models/qwen2-72b-instruct",
                 "icon": "dummy_icon.png"
@@ -4560,7 +4009,6 @@
             {
                 "name": "fireworks_ai/accounts/fireworks/models/yi-large",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "fireworks_ai",
                 "uri": "fireworks_ai/accounts/fireworks/models/yi-large",
                 "icon": "dummy_icon.png"
@@ -4568,7 +4016,6 @@
             {
                 "name": "fireworks_ai/accounts/fireworks/models/deepseek-coder-v2-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "fireworks_ai",
                 "uri": "fireworks_ai/accounts/fireworks/models/deepseek-coder-v2-instruct",
                 "icon": "dummy_icon.png"
@@ -4580,7 +4027,6 @@
             {
                 "name": "anyscale/mistralai/Mistral-7B-Instruct-v0.1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "anyscale",
                 "uri": "anyscale/mistralai/Mistral-7B-Instruct-v0.1",
                 "icon": "dummy_icon.png"
@@ -4588,7 +4034,6 @@
             {
                 "name": "anyscale/mistralai/Mixtral-8x7B-Instruct-v0.1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "anyscale",
                 "uri": "anyscale/mistralai/Mixtral-8x7B-Instruct-v0.1",
                 "icon": "dummy_icon.png"
@@ -4596,7 +4041,6 @@
             {
                 "name": "anyscale/mistralai/Mixtral-8x22B-Instruct-v0.1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "anyscale",
                 "uri": "anyscale/mistralai/Mixtral-8x22B-Instruct-v0.1",
                 "icon": "dummy_icon.png"
@@ -4604,7 +4048,6 @@
             {
                 "name": "anyscale/HuggingFaceH4/zephyr-7b-beta",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "anyscale",
                 "uri": "anyscale/HuggingFaceH4/zephyr-7b-beta",
                 "icon": "dummy_icon.png"
@@ -4612,7 +4055,6 @@
             {
                 "name": "anyscale/google/gemma-7b-it",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "anyscale",
                 "uri": "anyscale/google/gemma-7b-it",
                 "icon": "dummy_icon.png"
@@ -4620,7 +4062,6 @@
             {
                 "name": "anyscale/meta-llama/Llama-2-7b-chat-hf",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "anyscale",
                 "uri": "anyscale/meta-llama/Llama-2-7b-chat-hf",
                 "icon": "dummy_icon.png"
@@ -4628,7 +4069,6 @@
             {
                 "name": "anyscale/meta-llama/Llama-2-13b-chat-hf",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "anyscale",
                 "uri": "anyscale/meta-llama/Llama-2-13b-chat-hf",
                 "icon": "dummy_icon.png"
@@ -4636,7 +4076,6 @@
             {
                 "name": "anyscale/meta-llama/Llama-2-70b-chat-hf",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "anyscale",
                 "uri": "anyscale/meta-llama/Llama-2-70b-chat-hf",
                 "icon": "dummy_icon.png"
@@ -4644,7 +4083,6 @@
             {
                 "name": "anyscale/codellama/CodeLlama-34b-Instruct-hf",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "anyscale",
                 "uri": "anyscale/codellama/CodeLlama-34b-Instruct-hf",
                 "icon": "dummy_icon.png"
@@ -4652,7 +4090,6 @@
             {
                 "name": "anyscale/codellama/CodeLlama-70b-Instruct-hf",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "anyscale",
                 "uri": "anyscale/codellama/CodeLlama-70b-Instruct-hf",
                 "icon": "dummy_icon.png"
@@ -4660,7 +4097,6 @@
             {
                 "name": "anyscale/meta-llama/Meta-Llama-3-8B-Instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "anyscale",
                 "uri": "anyscale/meta-llama/Meta-Llama-3-8B-Instruct",
                 "icon": "dummy_icon.png"
@@ -4668,7 +4104,6 @@
             {
                 "name": "anyscale/meta-llama/Meta-Llama-3-70B-Instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "anyscale",
                 "uri": "anyscale/meta-llama/Meta-Llama-3-70B-Instruct",
                 "icon": "dummy_icon.png"
@@ -4680,7 +4115,6 @@
             {
                 "name": "cloudflare/@cf/meta/llama-2-7b-chat-fp16",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "cloudflare",
                 "uri": "cloudflare/@cf/meta/llama-2-7b-chat-fp16",
                 "icon": "dummy_icon.png"
@@ -4688,7 +4122,6 @@
             {
                 "name": "cloudflare/@cf/meta/llama-2-7b-chat-int8",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "cloudflare",
                 "uri": "cloudflare/@cf/meta/llama-2-7b-chat-int8",
                 "icon": "dummy_icon.png"
@@ -4696,7 +4129,6 @@
             {
                 "name": "cloudflare/@cf/mistral/mistral-7b-instruct-v0.1",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "cloudflare",
                 "uri": "cloudflare/@cf/mistral/mistral-7b-instruct-v0.1",
                 "icon": "dummy_icon.png"
@@ -4704,7 +4136,6 @@
             {
                 "name": "cloudflare/@hf/thebloke/codellama-7b-instruct-awq",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "cloudflare",
                 "uri": "cloudflare/@hf/thebloke/codellama-7b-instruct-awq",
                 "icon": "dummy_icon.png"
@@ -4716,7 +4147,6 @@
             {
                 "name": "voyage/voyage-01",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "voyage",
                 "uri": "voyage/voyage-01",
                 "icon": "dummy_icon.png"
@@ -4724,7 +4154,6 @@
             {
                 "name": "voyage/voyage-lite-01",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "voyage",
                 "uri": "voyage/voyage-lite-01",
                 "icon": "dummy_icon.png"
@@ -4732,7 +4161,6 @@
             {
                 "name": "voyage/voyage-large-2",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "voyage",
                 "uri": "voyage/voyage-large-2",
                 "icon": "dummy_icon.png"
@@ -4740,7 +4168,6 @@
             {
                 "name": "voyage/voyage-law-2",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "voyage",
                 "uri": "voyage/voyage-law-2",
                 "icon": "dummy_icon.png"
@@ -4748,7 +4175,6 @@
             {
                 "name": "voyage/voyage-code-2",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "voyage",
                 "uri": "voyage/voyage-code-2",
                 "icon": "dummy_icon.png"
@@ -4756,7 +4182,6 @@
             {
                 "name": "voyage/voyage-2",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "voyage",
                 "uri": "voyage/voyage-2",
                 "icon": "dummy_icon.png"
@@ -4764,7 +4189,6 @@
             {
                 "name": "voyage/voyage-lite-02-instruct",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "voyage",
                 "uri": "voyage/voyage-lite-02-instruct",
                 "icon": "dummy_icon.png"
@@ -4772,7 +4196,6 @@
             {
                 "name": "voyage/voyage-finance-2",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "voyage",
                 "uri": "voyage/voyage-finance-2",
                 "icon": "dummy_icon.png"
@@ -4784,7 +4207,6 @@
             {
                 "name": "databricks/databricks-meta-llama-3-1-405b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "databricks",
                 "uri": "databricks/databricks-meta-llama-3-1-405b-instruct",
                 "icon": "dummy_icon.png"
@@ -4792,7 +4214,6 @@
             {
                 "name": "databricks/databricks-meta-llama-3-1-70b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "databricks",
                 "uri": "databricks/databricks-meta-llama-3-1-70b-instruct",
                 "icon": "dummy_icon.png"
@@ -4800,7 +4221,6 @@
             {
                 "name": "databricks/databricks-dbrx-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "databricks",
                 "uri": "databricks/databricks-dbrx-instruct",
                 "icon": "dummy_icon.png"
@@ -4808,7 +4228,6 @@
             {
                 "name": "databricks/databricks-meta-llama-3-70b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "databricks",
                 "uri": "databricks/databricks-meta-llama-3-70b-instruct",
                 "icon": "dummy_icon.png"
@@ -4816,7 +4235,6 @@
             {
                 "name": "databricks/databricks-llama-2-70b-chat",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "databricks",
                 "uri": "databricks/databricks-llama-2-70b-chat",
                 "icon": "dummy_icon.png"
@@ -4824,7 +4242,6 @@
             {
                 "name": "databricks/databricks-mixtral-8x7b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "databricks",
                 "uri": "databricks/databricks-mixtral-8x7b-instruct",
                 "icon": "dummy_icon.png"
@@ -4832,7 +4249,6 @@
             {
                 "name": "databricks/databricks-mpt-30b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "databricks",
                 "uri": "databricks/databricks-mpt-30b-instruct",
                 "icon": "dummy_icon.png"
@@ -4840,7 +4256,6 @@
             {
                 "name": "databricks/databricks-mpt-7b-instruct",
                 "modality": "llm",
-                "type": "pretrained",
                 "source": "databricks",
                 "uri": "databricks/databricks-mpt-7b-instruct",
                 "icon": "dummy_icon.png"
@@ -4848,7 +4263,6 @@
             {
                 "name": "databricks/databricks-bge-large-en",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "databricks",
                 "uri": "databricks/databricks-bge-large-en",
                 "icon": "dummy_icon.png"
@@ -4856,7 +4270,6 @@
             {
                 "name": "databricks/databricks-gte-large-en",
                 "modality": "embedding",
-                "type": "pretrained",
                 "source": "databricks",
                 "uri": "databricks/databricks-gte-large-en",
                 "icon": "dummy_icon.png"
