@@ -8,8 +8,9 @@ from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import ModelProviderTypeEnum
 from budapp.commons.database import engine
-from budapp.model_ops.crud import ModelDataManager
-from budapp.model_ops.models import Model
+from budapp.model_ops.crud import CloudModelDataManager, ProviderDataManager
+from budapp.model_ops.models import CloudModel
+from budapp.model_ops.models import Provider as ProviderModel
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import User as UserModel
 
@@ -50,13 +51,18 @@ class CloudModelSeeder(BaseSeeder):
             logger.debug(f"Seeding cloud models for {len(cloud_model_data)} providers")
 
             for provider, model_data in cloud_model_data.items():
+                db_provider = await ProviderDataManager(session).retrieve_by_fields(
+                    ProviderModel,
+                    {"type": provider},
+                    missing_ok=True,
+                )
                 # URI as key and details as value
                 provider_model = {}
                 for model in model_data["models"]:
                     provider_model[model["uri"]] = model
 
                 # Check if the models already exist
-                existing_models = await ModelDataManager(session).get_all_models_by_source_uris(
+                existing_models = await CloudModelDataManager(session).get_all_cloud_models_by_source_uris(
                     provider, list(provider_model.keys())
                 )
                 logger.debug(f"Found {len(existing_models)} existing models for provider {provider}. Updating...")
@@ -66,26 +72,27 @@ class CloudModelSeeder(BaseSeeder):
                     update_data = {
                         "name": provider_model[existing_model.uri]["name"],
                         "modality": provider_model[existing_model.uri]["modality"],
-                        "type": provider_model[existing_model.uri]["type"],
                         "source": provider_model[existing_model.uri]["source"],
                         "uri": provider_model[existing_model.uri]["uri"],
                         "icon": provider_model[existing_model.uri]["icon"],
                         "provider_type": ModelProviderTypeEnum.CLOUD_MODEL.value,
-                        "created_by": db_user.id,
+                        "provider_id": db_provider.id,
                     }
 
                     # Update existing model in the database
-                    await ModelDataManager(session).update_by_fields(existing_model, update_data)
+                    await CloudModelDataManager(session).update_by_fields(existing_model, update_data)
 
                     # Remove the model from the provider_model
                     del provider_model[existing_model.uri]
 
                 # Bulk insert the new models
                 new_models = [
-                    Model(**model, provider_type=ModelProviderTypeEnum.CLOUD_MODEL.value, created_by=db_user.id)
+                    CloudModel(
+                        **model, provider_type=ModelProviderTypeEnum.CLOUD_MODEL.value, provider_id=db_provider.id
+                    )
                     for model in provider_model.values()
                 ]
-                await ModelDataManager(session).insert_all(new_models)
+                await CloudModelDataManager(session).insert_all(new_models)
                 logger.debug(f"Seeded {len(new_models)} new models for provider {provider}")
         else:
             logger.error("Super user not found. Skipping cloud model seeding.")
