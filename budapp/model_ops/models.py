@@ -3,6 +3,7 @@ from typing import Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, String, Uuid
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -46,7 +47,7 @@ class Model(Base):
             name="model_type_enum",
             values_callable=lambda x: [e.value for e in x],
         ),
-        nullable=False,
+        nullable=True,
     )
     source: Mapped[str] = mapped_column(String, nullable=False)
     provider_type: Mapped[str] = mapped_column(
@@ -86,3 +87,54 @@ class Provider(Base):
     )
     description: Mapped[str] = mapped_column(String, nullable=True)
     icon: Mapped[Optional[str]] = mapped_column(String, nullable=False)
+
+
+class CloudModel(Base):
+    """Model for a AI cloud model."""
+
+    __tablename__ = "cloud_model"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=True)
+    tags: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
+    tasks: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
+    author: Mapped[str] = mapped_column(String, nullable=True)
+    model_size: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    icon: Mapped[Optional[str]] = mapped_column(String, nullable=False)
+    github_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    huggingface_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    website_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    modality: Mapped[str] = mapped_column(
+        PG_ENUM(
+            ModalityEnum,
+            name="modality_enum",
+            values_callable=lambda x: [e.value for e in x],
+            create_type=False,
+        ),
+        nullable=False,
+    )
+    type: Mapped[str] = mapped_column(
+        PG_ENUM(
+            ModelTypeEnum,
+            name="model_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+            create_type=False,
+        ),
+        nullable=True,
+    )
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    provider_type: Mapped[str] = mapped_column(
+        PG_ENUM(
+            ModelProviderTypeEnum,
+            name="model_provider_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+            create_type=False,
+        ),
+        nullable=False,
+    )
+    uri: Mapped[str] = mapped_column(String, nullable=False)
+    provider_id: Mapped[UUID] = mapped_column(ForeignKey("provider.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

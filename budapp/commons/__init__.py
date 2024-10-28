@@ -19,6 +19,7 @@
 from budapp.auth.models import Token as Token
 from budapp.core.models import Workflow as Workflow
 from budapp.core.models import WorkflowStep as WorkflowStep
+from budapp.model_ops.models import CloudModel as CloudModel
 from budapp.model_ops.models import Model as Model
 from budapp.model_ops.models import Provider as Provider
 from budapp.permissions.models import Permission as Permission
