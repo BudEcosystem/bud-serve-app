@@ -152,3 +152,42 @@ class AddCloudModelWorkflowResponse(SuccessResponse):
     total_steps: int
     reason: str | None = None
     workflow_steps: AddCloudModelWorkflowStepDataResponse | None = None
+
+
+class CloudModelFilter(BaseModel):
+    """Cloud model filter schema."""
+
+    source: CredentialTypeEnum | None = None
+    modality: ModalityEnum | None = None
+    model_size: int | None = None
+    name: str | None = None
+
+    @field_validator("source")
+    def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
+        """Change the source to a string."""
+        return v.value if v else None
+
+
+class CloudModel(BaseModel):
+    """Cloud model schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    description: str | None = None
+    modality: ModalityEnum
+    source: CredentialTypeEnum
+    provider_type: ModelProviderTypeEnum
+    uri: str
+    model_size: int | None = None
+    tags: list[Tag] | None = None
+    tasks: list[Tag] | None = None
+
+
+class CloudModelResponse(PaginatedSuccessResponse):
+    """Cloud model response schema."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    cloud_models: list[CloudModel] = []

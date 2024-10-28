@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Tuple
 
 from sqlalchemy import and_, func, or_, select
+from sqlalchemy.dialects.postgresql import JSONB
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
@@ -68,3 +69,55 @@ class CloudModelDataManager(DataManagerUtils):
         """Get all cloud models from the database."""
         stmt = select(CloudModel).filter(CloudModel.uri.in_(uris), CloudModel.source == provider)
         return self.scalars_all(stmt)
+
+    async def get_all_cloud_models(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict[str, Any] = {},
+        order_by: List[Tuple[str, str]] = [],
+        search: bool = False,
+    ) -> Tuple[List[CloudModel], int]:
+        """Get all cloud models from the database."""
+        await self.validate_fields(CloudModel, filters)
+
+        # Tags and tasks are not filterable
+        json_filters = {"tags": [], "tasks": []}
+        if "tags" in filters:
+            json_filters["tags"] = filters["tags"]
+            del filters["tags"]
+        if "tasks" in filters:
+            json_filters["tasks"] = filters["tasks"]
+            del filters["tasks"]
+
+        conditions = [CloudModel.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]]
+
+        conditions.extend(
+            [CloudModel.tasks.cast(JSONB).contains([{"name": task_name}]) for task_name in json_filters["tasks"]]
+        )
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(CloudModel, filters)
+            stmt = select(CloudModel).filter(or_(*search_conditions)).where(or_(*conditions))
+            count_stmt = (
+                select(func.count()).select_from(CloudModel).filter(or_(*search_conditions)).where(or_(*conditions))
+            )
+        else:
+            stmt = select(CloudModel).filter_by(**filters).where(and_(*conditions))
+            count_stmt = select(func.count()).select_from(CloudModel).filter_by(**filters).where(and_(*conditions))
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(CloudModel, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.scalars_all(stmt)
+
+        return result, count

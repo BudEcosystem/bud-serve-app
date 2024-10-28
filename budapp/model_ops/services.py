@@ -14,8 +14,8 @@ from budapp.core.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.core.models import Workflow as WorkflowModel
 from budapp.core.models import WorkflowStep as WorkflowStepModel
 
-from .crud import ModelDataManager, ProviderDataManager
-from .models import Model
+from .crud import CloudModelDataManager, ModelDataManager, ProviderDataManager
+from .models import CloudModel, Model
 from .models import Provider as ProviderModel
 from .schemas import AddCloudModelWorkflowStepData
 
@@ -220,3 +220,18 @@ class ModelService(SessionMixin):
             logger.info("Successfully triggered model deployment")
 
         return db_workflow
+
+
+class CloudModelService(SessionMixin):
+    """Cloud model service."""
+
+    async def get_all_cloud_models(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[CloudModel], int]:
+        """Get all cloud models."""
+        return await CloudModelDataManager(self.session).get_all_cloud_models(offset, limit, filters, order_by, search)
