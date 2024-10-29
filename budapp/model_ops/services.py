@@ -1,11 +1,10 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 from uuid import UUID
+
+from fastapi import status
 
 from budapp.commons import logging
 from budapp.commons.constants import (
-    CredentialTypeEnum,
-    ModalityEnum,
-    ModelProviderTypeEnum,
     WorkflowStatusEnum,
 )
 from budapp.commons.db_utils import SessionMixin
@@ -17,7 +16,12 @@ from budapp.core.models import WorkflowStep as WorkflowStepModel
 from .crud import CloudModelDataManager, ModelDataManager, ProviderDataManager
 from .models import CloudModel, Model
 from .models import Provider as ProviderModel
-from .schemas import AddCloudModelWorkflowStepData
+from .schemas import (
+    CreateCloudModelWorkflowRequest,
+    CreateCloudModelWorkflowResponse,
+    CreateCloudModelWorkflowStepData,
+    CreateCloudModelWorkflowSteps,
+)
 
 
 logger = logging.get_logger(__name__)
@@ -41,22 +45,23 @@ class ProviderService(SessionMixin):
 class ModelService(SessionMixin):
     """Model service."""
 
-    async def add_cloud_model_workflow(
-        self,
-        current_user_id: UUID,
-        step_number: int,
-        workflow_id: Optional[UUID] = None,
-        workflow_total_steps: Optional[int] = None,
-        provider_type: Optional[ModelProviderTypeEnum] = None,
-        source: Optional[CredentialTypeEnum] = None,
-        name: Optional[str] = None,
-        modality: Optional[ModalityEnum] = None,
-        uri: Optional[str] = None,
-        tags: Optional[list[dict]] = None,
-        icon: Optional[str] = None,
-        trigger_workflow: bool = False,
-    ) -> None:
+    async def add_cloud_model_workflow(self, current_user_id: UUID, request: CreateCloudModelWorkflowRequest) -> None:
         """Add a cloud model workflow."""
+        # Get request data
+        step_number = request.step_number
+        workflow_id = request.workflow_id
+        workflow_total_steps = request.workflow_total_steps
+        provider_type = request.provider_type
+        name = request.name
+        modality = request.modality
+        uri = request.uri
+        tags = request.tags
+        icon = request.icon
+        trigger_workflow = request.trigger_workflow
+        provider_id = request.provider_id
+        cloud_model_id = request.cloud_model_id
+        description = request.description
+
         current_step_number = step_number
 
         # Validate workflow
@@ -79,8 +84,16 @@ class ModelService(SessionMixin):
         else:
             raise ClientException("Either workflow_id or workflow_total_steps should be provided")
 
+        # Model source is provider type
+        source = None
+        if provider_id:
+            db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                ProviderModel, {"id": provider_id}
+            )
+            source = db_provider.type
+
         # Prepare workflow step data
-        workflow_step_data = AddCloudModelWorkflowStepData(
+        workflow_step_data = CreateCloudModelWorkflowSteps(
             provider_type=provider_type,
             source=source.value if source else None,
             name=name,
@@ -88,6 +101,9 @@ class ModelService(SessionMixin):
             uri=uri,
             tags=tags,
             icon=icon,
+            provider_id=provider_id,
+            cloud_model_id=cloud_model_id,
+            description=description,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
@@ -201,6 +217,9 @@ class ModelService(SessionMixin):
                 "uri",
                 "tags",
                 "icon",
+                "provider_type",
+                "provider_id",
+                "description",
             ]
 
             # from workflow steps extract necessary information
@@ -220,6 +239,104 @@ class ModelService(SessionMixin):
             logger.info("Successfully triggered model deployment")
 
         return db_workflow
+
+    async def get_cloud_model_workflow(self, workflow_id: UUID) -> CreateCloudModelWorkflowResponse:
+        """Get cloud model workflow."""
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        if not db_workflow_steps:
+            return CreateCloudModelWorkflowResponse(
+                workflow_id=db_workflow.id,
+                status=db_workflow.status,
+                current_step=db_workflow.current_step,
+                total_steps=db_workflow.total_steps,
+                reason=db_workflow.reason,
+                workflow_steps=CreateCloudModelWorkflowStepData(),
+                code=status.HTTP_200_OK,
+            )
+
+        # Define the keys required for model deployment
+        keys_of_interest = [
+            "source",
+            "name",
+            "modality",
+            "uri",
+            "tags",
+            "icon",
+            "provider_type",
+            "provider_id",
+            "cloud_model_id",
+            "description",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        provider_type = required_data.get("provider_type")
+
+        db_provider = (
+            await ProviderDataManager(self.session).retrieve_by_fields(
+                ProviderModel, {"id": required_data["provider_id"]}, missing_ok=True
+            )
+            if "provider_id" in required_data
+            else None
+        )
+
+        db_cloud_model = (
+            await CloudModelDataManager(self.session).retrieve_by_fields(
+                CloudModel, {"id": required_data["cloud_model_id"]}, missing_ok=True
+            )
+            if "cloud_model_id" in required_data
+            else None
+        )
+
+        # budserve_cluster_events = required_data.get("budserve_cluster_events")
+        # bud_simulator_events = required_data.get("bud_simulator_events")
+        # simulator_id = required_data.get("simulator_id")
+        # template_id = required_data.get("template_id")
+        # deploy_config = required_data.get("deploy_config")
+
+        # return ModelDeployWorkflowResponse(
+        #     workflow_id=db_workflow.id,
+        #     status=db_workflow.status,
+        #     current_step=db_workflow.current_step,
+        #     total_steps=db_workflow.total_steps,
+        #     reason=db_workflow.reason,
+        #     workflow_steps=ModelDeployWorkflowStepResponse(
+        #         model=db_model,
+        #         cluster=db_cluster,
+        #         project=db_project,
+        #         template=db_template,
+        #         endpoint_name=endpoint_name,
+        #         budserve_cluster_events=budserve_cluster_events,
+        #         bud_simulator_events=bud_simulator_events,
+        #         simulator_id=simulator_id,
+        #         template_id=template_id,
+        #         deploy_config=deploy_config,
+        #     ),
+        # )
+
+        return CreateCloudModelWorkflowResponse(
+            workflow_id=db_workflow.id,
+            status=db_workflow.status,
+            current_step=db_workflow.current_step,
+            total_steps=db_workflow.total_steps,
+            reason=db_workflow.reason,
+            workflow_steps=CreateCloudModelWorkflowStepData(
+                provider_type=provider_type,
+                provider=db_provider,
+                cloud_model=db_cloud_model,
+            ),
+            code=status.HTTP_200_OK,
+        )
 
 
 class CloudModelService(SessionMixin):

@@ -14,10 +14,10 @@ from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
 
 from .schemas import (
-    AddCloudModelWorkflowRequest,
-    AddCloudModelWorkflowResponse,
     CloudModelFilter,
     CloudModelResponse,
+    CreateCloudModelWorkflowRequest,
+    CreateCloudModelWorkflowResponse,
     ProviderFilter,
     ProviderResponse,
     RecommendedTagsResponse,
@@ -96,7 +96,7 @@ async def list_providers(
             "description": "Service is unavailable due to client error",
         },
         status.HTTP_200_OK: {
-            "model": AddCloudModelWorkflowResponse,
+            "model": CreateCloudModelWorkflowResponse,
             "description": "Successfully add cloud model workflow",
         },
     },
@@ -105,38 +105,21 @@ async def list_providers(
 async def add_cloud_model_workflow(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    request: AddCloudModelWorkflowRequest,
-) -> Union[AddCloudModelWorkflowResponse, ErrorResponse]:
+    request: CreateCloudModelWorkflowRequest,
+) -> Union[CreateCloudModelWorkflowResponse, ErrorResponse]:
     """Add cloud model workflow."""
     try:
         db_workflow = await ModelService(session).add_cloud_model_workflow(
             current_user_id=current_user.id,
-            step_number=request.step_number,
-            workflow_id=request.workflow_id,
-            workflow_total_steps=request.workflow_total_steps,
-            provider_type=request.provider_type,
-            source=request.source,
-            name=request.name,
-            modality=request.modality,
-            uri=request.uri,
-            tags=request.tags,
-            icon=request.icon,
-            trigger_workflow=request.trigger_workflow,
+            request=request,
         )
+
+        return await ModelService(session).get_cloud_model_workflow(db_workflow.id)
     except Exception as e:
         logger.exception(f"Failed to get all providers: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all providers"
         ).to_http_response()
-
-    return AddCloudModelWorkflowResponse(
-        workflow_id=db_workflow.id,
-        status=db_workflow.status,
-        current_step=db_workflow.current_step,
-        total_steps=db_workflow.total_steps,
-        reason=db_workflow.reason,
-        workflow_steps=db_workflow.steps,
-    ).to_http_response()
 
 
 @model_router.get(

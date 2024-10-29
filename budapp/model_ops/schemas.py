@@ -78,97 +78,6 @@ class Tag(BaseModel):
         return v.upper()  # Normalize to uppercase
 
 
-class AddCloudModelWorkflowRequest(BaseModel):
-    """Cloud model workflow request schema."""
-
-    workflow_id: UUID4 | None = None
-    workflow_total_steps: int | None = None
-    step_number: int = Field(..., gt=0)
-    trigger_workflow: bool = False
-    provider_type: ModelProviderTypeEnum | None = None
-    source: CredentialTypeEnum | None = None
-    name: str | None = None
-    modality: ModalityEnum | None = None
-    uri: str | None = None
-    tags: list[Tag] | None = None
-    icon: str | None = None
-
-    @model_validator(mode="after")
-    def validate_fields(self) -> "AddCloudModelWorkflowRequest":
-        """Validate the fields of the request."""
-        if self.workflow_id is None and self.workflow_total_steps is None:
-            raise ValueError("workflow_total_steps is required when workflow_id is not provided")
-
-        if self.workflow_id is not None and self.workflow_total_steps is not None:
-            raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
-
-        # Check if at least one of the other fields is provided
-        other_fields = [
-            self.provider_type,
-            self.source,
-            self.modality,
-            self.uri,
-            self.tags,
-        ]
-        if not any(other_fields):
-            raise ValueError(
-                "At least one of provider_type, source, modality, uri, or tags is required when workflow_id is provided"
-            )
-
-        return self
-
-
-class AddCloudModelWorkflowStepData(BaseModel):
-    """Cloud model workflow step data schema."""
-
-    provider_type: ModelProviderTypeEnum | None = None
-    source: CredentialTypeEnum | None = None
-    name: str | None = None
-    modality: ModalityEnum | None = None
-    uri: str | None = None
-    tags: list[Tag] | None = None
-    icon: str | None = None
-
-
-class AddCloudModelWorkflowStepDataResponse(BaseModel):
-    """Cloud model workflow step data schema."""
-
-    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
-
-    provider_type: ModelProviderTypeEnum | None = None
-    source: CredentialTypeEnum | None = None
-    name: str | None = None
-    modality: ModalityEnum | None = None
-    uri: str | None = None
-    tags: list[Tag] | None = None
-    icon: str | None = None
-
-
-class AddCloudModelWorkflowResponse(SuccessResponse):
-    """Add Cloud Model Workflow Response."""
-
-    workflow_id: UUID4
-    status: WorkflowStatusEnum
-    current_step: int
-    total_steps: int
-    reason: str | None = None
-    workflow_steps: AddCloudModelWorkflowStepDataResponse | None = None
-
-
-class CloudModelFilter(BaseModel):
-    """Cloud model filter schema."""
-
-    source: CredentialTypeEnum | None = None
-    modality: ModalityEnum | None = None
-    model_size: int | None = None
-    name: str | None = None
-
-    @field_validator("source")
-    def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
-        """Change the source to a string."""
-        return v.value if v else None
-
-
 class CloudModel(BaseModel):
     """Cloud model schema."""
 
@@ -184,6 +93,104 @@ class CloudModel(BaseModel):
     model_size: int | None = None
     tags: list[Tag] | None = None
     tasks: list[Tag] | None = None
+
+
+class CreateCloudModelWorkflowRequest(BaseModel):
+    """Cloud model workflow request schema."""
+
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None
+    step_number: int = Field(..., gt=0)
+    trigger_workflow: bool = False
+    provider_type: ModelProviderTypeEnum | None = None
+    provider_id: UUID4 | None = None
+    name: str | None = None
+    modality: ModalityEnum | None = None
+    uri: str | None = None
+    tags: list[Tag] | None = None
+    icon: str | None = None
+    cloud_model_id: UUID4 | None = None
+    description: str | None = None
+
+    @model_validator(mode="after")
+    def validate_fields(self) -> "CreateCloudModelWorkflowRequest":
+        """Validate the fields of the request."""
+        if self.workflow_id is None and self.workflow_total_steps is None:
+            raise ValueError("workflow_total_steps is required when workflow_id is not provided")
+
+        if self.workflow_id is not None and self.workflow_total_steps is not None:
+            raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
+
+        # Check if at least one of the other fields is provided
+        other_fields = [
+            self.provider_type,
+            self.provider_id,
+            self.modality,
+            self.uri,
+            self.tags,
+            self.cloud_model_id,
+            self.description,
+        ]
+        required_fields = ["provider_type", "provider_id", "modality", "uri", "tags", "cloud_model_id", "description"]
+        if not any(other_fields):
+            raise ValueError(f"At least one of {', '.join(required_fields)} is required when workflow_id is provided")
+
+        return self
+
+
+class CreateCloudModelWorkflowSteps(BaseModel):
+    """Cloud model workflow step data schema."""
+
+    provider_type: ModelProviderTypeEnum | None = None
+    source: CredentialTypeEnum | None = None
+    name: str | None = None
+    modality: ModalityEnum | None = None
+    uri: str | None = None
+    tags: list[Tag] | None = None
+    icon: str | None = None
+    provider_id: UUID4 | None = None
+    cloud_model_id: UUID4 | None = None
+
+
+class CreateCloudModelWorkflowStepData(BaseModel):
+    """Cloud model workflow step data schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    provider_type: ModelProviderTypeEnum | None = None
+    source: CredentialTypeEnum | None = None
+    name: str | None = None
+    modality: ModalityEnum | None = None
+    uri: str | None = None
+    tags: list[Tag] | None = None
+    icon: str | None = None
+    provider: Provider | None = None
+    cloud_model: CloudModel | None = None
+
+
+class CreateCloudModelWorkflowResponse(SuccessResponse):
+    """Add Cloud Model Workflow Response."""
+
+    workflow_id: UUID4
+    status: WorkflowStatusEnum
+    current_step: int
+    total_steps: int
+    reason: str | None = None
+    workflow_steps: CreateCloudModelWorkflowStepData | None = None
+
+
+class CloudModelFilter(BaseModel):
+    """Cloud model filter schema."""
+
+    source: CredentialTypeEnum | None = None
+    modality: ModalityEnum | None = None
+    model_size: int | None = None
+    name: str | None = None
+
+    @field_validator("source")
+    def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
+        """Change the source to a string."""
+        return v.value if v else None
 
 
 class CloudModelResponse(PaginatedSuccessResponse):
