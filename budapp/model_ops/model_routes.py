@@ -40,7 +40,7 @@ from .schemas import (
     ProviderResponse,
     RecommendedTagsResponse,
 )
-from .services import CloudModelService, ModelService, ProviderService
+from .services import CloudModelService, CloudModelWorkflowService, ProviderService
 
 
 logger = logging.get_logger(__name__)
@@ -127,12 +127,12 @@ async def add_cloud_model_workflow(
 ) -> Union[CreateCloudModelWorkflowResponse, ErrorResponse]:
     """Add cloud model workflow."""
     try:
-        db_workflow = await ModelService(session).add_cloud_model_workflow(
+        db_workflow = await CloudModelWorkflowService(session).add_cloud_model_workflow(
             current_user_id=current_user.id,
             request=request,
         )
 
-        return await ModelService(session).get_cloud_model_workflow(db_workflow.id)
+        return await CloudModelWorkflowService(session).get_cloud_model_workflow(db_workflow.id)
     except Exception as e:
         logger.exception(f"Failed to get all providers: {e}")
         return ErrorResponse(

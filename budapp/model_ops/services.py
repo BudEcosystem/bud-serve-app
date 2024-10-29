@@ -59,7 +59,7 @@ class ProviderService(SessionMixin):
         return await ProviderDataManager(self.session).get_all_providers(offset, limit, filters, order_by, search)
 
 
-class ModelService(SessionMixin):
+class CloudModelWorkflowService(SessionMixin):
     """Model service."""
 
     async def add_cloud_model_workflow(self, current_user_id: UUID, request: CreateCloudModelWorkflowRequest) -> None:
