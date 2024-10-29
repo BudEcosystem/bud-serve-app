@@ -1,0 +1,308 @@
+{
+    "openai": {
+        "name": "OpenAI",
+        "type": "openai",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "text-completion-openai": {
+        "name": "OpenAI (Text Completion)",
+        "type": "text-completion-openai",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "azure": {
+        "name": "Azure OpenAI",
+        "type": "azure",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "azure_ai": {
+        "name": "Azure AI Studio",
+        "type": "azure_ai",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "vertex_ai-ai21_models": {
+        "name": "Vertex AI AI21",
+        "type": "vertex_ai-ai21_models",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "vertex_ai-anthropic_models": {
+        "name": "Vertex AI Anthropic",
+        "type": "vertex_ai-anthropic_models",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "vertex_ai-chat-models": {
+        "name": "Vertex AI Chat",
+        "type": "vertex_ai-chat-models",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "vertex_ai-code-chat-models": {
+        "name": "Vertex AI Code Chat",
+        "type": "vertex_ai-code-chat-models",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "vertex_ai-code-text-models": {
+        "name": "Vertex AI Code Text",
+        "type": "vertex_ai-code-text-models",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "vertex_ai-embedding-models": {
+        "name": "Vertex AI Embedding",
+        "type": "vertex_ai-embedding-models",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "vertex_ai-image-models": {
+        "name": "Vertex AI Image",
+        "type": "vertex_ai-image-models",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "vertex_ai-language-models": {
+        "name": "Vertex AI Language",
+        "type": "vertex_ai-language-models",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "vertex_ai-llama_models": {
+        "name": "Vertex AI Llama",
+        "type": "vertex_ai-llama_models",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "vertex_ai-mistral_models": {
+        "name": "Vertex AI Mistral",
+        "type": "vertex_ai-mistral_models",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "vertex_ai-text-models": {
+        "name": "Vertex AI Text",
+        "type": "vertex_ai-text-models",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "vertex_ai-vision-models": {
+        "name": "Vertex AI Vision",
+        "type": "vertex_ai-vision-models",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "gemini": {
+        "name": "Gemini - Google AI Studio",
+        "type": "gemini",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "sagemaker": {
+        "name": "AWS Sagemaker",
+        "type": "sagemaker",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "bedrock": {
+        "name": "AWS Bedrock",
+        "type": "bedrock",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "mistral": {
+        "name": "Mistral AI API",
+        "type": "mistral",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "codestral": {
+        "name": "Codestral API",
+        "type": "codestral",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "text-completion-codestral": {
+        "name": "Codestral API (Text Completion)",
+        "type": "text-completion-codestral",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "cohere": {
+        "name": "Cohere",
+        "type": "cohere",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "cohere_chat": {
+        "name": "Cohere (Chat)",
+        "type": "cohere_chat",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "anyscale": {
+        "name": "Anyscale",
+        "type": "anyscale",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "huggingface": {
+        "name": "Huggingface",
+        "type": "huggingface",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "perplexity": {
+        "name": "Perplexity AI (pplx-api)",
+        "type": "perplexity",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "groq": {
+        "name": "Groq",
+        "type": "groq",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "together_ai": {
+        "name": "Together AI",
+        "type": "together_ai",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "databricks": {
+        "name": "Databricks",
+        "type": "databricks",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "cerebras": {
+        "name": "Cerebras",
+        "type": "cerebras",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "friendliai": {
+        "name": "FriendliAI",
+        "type": "friendliai",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "deepseek": {
+        "name": "Deepseek",
+        "type": "deepseek",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "fireworks_ai": {
+        "name": "Fireworks AI",
+        "type": "fireworks_ai",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "cloudflare": {
+        "name": "Cloudflare Workers AI",
+        "type": "cloudflare",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "deepinfra": {
+        "name": "DeepInfra",
+        "type": "deepinfra",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "ai21": {
+        "name": "AI21",
+        "type": "ai21",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "nlp_cloud": {
+        "name": "NLP Cloud",
+        "type": "nlp_cloud",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "replicate": {
+        "name": "Replicate",
+        "type": "replicate",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "voyage": {
+        "name": "Voyage AI",
+        "type": "voyage",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "aleph_alpha": {
+        "name": "Aleph Alpha",
+        "type": "aleph_alpha",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "openrouter": {
+        "name": "OpenRouter",
+        "type": "openrouter",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "watsonx": {
+        "name": "IBM watsonx.ai",
+        "type": "watsonx",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "predibase": {
+        "name": "Predibase",
+        "type": "predibase",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "volcengine": {
+        "name": "Volcano Engine",
+        "type": "volcengine",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "clarifai": {
+        "name": "Clarifai",
+        "type": "clarifai",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "baseten": {
+        "name": "Baseten",
+        "type": "baseten",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "palm": {
+        "name": "PaLM API",
+        "type": "palm",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "sambanova": {
+        "name": "Sambanova",
+        "type": "sambanova",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "github": {
+        "name": "Github",
+        "type": "github",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    },
+    "petals": {
+        "name": "Petals",
+        "type": "petals",
+        "description": "Here we can add a description about the provider",
+        "icon": "dummy_icon.png"
+    }
+}

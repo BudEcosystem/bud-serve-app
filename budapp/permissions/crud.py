@@ -14,15 +14,15 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""Initialization module for the `commons` subpackage. Contains common utilities, configurations, constants, and helper functions that are shared across the project."""
+"""The core package, containing essential business logic, services, and routing configurations for the permissions."""
 
-from budapp.auth.models import Token as Token
-from budapp.core.models import Workflow as Workflow
-from budapp.core.models import WorkflowStep as WorkflowStep
-from budapp.model_ops.models import CloudModel as CloudModel
-from budapp.model_ops.models import Model as Model
-from budapp.model_ops.models import Provider as Provider
-from budapp.permissions.models import Permission as Permission
-from budapp.user_ops.models import User as User
+from budapp.commons import logging
+from budapp.commons.db_utils import DataManagerUtils
 
-from .database import Base as Base
+logger = logging.get_logger(__name__)
+
+
+class PermissionDataManager(DataManagerUtils):
+    """Data manager for the Permission model."""
+
+    pass

@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dapr.conf import settings as dapr_settings
-from pydantic import ConfigDict, DirectoryPath, Field, model_validator
+from pydantic import ConfigDict, DirectoryPath, Field, computed_field, model_validator
 from pydantic_settings import BaseSettings
 
 from budapp.__about__ import __version__
@@ -183,10 +183,32 @@ class AppConfig(BaseConfig):
     # Profiling
     profiler_enabled: bool = Field(False, alias="ENABLE_PROFILER")
 
-    # Runtime
-    vllm_cpu_image: str = Field("budecosystem/bud-runtime-cpu:latest", alias="VLLM_CPU_IMAGE")
-    vllm_cuda_image: str = Field("budecosystem/bud-runtime-cuda:latest", alias="VLLM_CUDA_IMAGE")
-    sglang_cuda_image: str = Field("budecosystem/bud-runtime-cuda:latest", alias="SGLANG_CUDA_IMAGE")
+    # DB connection
+    postgres_host: str = Field("localhost", alias="POSTGRES_HOST")
+    postgres_port: int = Field(5432, alias="POSTGRES_PORT")
+    postgres_user: str = Field(alias="POSTGRES_USER")
+    postgres_password: str = Field(alias="POSTGRES_PASSWORD")
+    postgres_db: str = Field(alias="POSTGRES_DB")
+
+    # Superuser
+    superuser_email: str = Field(alias="SUPER_USER_EMAIL")
+    superuser_password: str = Field(alias="SUPER_USER_PASSWORD")
+
+    # Token
+    access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
+    refresh_token_expire_minutes: int = Field(60 * 24 * 7, alias="REFRESH_TOKEN_EXPIRE_MINUTES")
+
+    @computed_field
+    def postgres_url(self) -> str:
+        """Construct and returns a PostgreSQL connection URL.
+
+        This property combines the individual PostgreSQL connection parameters
+        into a single connection URL string.
+
+        Returns:
+            A formatted PostgreSQL connection string.
+        """
+        return f"postgresql://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
 
     @model_validator(mode="before")
     @classmethod
@@ -284,6 +306,8 @@ class SecretsConfig(BaseConfig):
     """
 
     dapr_api_token: Optional[str] = Field(None, alias="DAPR_API_TOKEN")
+    password_salt: str = Field("bud_password_salt", alias="PASSWORD_SALT")
+    jwt_secret_key: str = Field(alias="JWT_SECRET_KEY")
 
 
 app_settings = AppConfig()

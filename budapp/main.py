@@ -23,10 +23,13 @@ from typing import Any, AsyncIterator
 from fastapi import APIRouter, FastAPI
 from fastapi.openapi.utils import get_openapi
 
+from .auth import auth_routes
 from .commons import logging
 from .commons.config import app_settings
 from .commons.constants import Environment
 from .core import meta_routes
+from .initializers.seeder import seeders
+from .model_ops import model_routes
 
 
 logger = logging.get_logger(__name__)
@@ -70,6 +73,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         task = None
 
+    for seeder_name, seeder in seeders.items():
+        try:
+            await seeder().seed()
+            logger.info(f"Seeded {seeder_name} seeder successfully.")
+        except Exception as e:
+            logger.error(f"Failed to seed {seeder_name}. Error: {e}")
+
     yield
 
     if task is not None:
@@ -90,6 +100,8 @@ app = FastAPI(
 
 internal_router = APIRouter()
 internal_router.include_router(meta_routes.meta_router)
+internal_router.include_router(auth_routes.auth_router)
+internal_router.include_router(model_routes.model_router)
 
 app.include_router(internal_router)
 

@@ -1,0 +1,158 @@
+#  -----------------------------------------------------------------------------
+#  Copyright (c) 2024 Bud Ecosystem Inc.
+#  #
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#  #
+#      http://www.apache.org/licenses/LICENSE-2.0
+#  #
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#  -----------------------------------------------------------------------------
+
+"""The model ops package, containing essential business logic, services, and routing configurations for the model ops."""
+
+from datetime import datetime
+from typing import Optional
+from uuid import UUID, uuid4
+
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, String, Uuid
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from budapp.commons.constants import (
+    CredentialTypeEnum,
+    ModalityEnum,
+    ModelProviderTypeEnum,
+    ModelTypeEnum,
+)
+from budapp.commons.database import Base
+
+
+class Model(Base):
+    """Model for a AI model."""
+
+    __tablename__ = "model"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=True)
+    tags: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
+    tasks: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
+    author: Mapped[str] = mapped_column(String, nullable=True)
+    model_size: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    icon: Mapped[Optional[str]] = mapped_column(String, nullable=False)
+    github_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    huggingface_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    website_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    modality: Mapped[str] = mapped_column(
+        Enum(
+            ModalityEnum,
+            name="modality_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+    )
+    type: Mapped[str] = mapped_column(
+        Enum(
+            ModelTypeEnum,
+            name="model_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=True,
+    )
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    provider_type: Mapped[str] = mapped_column(
+        Enum(
+            ModelProviderTypeEnum,
+            name="model_provider_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+    )
+    uri: Mapped[str] = mapped_column(String, nullable=False)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # TODO: uncomment when implement individual fields
+    # endpoints: Mapped[list["Endpoint"]] = relationship(back_populates="model")
+    # benchmarks: Mapped[list["Benchmark"]] = relationship(back_populates="model")
+
+    created_user: Mapped["User"] = relationship(back_populates="created_models", foreign_keys=[created_by])
+
+
+class Provider(Base):
+    """Model for a AI model provider."""
+
+    __tablename__ = "provider"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    type: Mapped[str] = mapped_column(
+        Enum(
+            CredentialTypeEnum,
+            name="credential_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+    )
+    description: Mapped[str] = mapped_column(String, nullable=True)
+    icon: Mapped[Optional[str]] = mapped_column(String, nullable=False)
+
+
+class CloudModel(Base):
+    """Model for a AI cloud model."""
+
+    __tablename__ = "cloud_model"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=True)
+    tags: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
+    tasks: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
+    author: Mapped[str] = mapped_column(String, nullable=True)
+    model_size: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    icon: Mapped[Optional[str]] = mapped_column(String, nullable=False)
+    github_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    huggingface_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    website_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    modality: Mapped[str] = mapped_column(
+        PG_ENUM(
+            ModalityEnum,
+            name="modality_enum",
+            values_callable=lambda x: [e.value for e in x],
+            create_type=False,
+        ),
+        nullable=False,
+    )
+    type: Mapped[str] = mapped_column(
+        PG_ENUM(
+            ModelTypeEnum,
+            name="model_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+            create_type=False,
+        ),
+        nullable=True,
+    )
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    provider_type: Mapped[str] = mapped_column(
+        PG_ENUM(
+            ModelProviderTypeEnum,
+            name="model_provider_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+            create_type=False,
+        ),
+        nullable=False,
+    )
+    uri: Mapped[str] = mapped_column(String, nullable=False)
+    provider_id: Mapped[UUID] = mapped_column(ForeignKey("provider.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

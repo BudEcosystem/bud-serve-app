@@ -1,0 +1,72 @@
+import json
+import os
+from typing import Any, Dict
+
+from sqlalchemy.orm import Session
+
+from budapp.commons import logging
+from budapp.commons.database import engine
+from budapp.model_ops.crud import ProviderDataManager
+from budapp.model_ops.models import Provider as ProviderModel
+
+from .base_seeder import BaseSeeder
+
+
+logger = logging.get_logger(__name__)
+
+# current file path
+CURRENT_FILE_PATH = os.path.dirname(os.path.abspath(__file__))
+
+# seeder file path
+PROVIDERS_SEEDER_FILE_PATH = os.path.join(CURRENT_FILE_PATH, "data", "providers_seeder.json")
+
+
+class ProviderSeeder(BaseSeeder):
+    """Seeder for the Provider model."""
+
+    async def seed(self) -> None:
+        """Seed providers to the database."""
+        with Session(engine) as session:
+            try:
+                await self._seed_providers(session)
+            except Exception as e:
+                logger.exception(f"Failed to seed providers: {e}")
+
+    @staticmethod
+    async def _seed_providers(session: Session) -> None:
+        """Seed providers to the database."""
+        providers_data = await ProviderSeeder._get_providers_data()
+        logger.debug(f"Found {len(providers_data)} providers in the seeder file")
+
+        all_providers = await ProviderDataManager(session).get_all_providers_by_type(list(providers_data.keys()))
+        logger.debug(f"Found {len(all_providers)} providers in the database")
+
+        for provider in all_providers:
+            values = {
+                "name": providers_data[provider.type.value]["name"],
+                "description": providers_data[provider.type.value]["description"],
+                "icon": providers_data[provider.type.value]["icon"],
+            }
+            await ProviderDataManager(session).update_by_fields(provider, values)
+
+            # Remove the provider from the data after it has been seeded
+            providers_data.pop(provider.type.value)
+
+        if providers_data:
+            logger.debug(f"Found {len(providers_data)} new providers")
+            create_providers_data = []
+
+            for provider in providers_data:
+                create_providers_data.append(ProviderModel(**providers_data[provider]))
+
+            db_providers = await ProviderDataManager(session).insert_all(create_providers_data)
+            logger.debug(f"Seeded {len(db_providers)} new providers")
+
+    @staticmethod
+    async def _get_providers_data() -> Dict[str, Any]:
+        """Get providers data from the database."""
+        try:
+            with open(PROVIDERS_SEEDER_FILE_PATH, "r") as file:
+                return json.load(file)
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"File not found: {PROVIDERS_SEEDER_FILE_PATH}") from e

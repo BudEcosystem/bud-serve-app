@@ -1,5 +1,6 @@
 include:
   - ./docker-compose-redis.yaml
+  - ./docker-compose-postgres.yaml
 
 services:
   app:
@@ -8,7 +9,8 @@ services:
     build:
       context: ..
       dockerfile: ./deploy/Dockerfile
-    command: [ "uvicorn", "$APP_NAME.main:app", "--host", "0.0.0.0", "--port", $APP_PORT ]
+    # command: [ "uvicorn", "$APP_NAME.main:app", "--host", "0.0.0.0", "--port", $APP_PORT ]
+    command: [ "sh", "/app/startup.sh" ]
     ports:
       - "$DAPR_GRPC_PORT:$DAPR_GRPC_PORT" # Dapr instances communicate over gRPC so gRPC port needs to be exposed
       - "$DAPR_HTTP_PORT:$DAPR_HTTP_PORT" # Expose Dapr HTTP port for service invocation
@@ -21,6 +23,7 @@ services:
     depends_on:
       - redis
       - placement
+      - postgres
     networks:
       - bud-microframe-nw
   sidecar:
