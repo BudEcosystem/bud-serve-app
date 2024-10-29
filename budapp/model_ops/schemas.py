@@ -154,11 +154,14 @@ class CreateCloudModelWorkflowRequest(BaseModel):
             self.modality,
             self.uri,
             self.tags,
-            self.cloud_model_id,
             self.name,
         ]
-        required_fields = ["provider_type", "provider_id", "modality", "uri", "tags", "cloud_model_id", "name"]
+        required_fields = ["provider_type", "provider_id", "modality", "uri", "tags", "name"]
         if not any(other_fields):
+            # Allow if cloud model id is explicitly provided
+            input_data = self.model_dump(exclude_unset=True)
+            if "cloud_model_id" in input_data:
+                return self
             raise ValueError(f"At least one of {', '.join(required_fields)} is required when workflow_id is provided")
 
         return self

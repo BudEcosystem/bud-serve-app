@@ -262,7 +262,7 @@ class CloudModelWorkflowService(SessionMixin):
             end_step_number = db_workflow_step.step_number + 1
 
             # Create or update next workflow step
-            db_workflow_step = self._create_or_update_next_workflow_step(
+            db_workflow_step = await self._create_or_update_next_workflow_step(
                 workflow_id, end_step_number, {"leaderboard": leaderboard_data}
             )
 
