@@ -18,7 +18,6 @@
 
 from typing import Any, Dict, List, Optional, Tuple, Type
 
-from fastapi import HTTPException, status
 from sqlalchemy import BigInteger as SqlAlchemyBigInteger
 from sqlalchemy import String as SqlAlchemyString
 from sqlalchemy import cast, func, inspect, select
@@ -28,7 +27,7 @@ from sqlalchemy.orm import DeclarativeBase, Session
 from sqlalchemy.sql import Executable
 
 from . import logging
-from .exceptions import DatabaseException
+from .exceptions import ClientException, DatabaseException
 
 
 logger = logging.get_logger(__name__)
@@ -361,7 +360,7 @@ class DataManagerUtils(SQLAlchemyMixin):
 
         if not missing_ok and db_model is None:
             logger.info(f"{model.__name__} not found in database")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{model.__name__} not found")
+            raise ClientException(f"{model.__name__} not found")
 
         return db_model if db_model else None
 

@@ -28,6 +28,7 @@ from budapp.commons.dependencies import (
     get_session,
     parse_ordering_fields,
 )
+from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
 
@@ -133,6 +134,9 @@ async def add_cloud_model_workflow(
         )
 
         return await CloudModelWorkflowService(session).get_cloud_model_workflow(db_workflow.id)
+    except ClientException as e:
+        logger.exception(f"Failed to get all cloud models: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to get all providers: {e}")
         return ErrorResponse(

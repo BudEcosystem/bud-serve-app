@@ -16,7 +16,7 @@
 
 """The model ops services. Contains business logic for model ops."""
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import status
@@ -79,25 +79,8 @@ class CloudModelWorkflowService(SessionMixin):
 
         current_step_number = step_number
 
-        # Validate workflow
-        if workflow_id:
-            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
-                WorkflowModel, {"id": workflow_id}
-            )
-
-            if db_workflow.status != WorkflowStatusEnum.IN_PROGRESS:
-                logger.error(f"Workflow {workflow_id} is not in progress")
-                raise ClientException("Workflow is not in progress")
-
-            if db_workflow.created_by != current_user_id:
-                logger.error(f"User {current_user_id} is not the creator of workflow {workflow_id}")
-                raise ClientException("User is not authorized to perform this action")
-        elif workflow_total_steps:
-            db_workflow = await WorkflowDataManager(self.session).insert_one(
-                WorkflowModel(total_steps=workflow_total_steps, created_by=current_user_id),
-            )
-        else:
-            raise ClientException("Either workflow_id or workflow_total_steps should be provided")
+        # Retrieve or create workflow
+        db_workflow = await self._retrieve_or_create_workflow(workflow_id, workflow_total_steps, current_user_id)
 
         # Model source is provider type
         source = None
@@ -105,12 +88,17 @@ class CloudModelWorkflowService(SessionMixin):
             db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
                 ProviderModel, {"id": provider_id}
             )
-            source = db_provider.type
+            source = db_provider.type.value
+
+        if cloud_model_id:
+            db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
+                CloudModel, {"id": cloud_model_id}
+            )
 
         # Prepare workflow step data
         workflow_step_data = CreateCloudModelWorkflowSteps(
             provider_type=provider_type,
-            source=source.value if source else None,
+            source=source if source else None,
             name=name,
             modality=modality,
             uri=uri,
@@ -128,53 +116,12 @@ class CloudModelWorkflowService(SessionMixin):
         db_current_workflow_step = None
 
         if db_workflow_steps:
-            db_step_uri = None
-            db_step_source = None
+            await self._validate_duplicate_source_uri_model(source, uri, db_workflow_steps, current_step_number)
 
             for db_step in db_workflow_steps:
                 # Get current workflow step
                 if db_step.step_number == current_step_number:
                     db_current_workflow_step = db_step
-
-                if "uri" in db_step.data:
-                    db_step_uri = db_step.data["uri"]
-                if "source" in db_step.data:
-                    db_step_source = db_step.data["source"]
-
-            # Check duplicate endpoint in project
-            query_uri = None
-            query_source = None
-            if uri and db_step_source:
-                # If user gives uri but source given in earlier step
-                query_uri = uri
-                query_source = db_step_source
-            elif source and db_step_uri:
-                # If user gives source but uri given in earlier step
-                query_uri = db_step_uri
-                query_source = source.value
-            elif uri and source:
-                # if user gives both source and uri
-                query_uri = uri
-                query_source = source.value
-            elif db_step_uri and db_step_source:
-                # if user gives source and uri in earlier step
-                query_uri = db_step_uri
-                query_source = db_step_source
-
-            if query_uri and query_source:
-                # NOTE: A model can only be deployed once in a project
-                db_cloud_model = await ModelDataManager(self.session).retrieve_by_fields(
-                    Model,
-                    {
-                        "uri": query_uri,
-                        "source": query_source,
-                        "is_active": True,
-                    },
-                    missing_ok=True,
-                )
-                if db_cloud_model:
-                    logger.info(f"Model {query_uri} already added with {query_source}")
-                    raise ClientException("Duplicate model uri and source found")
 
         if db_current_workflow_step:
             logger.info(f"Workflow {db_workflow.id} step {current_step_number} already exists")
@@ -212,31 +159,8 @@ class CloudModelWorkflowService(SessionMixin):
             current_step_number = current_step_number + 1
             workflow_current_step = current_step_number
 
-            # Check for workflow step exist or not
-            db_workflow_step = await WorkflowStepDataManager(self.session).retrieve_by_fields(
-                WorkflowStepModel,
-                {"workflow_id": db_workflow.id, "step_number": current_step_number},
-                missing_ok=True,
-            )
-
-            if db_workflow_step:
-                db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
-                    db_workflow_step,
-                    {
-                        "workflow_id": db_workflow.id,
-                        "step_number": current_step_number,
-                        "data": {},
-                    },
-                )
-            else:
-                # Create a new workflow step
-                db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
-                    WorkflowStepModel(
-                        workflow_id=db_workflow.id,
-                        step_number=current_step_number,
-                        data={},
-                    )
-                )
+            # Update or create next workflow step
+            db_workflow_step = await self._create_or_update_next_workflow_step(db_workflow.id, current_step_number, {})
 
         # Update workflow step data in db
         db_workflow = await WorkflowDataManager(self.session).update_by_fields(
@@ -281,12 +205,12 @@ class CloudModelWorkflowService(SessionMixin):
                 raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
 
             # Trigger deploy model by step
-            db_model = await self.execute_add_cloud_model_workflow(required_data, db_workflow.id)
-            logger.info("Successfully triggered model deployment")
+            db_model = await self._execute_add_cloud_model_workflow(required_data, db_workflow.id)
+            logger.debug(f"Successfully created model {db_model.id}")
 
         return db_workflow
 
-    async def execute_add_cloud_model_workflow(self, data: Dict[str, Any], workflow_id: UUID) -> None:
+    async def _execute_add_cloud_model_workflow(self, data: Dict[str, Any], workflow_id: UUID) -> None:
         """Execute add cloud model workflow."""
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
             {"workflow_id": workflow_id}
@@ -295,6 +219,207 @@ class CloudModelWorkflowService(SessionMixin):
         # Latest step
         db_latest_workflow_step = db_workflow_steps[-1]
 
+        # Prepare model creation data from input
+        model_data = await self._prepare_model_data(data)
+
+        # Check for duplicate model
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"uri": model_data.uri, "source": model_data.source}, missing_ok=True
+        )
+        if db_model:
+            logger.info(f"Model {model_data.uri} with {model_data.source} already exists")
+            raise ClientException("Duplicate model uri and source found")
+
+        execution_status_data = {
+            "workflow_execution_status": {
+                "status": "success",
+                "message": "Model successfully added to the repository",
+            },
+            "model_id": None,
+        }
+        try:
+            db_model = await ModelDataManager(self.session).insert_one(
+                Model(**model_data.model_dump(exclude_unset=True))
+            )
+        except Exception as e:
+            logger.exception(f"Failed to add model to the repository {e}")
+            execution_status_data["workflow_execution_status"]["status"] = "error"
+            execution_status_data["workflow_execution_status"]["message"] = "Failed to add model to the repository"
+            execution_status_data["model_id"] = None
+            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                db_latest_workflow_step, {"data": execution_status_data}
+            )
+        else:
+            execution_status_data["model_id"] = str(db_model.id)
+            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                db_latest_workflow_step, {"data": execution_status_data}
+            )
+
+            # leaderboard data. TODO: Need to add service for leaderboard
+            leaderboard_data = await self._get_leaderboard_data()
+
+            # Add leader board details
+            end_step_number = db_workflow_step.step_number + 1
+
+            # Create or update next workflow step
+            db_workflow_step = self._create_or_update_next_workflow_step(
+                workflow_id, end_step_number, {"leaderboard": leaderboard_data}
+            )
+
+            # Update workflow current step
+            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+                WorkflowModel, {"id": workflow_id}
+            )
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"current_step": end_step_number},
+            )
+        return db_model
+
+    async def _retrieve_or_create_workflow(
+        self, workflow_id: Optional[UUID], workflow_total_steps: Optional[int], current_user_id: UUID
+    ) -> None:
+        """Retrieve or create workflow."""
+        if workflow_id:
+            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+                WorkflowModel, {"id": workflow_id}
+            )
+
+            if db_workflow.status != WorkflowStatusEnum.IN_PROGRESS:
+                logger.error(f"Workflow {workflow_id} is not in progress")
+                raise ClientException("Workflow is not in progress")
+
+            if db_workflow.created_by != current_user_id:
+                logger.error(f"User {current_user_id} is not the creator of workflow {workflow_id}")
+                raise ClientException("User is not authorized to perform this action")
+        elif workflow_total_steps:
+            db_workflow = await WorkflowDataManager(self.session).insert_one(
+                WorkflowModel(total_steps=workflow_total_steps, created_by=current_user_id),
+            )
+        else:
+            raise ClientException("Either workflow_id or workflow_total_steps should be provided")
+
+        return db_workflow
+
+    async def _validate_duplicate_source_uri_model(
+        self, source: str, uri: str, db_workflow_steps: List[WorkflowStepModel], current_step_number: int
+    ) -> None:
+        """Validate duplicate source and uri."""
+        db_step_uri = None
+        db_step_source = None
+
+        for db_step in db_workflow_steps:
+            # Get current workflow step
+            if db_step.step_number == current_step_number:
+                db_current_workflow_step = db_step
+
+            if "uri" in db_step.data:
+                db_step_uri = db_step.data["uri"]
+            if "source" in db_step.data:
+                db_step_source = db_step.data["source"]
+
+        # Check duplicate endpoint in project
+        query_uri = None
+        query_source = None
+        if uri and db_step_source:
+            # If user gives uri but source given in earlier step
+            query_uri = uri
+            query_source = db_step_source
+        elif source and db_step_uri:
+            # If user gives source but uri given in earlier step
+            query_uri = db_step_uri
+            query_source = source
+        elif uri and source:
+            # if user gives both source and uri
+            query_uri = uri
+            query_source = source
+        elif db_step_uri and db_step_source:
+            # if user gives source and uri in earlier step
+            query_uri = db_step_uri
+            query_source = db_step_source
+
+        if query_uri and query_source:
+            # NOTE: A model can only be deployed once in a project
+            db_cloud_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model,
+                {
+                    "uri": query_uri,
+                    "source": query_source,
+                    "is_active": True,
+                },
+                missing_ok=True,
+            )
+            if db_cloud_model:
+                logger.info(f"Model {query_uri} already added with {query_source}")
+                raise ClientException("Duplicate model uri and source found")
+
+    async def _create_or_update_next_workflow_step(
+        self, workflow_id: UUID, step_number: int, data: Dict[str, Any]
+    ) -> None:
+        """Create or update next workflow step."""
+        # Check for workflow step exist or not
+        db_workflow_step = await WorkflowStepDataManager(self.session).retrieve_by_fields(
+            WorkflowStepModel,
+            {"workflow_id": workflow_id, "step_number": step_number},
+            missing_ok=True,
+        )
+
+        if db_workflow_step:
+            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                db_workflow_step,
+                {
+                    "workflow_id": workflow_id,
+                    "step_number": step_number,
+                    "data": data,
+                },
+            )
+        else:
+            # Create a new workflow step
+            db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+                WorkflowStepModel(
+                    workflow_id=workflow_id,
+                    step_number=step_number,
+                    data=data,
+                )
+            )
+
+        return db_workflow_step
+
+    async def _get_leaderboard_data(self) -> None:
+        """Get leaderboard data."""
+        return [
+            {
+                "position": 1,
+                "model": "name",
+                "IFEval": 13.2,
+                "BBH": 13.2,
+                "M": 1.2,
+            },
+            {
+                "position": 1,
+                "model": "name",
+                "IFEval": 13.2,
+                "BBH": 13.2,
+                "M": 1.2,
+            },
+            {
+                "position": 1,
+                "model": "name",
+                "IFEval": 13.2,
+                "BBH": 13.2,
+                "M": 1.2,
+            },
+            {
+                "position": 1,
+                "model": "name",
+                "IFEval": 13.2,
+                "BBH": 13.2,
+                "M": 1.2,
+            },
+        ]
+
+    async def _prepare_model_data(self, data: Dict[str, Any]) -> None:
+        """Prepare model data."""
         cloud_model_id = data.get("cloud_model_id")
         source = data.get("source")
         name = data.get("name")
@@ -303,7 +428,6 @@ class CloudModelWorkflowService(SessionMixin):
         tags = data.get("tags")
         provider_type = data.get("provider_type")
         provider_id = data.get("provider_id")
-        cloud_model_id = data.get("cloud_model_id")
         created_by = data.get("created_by")
 
         db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
@@ -345,89 +469,7 @@ class CloudModelWorkflowService(SessionMixin):
                 created_by=UUID(created_by),
             )
 
-        execution_data = {
-            "workflow_execution_status": {
-                "status": "success",
-                "message": "Model successfully added to the repository",
-            },
-            "model_id": None,
-        }
-        try:
-            db_model = await ModelDataManager(self.session).insert_one(
-                Model(**model_data.model_dump(exclude_unset=True))
-            )
-        except Exception as e:
-            logger.exception(f"Failed to add model to the repository {e}")
-            execution_data["workflow_execution_status"]["status"] = "error"
-            execution_data["workflow_execution_status"]["message"] = "Failed to add model to the repository"
-            execution_data["model_id"] = None
-            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
-                db_latest_workflow_step, {"data": execution_data}
-            )
-        else:
-            execution_data["model_id"] = str(db_model.id)
-            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
-                db_latest_workflow_step, {"data": execution_data}
-            )
-
-            # leaderboard data. TODO: Need to add service for leaderboard
-            leaderboard_data = [
-                {
-                    "position": 1,
-                    "model": "name",
-                    "IFEval": 13.2,
-                    "BBH": 13.2,
-                    "M": 1.2,
-                },
-                {
-                    "position": 1,
-                    "model": "name",
-                    "IFEval": 13.2,
-                    "BBH": 13.2,
-                    "M": 1.2,
-                },
-                {
-                    "position": 1,
-                    "model": "name",
-                    "IFEval": 13.2,
-                    "BBH": 13.2,
-                    "M": 1.2,
-                },
-                {
-                    "position": 1,
-                    "model": "name",
-                    "IFEval": 13.2,
-                    "BBH": 13.2,
-                    "M": 1.2,
-                },
-            ]
-
-            # Add leader board details
-            end_step_number = db_workflow_step.step_number + 1
-            db_workflow_step = await WorkflowStepDataManager(self.session).retrieve_by_fields(
-                WorkflowStepModel, {"step_number": end_step_number, "workflow_id": workflow_id}, missing_ok=True
-            )
-
-            if db_workflow_step:
-                db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
-                    db_workflow_step, {"data": {"leaderboard": leaderboard_data}}
-                )
-            else:
-                db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
-                    WorkflowStepModel(
-                        workflow_id=workflow_id, step_number=end_step_number, data={"leaderboard": leaderboard_data}
-                    )
-                )
-
-            # Update workflow current step
-            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
-                WorkflowModel, {"id": workflow_id}
-            )
-            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-                db_workflow,
-                {"current_step": end_step_number},
-            )
-        return db_model
+        return model_data
 
     async def get_cloud_model_workflow(self, workflow_id: UUID) -> CreateCloudModelWorkflowResponse:
         """Get cloud model workflow."""

@@ -168,7 +168,7 @@ class CreateCloudModelWorkflowSteps(BaseModel):
     """Cloud model workflow step data schema."""
 
     provider_type: ModelProviderTypeEnum | None = None
-    source: CredentialTypeEnum | None = None
+    source: str | None = None
     name: str | None = None
     modality: ModalityEnum | None = None
     uri: str | None = None
@@ -184,7 +184,6 @@ class CreateCloudModelWorkflowStepData(BaseModel):
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     provider_type: ModelProviderTypeEnum | None = None
-    source: CredentialTypeEnum | None = None
     provider: Provider | None = None
     cloud_model: CloudModel | None = None
     cloud_model_id: UUID4 | None = None
