@@ -14,7 +14,7 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""Provides utility functions for managing the database."""
+"""Provides utility functions for managing the database connection."""
 
 import os
 
