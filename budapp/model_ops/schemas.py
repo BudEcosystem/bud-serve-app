@@ -18,6 +18,7 @@
 """Contains core Pydantic schemas used for data validation and serialization within the model ops services."""
 
 import re
+from datetime import datetime
 from typing import List, Tuple
 
 from pydantic import (
@@ -33,6 +34,7 @@ from budapp.commons.constants import (
     CredentialTypeEnum,
     ModalityEnum,
     ModelProviderTypeEnum,
+    ModelTypeEnum,
     WorkflowStatusEnum,
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
@@ -78,6 +80,32 @@ class Tag(BaseModel):
         return v.upper()  # Normalize to uppercase
 
 
+class Model(BaseModel):
+    """Model schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    description: str | None = None
+    modality: ModalityEnum
+    source: CredentialTypeEnum
+    provider_type: ModelProviderTypeEnum
+    uri: str
+    model_size: int | None = None
+    tags: list[Tag] | None = None
+    tasks: list[Tag] | None = None
+    icon: str
+    github_url: str | None = None
+    huggingface_url: str | None = None
+    website_url: str | None = None
+    type: ModelTypeEnum | None = None
+    created_by: UUID4 | None = None
+    author: str | None = None
+    created_at: datetime
+    modified_at: datetime
+
+
 class CloudModel(BaseModel):
     """Cloud model schema."""
 
@@ -108,9 +136,7 @@ class CreateCloudModelWorkflowRequest(BaseModel):
     modality: ModalityEnum | None = None
     uri: str | None = None
     tags: list[Tag] | None = None
-    icon: str | None = None
     cloud_model_id: UUID4 | None = None
-    description: str | None = None
 
     @model_validator(mode="after")
     def validate_fields(self) -> "CreateCloudModelWorkflowRequest":
@@ -129,9 +155,9 @@ class CreateCloudModelWorkflowRequest(BaseModel):
             self.uri,
             self.tags,
             self.cloud_model_id,
-            self.description,
+            self.name,
         ]
-        required_fields = ["provider_type", "provider_id", "modality", "uri", "tags", "cloud_model_id", "description"]
+        required_fields = ["provider_type", "provider_id", "modality", "uri", "tags", "cloud_model_id", "name"]
         if not any(other_fields):
             raise ValueError(f"At least one of {', '.join(required_fields)} is required when workflow_id is provided")
 
@@ -159,13 +185,14 @@ class CreateCloudModelWorkflowStepData(BaseModel):
 
     provider_type: ModelProviderTypeEnum | None = None
     source: CredentialTypeEnum | None = None
-    name: str | None = None
-    modality: ModalityEnum | None = None
-    uri: str | None = None
-    tags: list[Tag] | None = None
-    icon: str | None = None
     provider: Provider | None = None
     cloud_model: CloudModel | None = None
+    cloud_model_id: UUID4 | None = None
+    provider_id: UUID4 | None = None
+    model_id: UUID4 | None = None
+    model: Model | None = None
+    workflow_execution_status: dict | None = None
+    leaderboard: list | None = None
 
 
 class CreateCloudModelWorkflowResponse(SuccessResponse):
@@ -225,3 +252,24 @@ class RecommendedTagsResponse(PaginatedSuccessResponse):
     def validate_tags(cls, v: List[Tuple[str, str, int]]) -> List[TagWithCount]:
         """Convert tuples to TagWithCount objects."""
         return [TagWithCount(name=tag[0], color=tag[1], count=tag[2]) for tag in v]
+
+
+class ModelCreate(BaseModel):
+    """Schema for creating a new AI Model."""
+
+    name: str
+    description: str | None = None
+    tags: List[Tag] | None = None
+    tasks: List[Tag] | None = None
+    author: str | None = None
+    model_size: int | None = None
+    icon: str
+    github_url: str | None = None
+    huggingface_url: str | None = None
+    website_url: str | None = None
+    modality: ModalityEnum
+    type: ModelTypeEnum | None = None
+    source: str
+    provider_type: ModelProviderTypeEnum
+    uri: str
+    created_by: UUID4

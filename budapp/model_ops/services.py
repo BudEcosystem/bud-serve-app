@@ -1,12 +1,10 @@
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
 from fastapi import status
 
 from budapp.commons import logging
-from budapp.commons.constants import (
-    WorkflowStatusEnum,
-)
+from budapp.commons.constants import WorkflowStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.core.crud import WorkflowDataManager, WorkflowStepDataManager
@@ -21,6 +19,7 @@ from .schemas import (
     CreateCloudModelWorkflowResponse,
     CreateCloudModelWorkflowStepData,
     CreateCloudModelWorkflowSteps,
+    ModelCreate,
 )
 
 
@@ -56,11 +55,9 @@ class ModelService(SessionMixin):
         modality = request.modality
         uri = request.uri
         tags = request.tags
-        icon = request.icon
         trigger_workflow = request.trigger_workflow
         provider_id = request.provider_id
         cloud_model_id = request.cloud_model_id
-        description = request.description
 
         current_step_number = step_number
 
@@ -100,10 +97,8 @@ class ModelService(SessionMixin):
             modality=modality,
             uri=uri,
             tags=tags,
-            icon=icon,
             provider_id=provider_id,
             cloud_model_id=cloud_model_id,
-            description=description,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
@@ -193,6 +188,38 @@ class ModelService(SessionMixin):
         workflow_current_step = max(current_step_number, db_max_workflow_step_number)
         logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
 
+        # Create next step if workflow is triggered
+        if trigger_workflow:
+            # Increment step number of workflow and workflow step
+            current_step_number = current_step_number + 1
+            workflow_current_step = current_step_number
+
+            # Check for workflow step exist or not
+            db_workflow_step = await WorkflowStepDataManager(self.session).retrieve_by_fields(
+                WorkflowStepModel,
+                {"workflow_id": db_workflow.id, "step_number": current_step_number},
+                missing_ok=True,
+            )
+
+            if db_workflow_step:
+                db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                    db_workflow_step,
+                    {
+                        "workflow_id": db_workflow.id,
+                        "step_number": current_step_number,
+                        "data": {},
+                    },
+                )
+            else:
+                # Create a new workflow step
+                db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+                    WorkflowStepModel(
+                        workflow_id=db_workflow.id,
+                        step_number=current_step_number,
+                        data={},
+                    )
+                )
+
         # Update workflow step data in db
         db_workflow = await WorkflowDataManager(self.session).update_by_fields(
             db_workflow,
@@ -216,10 +243,10 @@ class ModelService(SessionMixin):
                 "modality",
                 "uri",
                 "tags",
-                "icon",
                 "provider_type",
                 "provider_id",
-                "description",
+                "cloud_model_id",
+                "created_by",
             ]
 
             # from workflow steps extract necessary information
@@ -230,15 +257,159 @@ class ModelService(SessionMixin):
                         required_data[key] = db_workflow_step.data[key]
 
             # Check if all required keys are present
-            missing_keys = [key for key in keys_of_interest if key not in required_data]
+            required_keys = ["provider_type", "provider_id", "modality", "tags", "name", "source"]
+            missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
 
             # Trigger deploy model by step
-            db_model = await ModelDataManager(self.session).insert_one(Model(**required_data))
+            db_model = await self.execute_add_cloud_model_workflow(required_data, db_workflow.id)
             logger.info("Successfully triggered model deployment")
 
         return db_workflow
+
+    async def execute_add_cloud_model_workflow(self, data: Dict[str, Any], workflow_id: UUID) -> None:
+        """Execute add cloud model workflow."""
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Latest step
+        db_latest_workflow_step = db_workflow_steps[-1]
+
+        cloud_model_id = data.get("cloud_model_id")
+        source = data.get("source")
+        name = data.get("name")
+        modality = data.get("modality")
+        uri = data.get("uri")
+        tags = data.get("tags")
+        provider_type = data.get("provider_type")
+        provider_id = data.get("provider_id")
+        cloud_model_id = data.get("cloud_model_id")
+        created_by = data.get("created_by")
+
+        db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+            ProviderModel, {"id": provider_id}, missing_ok=True
+        )
+        icon = db_provider.icon
+
+        if cloud_model_id:
+            db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
+                CloudModel, {"id": cloud_model_id}, missing_ok=True
+            )
+            model_data = ModelCreate(
+                name=name,
+                description=db_cloud_model.description,
+                tags=tags,
+                tasks=db_cloud_model.tasks,
+                author=db_cloud_model.author,
+                model_size=db_cloud_model.model_size,
+                icon=icon,
+                github_url=db_cloud_model.github_url,
+                huggingface_url=db_cloud_model.huggingface_url,
+                website_url=db_cloud_model.website_url,
+                modality=db_cloud_model.modality,
+                type=db_cloud_model.type,
+                source=db_cloud_model.source,
+                provider_type=provider_type,
+                uri=db_cloud_model.uri,
+                created_by=UUID(created_by),
+            )
+        else:
+            model_data = ModelCreate(
+                source=source,
+                name=name,
+                modality=modality,
+                uri=uri,
+                tags=tags,
+                provider_type=provider_type,
+                icon=icon,
+                created_by=UUID(created_by),
+            )
+
+        execution_data = {
+            "workflow_execution_status": {
+                "status": "success",
+                "message": "Model successfully added to the repository",
+            },
+            "model_id": None,
+        }
+        try:
+            db_model = await ModelDataManager(self.session).insert_one(
+                Model(**model_data.model_dump(exclude_unset=True))
+            )
+        except Exception as e:
+            logger.exception(f"Failed to add model to the repository {e}")
+            execution_data["workflow_execution_status"]["status"] = "error"
+            execution_data["workflow_execution_status"]["message"] = "Failed to add model to the repository"
+            execution_data["model_id"] = None
+            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                db_latest_workflow_step, {"data": execution_data}
+            )
+        else:
+            execution_data["model_id"] = str(db_model.id)
+            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                db_latest_workflow_step, {"data": execution_data}
+            )
+
+            # leaderboard data. TODO: Need to add service for leaderboard
+            leaderboard_data = [
+                {
+                    "position": 1,
+                    "model": "name",
+                    "IFEval": 13.2,
+                    "BBH": 13.2,
+                    "M": 1.2,
+                },
+                {
+                    "position": 1,
+                    "model": "name",
+                    "IFEval": 13.2,
+                    "BBH": 13.2,
+                    "M": 1.2,
+                },
+                {
+                    "position": 1,
+                    "model": "name",
+                    "IFEval": 13.2,
+                    "BBH": 13.2,
+                    "M": 1.2,
+                },
+                {
+                    "position": 1,
+                    "model": "name",
+                    "IFEval": 13.2,
+                    "BBH": 13.2,
+                    "M": 1.2,
+                },
+            ]
+
+            # Add leader board details
+            end_step_number = db_workflow_step.step_number + 1
+            db_workflow_step = await WorkflowStepDataManager(self.session).retrieve_by_fields(
+                WorkflowStepModel, {"step_number": end_step_number, "workflow_id": workflow_id}, missing_ok=True
+            )
+
+            if db_workflow_step:
+                db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                    db_workflow_step, {"data": {"leaderboard": leaderboard_data}}
+                )
+            else:
+                db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+                    WorkflowStepModel(
+                        workflow_id=workflow_id, step_number=end_step_number, data={"leaderboard": leaderboard_data}
+                    )
+                )
+
+            # Update workflow current step
+            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+                WorkflowModel, {"id": workflow_id}
+            )
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"current_step": end_step_number},
+            )
+        return db_model
 
     async def get_cloud_model_workflow(self, workflow_id: UUID) -> CreateCloudModelWorkflowResponse:
         """Get cloud model workflow."""
@@ -271,6 +442,9 @@ class ModelService(SessionMixin):
             "provider_id",
             "cloud_model_id",
             "description",
+            "model_id",
+            "workflow_execution_status",
+            "leaderboard",
         ]
 
         # from workflow steps extract necessary information
@@ -281,6 +455,11 @@ class ModelService(SessionMixin):
                     required_data[key] = db_workflow_step.data[key]
 
         provider_type = required_data.get("provider_type")
+        provider_id = required_data.get("provider_id")
+        cloud_model_id = required_data.get("cloud_model_id")
+        model_id = required_data.get("model_id")
+        workflow_execution_status = required_data.get("workflow_execution_status")
+        leaderboard = required_data.get("leaderboard")
 
         db_provider = (
             await ProviderDataManager(self.session).retrieve_by_fields(
@@ -298,31 +477,13 @@ class ModelService(SessionMixin):
             else None
         )
 
-        # budserve_cluster_events = required_data.get("budserve_cluster_events")
-        # bud_simulator_events = required_data.get("bud_simulator_events")
-        # simulator_id = required_data.get("simulator_id")
-        # template_id = required_data.get("template_id")
-        # deploy_config = required_data.get("deploy_config")
-
-        # return ModelDeployWorkflowResponse(
-        #     workflow_id=db_workflow.id,
-        #     status=db_workflow.status,
-        #     current_step=db_workflow.current_step,
-        #     total_steps=db_workflow.total_steps,
-        #     reason=db_workflow.reason,
-        #     workflow_steps=ModelDeployWorkflowStepResponse(
-        #         model=db_model,
-        #         cluster=db_cluster,
-        #         project=db_project,
-        #         template=db_template,
-        #         endpoint_name=endpoint_name,
-        #         budserve_cluster_events=budserve_cluster_events,
-        #         bud_simulator_events=bud_simulator_events,
-        #         simulator_id=simulator_id,
-        #         template_id=template_id,
-        #         deploy_config=deploy_config,
-        #     ),
-        # )
+        db_model = (
+            await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"id": UUID(required_data["model_id"])}, missing_ok=True
+            )
+            if "model_id" in required_data
+            else None
+        )
 
         return CreateCloudModelWorkflowResponse(
             workflow_id=db_workflow.id,
@@ -333,7 +494,13 @@ class ModelService(SessionMixin):
             workflow_steps=CreateCloudModelWorkflowStepData(
                 provider_type=provider_type,
                 provider=db_provider,
+                provider_id=provider_id,
                 cloud_model=db_cloud_model,
+                cloud_model_id=cloud_model_id,
+                model=db_model,
+                model_id=model_id,
+                workflow_execution_status=workflow_execution_status,
+                leaderboard=leaderboard,
             ),
             code=status.HTTP_200_OK,
         )
