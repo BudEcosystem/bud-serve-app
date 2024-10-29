@@ -17,6 +17,7 @@
 """The model ops package, containing essential business logic, services, and routing configurations for the model ops."""
 
 from typing import List, Optional, Union
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -135,12 +136,48 @@ async def add_cloud_model_workflow(
 
         return await CloudModelWorkflowService(session).get_cloud_model_workflow(db_workflow.id)
     except ClientException as e:
-        logger.exception(f"Failed to get all cloud models: {e}")
+        logger.exception(f"Failed to add cloud model workflow: {e}")
         return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
     except Exception as e:
-        logger.exception(f"Failed to get all providers: {e}")
+        logger.exception(f"Failed to add cloud model workflow: {e}")
         return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all providers"
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add cloud model workflow"
+        ).to_http_response()
+
+
+@model_router.get(
+    "/cloud-model-workflow/{workflow_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": CreateCloudModelWorkflowResponse,
+            "description": "Successfully add cloud model workflow",
+        },
+    },
+    description="Get cloud model workflow",
+)
+async def get_cloud_model_workflow(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    workflow_id: UUID,
+) -> Union[CreateCloudModelWorkflowResponse, ErrorResponse]:
+    """Get cloud model workflow."""
+    try:
+        return await CloudModelWorkflowService(session).get_cloud_model_workflow(workflow_id)
+    except ClientException as e:
+        logger.exception(f"Failed to get cloud model workflow: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get cloud model workflow: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get cloud model workflow"
         ).to_http_response()
 
 

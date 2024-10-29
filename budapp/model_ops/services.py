@@ -488,6 +488,8 @@ class CloudModelWorkflowService(SessionMixin):
                 reason=db_workflow.reason,
                 workflow_steps=CreateCloudModelWorkflowStepData(),
                 code=status.HTTP_200_OK,
+                object="cloud_model_workflow.get",
+                message="Cloud model workflow retrieved successfully",
             )
 
         # Define the keys required for model deployment
@@ -563,6 +565,8 @@ class CloudModelWorkflowService(SessionMixin):
                 leaderboard=leaderboard,
             ),
             code=status.HTTP_200_OK,
+            object="cloud_model_workflow.get",
+            message="Cloud model workflow retrieved successfully",
         )
 
 
