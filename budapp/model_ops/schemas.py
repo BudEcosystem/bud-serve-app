@@ -83,7 +83,7 @@ class Tag(BaseModel):
 class Model(BaseModel):
     """Model schema."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     id: UUID4
     name: str
@@ -109,7 +109,7 @@ class Model(BaseModel):
 class CloudModel(BaseModel):
     """Cloud model schema."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     id: UUID4
     name: str
@@ -211,6 +211,8 @@ class CreateCloudModelWorkflowResponse(SuccessResponse):
 class CloudModelFilter(BaseModel):
     """Cloud model filter schema."""
 
+    model_config = ConfigDict(protected_namespaces=())
+
     source: CredentialTypeEnum | None = None
     modality: ModalityEnum | None = None
     model_size: int | None = None
@@ -258,6 +260,8 @@ class RecommendedTagsResponse(PaginatedSuccessResponse):
 
 class ModelCreate(BaseModel):
     """Schema for creating a new AI Model."""
+
+    model_config = ConfigDict(protected_namespaces=())
 
     name: str
     description: str | None = None
