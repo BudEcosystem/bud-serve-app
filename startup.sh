@@ -3,8 +3,8 @@
 set -e
 
 # Run database migrations
-echo "Running database migrations..."
-alembic -c ./budapp/alembic.ini upgrade head
+# echo "Running database migrations..."
+# alembic -c ./budapp/alembic.ini upgrade head
 
 # Start the application
 echo "Starting the application..."
