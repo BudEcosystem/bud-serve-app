@@ -3,6 +3,7 @@
 ## Index
 [Add Model](#add-model)
 
+[Deploy Model](#deploy-model)
 
 ## Add Model
 
@@ -76,5 +77,54 @@
   "modality": "llm",
   "uri": "openai/gpt4",
   "trigger_workflow": true
+}
+```
+
+## Deploy Model
+
+### Deploy model workflow
+
+```json
+// First Screen
+{
+  "workflow_total_steps": 6,
+  "step_number": 1,
+  "trigger_workflow": false,
+  "project_id": "ffeb0cbe-8caa-461a-aacc-9b7422f44131",
+  "model_id": "318dc142-cf44-407d-9b9d-baa47fe4a456"
+}
+// Second Screen
+{
+  "workflow_id": "95a98482-4e00-48d6-8514-137914cd786f",
+  "step_number": 2,
+  "trigger_workflow": false,
+  "template_id": "791e2219-5377-4aba-b0f5-a61b083d6bec"
+}
+// Third Screen
+{
+  "workflow_id": "95a98482-4e00-48d6-8514-137914cd786f",
+  "step_number": 3,
+  "trigger_workflow": false,
+  "endpoint_name": "test endpoint",
+  "deploy_config": {
+    "concurrent_requests": 10,
+    "avg_sequence_length": 2,
+    "avg_context_length": 3,
+    "per_session_tokens_per_sec": [
+      0,
+      5
+    ],
+    "ttft": [
+      0,
+      6
+    ]
+  }
+}
+// Final Screen
+{
+  "workflow_id": "95a98482-4e00-48d6-8514-137914cd786f",
+  "step_number": 5,
+  "trigger_workflow": true, // consider this as final step
+  "cluster_id": "57e574e3-8208-4ba1-bb91-28c1d6e02b32"
 }
 ```
