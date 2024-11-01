@@ -22,7 +22,8 @@ from sqlalchemy import select
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
-from budapp.core.models import WorkflowStep as WorkflowStepModel
+
+from .models import WorkflowStep as WorkflowStepModel
 
 
 logger = logging.get_logger(__name__)
@@ -41,3 +42,9 @@ class WorkflowStepDataManager(DataManagerUtils):
         """Get all workflow steps from the database."""
         stmt = select(WorkflowStepModel).filter_by(**filters).order_by(WorkflowStepModel.step_number)
         return self.scalars_all(stmt)
+
+
+class IconDataManager(DataManagerUtils):
+    """Data manager for the Icon model."""
+
+    pass

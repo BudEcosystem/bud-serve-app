@@ -16,6 +16,7 @@
 
 """Manages application and secret configurations, utilizing environment variables and Dapr's configuration store for syncing."""
 
+import os
 from datetime import datetime, timedelta, timezone
 from distutils.util import strtobool
 from pathlib import Path
@@ -197,6 +198,22 @@ class AppConfig(BaseConfig):
     # Token
     access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_minutes: int = Field(60 * 24 * 7, alias="REFRESH_TOKEN_EXPIRE_MINUTES")
+
+    # Static
+    static_dir_path: DirectoryPath | None = Field(None, alias="STATIC_DIR")
+
+    @computed_field
+    def static_dir(self) -> str:
+        """Get the static directory."""
+        if self.static_dir_path is None:
+            return os.path.join(str(self.base_dir), "static")
+
+        return self.static_dir_path
+
+    @computed_field
+    def icon_dir(self) -> DirectoryPath:
+        """The directory for icons."""
+        return os.path.join(self.static_dir, "icons")
 
     @computed_field
     def postgres_url(self) -> str:

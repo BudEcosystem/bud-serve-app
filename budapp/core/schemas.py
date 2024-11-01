@@ -16,3 +16,26 @@
 
 
 """Contains core Pydantic schemas used for data validation and serialization within the core services."""
+
+from pydantic import BaseModel
+
+
+class IconBase(BaseModel):
+    """Base icon schema"""
+
+    name: str
+    file_path: str
+    category: str
+
+
+class IconCreate(IconBase):
+    """Create icon schema"""
+
+    pass
+
+
+class IconUpdate(BaseModel):
+    """Update icon schema"""
+
+    category: str
+    name: str

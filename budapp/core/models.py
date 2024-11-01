@@ -68,3 +68,14 @@ class WorkflowStep(Base):
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     workflow: Mapped[Workflow] = relationship("Workflow", back_populates="steps")
+
+
+class Icon(Base):
+    """Icon model."""
+
+    __tablename__ = "icon"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    file_path: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    category: Mapped[str] = mapped_column(String, index=True, nullable=False)
