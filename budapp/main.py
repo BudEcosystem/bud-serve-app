@@ -22,6 +22,7 @@ from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, FastAPI
 from fastapi.openapi.utils import get_openapi
+from fastapi.staticfiles import StaticFiles
 
 from .auth import auth_routes
 from .commons import logging
@@ -97,6 +98,8 @@ app = FastAPI(
     lifespan=lifespan,
     openapi_url=None if app_settings.env == Environment.PRODUCTION else "/openapi.json",
 )
+
+app.mount("/static", StaticFiles(directory=app_settings.static_dir), name="static")
 
 internal_router = APIRouter()
 internal_router.include_router(meta_routes.meta_router)
