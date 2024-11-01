@@ -34,7 +34,8 @@ class IconCreate(IconBase):
     pass
 
 
-class IconUpdate(IconBase):
+class IconUpdate(BaseModel):
     """Update icon schema"""
 
-    pass
+    category: str
+    name: str
