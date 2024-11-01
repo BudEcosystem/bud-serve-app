@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 
@@ -100,6 +101,16 @@ app = FastAPI(
 )
 
 app.mount("/static", StaticFiles(directory=app_settings.static_dir), name="static")
+
+# Set all CORS enabled origins
+if app_settings.cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[str(origin).strip("/") for origin in app_settings.cors_origins],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 internal_router = APIRouter()
 internal_router.include_router(meta_routes.meta_router)
