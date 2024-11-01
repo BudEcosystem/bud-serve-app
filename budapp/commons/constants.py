@@ -135,22 +135,6 @@ class ModalityEnum(Enum):
     SPEECH_TO_TEXT = "speech_to_text"
 
 
-class ModelTypeEnum(Enum):
-    """Enumeration of model types.
-
-    This enum represents different categories or types of AI models based on their primary function or training approach.
-
-    Attributes:
-        PRETRAINED (str): Represents models that have been pre-trained on large datasets and can be fine-tuned for specific tasks.
-        CHAT (str): Represents models specifically designed or fine-tuned for conversational AI and chat applications.
-        CODEGEN (str): Represents models specialized in code generation tasks.
-    """
-
-    PRETRAINED = "pretrained"
-    CHAT = "chat"
-    CODEGEN = "codegen"
-
-
 ModelSourceEnum = create_dynamic_enum(
     "ModelSourceEnum",
     [

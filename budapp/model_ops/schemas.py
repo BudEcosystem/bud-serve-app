@@ -34,7 +34,6 @@ from budapp.commons.constants import (
     CredentialTypeEnum,
     ModalityEnum,
     ModelProviderTypeEnum,
-    ModelTypeEnum,
     WorkflowStatusEnum,
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
@@ -99,7 +98,6 @@ class Model(BaseModel):
     github_url: str | None = None
     huggingface_url: str | None = None
     website_url: str | None = None
-    type: ModelTypeEnum | None = None
     created_by: UUID4 | None = None
     author: str | None = None
     created_at: datetime
@@ -274,7 +272,6 @@ class ModelCreate(BaseModel):
     huggingface_url: str | None = None
     website_url: str | None = None
     modality: ModalityEnum
-    type: ModelTypeEnum | None = None
     source: str
     provider_type: ModelProviderTypeEnum
     uri: str

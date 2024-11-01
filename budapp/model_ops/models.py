@@ -29,7 +29,6 @@ from budapp.commons.constants import (
     CredentialTypeEnum,
     ModalityEnum,
     ModelProviderTypeEnum,
-    ModelTypeEnum,
 )
 from budapp.commons.database import Base
 
@@ -58,14 +57,6 @@ class Model(Base):
             values_callable=lambda x: [e.value for e in x],
         ),
         nullable=False,
-    )
-    type: Mapped[str] = mapped_column(
-        Enum(
-            ModelTypeEnum,
-            name="model_type_enum",
-            values_callable=lambda x: [e.value for e in x],
-        ),
-        nullable=True,
     )
     source: Mapped[str] = mapped_column(String, nullable=False)
     provider_type: Mapped[str] = mapped_column(
@@ -132,15 +123,6 @@ class CloudModel(Base):
             create_type=False,
         ),
         nullable=False,
-    )
-    type: Mapped[str] = mapped_column(
-        PG_ENUM(
-            ModelTypeEnum,
-            name="model_type_enum",
-            values_callable=lambda x: [e.value for e in x],
-            create_type=False,
-        ),
-        nullable=True,
     )
     source: Mapped[str] = mapped_column(String, nullable=False)
     provider_type: Mapped[str] = mapped_column(
