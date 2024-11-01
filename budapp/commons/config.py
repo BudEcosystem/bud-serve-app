@@ -20,16 +20,33 @@ import os
 from datetime import datetime, timedelta, timezone
 from distutils.util import strtobool
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 
 from dapr.conf import settings as dapr_settings
-from pydantic import ConfigDict, DirectoryPath, Field, computed_field, model_validator
+from pydantic import (
+    AnyUrl,
+    BeforeValidator,
+    ConfigDict,
+    DirectoryPath,
+    Field,
+    computed_field,
+    model_validator,
+)
 from pydantic_settings import BaseSettings
 
 from budapp.__about__ import __version__
 
 from . import logging
 from .constants import Environment, LogLevel
+
+
+def parse_cors(v: Any) -> List[str] | str:
+    """Parse CORS_ORIGINS into a list of strings"""
+    if isinstance(v, str) and not v.startswith("["):
+        return [i.strip() for i in v.split(",")]
+    elif isinstance(v, list | str):
+        return v
+    raise ValueError(v)
 
 
 def enable_periodic_sync_from_store(is_global: bool = False) -> Dict[str, Any]:
@@ -201,6 +218,9 @@ class AppConfig(BaseConfig):
 
     # Static
     static_dir_path: DirectoryPath | None = Field(None, alias="STATIC_DIR")
+
+    # CORS
+    cors_origins: Annotated[list[AnyUrl] | str, BeforeValidator(parse_cors)] = []
 
     @computed_field
     def static_dir(self) -> str:
