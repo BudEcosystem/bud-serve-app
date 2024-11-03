@@ -16,14 +16,18 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the model ops."""
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
+from uuid import UUID
+
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
+from budapp.commons.exceptions import DatabaseException
 from budapp.model_ops.models import CloudModel
+from budapp.model_ops.models import Model
 from budapp.model_ops.models import Provider as ProviderModel
 
 
@@ -77,7 +81,24 @@ class ProviderDataManager(DataManagerUtils):
 class ModelDataManager(DataManagerUtils):
     """Data manager for the Model model."""
 
-    pass
+    async def get_model_by_id(self, model_id: UUID) -> Optional[Model]:
+        """Retrieve a cloud model by its ID."""
+        stmt = select(Model).where(Model.id == model_id)
+        return self.scalar_one_or_none(stmt)
+    
+    async def update_model_by_fields(self, model: Model, update_data: Dict[str, Any]) -> Model:
+        """Update specific fields of a cloud model and save using update_one."""
+        # Update only the specified fields
+        for field, value in update_data.items():
+            if hasattr(model, field):
+                setattr(model, field, value)
+
+        # Use the update_one method to commit and refresh
+        try:
+            return self.update_one(model)
+        except DatabaseException as e:
+            logger.error(f"Failed to update model by fields: {e}")
+            raise
 
 
 class CloudModelDataManager(DataManagerUtils):

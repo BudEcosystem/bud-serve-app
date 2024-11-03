@@ -37,8 +37,11 @@ from .schemas import (
     CreateCloudModelWorkflowResponse,
     CreateCloudModelWorkflowStepData,
     CreateCloudModelWorkflowSteps,
+    EditModel,
     ModelCreate,
 )
+from pydantic import ValidationError
+
 
 
 logger = logging.get_logger(__name__)
@@ -210,6 +213,32 @@ class CloudModelWorkflowService(SessionMixin):
 
         return db_workflow
 
+    async def edit_cloud_model(self, model_id: UUID, data: Dict[str, Any]) -> None:
+        """Edit cloud model by validating and updating specific fields."""
+
+        # Retrieve the existing model from the database
+        model = await ModelDataManager(self.session).get_model_by_id(model_id=model_id)
+        if not model:
+            raise ValueError(f"Model with ID {model_id} not found")
+
+        # Validate and update fields using EditModel
+        try:
+            # Convert existing model to a dictionary of attributes
+            model_data = {key: getattr(model, key) for key in model.__table__.columns.keys()}
+
+            # Combine existing data with new update data
+            updated_data = {**model_data, **data}
+
+            # Validate data with EditModel schema
+            validated_data = EditModel(**updated_data).dict(exclude_unset=True)
+
+        except ValidationError as e:
+            raise ValueError(f"Validation error: {e}")
+
+        # Call update_model_by_fields with the validated data
+        return await ModelDataManager(self.session).update_model_by_fields(model, validated_data)
+
+        
     async def _execute_add_cloud_model_workflow(self, data: Dict[str, Any], workflow_id: UUID) -> None:
         """Execute add cloud model workflow."""
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(

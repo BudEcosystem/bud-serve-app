@@ -19,7 +19,7 @@
 
 import re
 from datetime import datetime
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from pydantic import (
     UUID4,
@@ -28,6 +28,7 @@ from pydantic import (
     Field,
     field_validator,
     model_validator,
+    validator,
 )
 
 from budapp.commons.constants import (
@@ -163,6 +164,39 @@ class CreateCloudModelWorkflowRequest(BaseModel):
             raise ValueError(f"At least one of {', '.join(required_fields)} is required when workflow_id is provided")
 
         return self
+
+
+class EditModel(BaseModel):
+    """Schema for editing a model with optional fields and validations."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=100, description="Model name")
+    description: Optional[str] = Field(None, max_length=500, description="Brief model description")
+    modality: Optional[ModalityEnum] = None
+    source: Optional[str] = None
+    provider_type: Optional[ModelProviderTypeEnum] = None
+    uri: Optional[str] = Field(None, description="Direct URI of the model")
+    model_size: Optional[int] = Field(None, gt=0, description="Size of the model in bytes")
+    tags: Optional[List[Tag]] = None
+    tasks: Optional[List[Tag]] = None
+    icon: Optional[str] = Field(None, description="URL for the model's icon")
+    github_url: Optional[str] = Field(None, description="URL to the model's GitHub repository")
+    huggingface_url: Optional[str] = Field(None, description="URL to the model's Hugging Face page")
+    website_url: Optional[str] = Field(None, description="URL to the model's official website")
+    created_by: Optional[UUID4] = Field(None, description="UUID of the user who created the model")
+    author: Optional[str] = Field(None, max_length=100, description="Author name")
+
+    @validator('name')
+    def validate_name(cls, v):
+        if v and not v.isalnum():
+            raise ValueError("Model name must be alphanumeric")
+        return v
+    
+    @validator('model_size')
+    def validate_model_size(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("Model size must be a positive integer")
+        return v
+
 
 
 class CreateCloudModelWorkflowSteps(BaseModel):
