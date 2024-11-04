@@ -43,6 +43,17 @@ class WorkflowStepDataManager(DataManagerUtils):
         stmt = select(WorkflowStepModel).filter_by(**filters).order_by(WorkflowStepModel.step_number)
         return self.scalars_all(stmt)
 
+    async def get_all_workflow_steps_by_data(self, data_key: str, workflow_id: str) -> List[WorkflowStepModel]:
+        """Get all workflow steps from the database by data key and workflow id."""
+        stmt = (
+            select(WorkflowStepModel)
+            .filter(
+                WorkflowStepModel.data.op("->>")(data_key).isnot(None), WorkflowStepModel.workflow_id == workflow_id
+            )
+            .order_by(WorkflowStepModel.step_number)
+        )
+        return self.scalars_all(stmt)
+
 
 class IconDataManager(DataManagerUtils):
     """Data manager for the Icon model."""
