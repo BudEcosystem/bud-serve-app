@@ -310,3 +310,13 @@ class ModelCreate(BaseModel):
     provider_type: ModelProviderTypeEnum
     uri: str
     created_by: UUID4
+
+class ModelDetailResponse(BaseModel):
+    id: UUID4
+    name: str
+    description: Optional[str]
+    tags: Optional[List[dict]]
+    tasks: Optional[List[dict]]
+    github_url: Optional[str]
+    huggingface_url: Optional[str]
+    website_url: Optional[str]

@@ -480,7 +480,7 @@ class CloudModelWorkflowService(SessionMixin):
                 huggingface_url=db_cloud_model.huggingface_url,
                 website_url=db_cloud_model.website_url,
                 modality=db_cloud_model.modality,
-                type=db_cloud_model.type,
+                # type=db_cloud_model.type,
                 source=db_cloud_model.source,
                 provider_type=provider_type,
                 uri=db_cloud_model.uri,
@@ -620,3 +620,11 @@ class CloudModelService(SessionMixin):
     ) -> Tuple[List[CloudModel], int]:
         """Get all cloud models."""
         return await CloudModelDataManager(self.session).get_all_recommended_tags(offset, limit)
+    
+class ModelService(SessionMixin):
+    """Cloud model service."""
+    
+    async def get_model_details(self, model_id: UUID) -> Model:
+        """Retrieve model details by model ID."""
+        return await ModelDataManager(self.session).get_model_by_id(model_id=model_id)
+
