@@ -112,6 +112,7 @@ class CloudModel(BaseModel):
     id: UUID4
     name: str
     description: str | None = None
+    icon: str
     modality: ModalityEnum
     source: CredentialTypeEnum
     provider_type: ModelProviderTypeEnum
