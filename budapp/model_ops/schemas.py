@@ -342,3 +342,13 @@ class SearchTagsResponse(PaginatedSuccessResponse):
     """Response schema for searching tags by name."""
 
     tags: List[Tag] = Field(..., description="List of matching tags")
+
+class ModelDetailResponse(BaseModel):
+    id: UUID4
+    name: str
+    description: Optional[str]
+    tags: Optional[List[dict]]
+    tasks: Optional[List[dict]]
+    github_url: Optional[str]
+    huggingface_url: Optional[str]
+    website_url: Optional[str]

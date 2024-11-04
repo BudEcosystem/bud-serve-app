@@ -39,6 +39,7 @@ from budapp.user_ops.schemas import User
 from .schemas import (
     CloudModelFilter,
     CloudModelResponse,
+    ModelDetailResponse,
     CreateCloudModelWorkflowRequest,
     CreateCloudModelWorkflowResponse,
     EditModel,
@@ -366,6 +367,55 @@ async def list_cloud_model_recommended_tags(
         object="recommended_tags.list",
         code=status.HTTP_200_OK,
     ).to_http_response()
+
+
+@model_router.get(
+    "/cloud_model/{model_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request parameters",
+        },
+        status.HTTP_200_OK: {
+            "model": ModelDetailResponse,
+            "description": "Successfully retrieved model details",
+        },
+    },
+    description="Retrieve details of a model by ID",
+)
+async def get_model_details(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    model_id: UUID,
+) -> Union[ModelDetailResponse, ErrorResponse]:
+    """Retrieve details of a model by its ID."""
+    try:
+        model_details = await ModelService(session).get_model_details(model_id)
+        response_data = {
+            "id": model_details.id,
+            "name": model_details.name,
+            "description": model_details.description,
+            "tags": model_details.tags,
+            "tasks": model_details.tasks,
+            "github_url": model_details.github_url,
+            "huggingface_url": model_details.huggingface_url,
+            "website_url": model_details.website_url
+        }
+        
+        return ModelDetailResponse(**response_data)
+    except ClientException as e:
+        logger.exception(f"Failed to get model details: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get model details: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to retrieve model details",
+        ).to_http_response()
 
 @model_router.get(
     "/tags",

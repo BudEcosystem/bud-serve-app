@@ -691,9 +691,14 @@ class CloudModelService(SessionMixin):
     ) -> Tuple[List[CloudModel], int]:
         """Get all cloud models."""
         return await CloudModelDataManager(self.session).get_all_recommended_tags(offset, limit)
-
+    
 class ModelService(SessionMixin):
     """Cloud model service."""
+    
+    async def get_model_details(self, model_id: UUID) -> Model:
+        """Retrieve model details by model ID."""
+        return await ModelDataManager(self.session).get_model_by_id(model_id=model_id)
+    
     async def search_tags_by_name(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
         """Search model tags by name with pagination."""
         return await ModelDataManager(self.session).search_tags_by_name(name, offset, limit)
