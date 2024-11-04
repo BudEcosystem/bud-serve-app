@@ -32,6 +32,7 @@ from .commons.constants import Environment
 from .core import meta_routes
 from .initializers.seeder import seeders
 from .model_ops import model_routes
+from .user_ops import user_routes
 
 
 logger = logging.get_logger(__name__)
@@ -116,6 +117,7 @@ internal_router = APIRouter()
 internal_router.include_router(meta_routes.meta_router)
 internal_router.include_router(auth_routes.auth_router)
 internal_router.include_router(model_routes.model_router)
+internal_router.include_router(user_routes.user_router)
 
 app.include_router(internal_router)
 

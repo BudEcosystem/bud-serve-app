@@ -21,6 +21,7 @@ from datetime import datetime
 from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field
 
 from budapp.commons.constants import UserRoleEnum, UserStatusEnum
+from budapp.commons.schemas import SuccessResponse
 
 
 class UserBase(BaseModel):
@@ -30,7 +31,7 @@ class UserBase(BaseModel):
     email: EmailStr = Field(min_length=1, max_length=100)
 
 
-class UserResponse(UserBase):
+class UserInfo(UserBase):
     """User response to client schema."""
 
     model_config = ConfigDict(from_attributes=True)
@@ -40,7 +41,7 @@ class UserResponse(UserBase):
     role: UserRoleEnum
 
 
-class User(UserResponse):
+class User(UserInfo):
     """User schema."""
 
     model_config = ConfigDict(from_attributes=True)
@@ -51,3 +52,11 @@ class User(UserResponse):
     status: UserStatusEnum
     created_at: datetime
     modified_at: datetime
+
+
+class UserResponse(SuccessResponse):
+    """User response to client schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    user: UserInfo
