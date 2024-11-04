@@ -93,6 +93,9 @@ async def receive_notification(
         #     }
         # }
         # payload = NotificationPayload(**example_payload)
+        logger.info("================================================")
+        logger.info(f"Received notification payload: {payload}")
+        logger.info("================================================")
 
         # Check if the notification is internal
         if payload.category == NotificationCategory.INTERNAL and payload.type == PayloadType.DEPLOYMENT_RECOMMENDATION:
