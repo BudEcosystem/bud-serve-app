@@ -16,10 +16,11 @@
 
 """The model ops services. Contains business logic for model ops."""
 
+import os
 from typing import Any, Dict, List, Optional, Tuple
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import status
+from fastapi import UploadFile, status
 
 from budapp.commons import logging
 from budapp.commons.constants import WorkflowStatusEnum
@@ -29,8 +30,8 @@ from budapp.core.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.core.models import Workflow as WorkflowModel
 from budapp.core.models import WorkflowStep as WorkflowStepModel
 
-from .crud import CloudModelDataManager, ModelDataManager, ProviderDataManager
-from .models import CloudModel, Model
+from .crud import CloudModelDataManager, ModelDataManager, PaperPublishedDataManager, ProviderDataManager
+from .models import CloudModel, Model, ModelLicenses, PaperPublished
 from .models import Provider as ProviderModel
 from .schemas import (
     CreateCloudModelWorkflowRequest,
@@ -39,6 +40,8 @@ from .schemas import (
     CreateCloudModelWorkflowSteps,
     EditModel,
     ModelCreate,
+    ModelLicensesModel,
+    PaperPublishedModel,
 )
 from pydantic import ValidationError
 
@@ -213,13 +216,35 @@ class CloudModelWorkflowService(SessionMixin):
 
         return db_workflow
 
-    async def edit_cloud_model(self, model_id: UUID, data: Dict[str, Any]) -> None:
-        """Edit cloud model by validating and updating specific fields."""
+    async def edit_cloud_model(self, model_id: UUID, data: Dict[str, Any], file: UploadFile = None) -> None:
+        """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
 
         # Retrieve the existing model from the database
         model = await ModelDataManager(self.session).get_model_by_id(model_id=model_id)
         if not model:
             raise ValueError(f"Model with ID {model_id} not found")
+
+        # Handle file upload and save to static/licenses if file is provided
+        if file:
+            # TODO: Currently saving the file in static/licenses directory for now. Move to dapr local storage later
+            file_directory = "static/licenses"
+            os.makedirs(file_directory, exist_ok=True)  # Create directory if it doesn't exist
+            file_path = os.path.join(file_directory, file.filename)
+
+            # Save the file
+            with open(file_path, "wb") as f:
+                content = await file.read()
+                f.write(content)
+
+            license_entry = ModelLicensesModel(
+                id=uuid4(),  # Generate a unique UUID for the license
+                name=file.filename,
+                path=file_path,
+                model_id=model_id
+            )
+            await ModelDataManager(self.session).insert_one(
+                ModelLicenses(**license_entry.model_dump(exclude_unset=True))
+            )
 
         # Validate and update fields using EditModel
         try:
@@ -234,6 +259,43 @@ class CloudModelWorkflowService(SessionMixin):
 
         except ValidationError as e:
             raise ValueError(f"Validation error: {e}")
+
+        # Update or insert papers if `paper_published` data is provided
+        if "paper_published" in data and data["paper_published"]:
+            for paper in data["paper_published"]:
+                paper_id = paper.get("id")  # Assume each paper has an "id" if it's an existing entry
+                if paper_id:
+                    # Try to retrieve the existing paper entry
+                    existing_paper = await PaperPublishedDataManager(self.session).get_paper_by_id(paper_id)
+                    if existing_paper:
+                        # Update the existing paper
+                        updated_data = PaperPublishedModel(
+                            **paper,
+                            model_id=model_id
+                        ).model_dump(exclude_unset=True)
+                        await PaperPublishedDataManager(self.session).update_paper_by_id(existing_paper, updated_data)
+                    else:
+                        # Insert as a new entry if the paper does not exist
+                        new_paper = PaperPublishedModel(
+                            id=uuid4(),
+                            title=paper["title"],
+                            url=paper["url"],
+                            model_id=model_id
+                        )
+                        await ModelDataManager(self.session).insert_one(
+                            PaperPublished(**new_paper.model_dump(exclude_unset=True))
+                        )
+                else:
+                    # Insert as a new entry if no ID is provided (assumed new entry)
+                    new_paper = PaperPublishedModel(
+                        id=uuid4(),
+                        title=paper["title"],
+                        url=paper["url"],
+                        model_id=model_id
+                    )
+                    await ModelDataManager(self.session).insert_one(
+                        PaperPublished(**new_paper.model_dump(exclude_unset=True))
+                    )
 
         # Call update_model_by_fields with the validated data
         return await ModelDataManager(self.session).update_model_by_fields(model, validated_data)

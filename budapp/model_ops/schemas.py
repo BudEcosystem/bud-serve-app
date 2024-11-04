@@ -122,6 +122,30 @@ class CloudModel(BaseModel):
     tasks: list[Tag] | None = None
 
 
+class PaperPublishedModel(BaseModel):
+    """Paper Published Model Schema"""
+
+    id: UUID4
+    title: str | None = None
+    url: str
+    model_id: UUID4
+
+class PaperPublishedModelEditRequest(BaseModel):
+    """Paper Published Edit Model Schema"""
+
+    id: UUID4 | None = None
+    title: str | None = None
+    url: str
+
+class ModelLicensesModel(BaseModel):
+    """Paper Published Model Schema"""
+
+    id: UUID4
+    name: str
+    path: str
+    model_id: UUID4
+
+
 class CreateCloudModelWorkflowRequest(BaseModel):
     """Cloud model workflow request schema."""
 
@@ -171,30 +195,17 @@ class EditModel(BaseModel):
 
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="Model name")
     description: Optional[str] = Field(None, max_length=500, description="Brief model description")
-    modality: Optional[ModalityEnum] = None
-    source: Optional[str] = None
-    provider_type: Optional[ModelProviderTypeEnum] = None
-    uri: Optional[str] = Field(None, description="Direct URI of the model")
-    model_size: Optional[int] = Field(None, gt=0, description="Size of the model in bytes")
     tags: Optional[List[Tag]] = None
     tasks: Optional[List[Tag]] = None
-    icon: Optional[str] = Field(None, description="URL for the model's icon")
+    paper_published: Optional[List[PaperPublishedModelEditRequest]] = None
     github_url: Optional[str] = Field(None, description="URL to the model's GitHub repository")
     huggingface_url: Optional[str] = Field(None, description="URL to the model's Hugging Face page")
     website_url: Optional[str] = Field(None, description="URL to the model's official website")
-    created_by: Optional[UUID4] = Field(None, description="UUID of the user who created the model")
-    author: Optional[str] = Field(None, max_length=100, description="Author name")
 
     @validator('name')
     def validate_name(cls, v):
         if v and not v.isalnum():
             raise ValueError("Model name must be alphanumeric")
-        return v
-    
-    @validator('model_size')
-    def validate_model_size(cls, v):
-        if v is not None and v <= 0:
-            raise ValueError("Model size must be a positive integer")
         return v
 
 

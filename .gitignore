@@ -11,6 +11,7 @@ bin
 obj
 github.com
 **/*.log
+static/licenses/*
 
 ## Build generated
 target/
