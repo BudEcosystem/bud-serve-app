@@ -405,3 +405,39 @@ class WorkflowStatusEnum(StrEnum):
     IN_PROGRESS = auto()
     COMPLETED = auto()
     FAILED = auto()
+
+
+class NotificationType(Enum):
+    """Represents the type of a notification.
+
+    Attributes:
+        EVENT: Notification triggered by an event.
+        TOPIC: Notification related to a specific topic.
+        BROADCAST: Notification triggered by a broadcast.
+    """
+
+    EVENT = "event"
+    TOPIC = "topic"
+    BROADCAST = "broadcast"
+
+
+class NotificationCategory(str, Enum):
+    """Represents the type of an internal notification.
+
+    Attributes:
+        INAPP: Represents the in-app notification type.
+        INTERNAL: Represents the internal notification type.
+    """
+
+    INAPP = "inapp"
+    INTERNAL = "internal"
+
+
+class PayloadType(str, Enum):
+    """Represents the type of a payload.
+
+    Attributes:
+        DEPLOYMENT_RECOMMENDATION: Represents the deployment recommendation payload type.
+    """
+
+    DEPLOYMENT_RECOMMENDATION = "deployment_recommendation"

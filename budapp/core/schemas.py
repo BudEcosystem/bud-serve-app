@@ -17,11 +17,16 @@
 
 """Contains core Pydantic schemas used for data validation and serialization within the core services."""
 
-from pydantic import BaseModel
+from typing import List, Optional, Self, Union
+
+from pydantic import BaseModel, model_validator
+
+from budapp.commons.constants import NotificationCategory, NotificationType
+from budapp.commons.schemas import CloudEventBase, SuccessResponse
 
 
 class IconBase(BaseModel):
-    """Base icon schema"""
+    """Base icon schema."""
 
     name: str
     file_path: str
@@ -29,13 +34,76 @@ class IconBase(BaseModel):
 
 
 class IconCreate(IconBase):
-    """Create icon schema"""
+    """Create icon schema."""
 
     pass
 
 
 class IconUpdate(BaseModel):
-    """Update icon schema"""
+    """Update icon schema."""
 
     category: str
     name: str
+
+
+# Schemas related to notifications
+
+
+class NotificationContent(BaseModel):
+    """Represents the content of a notification."""
+
+    title: str | None = None
+    message: str | None = None
+    status: str | None = None
+    primary_action: str | None = None
+    secondary_action: str | None = None
+
+
+class NotificationPayload(BaseModel):
+    """Schema for notification payload."""
+
+    category: NotificationCategory
+    type: str | None = None
+    event: str | None = None
+    workflow_id: str | None = None
+    source: str
+    content: NotificationContent
+
+
+class NotificationRequest(CloudEventBase):
+    """Represents a notification request."""
+
+    notification_type: NotificationType = NotificationType.EVENT
+    name: str  # Workflow identifier
+    subscriber_ids: Optional[Union[str, List[str]]] = None
+    actor: Optional[str] = None
+    topic_keys: Optional[Union[str, List[str]]] = None
+    payload: NotificationPayload
+
+    @model_validator(mode="after")
+    def validate_notification_rules(self) -> Self:
+        """Check if required fields are present in the request.
+
+        Raises:
+            ValueError: If `subscriber_ids` is not present for event notifications.
+            ValueError: If `topic_keys` is not present for topic notifications.
+
+        Returns:
+            Self: The instance of the class.
+        """
+        if self.notification_type == NotificationType.EVENT and not self.subscriber_ids:
+            raise ValueError("subscriber_ids is required for event notifications")
+        if self.notification_type == NotificationType.TOPIC and not self.topic_keys:
+            raise ValueError("topic_keys is required for topic notifications")
+        if self.notification_type == NotificationType.BROADCAST and (self.subscriber_ids or self.topic_keys):
+            raise ValueError("subscriber_ids and topic_keys are not allowed for broadcast notifications")
+
+        # Convert payload to dict
+        self.payload = self.payload.model_dump()
+        return self
+
+
+class NotificationResponse(SuccessResponse):
+    """Represents a notification response."""
+
+    pass

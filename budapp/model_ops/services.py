@@ -480,7 +480,6 @@ class CloudModelWorkflowService(SessionMixin):
                 huggingface_url=db_cloud_model.huggingface_url,
                 website_url=db_cloud_model.website_url,
                 modality=db_cloud_model.modality,
-                # type=db_cloud_model.type,
                 source=db_cloud_model.source,
                 provider_type=provider_type,
                 uri=db_cloud_model.uri,
