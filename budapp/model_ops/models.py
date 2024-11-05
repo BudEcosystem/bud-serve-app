@@ -78,6 +78,29 @@ class Model(Base):
 
     created_user: Mapped["User"] = relationship(back_populates="created_models", foreign_keys=[created_by])
 
+class PaperPublished(Base):
+    """Model for Paper Published."""
+
+    __tablename__ = "paper_published"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    title: Mapped[str] = mapped_column(String, nullable=True)
+    url: Mapped[str] = mapped_column(String, nullable=True)
+    model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class ModelLicenses(Base):
+    """Model for a AI model licenses."""
+
+    __tablename__ = "model_licenses"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=True)
+    path: Mapped[str] = mapped_column(String, nullable=True)
+    model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class Provider(Base):
     """Model for a AI model provider."""

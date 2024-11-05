@@ -221,6 +221,30 @@ class CloudModelResponse(PaginatedSuccessResponse):
 
 # workflow related schemas
 
+class PaperPublishedModel(BaseModel):
+    """Paper Published Model Schema"""
+
+    id: UUID4
+    title: str | None = None
+    url: str
+    model_id: UUID4
+
+class PaperPublishedModelEditRequest(BaseModel):
+    """Paper Published Edit Model Schema"""
+
+    id: UUID4 | None = None
+    title: str | None = None
+    url: str
+
+class ModelLicensesModel(BaseModel):
+    """Paper Published Model Schema"""
+
+    id: UUID4
+    name: str
+    path: str
+    model_id: UUID4
+
+
 class CreateCloudModelWorkflowRequest(BaseModel):
     """Cloud model workflow request schema."""
 
@@ -263,6 +287,26 @@ class CreateCloudModelWorkflowRequest(BaseModel):
             raise ValueError(f"At least one of {', '.join(required_fields)} is required when workflow_id is provided")
 
         return self
+
+
+class EditModel(BaseModel):
+    """Schema for editing a model with optional fields and validations."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=100, description="Model name")
+    description: Optional[str] = Field(None, max_length=500, description="Brief model description")
+    tags: Optional[List[Tag]] = None
+    tasks: Optional[List[Tag]] = None
+    paper_published: Optional[List[PaperPublishedModelEditRequest]] = None
+    github_url: Optional[str] = Field(None, description="URL to the model's GitHub repository")
+    huggingface_url: Optional[str] = Field(None, description="URL to the model's Hugging Face page")
+    website_url: Optional[str] = Field(None, description="URL to the model's official website")
+
+    @validator('name')
+    def validate_name(cls, v):
+        if v and not v.isalnum():
+            raise ValueError("Model name must be alphanumeric")
+        return v
+
 
 
 class CreateCloudModelWorkflowSteps(BaseModel):
