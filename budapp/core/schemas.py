@@ -98,8 +98,6 @@ class NotificationRequest(CloudEventBase):
         if self.notification_type == NotificationType.BROADCAST and (self.subscriber_ids or self.topic_keys):
             raise ValueError("subscriber_ids and topic_keys are not allowed for broadcast notifications")
 
-        # Convert payload to dict
-        self.payload = self.payload.model_dump()
         return self
 
 
