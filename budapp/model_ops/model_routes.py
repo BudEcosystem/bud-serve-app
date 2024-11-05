@@ -362,6 +362,7 @@ async def get_model_details(
             "id": model_details.id,
             "name": model_details.name,
             "description": model_details.description,
+            "icon": model_details.icon,
             "tags": model_details.tags,
             "tasks": model_details.tasks,
             "github_url": model_details.github_url,

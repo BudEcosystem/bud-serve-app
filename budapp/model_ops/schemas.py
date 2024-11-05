@@ -39,6 +39,7 @@ from budapp.commons.constants import (
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 
+# provider related schemas
 
 class ProviderFilter(BaseModel):
     """Provider filter schema."""
@@ -65,6 +66,7 @@ class ProviderResponse(PaginatedSuccessResponse):
 
     providers: list[Provider] = []
 
+# tags structure
 
 class Tag(BaseModel):
     """Tag schema with name and color."""
@@ -78,32 +80,104 @@ class Tag(BaseModel):
         if not re.match(r"^#[0-9A-Fa-f]{6}$", v):
             raise ValueError("Color must be a valid hex color code (e.g., #FF0000)")
         return v.upper()  # Normalize to uppercase
+    
+class TagWithCount(BaseModel):
+    """Tag with count schema."""
 
-
-class Model(BaseModel):
-    """Model schema."""
-
-    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
-
-    id: UUID4
     name: str
-    description: str | None = None
+    color: str = Field(..., pattern="^#[0-9A-Fa-f]{6}$")
+    count: int
+
+    @field_validator("color")
+    def validate_hex_color(cls, v: str) -> str:
+        """Validate that color is a valid hex color code."""
+        if not re.match(r"^#[0-9A-Fa-f]{6}$", v):
+            raise ValueError("Color must be a valid hex color code (e.g., #FF0000)")
+        return v.upper()  # Normalize to uppercase
+
+
+class RecommendedTagsResponse(PaginatedSuccessResponse):
+    """Recommended tags response schema."""
+
+    tags: List[TagWithCount] = []
+
+    @field_validator("tags", mode="before")
+    def validate_tags(cls, v: List[Tuple[str, str, int]]) -> List[TagWithCount]:
+        """Convert tuples to TagWithCount objects."""
+        return [TagWithCount(name=tag[0], color=tag[1], count=tag[2]) for tag in v]
+
+# Model related schemas
+
+class ModelBase(BaseModel):
+    """Base model schema."""
+    
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+    
+    name: str
+    description: Optional[str] = None
+    tags: Optional[List[Tag]] = None
+    tasks: Optional[List[Tag]] = None
+    icon: str
+    github_url: Optional[str] = None
+    huggingface_url: Optional[str] = None
+    website_url: Optional[str] = None
+
+class Model(ModelBase):
+    """Model schema."""
+    
+    id: UUID4
     modality: ModalityEnum
     source: CredentialTypeEnum
     provider_type: ModelProviderTypeEnum
     uri: str
-    model_size: int | None = None
-    tags: list[Tag] | None = None
-    tasks: list[Tag] | None = None
-    icon: str
-    github_url: str | None = None
-    huggingface_url: str | None = None
-    website_url: str | None = None
-    created_by: UUID4 | None = None
-    author: str | None = None
+    model_size: Optional[int] = None
+    created_by: Optional[UUID4] = None
+    author: Optional[str] = None
     created_at: datetime
     modified_at: datetime
 
+class ModelCreate(ModelBase):
+    """Schema for creating a new AI Model."""
+
+    modality: ModalityEnum
+    source: CredentialTypeEnum
+    provider_type: ModelProviderTypeEnum
+    uri: str
+    model_size: Optional[int] = None
+    created_by: UUID4
+    author: Optional[str] = None
+
+class ModelDetailResponse(ModelBase):
+    """Response schema for model details."""
+    
+    id: UUID4
+
+class EditModel(ModelBase):
+    """Schema for editing a model with optional fields and validations."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=100, description="Model name")
+    description: Optional[str] = Field(None, max_length=500, description="Brief model description")
+    modality: Optional[ModalityEnum] = None
+    source: Optional[CredentialTypeEnum] = None
+    provider_type: Optional[ModelProviderTypeEnum] = None
+    uri: Optional[str] = Field(None, description="Direct URI of the model")
+    model_size: Optional[int] = Field(None, gt=0, description="Size of the model in bytes")
+    created_by: Optional[UUID4] = Field(None, description="UUID of the user who created the model")
+    author: Optional[str] = Field(None, max_length=100, description="Author name")
+
+    @validator('name')
+    def validate_name(cls, v):
+        if v and not v.isalnum():
+            raise ValueError("Model name must be alphanumeric")
+        return v
+
+    @validator('model_size')
+    def validate_model_size(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("Model size must be a positive integer")
+        return v
+
+# cloud model related schemas
 
 class CloudModel(BaseModel):
     """Cloud model schema."""
@@ -113,6 +187,7 @@ class CloudModel(BaseModel):
     id: UUID4
     name: str
     description: str | None = None
+    icon: str
     modality: ModalityEnum
     source: CredentialTypeEnum
     provider_type: ModelProviderTypeEnum
@@ -121,6 +196,30 @@ class CloudModel(BaseModel):
     tags: list[Tag] | None = None
     tasks: list[Tag] | None = None
 
+class CloudModelFilter(BaseModel):
+    """Cloud model filter schema."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    source: CredentialTypeEnum | None = None
+    modality: ModalityEnum | None = None
+    model_size: int | None = None
+    name: str | None = None
+
+    @field_validator("source")
+    def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
+        """Change the source to a string."""
+        return v.value if v else None
+
+
+class CloudModelResponse(PaginatedSuccessResponse):
+    """Cloud model response schema."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    cloud_models: list[CloudModel] = []
+
+# workflow related schemas
 
 class CreateCloudModelWorkflowRequest(BaseModel):
     """Cloud model workflow request schema."""
@@ -166,39 +265,6 @@ class CreateCloudModelWorkflowRequest(BaseModel):
         return self
 
 
-class EditModel(BaseModel):
-    """Schema for editing a model with optional fields and validations."""
-
-    name: Optional[str] = Field(None, min_length=1, max_length=100, description="Model name")
-    description: Optional[str] = Field(None, max_length=500, description="Brief model description")
-    modality: Optional[ModalityEnum] = None
-    source: Optional[str] = None
-    provider_type: Optional[ModelProviderTypeEnum] = None
-    uri: Optional[str] = Field(None, description="Direct URI of the model")
-    model_size: Optional[int] = Field(None, gt=0, description="Size of the model in bytes")
-    tags: Optional[List[Tag]] = None
-    tasks: Optional[List[Tag]] = None
-    icon: Optional[str] = Field(None, description="URL for the model's icon")
-    github_url: Optional[str] = Field(None, description="URL to the model's GitHub repository")
-    huggingface_url: Optional[str] = Field(None, description="URL to the model's Hugging Face page")
-    website_url: Optional[str] = Field(None, description="URL to the model's official website")
-    created_by: Optional[UUID4] = Field(None, description="UUID of the user who created the model")
-    author: Optional[str] = Field(None, max_length=100, description="Author name")
-
-    @validator('name')
-    def validate_name(cls, v):
-        if v and not v.isalnum():
-            raise ValueError("Model name must be alphanumeric")
-        return v
-    
-    @validator('model_size')
-    def validate_model_size(cls, v):
-        if v is not None and v <= 0:
-            raise ValueError("Model size must be a positive integer")
-        return v
-
-
-
 class CreateCloudModelWorkflowSteps(BaseModel):
     """Cloud model workflow step data schema."""
 
@@ -240,83 +306,8 @@ class CreateCloudModelWorkflowResponse(SuccessResponse):
     workflow_steps: CreateCloudModelWorkflowStepData | None = None
 
 
-class CloudModelFilter(BaseModel):
-    """Cloud model filter schema."""
-
-    model_config = ConfigDict(protected_namespaces=())
-
-    source: CredentialTypeEnum | None = None
-    modality: ModalityEnum | None = None
-    model_size: int | None = None
-    name: str | None = None
-
-    @field_validator("source")
-    def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
-        """Change the source to a string."""
-        return v.value if v else None
 
 
-class CloudModelResponse(PaginatedSuccessResponse):
-    """Cloud model response schema."""
-
-    model_config = ConfigDict(extra="ignore")
-
-    cloud_models: list[CloudModel] = []
 
 
-class TagWithCount(BaseModel):
-    """Tag with count schema."""
 
-    name: str
-    color: str = Field(..., pattern="^#[0-9A-Fa-f]{6}$")
-    count: int
-
-    @field_validator("color")
-    def validate_hex_color(cls, v: str) -> str:
-        """Validate that color is a valid hex color code."""
-        if not re.match(r"^#[0-9A-Fa-f]{6}$", v):
-            raise ValueError("Color must be a valid hex color code (e.g., #FF0000)")
-        return v.upper()  # Normalize to uppercase
-
-
-class RecommendedTagsResponse(PaginatedSuccessResponse):
-    """Recommended tags response schema."""
-
-    tags: List[TagWithCount] = []
-
-    @field_validator("tags", mode="before")
-    def validate_tags(cls, v: List[Tuple[str, str, int]]) -> List[TagWithCount]:
-        """Convert tuples to TagWithCount objects."""
-        return [TagWithCount(name=tag[0], color=tag[1], count=tag[2]) for tag in v]
-
-
-class ModelCreate(BaseModel):
-    """Schema for creating a new AI Model."""
-
-    model_config = ConfigDict(protected_namespaces=())
-
-    name: str
-    description: str | None = None
-    tags: List[Tag] | None = None
-    tasks: List[Tag] | None = None
-    author: str | None = None
-    model_size: int | None = None
-    icon: str
-    github_url: str | None = None
-    huggingface_url: str | None = None
-    website_url: str | None = None
-    modality: ModalityEnum
-    source: str
-    provider_type: ModelProviderTypeEnum
-    uri: str
-    created_by: UUID4
-
-class ModelDetailResponse(BaseModel):
-    id: UUID4
-    name: str
-    description: Optional[str]
-    tags: Optional[List[dict]]
-    tasks: Optional[List[dict]]
-    github_url: Optional[str]
-    huggingface_url: Optional[str]
-    website_url: Optional[str]
