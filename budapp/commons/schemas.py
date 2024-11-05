@@ -16,6 +16,7 @@
 
 """Contains Pydantic schemas used for data validation and serialization within the microservices."""
 
+import datetime
 import math
 import re
 from http import HTTPStatus
@@ -53,7 +54,7 @@ class CloudEventBase(BaseModel):
         traceid (str): The trace id of the cloud event, excluded from serialization.
         tracestate (str): The trace state of the cloud event, excluded from serialization.
         traceparent (str): The trace parent of the cloud event, excluded from serialization.
-        workflow (str): The type of the cloud event
+        type (str): The type of the cloud event
         time (str): The time of the cloud event
     """
 
@@ -76,8 +77,7 @@ class CloudEventBase(BaseModel):
     topic: Optional[str] = None
     pubsubname: Optional[str] = None
     source: Optional[str] = None
-
-    out_topic: Optional[str] = None
+    source_topic: Optional[str] = None
 
     data: Optional[Dict[str, Any]] = None
 
@@ -85,8 +85,9 @@ class CloudEventBase(BaseModel):
     tracestate: Optional[str] = None
     traceparent: Optional[str] = None
 
-    workflow: str
-    time: str
+    type: Optional[str] = None
+    time: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat() + "Z")  # type: ignore
+    debug: bool = Field(default=False)
 
     def is_pubsub(self) -> bool:
         """Check if the event is a PubSub event."""
