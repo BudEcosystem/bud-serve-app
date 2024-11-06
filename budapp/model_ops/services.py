@@ -275,7 +275,7 @@ class CloudModelWorkflowService(SessionMixin):
     async def _create_or_update_license_entry(self, model_id: UUID, filename: str, file_path: str) -> None:
         """Create or update a license entry in the database."""
         # Check if a license entry with the given model_id exists
-        existing_license = await ModelDataManager(self.session).retrieve_by_fields(ModelLicenses, ModelLicenses.model_id == model_id)
+        existing_license = await ModelDataManager(self.session).retrieve_by_fields(ModelLicenses, fields=dict(model_id=model_id), missing_ok=True)
 
         if existing_license:
             # Update the existing license entry
