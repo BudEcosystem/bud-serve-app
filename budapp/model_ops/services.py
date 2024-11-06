@@ -229,12 +229,12 @@ class CloudModelWorkflowService(SessionMixin):
         # Handle file upload if provided
         if file:
             file_path = await self._save_uploaded_file(file)
-            await self._create_license_entry(model_id, file.filename, file_path)
+            await self._create_or_update_license_entry(model_id, file.filename, file_path)
 
         # Handle license URL if provided
         elif data.get("license_url"):
             file_path, filename = await self._download_license_file(data.pop("license_url"))
-            await self._create_license_entry(model_id, filename, file_path)
+            await self._create_or_update_license_entry(model_id, filename, file_path)
 
         # Validate and update fields
         validated_data = await self._validate_update_data(model, data)
@@ -272,15 +272,25 @@ class CloudModelWorkflowService(SessionMixin):
                     raise Exception("Failed to download the file from the provided URL")
         return file_path, filename
 
-    async def _create_license_entry(self, model_id: UUID, filename: str, file_path: str) -> None:
-        """Create a license entry in the database."""
-        license_entry = ModelLicensesModel(
-            id=uuid4(),
-            name=filename,
-            path=file_path,
-            model_id=model_id
-        )
-        await ModelDataManager(self.session).insert_one(ModelLicenses(**license_entry.model_dump(exclude_unset=True)))
+    async def _create_or_update_license_entry(self, model_id: UUID, filename: str, file_path: str) -> None:
+        """Create or update a license entry in the database."""
+        # Check if a license entry with the given model_id exists
+        existing_license = await ModelDataManager(self.session).retrieve_by_fields(ModelLicenses, ModelLicenses.model_id == model_id)
+
+        if existing_license:
+            # Update the existing license entry
+            existing_license.name = filename
+            existing_license.path = file_path
+            await ModelDataManager(self.session).update_one(existing_license)
+        else:
+            # Create a new license entry
+            license_entry = ModelLicensesModel(
+                id=uuid4(),
+                name=filename,
+                path=file_path,
+                model_id=model_id
+            )
+            await ModelDataManager(self.session).insert_one(ModelLicenses(**license_entry.model_dump(exclude_unset=True)))
 
     async def _validate_update_data(self, model: Model, data: Dict[str, Any]) -> Dict[str, Any]:
         """Validate and prepare update data using EditModel schema."""
