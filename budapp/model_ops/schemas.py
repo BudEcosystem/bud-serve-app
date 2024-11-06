@@ -68,6 +68,33 @@ class ProviderResponse(PaginatedSuccessResponse):
 
     providers: list[Provider] = []
 
+# paper published and license related schemas
+
+class PaperPublishedModel(BaseModel):
+    """Paper Published Model Schema"""
+
+    id: UUID4
+    title: str | None = None
+    url: str
+    model_id: UUID4
+
+class PaperPublishedModelEditRequest(BaseModel):
+    """Paper Published Edit Model Schema"""
+
+    id: UUID4 | None = None
+    title: str | None = None
+    url: str
+
+class ModelLicensesModel(BaseModel):
+    """Paper Published Model Schema"""
+
+    id: UUID4
+    name: str
+    path: str
+    model_id: UUID4
+
+
+
 # tags structure
 
 class Tag(BaseModel):
@@ -149,36 +176,38 @@ class ModelCreate(ModelBase):
     created_by: UUID4
     author: Optional[str] = None
 
-class ModelDetailResponse(ModelBase):
+class ModelDetailResponse(SuccessResponse):
     """Response schema for model details."""
     
     id: UUID4
+    name: str
+    description: Optional[str] = None
+    tags: Optional[List[Tag]] = None
+    tasks: Optional[List[Tag]] = None
+    icon: str
+    github_url: Optional[str] = None
+    huggingface_url: Optional[str] = None
+    website_url: Optional[str] = None
+    paper_published: Optional[List[PaperPublishedModel]] = []
+    licenses: Optional[ModelLicensesModel] = None
 
-class EditModel(ModelBase):
+class EditModel(BaseModel):
     """Schema for editing a model with optional fields and validations."""
 
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="Model name")
     description: Optional[str] = Field(None, max_length=500, description="Brief model description")
-    modality: Optional[ModalityEnum] = None
-    source: Optional[CredentialTypeEnum] = None
-    provider_type: Optional[ModelProviderTypeEnum] = None
-    uri: Optional[str] = Field(None, description="Direct URI of the model")
-    model_size: Optional[int] = Field(None, gt=0, description="Size of the model in bytes")
-    created_by: Optional[UUID4] = Field(None, description="UUID of the user who created the model")
-    author: Optional[str] = Field(None, max_length=100, description="Author name")
+    tags: Optional[List[Tag]] = None
+    tasks: Optional[List[Tag]] = None
+    paper_published: Optional[List[PaperPublishedModelEditRequest]] = None
+    github_url: Optional[str] = Field(None, description="URL to the model's GitHub repository")
+    huggingface_url: Optional[str] = Field(None, description="URL to the model's Hugging Face page")
+    website_url: Optional[str] = Field(None, description="URL to the model's official website")
 
     @validator('name')
     def validate_name(cls, v):
         if v and not v.isalnum():
             raise ValueError("Model name must be alphanumeric")
         return v
-
-    @validator('model_size')
-    def validate_model_size(cls, v):
-        if v is not None and v <= 0:
-            raise ValueError("Model size must be a positive integer")
-        return v
-
 # cloud model related schemas
 
 class CloudModel(BaseModel):
@@ -222,30 +251,6 @@ class CloudModelResponse(PaginatedSuccessResponse):
     cloud_models: list[CloudModel] = []
 
 # workflow related schemas
-
-class PaperPublishedModel(BaseModel):
-    """Paper Published Model Schema"""
-
-    id: UUID4
-    title: str | None = None
-    url: str
-    model_id: UUID4
-
-class PaperPublishedModelEditRequest(BaseModel):
-    """Paper Published Edit Model Schema"""
-
-    id: UUID4 | None = None
-    title: str | None = None
-    url: str
-
-class ModelLicensesModel(BaseModel):
-    """Paper Published Model Schema"""
-
-    id: UUID4
-    name: str
-    path: str
-    model_id: UUID4
-
 
 class CreateCloudModelWorkflowRequest(BaseModel):
     """Cloud model workflow request schema."""
