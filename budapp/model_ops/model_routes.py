@@ -385,20 +385,7 @@ async def get_model_details(
 ) -> Union[ModelDetailResponse, ErrorResponse]:
     """Retrieve details of a model by its ID."""
     try:
-        model_details = await ModelService(session).get_model_details(model_id)
-        response_data = {
-            "id": model_details.id,
-            "name": model_details.name,
-            "description": model_details.description,
-            "icon": model_details.icon,
-            "tags": model_details.tags,
-            "tasks": model_details.tasks,
-            "github_url": model_details.github_url,
-            "huggingface_url": model_details.huggingface_url,
-            "website_url": model_details.website_url
-        }
-        
-        return ModelDetailResponse(**response_data)
+        model_details = await ModelService(session).get_model_details(model_id)        
     except ClientException as e:
         logger.exception(f"Failed to get model details: {e}")
         return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
@@ -408,3 +395,6 @@ async def get_model_details(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to retrieve model details",
         ).to_http_response()
+    
+    return ModelDetailResponse(**model_details, message="model details feched successfully", code=status.HTTP_200_OK, object="ModelDetailResponse")
+

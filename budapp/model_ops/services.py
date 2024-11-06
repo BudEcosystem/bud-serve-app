@@ -687,5 +687,23 @@ class ModelService(SessionMixin):
     
     async def get_model_details(self, model_id: UUID) -> Model:
         """Retrieve model details by model ID."""
-        return await ModelDataManager(self.session).get_model_by_id(model_id=model_id)
+        model_details = (
+            await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"id": model_id}, missing_ok=True)
+            )
+        response_data = {
+            "id": model_details.id,
+            "name": model_details.name,
+            "description": model_details.description,
+            "icon": model_details.icon,
+            "tags": model_details.tags,
+            "tasks": model_details.tasks,
+            "github_url": model_details.github_url,
+            "huggingface_url": model_details.huggingface_url,
+            "website_url": model_details.website_url,
+            "paper_published": model_details.paper_published,
+            "licenses": model_details.model_licenses
+        }
+        # return await ModelDataManager(self.session).get_model_by_id(model_id=model_id)
+        return response_data
 
