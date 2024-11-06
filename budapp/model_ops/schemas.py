@@ -78,6 +78,10 @@ class PaperPublishedModel(BaseModel):
     url: str
     model_id: UUID4
 
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
 class PaperPublishedModelEditRequest(BaseModel):
     """Paper Published Edit Model Schema"""
 
@@ -92,6 +96,10 @@ class ModelLicensesModel(BaseModel):
     name: str
     path: str
     model_id: UUID4
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 
