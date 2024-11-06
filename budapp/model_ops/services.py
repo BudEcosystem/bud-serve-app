@@ -691,6 +691,10 @@ class ModelService(SessionMixin):
             await ModelDataManager(self.session).retrieve_by_fields(
                 Model, {"id": model_id}, missing_ok=True)
             )
+        paper_published_list = [
+            PaperPublishedModel.from_orm(paper) for paper in model_details.paper_published
+        ]        
+        licenses = ModelLicensesModel.from_orm(model_details.model_licenses)
         response_data = {
             "id": model_details.id,
             "name": model_details.name,
@@ -701,9 +705,8 @@ class ModelService(SessionMixin):
             "github_url": model_details.github_url,
             "huggingface_url": model_details.huggingface_url,
             "website_url": model_details.website_url,
-            "paper_published": model_details.paper_published,
-            "licenses": model_details.model_licenses
+            "paper_published": paper_published_list,
+            "licenses": licenses
         }
-        # return await ModelDataManager(self.session).get_model_by_id(model_id=model_id)
         return response_data
 
