@@ -23,9 +23,11 @@ from typing import List, Optional, Tuple
 
 from pydantic import (
     UUID4,
+    AnyHttpUrl,
     BaseModel,
     ConfigDict,
     Field,
+    HttpUrl,
     field_validator,
     model_validator,
     validator,
@@ -197,10 +199,11 @@ class EditModel(BaseModel):
     description: Optional[str] = Field(None, max_length=500, description="Brief model description")
     tags: Optional[List[Tag]] = None
     tasks: Optional[List[Tag]] = None
-    paper_published: Optional[List[PaperPublishedModelEditRequest]] = None
-    github_url: Optional[str] = Field(None, description="URL to the model's GitHub repository")
-    huggingface_url: Optional[str] = Field(None, description="URL to the model's Hugging Face page")
-    website_url: Optional[str] = Field(None, description="URL to the model's official website")
+    paper_urls: Optional[List[HttpUrl]] = None
+    github_url: Optional[HttpUrl] = Field(None, description="URL to the model's GitHub repository")
+    huggingface_url: Optional[HttpUrl] = Field(None, description="URL to the model's Hugging Face page")
+    website_url: Optional[HttpUrl] = Field(None, description="URL to the model's official website")
+    license_url: Optional[HttpUrl] = Field(None, description="License url")
 
     @validator('name')
     def validate_name(cls, v):
