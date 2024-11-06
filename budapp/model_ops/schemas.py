@@ -94,6 +94,7 @@ class ModelLicensesModel(BaseModel):
     name: str
     path: str
     model_id: UUID4
+    faqs: List[dict]
 
     class Config:
         orm_mode = True

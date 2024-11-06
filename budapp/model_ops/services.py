@@ -706,7 +706,7 @@ class ModelService(SessionMixin):
             "huggingface_url": model_details.huggingface_url,
             "website_url": model_details.website_url,
             "paper_published": paper_published_list,
-            "licenses": licenses
+            "license": licenses
         }
         return response_data
 

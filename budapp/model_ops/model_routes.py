@@ -396,5 +396,5 @@ async def get_model_details(
             message="Failed to retrieve model details",
         ).to_http_response()
     
-    return ModelDetailResponse(**model_details, message="model details feched successfully", code=status.HTTP_200_OK, object="ModelDetailResponse")
+    return ModelDetailResponse(**model_details, message="model details fetched successfully", code=status.HTTP_200_OK, object="ModelDetailResponse")
 
