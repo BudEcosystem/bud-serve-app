@@ -81,10 +81,10 @@ class ProviderDataManager(DataManagerUtils):
 class PaperPublishedDataManager(DataManagerUtils):
     """Data manager for the PaperPublished model."""
 
-    async def get_paper_by_id(self, paper_id: UUID) -> Optional[PaperPublished]:
-        """Retrieve a cloud model by its ID."""
-        stmt = select(PaperPublished).where(PaperPublished.id == paper_id)
-        return self.scalar_one_or_none(stmt)
+    # async def get_paper_by_id(self, paper_id: UUID) -> Optional[PaperPublished]:
+    #     """Retrieve a cloud model by its ID."""
+    #     stmt = select(PaperPublished).where(PaperPublished.id == paper_id)
+    #     return self.scalar_one_or_none(stmt)
 
     async def update_paper_by_id(self, paper_published: PaperPublished, update_data: Dict[str, Any]) -> PaperPublished:
         """Update specific fields of a cloud model and save using update_one."""

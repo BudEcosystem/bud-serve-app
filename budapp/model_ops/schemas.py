@@ -23,9 +23,11 @@ from typing import List, Optional, Tuple
 
 from pydantic import (
     UUID4,
+    AnyHttpUrl,
     BaseModel,
     ConfigDict,
     Field,
+    HttpUrl,
     field_validator,
     model_validator,
     validator,
@@ -301,6 +303,28 @@ class CreateCloudModelWorkflowRequest(BaseModel):
             raise ValueError(f"At least one of {', '.join(required_fields)} is required when workflow_id is provided")
 
         return self
+
+
+class EditModel(BaseModel):
+    """Schema for editing a model with optional fields and validations."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=100, description="Model name")
+    description: Optional[str] = Field(None, max_length=500, description="Brief model description")
+    tags: Optional[List[Tag]] = None
+    tasks: Optional[List[Tag]] = None
+    paper_urls: Optional[List[HttpUrl]] = None
+    github_url: Optional[HttpUrl] = Field(None, description="URL to the model's GitHub repository")
+    huggingface_url: Optional[HttpUrl] = Field(None, description="URL to the model's Hugging Face page")
+    website_url: Optional[HttpUrl] = Field(None, description="URL to the model's official website")
+    license_url: Optional[HttpUrl] = Field(None, description="License url")
+
+    @validator('name')
+    def validate_name(cls, v):
+        if v and not v.isalnum():
+            raise ValueError("Model name must be alphanumeric")
+        return v
+
+
 
 class CreateCloudModelWorkflowSteps(BaseModel):
     """Cloud model workflow step data schema."""

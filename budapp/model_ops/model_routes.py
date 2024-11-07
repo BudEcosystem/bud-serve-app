@@ -22,6 +22,7 @@ from uuid import UUID
 
 from fastapi import Form, File, UploadFile
 from fastapi import APIRouter, Depends, Query, status
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -175,31 +176,37 @@ async def edit_model(
     description: Optional[str] = Form(None, max_length=500),
     tags: Optional[str] = Form(None),  # JSON string of tags
     tasks: Optional[str] = Form(None),  # JSON string of tasks
-    paper_published: Optional[str] = Form(None),  # JSON string of PaperPublishedModel items
+    paper_urls: Optional[str] = Form(None),
     github_url: Optional[str] = Form(None),
     huggingface_url: Optional[str] = Form(None),
     website_url: Optional[str] = Form(None),
-    license_file: UploadFile = File(None)
+    license_file: Optional[UploadFile] = File(None),
+    license_url: Optional[str] = Form(None)
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Edit cloud model with file upload"""
     try:
         # Parse JSON strings for list fields
         tags = json.loads(tags) if tags else None
         tasks = json.loads(tasks) if tasks else None
-        paper_published = json.loads(paper_published) if paper_published else None
+        paper_urls = json.loads(paper_urls) if paper_urls else None
 
-        # Convert to EditModel
-        edit_model = EditModel(
-            name=name,
-            description=description,
-            tags=tags,
-            tasks=tasks,
-            paper_published=paper_published,
-            github_url=github_url,
-            huggingface_url=huggingface_url,
-            website_url=website_url,
-        )
-
+        try:
+            # Convert to EditModel
+            edit_model = EditModel(
+                name=name,
+                description=description,
+                tags=tags,
+                tasks=tasks,
+                paper_urls=paper_urls,
+                github_url=github_url,
+                huggingface_url=huggingface_url,
+                website_url=website_url,
+                license_url=license_url
+            )
+        except ValidationError as e:
+            logger.exception(f"Failed to edit cloud model: {e}")
+            return ErrorResponse(code=status.HTTP_422_UNPROCESSABLE_ENTITY, message='Validation error').to_http_response()
+        
         # Pass file and edit_model data to your service
         await CloudModelWorkflowService(session).edit_cloud_model(
             model_id=model_id,
