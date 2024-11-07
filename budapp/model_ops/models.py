@@ -106,7 +106,6 @@ class ModelLicenses(Base):
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    faqs: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
 
     model: Mapped["Model"] = relationship("Model", back_populates="model_licenses")
 

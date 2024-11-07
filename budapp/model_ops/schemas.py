@@ -96,7 +96,6 @@ class ModelLicensesModel(BaseModel):
     name: str
     path: str
     model_id: UUID4
-    faqs: List[dict]
 
     class Config:
         orm_mode = True
@@ -178,7 +177,7 @@ class ModelCreate(ModelBase):
     """Schema for creating a new AI Model."""
 
     modality: ModalityEnum
-    source: CredentialTypeEnum
+    source: str
     provider_type: ModelProviderTypeEnum
     uri: str
     model_size: Optional[int] = None
@@ -198,7 +197,7 @@ class ModelDetailResponse(SuccessResponse):
     huggingface_url: Optional[str] = None
     website_url: Optional[str] = None
     paper_published: Optional[List[PaperPublishedModel]] = []
-    licenses: Optional[ModelLicensesModel] = None
+    license: Optional[dict] = None
 
 class EditModel(BaseModel):
     """Schema for editing a model with optional fields and validations."""

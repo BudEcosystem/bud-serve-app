@@ -694,7 +694,18 @@ class CloudModelService(SessionMixin):
     
 class ModelService(SessionMixin):
     """Cloud model service."""
-    
+    async def get_faqs(self) -> List[Dict[str, Any]]:
+        """Dummy function to return FAQs for the license."""
+        return [
+            {
+                "answer": True,
+                "question": "Are the weights of models are opensource?"
+            },
+            {
+                "answer": False,
+                "question": "Are the weights of models are opensource?"
+            }
+        ]
     async def get_model_details(self, model_id: UUID) -> Model:
         """Retrieve model details by model ID."""
         model_details = (
@@ -704,7 +715,9 @@ class ModelService(SessionMixin):
         paper_published_list = [
             PaperPublishedModel.from_orm(paper) for paper in model_details.paper_published
         ]        
-        licenses = ModelLicensesModel.from_orm(model_details.model_licenses)
+        license = ModelLicensesModel.from_orm(model_details.model_licenses)
+        license_data = license.dict()
+        license_data['faqs'] = await self.get_faqs()
         response_data = {
             "id": model_details.id,
             "name": model_details.name,
@@ -716,7 +729,7 @@ class ModelService(SessionMixin):
             "huggingface_url": model_details.huggingface_url,
             "website_url": model_details.website_url,
             "paper_published": paper_published_list,
-            "license": licenses
+            "license": license_data
         }
         return response_data
     
