@@ -596,5 +596,4 @@ class ModelService(SessionMixin):
     """Cloud model service."""
     async def search_tags_by_name(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
         """Search model tags by name with pagination."""
-        print("in service")
         return await ModelDataManager(self.session).search_tags_by_name(name, offset, limit)
