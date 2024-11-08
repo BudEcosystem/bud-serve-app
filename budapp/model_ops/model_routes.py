@@ -408,6 +408,7 @@ async def get_model_details(
     return ModelDetailResponse(**model_details, message="model details fetched successfully", code=status.HTTP_200_OK, object="ModelDetailResponse")
 
 
+
 @model_router.get(
     "/tags",
     responses={
