@@ -16,13 +16,18 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the model ops."""
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
+from uuid import UUID
+
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
+from budapp.commons.exceptions import DatabaseException
+from budapp.model_ops.models import CloudModel, PaperPublished
+from budapp.model_ops.models import Model
 from budapp.model_ops.models import CloudModel, Model
 from budapp.model_ops.models import Provider as ProviderModel
 
@@ -73,6 +78,29 @@ class ProviderDataManager(DataManagerUtils):
 
         return result, count
 
+
+class PaperPublishedDataManager(DataManagerUtils):
+    """Data manager for the PaperPublished model."""
+
+    # async def get_paper_by_id(self, paper_id: UUID) -> Optional[PaperPublished]:
+    #     """Retrieve a cloud model by its ID."""
+    #     stmt = select(PaperPublished).where(PaperPublished.id == paper_id)
+    #     return self.scalar_one_or_none(stmt)
+
+    async def update_paper_by_id(self, paper_published: PaperPublished, update_data: Dict[str, Any]) -> PaperPublished:
+        """Update specific fields of a cloud model and save using update_one."""
+        # Update only the specified fields
+        for field, value in update_data.items():
+            if hasattr(paper_published, field):
+                setattr(paper_published, field, value)
+        
+        # Use the update_one method to commit and refresh
+        try:
+            return self.update_one(paper_published)
+        except DatabaseException as e:
+            logger.error(f"Failed to update paper by id: {e}")
+            raise
+    
 
 class ModelDataManager(DataManagerUtils):
     """Data manager for the Model model."""

@@ -16,10 +16,13 @@
 
 """The model ops services. Contains business logic for model ops."""
 
+import os
+import aiofiles
+import aiohttp
 from typing import Any, Dict, List, Optional, Tuple
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import status
+from fastapi import UploadFile, status
 
 from budapp.commons import logging
 from budapp.commons.constants import WorkflowStatusEnum
@@ -29,17 +32,22 @@ from budapp.core.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.core.models import Workflow as WorkflowModel
 from budapp.core.models import WorkflowStep as WorkflowStepModel
 
-from .crud import CloudModelDataManager, ModelDataManager, ProviderDataManager
-from .models import CloudModel, Model
+from .crud import CloudModelDataManager, ModelDataManager, PaperPublishedDataManager, ProviderDataManager
+from .models import CloudModel, Model, ModelLicenses, PaperPublished
 from .models import Provider as ProviderModel
 from .schemas import (
     CreateCloudModelWorkflowRequest,
     CreateCloudModelWorkflowResponse,
     CreateCloudModelWorkflowStepData,
     CreateCloudModelWorkflowSteps,
+    EditModel,
     ModelCreate,
+    ModelLicensesModel,
+    PaperPublishedModel,
     Tag,
 )
+from pydantic import ValidationError
+
 
 
 logger = logging.get_logger(__name__)
@@ -211,6 +219,98 @@ class CloudModelWorkflowService(SessionMixin):
 
         return db_workflow
 
+    async def edit_cloud_model(self, model_id: UUID, data: Dict[str, Any], file: UploadFile = None) -> None:
+        """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
+
+        # Retrieve existing model
+        model = await ModelDataManager(self.session).retrieve_by_fields(model=Model, fields={"id": model_id})
+        if not model:
+            raise ValueError(f"Model with ID {model_id} not found")
+
+        # Handle file upload if provided
+        if file:
+            file_path = await self._save_uploaded_file(file)
+            await self._create_or_update_license_entry(model_id, file.filename, file_path)
+
+        # Handle license URL if provided
+        elif data.get("license_url"):
+            file_path, filename = await self._download_license_file(data.pop("license_url"))
+            await self._create_or_update_license_entry(model_id, filename, file_path)
+
+        # Add papers if provided
+        if data.get("paper_urls"):
+            await self._add_papers(model_id, data.pop("paper_urls"))
+
+        # Validate and update fields
+        validated_data = await self._validate_update_data(model, data)
+
+        # Update model with validated data
+        await ModelDataManager(self.session).update_by_fields(model, validated_data)
+
+    async def _save_uploaded_file(self, file: UploadFile) -> str:
+        """Save uploaded file and return file path."""
+        file_directory = "static/licenses"
+        os.makedirs(file_directory, exist_ok=True)
+        file_path = os.path.join(file_directory, file.filename)
+        async with aiofiles.open(file_path, "wb") as f:
+            content = await file.read()
+            await f.write(content)
+        return file_path
+
+    async def _download_license_file(self, license_url: str) -> tuple[str, str]:
+        """Download file from URL and save locally, returning file path and name."""
+        file_directory = "static/licenses"
+        os.makedirs(file_directory, exist_ok=True)
+        filename = license_url.split("/")[-1]
+        file_path = os.path.join(file_directory, filename)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(license_url) as response:
+                if response.status == 200:
+                    content = await response.read()
+                    async with aiofiles.open(file_path, "wb") as f:
+                        await f.write(content)
+                else:
+                    raise Exception("Failed to download the file from the provided URL")
+        return file_path, filename
+
+    async def _create_or_update_license_entry(self, model_id: UUID, filename: str, file_path: str) -> None:
+        """Create or update a license entry in the database."""
+        # Check if a license entry with the given model_id exists
+        existing_license = await ModelDataManager(self.session).retrieve_by_fields(ModelLicenses, fields=dict(model_id=model_id), missing_ok=True)
+
+        if existing_license:
+            # Update the existing license entry
+            existing_license.name = filename
+            existing_license.path = file_path
+            print(existing_license)
+            ModelDataManager(self.session).update_one(existing_license)
+        else:
+            # Create a new license entry
+            license_entry = ModelLicensesModel(
+                id=uuid4(),
+                name=filename,
+                path=file_path,
+                model_id=model_id
+            )
+            await ModelDataManager(self.session).insert_one(ModelLicenses(**license_entry.model_dump(exclude_unset=True)))
+
+    async def _validate_update_data(self, model: Model, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate and prepare update data using EditModel schema."""
+        model_data = {key: getattr(model, key) for key in model.__table__.columns.keys()}
+        updated_data = {**model_data, **data}
+        try:
+            return EditModel(**updated_data).dict(exclude_unset=True, exclude_none=True)
+        except ValidationError as e:
+            raise ValueError(f"Validation error: {e}")
+
+    async def _add_papers(self, model_id: UUID, paper_urls: list[str]) -> None:
+        """Add paper entries if paper URLs are provided."""
+        for paper_url in paper_urls:
+            paper_entry = PaperPublishedModel(id=uuid4(), title=None, url=paper_url, model_id=model_id)
+            await ModelDataManager(self.session).insert_one(PaperPublished(**paper_entry.model_dump(exclude_unset=True)))
+
+
+        
     async def _execute_add_cloud_model_workflow(self, data: Dict[str, Any], workflow_id: UUID) -> None:
         """Execute add cloud model workflow."""
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(

@@ -16,10 +16,13 @@
 
 """The model ops package, containing essential business logic, services, and routing configurations for the model ops."""
 
+import json
 from typing import List, Optional, Union
 from uuid import UUID
 
+from fastapi import Form, File, UploadFile
 from fastapi import APIRouter, Depends, Query, status
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -30,7 +33,7 @@ from budapp.commons.dependencies import (
     parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
-from budapp.commons.schemas import ErrorResponse
+from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 
 from .schemas import (
@@ -38,6 +41,7 @@ from .schemas import (
     CloudModelResponse,
     CreateCloudModelWorkflowRequest,
     CreateCloudModelWorkflowResponse,
+    EditModel,
     ProviderFilter,
     ProviderResponse,
     RecommendedTagsResponse,
@@ -143,6 +147,82 @@ async def add_cloud_model_workflow(
         logger.exception(f"Failed to add cloud model workflow: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add cloud model workflow"
+        ).to_http_response()
+
+
+@model_router.patch(
+    "/{model_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": CreateCloudModelWorkflowResponse,
+            "description": "Successfully edited cloud model",
+        },
+    },
+    description="Edit cloud model",
+)
+async def edit_model(
+    model_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    name: Optional[str] = Form(None, min_length=1, max_length=100),
+    description: Optional[str] = Form(None, max_length=500),
+    tags: Optional[str] = Form(None),  # JSON string of tags
+    tasks: Optional[str] = Form(None),  # JSON string of tasks
+    paper_urls: Optional[str] = Form(None),
+    github_url: Optional[str] = Form(None),
+    huggingface_url: Optional[str] = Form(None),
+    website_url: Optional[str] = Form(None),
+    license_file: Optional[UploadFile] = File(None),
+    license_url: Optional[str] = Form(None)
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Edit cloud model with file upload"""
+    try:
+        # Parse JSON strings for list fields
+        tags = json.loads(tags) if tags else None
+        tasks = json.loads(tasks) if tasks else None
+        paper_urls = json.loads(paper_urls) if paper_urls else None
+
+        print(f"Received data: name={name}, description={description}, tags={tags}, tasks={tasks}, paper_urls={paper_urls}, github_url={github_url}, huggingface_url={huggingface_url}, website_url={website_url}, license_file={license_file}, license_url={license_url}")
+        try:
+            # Convert to EditModel
+            edit_model = EditModel(
+                name=name,
+                description=description,
+                tags=tags,
+                tasks=tasks,
+                paper_urls=paper_urls,
+                github_url=github_url,
+                huggingface_url=huggingface_url,
+                website_url=website_url,
+                license_url=license_url
+            )
+        except ValidationError as e:
+            logger.exception(f"Failed to edit cloud model: {e}")
+            return ErrorResponse(code=status.HTTP_422_UNPROCESSABLE_ENTITY, message='Validation error').to_http_response()
+        
+        # Pass file and edit_model data to your service
+        await CloudModelWorkflowService(session).edit_cloud_model(
+            model_id=model_id,
+            data=edit_model.dict(exclude_unset=True),
+            file=license_file
+        )
+
+        return SuccessResponse(message="Cloud model edited successfully", code=status.HTTP_200_OK).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to edit cloud model: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to edit cloud model: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit cloud model"
         ).to_http_response()
 
 
