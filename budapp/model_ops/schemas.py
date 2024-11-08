@@ -211,6 +211,18 @@ class EditModel(BaseModel):
             raise ValueError("Model name must be alphanumeric")
         return v
 
+    def dict(self, **kwargs):
+        # Use the parent `dict()` method to get the original dictionary
+        data = super().dict(**kwargs)
+        # Convert all HttpUrl fields to strings for compatibility with SQLAlchemy
+        for key in ['github_url', 'huggingface_url', 'website_url', 'license_url']:
+            if data.get(key) is not None:
+                data[key] = str(data[key])
+        # Handle `paper_urls` as a list of URLs
+        if data.get('paper_urls') is not None:
+            data['paper_urls'] = [str(url) for url in data['paper_urls']]
+        return data
+
 
 
 class CreateCloudModelWorkflowSteps(BaseModel):

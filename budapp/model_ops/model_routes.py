@@ -189,6 +189,7 @@ async def edit_model(
         tasks = json.loads(tasks) if tasks else None
         paper_urls = json.loads(paper_urls) if paper_urls else None
 
+        print(f"Received data: name={name}, description={description}, tags={tags}, tasks={tasks}, paper_urls={paper_urls}, github_url={github_url}, huggingface_url={huggingface_url}, website_url={website_url}, license_file={license_file}, license_url={license_url}")
         try:
             # Convert to EditModel
             edit_model = EditModel(

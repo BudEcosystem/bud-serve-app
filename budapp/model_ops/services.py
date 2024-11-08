@@ -236,12 +236,12 @@ class CloudModelWorkflowService(SessionMixin):
             file_path, filename = await self._download_license_file(data.pop("license_url"))
             await self._create_or_update_license_entry(model_id, filename, file_path)
 
-        # Validate and update fields
-        validated_data = await self._validate_update_data(model, data)
-
         # Add papers if provided
         if data.get("paper_urls"):
-            await self._add_papers(model_id, data["paper_urls"])
+            await self._add_papers(model_id, data.pop("paper_urls"))
+
+        # Validate and update fields
+        validated_data = await self._validate_update_data(model, data)
 
         # Update model with validated data
         await ModelDataManager(self.session).update_by_fields(model, validated_data)
@@ -281,7 +281,8 @@ class CloudModelWorkflowService(SessionMixin):
             # Update the existing license entry
             existing_license.name = filename
             existing_license.path = file_path
-            await ModelDataManager(self.session).update_one(existing_license)
+            print(existing_license)
+            ModelDataManager(self.session).update_one(existing_license)
         else:
             # Create a new license entry
             license_entry = ModelLicensesModel(
