@@ -370,7 +370,7 @@ async def list_cloud_model_recommended_tags(
 
 
 @model_router.get(
-    "/cloud_model/{model_id}",
+    "/{model_id}",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
