@@ -89,19 +89,19 @@ async def get_current_user(
 
         # Raise an exception if the token is not an access token
         if payload.get("type") != TokenTypeEnum.ACCESS.value:
-            raise credentials_exception
+            raise credentials_exception from None
 
         # Extract the user ID from the payload. Raise an exception if it can't be found
         auth_id: str = payload.get("sub")
         if not auth_id:
-            raise credentials_exception
+            raise credentials_exception from None
 
         # Create AccessTokenData instance with user auth ID
         token_data = AccessTokenData(sub=auth_id)
     except JWTError:
         logger.info("Invalid access token found")
         # Raise an exception if there's an issue decoding the token
-        raise credentials_exception
+        raise credentials_exception from None
 
     # Retrieve the user from the database
     db_user = await UserDataManager(session).retrieve_by_fields(
@@ -110,7 +110,7 @@ async def get_current_user(
 
     # Raise an exception if the user is not found
     if not db_user:
-        raise credentials_exception
+        raise credentials_exception from None
 
     return db_user
 
@@ -125,6 +125,21 @@ async def get_current_active_user(current_user: Annotated[User, Depends(get_curr
         User: The current active user.
     """
     if not current_user.is_active or current_user.status != UserStatusEnum.ACTIVE:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
+    return current_user
+
+
+async def get_current_active_invite_user(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+    """Get the current active invite user.
+
+    Args:
+        current_user (User): The current user.
+
+    Returns:
+        User: The current active invite user.
+    """
+    # NOTE: for invited, active user will have is_active False and status INVITED | ACTIVE
+    if current_user.status == UserStatusEnum.INACTIVE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
     return current_user
 

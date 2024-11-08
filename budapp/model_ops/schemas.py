@@ -115,6 +115,7 @@ class CloudModel(BaseModel):
     id: UUID4
     name: str
     description: str | None = None
+    icon: str
     modality: ModalityEnum
     source: CredentialTypeEnum
     provider_type: ModelProviderTypeEnum
@@ -336,3 +337,8 @@ class ModelCreate(BaseModel):
     provider_type: ModelProviderTypeEnum
     uri: str
     created_by: UUID4
+
+class SearchTagsResponse(PaginatedSuccessResponse):
+    """Response schema for searching tags by name."""
+
+    tags: List[Tag] = Field(..., description="List of matching tags")

@@ -28,6 +28,7 @@ from budapp.commons.db_utils import DataManagerUtils
 from budapp.commons.exceptions import DatabaseException
 from budapp.model_ops.models import CloudModel, PaperPublished
 from budapp.model_ops.models import Model
+from budapp.model_ops.models import CloudModel, Model
 from budapp.model_ops.models import Provider as ProviderModel
 
 
@@ -104,26 +105,46 @@ class PaperPublishedDataManager(DataManagerUtils):
 class ModelDataManager(DataManagerUtils):
     """Data manager for the Model model."""
 
-    async def get_model_by_id(self, model_id: UUID) -> Optional[Model]:
-        """Retrieve a cloud model by its ID."""
-        stmt = select(Model).where(Model.id == model_id)
-        return self.scalar_one_or_none(stmt)
-    
-    async def update_model_by_fields(self, model: Model, update_data: Dict[str, Any]) -> Model:
-        """Update specific fields of a cloud model and save using update_one."""
-        # Update only the specified fields
-        for field, value in update_data.items():
-            if hasattr(model, field):
-                setattr(model, field, value)
+    async def search_tags_by_name(
+        self,
+        search_value: str = "",
+        offset: int = 0,
+        limit: int = 10,
+    ) -> Tuple[List[dict], int]:
+        """Search tags by name with pagination, or fetch all tags if no search value is provided."""
 
-        # Use the update_one method to commit and refresh
-        try:
-            return self.update_one(model)
-        except DatabaseException as e:
-            logger.error(f"Failed to update model by fields: {e}")
-            raise
+        subquery = (
+            select(func.jsonb_array_elements(Model.tags).label("tag"))
+            .where(Model.is_active == True)
+            .where(Model.tags.isnot(None))
+        ).subquery()
 
-    
+        # Build the final query
+        final_query = select(
+            func.jsonb_extract_path_text(subquery.c.tag, 'name').label('name'),
+            func.min(func.jsonb_extract_path_text(subquery.c.tag, 'color')).label('color')
+        ).group_by('name').order_by('name').offset(offset).limit(limit)
+
+        # Add the WHERE clause only if a search_value is provided
+        if search_value:
+            final_query = final_query.where(
+                func.jsonb_extract_path_text(subquery.c.tag, 'name').ilike(f'{search_value}%')
+            )
+
+        # Execute the query
+        results = self.session.execute(final_query).all()
+        tags = [{'name': res.name, 'color': res.color} for res in results] if results else []
+
+        # Total count query, adjusted to conditionally apply the search filter
+        total_query = select(func.count(func.distinct(func.jsonb_extract_path_text(subquery.c.tag, 'name'))))
+        if search_value:
+            total_query = total_query.where(
+                func.jsonb_extract_path_text(subquery.c.tag, 'name').ilike(f'{search_value}%')
+            )
+        total_count = self.session.execute(total_query).scalar()
+
+        return tags, total_count
+
 
 
 class CloudModelDataManager(DataManagerUtils):
