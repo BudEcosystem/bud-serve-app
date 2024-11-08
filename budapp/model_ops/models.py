@@ -72,8 +72,7 @@ class Model(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # TODO: uncomment when implement individual fields
-    # endpoints: Mapped[list["Endpoint"]] = relationship(back_populates="model")
+    endpoints: Mapped[list["Endpoint"]] = relationship(back_populates="model")
     # benchmarks: Mapped[list["Benchmark"]] = relationship(back_populates="model")
 
     created_user: Mapped["User"] = relationship(back_populates="created_models", foreign_keys=[created_by])
