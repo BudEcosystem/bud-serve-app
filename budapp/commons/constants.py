@@ -441,3 +441,63 @@ class PayloadType(str, Enum):
     """
 
     DEPLOYMENT_RECOMMENDATION = "deployment_recommendation"
+
+
+class ClusterPlatformEnum(StrEnum):
+    """Cluster platform types.
+
+    Attributes:
+        KUBERNETES: Represents the Kubernetes platform.
+        OPENSHIFT: Represents the OpenShift platform.
+    """
+
+    KUBERNETES = auto()
+    OPENSHIFT = auto()
+
+
+class ClusterStatusEnum(StrEnum):
+    """Cluster status types.
+
+    Attributes:
+        AVAILABLE: Represents the available cluster status.
+        NOT_AVAILABLE: Represents the not available cluster status.
+        REGISTERING: Represents the registering cluster status.
+        ERROR: Represents the error cluster status.
+    """
+
+    AVAILABLE = auto()
+    NOT_AVAILABLE = auto()
+    REGISTERING = auto()
+    ERROR = auto()
+
+
+class ClusterTypeEnum(StrEnum):
+    """Cluster types.
+
+    Attributes:
+        CPU: Represents the CPU cluster type.
+        GPU: Represents the GPU cluster type.
+        HPU: Represents the HPU cluster type.
+    """
+
+    CPU = auto()
+    GPU = auto()
+    HPU = auto()
+
+
+class EndpointStatusEnum(StrEnum):
+    """Status for endpoint
+
+    Attributes:
+        RUNNING: Represents the running endpoint status.
+        FAILURE: Represents the failure endpoint status.
+        DEPLOYING: Represents the deploying endpoint status.
+        UNHEALTHY: Represents the unhealthy endpoint status.
+        DELETING: Represents the deleting endpoint status.
+    """
+
+    RUNNING = auto()
+    FAILURE = auto()
+    DEPLOYING = auto()
+    UNHEALTHY = auto()
+    DELETING = auto()
