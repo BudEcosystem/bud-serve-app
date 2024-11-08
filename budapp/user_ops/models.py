@@ -22,9 +22,12 @@ from uuid import UUID, uuid4
 from sqlalchemy import Boolean, DateTime, Enum, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from budapp.cluster_ops.models import Cluster
 from budapp.commons.constants import UserRoleEnum, UserStatusEnum
 from budapp.commons.database import Base
+from budapp.endpoint_ops.models import Endpoint
 from budapp.model_ops.models import Model
+from budapp.project_ops.models import Project, project_user_association
 
 
 class User(Base):
@@ -68,18 +71,10 @@ class User(Base):
     # TODO: uncomment when implement individual fields
     # benchmarks: Mapped[list["Benchmark"]] = relationship(back_populates="user")
     # benchmark_results: Mapped[list["BenchmarkResult"]] = relationship(back_populates="user")
-    # projects: Mapped[list[Project]] = relationship(
-    #     secondary=project_user_association, back_populates="users"
-    # )
+    projects: Mapped[list[Project]] = relationship(secondary=project_user_association, back_populates="users")
     # project_permissions: Mapped[list[ProjectPermission]] = relationship(
     #     back_populates="user"
     # )
-    # created_projects: Mapped[list[Project]] = relationship(
-    #     back_populates="created_user"
-    # )
-    # created_clusters: Mapped[list[Cluster]] = relationship(
-    #     back_populates="created_user"
-    # )
-    # created_endpoints: Mapped[list[Endpoint]] = relationship(
-    #     back_populates="created_user"
-    # )
+    created_projects: Mapped[list[Project]] = relationship(back_populates="created_user")
+    created_clusters: Mapped[list[Cluster]] = relationship(back_populates="created_user")
+    created_endpoints: Mapped[list[Endpoint]] = relationship(back_populates="created_user")
