@@ -277,3 +277,8 @@ class ModelCreate(BaseModel):
     provider_type: ModelProviderTypeEnum
     uri: str
     created_by: UUID4
+
+class SearchTagsResponse(PaginatedSuccessResponse):
+    """Response schema for searching tags by name."""
+
+    tags: List[Tag] = Field(..., description="List of matching tags")
