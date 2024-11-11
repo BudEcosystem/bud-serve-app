@@ -21,23 +21,24 @@
 
 // Select provider
 {
-  "workflow_id": "ba3fd9d3-ce02-4dd7-ae21-4a79ea6ca034",
+  "workflow_id": "a9a2e989-238a-4d5f-b655-4332cbea2b42",
   "step_number": 2,
-  "provider_id": "41e18165-3bbc-45ec-bf2b-81066722e269"
+  "provider_id": "1c64b7bf-7302-45f1-bd3d-2405a23a9111"
 }
 
 // Select cloud model
 {
-  "workflow_id": "ba3fd9d3-ce02-4dd7-ae21-4a79ea6ca034",
+  "workflow_id": "a9a2e989-238a-4d5f-b655-4332cbea2b42",
   "step_number": 3,
-  "cloud_model_id": "666316bd-a836-4eb6-a200-a20f46e45db4"
+  "cloud_model_id": null
 }
 
 // Add model details
 {
-  "workflow_id": "ba3fd9d3-ce02-4dd7-ae21-4a79ea6ca034",
+  "workflow_id": "a9a2e989-238a-4d5f-b655-4332cbea2b42",
   "step_number": 4,
   "name": "abc",
+  "uri": "openai/gpt7",
   "tags": [{"name": "Tag1", "color": "#000000"}, {"name": "Tag2", "color": "#000000"}],
   "modality": "llm",
   "trigger_workflow": true
@@ -95,36 +96,40 @@
 }
 // Second Screen
 {
-  "workflow_id": "95a98482-4e00-48d6-8514-137914cd786f",
+  "workflow_id": "0d9bd0d9-8f11-4a01-bda2-7bfab4735842",
   "step_number": 2,
   "trigger_workflow": false,
-  "template_id": "791e2219-5377-4aba-b0f5-a61b083d6bec"
+  "template_id": "891f8697-8053-45cf-887f-f2d9cd8cb1ed"
 }
 // Third Screen
 {
-  "workflow_id": "95a98482-4e00-48d6-8514-137914cd786f",
+  "workflow_id": "0d9bd0d9-8f11-4a01-bda2-7bfab4735842",
   "step_number": 3,
   "trigger_workflow": false,
   "endpoint_name": "test endpoint",
   "deploy_config": {
     "concurrent_requests": 10,
-    "avg_sequence_length": 2,
-    "avg_context_length": 3,
+    "avg_sequence_length": 100,
+    "avg_context_length": 102,
     "per_session_tokens_per_sec": [
-      0,
-      5
+      100,
+      100
     ],
     "ttft": [
-      0,
-      6
+      50,
+      1000
+    ],
+    "e2e_latency": [
+      100,
+      100
     ]
   }
 }
 // Final Screen
 {
-  "workflow_id": "95a98482-4e00-48d6-8514-137914cd786f",
+  "workflow_id": "0d9bd0d9-8f11-4a01-bda2-7bfab4735842",
   "step_number": 5,
-  "trigger_workflow": true, // consider this as final step
-  "cluster_id": "57e574e3-8208-4ba1-bb91-28c1d6e02b32"
+  "trigger_workflow": true,
+  "cluster_id": "538072a1-634b-4f8f-bd3b-d2fe6bfe7a50"
 }
 ```
