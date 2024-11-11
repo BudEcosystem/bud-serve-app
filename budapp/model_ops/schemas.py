@@ -19,15 +19,18 @@
 
 import re
 from datetime import datetime
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from pydantic import (
     UUID4,
+    AnyHttpUrl,
     BaseModel,
     ConfigDict,
     Field,
+    HttpUrl,
     field_validator,
     model_validator,
+    validator,
 )
 
 from budapp.commons.constants import (
@@ -79,31 +82,6 @@ class Tag(BaseModel):
         return v.upper()  # Normalize to uppercase
 
 
-class Model(BaseModel):
-    """Model schema."""
-
-    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
-
-    id: UUID4
-    name: str
-    description: str | None = None
-    modality: ModalityEnum
-    source: CredentialTypeEnum
-    provider_type: ModelProviderTypeEnum
-    uri: str
-    model_size: int | None = None
-    tags: list[Tag] | None = None
-    tasks: list[Tag] | None = None
-    icon: str
-    github_url: str | None = None
-    huggingface_url: str | None = None
-    website_url: str | None = None
-    created_by: UUID4 | None = None
-    author: str | None = None
-    created_at: datetime
-    modified_at: datetime
-
-
 class CloudModel(BaseModel):
     """Cloud model schema."""
 
@@ -121,6 +99,93 @@ class CloudModel(BaseModel):
     tags: list[Tag] | None = None
     tasks: list[Tag] | None = None
 
+
+class PaperPublishedModel(BaseModel):
+    """Paper Published Model Schema"""
+
+    id: UUID4
+    title: str | None = None
+    url: str
+    model_id: UUID4
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+class PaperPublishedModelEditRequest(BaseModel):
+    """Paper Published Edit Model Schema"""
+
+    id: UUID4 | None = None
+    title: str | None = None
+    url: str
+
+class ModelLicensesModel(BaseModel):
+    """Paper Published Model Schema"""
+
+    id: UUID4
+    name: str
+    path: str
+    model_id: UUID4
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+# Model related schemas
+
+class ModelBase(BaseModel):
+    """Base model schema."""
+    
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+    
+    name: str
+    description: Optional[str] = None
+    tags: Optional[List[Tag]] = None
+    tasks: Optional[List[Tag]] = None
+    icon: str
+    github_url: Optional[str] = None
+    huggingface_url: Optional[str] = None
+    website_url: Optional[str] = None
+
+class Model(ModelBase):
+    """Model schema."""
+    
+    id: UUID4
+    modality: ModalityEnum
+    source: CredentialTypeEnum
+    provider_type: ModelProviderTypeEnum
+    uri: str
+    model_size: Optional[int] = None
+    created_by: Optional[UUID4] = None
+    author: Optional[str] = None
+    created_at: datetime
+    modified_at: datetime
+
+class ModelCreate(ModelBase):
+    """Schema for creating a new AI Model."""
+
+    modality: ModalityEnum
+    source: str
+    provider_type: ModelProviderTypeEnum
+    uri: str
+    model_size: Optional[int] = None
+    created_by: UUID4
+    author: Optional[str] = None
+
+class ModelDetailResponse(SuccessResponse):
+    """Response schema for model details."""
+    
+    id: UUID4
+    name: str
+    description: Optional[str] = None
+    tags: Optional[List[Tag]] = None
+    tasks: Optional[List[Tag]] = None
+    icon: str
+    github_url: Optional[str] = None
+    huggingface_url: Optional[str] = None
+    website_url: Optional[str] = None
+    paper_published: Optional[List[PaperPublishedModel]] = []
+    license: Optional[dict] = None
 
 class CreateCloudModelWorkflowRequest(BaseModel):
     """Cloud model workflow request schema."""
@@ -164,6 +229,39 @@ class CreateCloudModelWorkflowRequest(BaseModel):
             raise ValueError(f"At least one of {', '.join(required_fields)} is required when workflow_id is provided")
 
         return self
+
+
+class EditModel(BaseModel):
+    """Schema for editing a model with optional fields and validations."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=100, description="Model name")
+    description: Optional[str] = Field(None, max_length=500, description="Brief model description")
+    tags: Optional[List[Tag]] = None
+    tasks: Optional[List[Tag]] = None
+    paper_urls: Optional[List[HttpUrl]] = None
+    github_url: Optional[HttpUrl] = Field(None, description="URL to the model's GitHub repository")
+    huggingface_url: Optional[HttpUrl] = Field(None, description="URL to the model's Hugging Face page")
+    website_url: Optional[HttpUrl] = Field(None, description="URL to the model's official website")
+    license_url: Optional[HttpUrl] = Field(None, description="License url")
+
+    @validator('name')
+    def validate_name(cls, v):
+        if v and not v.isalnum():
+            raise ValueError("Model name must be alphanumeric")
+        return v
+
+    def dict(self, **kwargs):
+        # Use the parent `dict()` method to get the original dictionary
+        data = super().dict(**kwargs)
+        # Convert all HttpUrl fields to strings for compatibility with SQLAlchemy
+        for key in ['github_url', 'huggingface_url', 'website_url', 'license_url']:
+            if data.get(key) is not None:
+                data[key] = str(data[key])
+        # Handle `paper_urls` as a list of URLs
+        if data.get('paper_urls') is not None:
+            data['paper_urls'] = [str(url) for url in data['paper_urls']]
+        return data
+
 
 
 class CreateCloudModelWorkflowSteps(BaseModel):
@@ -256,24 +354,7 @@ class RecommendedTagsResponse(PaginatedSuccessResponse):
         """Convert tuples to TagWithCount objects."""
         return [TagWithCount(name=tag[0], color=tag[1], count=tag[2]) for tag in v]
 
+class SearchTagsResponse(PaginatedSuccessResponse):
+    """Response schema for searching tags by name."""
 
-class ModelCreate(BaseModel):
-    """Schema for creating a new AI Model."""
-
-    model_config = ConfigDict(protected_namespaces=())
-
-    name: str
-    description: str | None = None
-    tags: List[Tag] | None = None
-    tasks: List[Tag] | None = None
-    author: str | None = None
-    model_size: int | None = None
-    icon: str
-    github_url: str | None = None
-    huggingface_url: str | None = None
-    website_url: str | None = None
-    modality: ModalityEnum
-    source: str
-    provider_type: ModelProviderTypeEnum
-    uri: str
-    created_by: UUID4
+    tags: List[Tag] = Field(..., description="List of matching tags")

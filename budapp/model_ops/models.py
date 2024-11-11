@@ -17,7 +17,7 @@
 """The model ops package, containing essential business logic, services, and routing configurations for the model ops."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID, uuid4
 
 from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, String, Uuid
@@ -77,6 +77,36 @@ class Model(Base):
 
     created_user: Mapped["User"] = relationship(back_populates="created_models", foreign_keys=[created_by])
 
+    paper_published: Mapped[List["PaperPublished"]] = relationship("PaperPublished", back_populates="model")
+    model_licenses: Mapped["ModelLicenses"] = relationship("ModelLicenses", back_populates="model")
+
+class PaperPublished(Base):
+    """Model for Paper Published."""
+
+    __tablename__ = "paper_published"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    title: Mapped[str] = mapped_column(String, nullable=True)
+    url: Mapped[str] = mapped_column(String, nullable=True)
+    model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    model: Mapped["Model"] = relationship("Model", back_populates="paper_published")
+
+class ModelLicenses(Base):
+    """Model for a AI model licenses."""
+
+    __tablename__ = "model_licenses"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=True)
+    path: Mapped[str] = mapped_column(String, nullable=True)
+    model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    model: Mapped["Model"] = relationship("Model", back_populates="model_licenses")
 
 class Provider(Base):
     """Model for a AI model provider."""
