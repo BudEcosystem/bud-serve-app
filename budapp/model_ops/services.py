@@ -691,9 +691,48 @@ class CloudModelService(SessionMixin):
     ) -> Tuple[List[CloudModel], int]:
         """Get all cloud models."""
         return await CloudModelDataManager(self.session).get_all_recommended_tags(offset, limit)
-
+    
 class ModelService(SessionMixin):
     """Cloud model service."""
+    async def get_faqs(self) -> List[Dict[str, Any]]:
+        """Dummy function to return FAQs for the license."""
+        return [
+            {
+                "answer": True,
+                "question": "Are the weights of models are opensource?"
+            },
+            {
+                "answer": False,
+                "question": "Are the weights of models are opensource?"
+            }
+        ]
+    async def get_model_details(self, model_id: UUID) -> Model:
+        """Retrieve model details by model ID."""
+        model_details = (
+            await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"id": model_id}, missing_ok=True)
+            )
+        paper_published_list = [
+            PaperPublishedModel.from_orm(paper) for paper in model_details.paper_published
+        ]        
+        license = ModelLicensesModel.from_orm(model_details.model_licenses)
+        license_data = license.dict()
+        license_data['faqs'] = await self.get_faqs()
+        response_data = {
+            "id": model_details.id,
+            "name": model_details.name,
+            "description": model_details.description,
+            "icon": model_details.icon,
+            "tags": model_details.tags,
+            "tasks": model_details.tasks,
+            "github_url": model_details.github_url,
+            "huggingface_url": model_details.huggingface_url,
+            "website_url": model_details.website_url,
+            "paper_published": paper_published_list,
+            "license": license_data
+        }
+        return response_data
+    
     async def search_tags_by_name(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
         """Search model tags by name with pagination."""
         return await ModelDataManager(self.session).search_tags_by_name(name, offset, limit)
