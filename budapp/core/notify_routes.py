@@ -28,7 +28,7 @@ from budapp.commons.dependencies import get_session
 from budapp.commons.schemas import ErrorResponse
 
 from .schemas import NotificationRequest, NotificationResponse
-from .services import WorkflowStepService
+from .services import NotificationService
 
 
 logger = logging.get_logger(__name__)
@@ -99,10 +99,16 @@ async def receive_notification(
 
         # Check if the notification is internal
         if payload.category == NotificationCategory.INTERNAL and payload.type == PayloadType.DEPLOYMENT_RECOMMENDATION:
-            await WorkflowStepService(session).update_recommended_cluster_events(payload)
+            await NotificationService(session).update_recommended_cluster_events(payload)
             return NotificationResponse(
                 object="notification",
                 message="Updated recommended cluster event in workflow step",
+            ).to_http_response()
+        if payload.category == NotificationCategory.INTERNAL and payload.type == PayloadType.DEPLOY_MODEL:
+            await NotificationService(session).update_model_deployment_events(payload)
+            return NotificationResponse(
+                object="notification",
+                message="Updated model deployment event in workflow step",
             ).to_http_response()
         else:
             return NotificationResponse(

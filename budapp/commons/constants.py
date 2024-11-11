@@ -438,9 +438,23 @@ class PayloadType(str, Enum):
 
     Attributes:
         DEPLOYMENT_RECOMMENDATION: Represents the deployment recommendation payload type.
+        DEPLOY_MODEL: Represents the model deployment payload type.
     """
 
     DEPLOYMENT_RECOMMENDATION = "deployment_recommendation"
+    DEPLOY_MODEL = "deploy_model"
+
+
+class BudServeWorkflowStepEventName(str, Enum):
+    """Represents the name of a workflow step event.
+
+    Attributes:
+        BUD_SIMULATOR_EVENTS: Represents the Bud simulator workflow step event name.
+        BUDSERVE_CLUSTER_EVENTS: Represents the Budserve cluster workflow step event name.
+    """
+
+    BUD_SIMULATOR_EVENTS = "bud_simulator_events"
+    BUDSERVE_CLUSTER_EVENTS = "budserve_cluster_events"
 
 
 class ClusterPlatformEnum(StrEnum):
@@ -486,7 +500,7 @@ class ClusterTypeEnum(StrEnum):
 
 
 class EndpointStatusEnum(StrEnum):
-    """Status for endpoint
+    """Status for endpoint.
 
     Attributes:
         RUNNING: Represents the running endpoint status.

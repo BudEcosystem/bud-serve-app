@@ -18,6 +18,7 @@
 """Implements core services and business logic that power the microservices, including key functionality and integrations."""
 
 from budapp.commons import logging
+from budapp.commons.constants import BudServeWorkflowStepEventName
 from budapp.commons.db_utils import SessionMixin
 
 from .crud import WorkflowStepDataManager
@@ -28,11 +29,11 @@ from .schemas import NotificationPayload
 logger = logging.get_logger(__name__)
 
 
-# Workflow related business logic
+# Notification related business logic
 
 
-class WorkflowStepService(SessionMixin):
-    """Service for managing workflows."""
+class NotificationService(SessionMixin):
+    """Service for managing notifications."""
 
     async def update_recommended_cluster_events(self, payload: NotificationPayload) -> None:
         """Update the recommended cluster events for a workflow step.
@@ -43,9 +44,32 @@ class WorkflowStepService(SessionMixin):
         Returns:
             None
         """
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
+
+    async def update_model_deployment_events(self, payload: NotificationPayload) -> None:
+        """Update the model deployment events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value, payload)
+
+    async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
+        """Update the workflow step events for a workflow step.
+
+        Args:
+            event_name: The name of event to update.
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
         # Fetch workflow steps with simulator events
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps_by_data(
-            data_key="bud_simulator_events", workflow_id=payload.workflow_id
+            data_key=event_name, workflow_id=payload.workflow_id
         )
 
         if not db_workflow_steps:
@@ -56,7 +80,7 @@ class WorkflowStepService(SessionMixin):
         latest_step = db_workflow_steps[-1]
 
         # Update the payload for the event
-        updated_data = await self._update_step_data(latest_step, payload)
+        updated_data = await self._update_step_data(event_name, latest_step, payload)
 
         if not updated_data:
             logger.warning(f"No matching event found for {payload.event}")
@@ -68,12 +92,13 @@ class WorkflowStepService(SessionMixin):
         db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
             latest_step, {"data": updated_data}
         )
-        logger.info(f"Updated workflow step with recommended cluster events: {db_workflow_step.id}")
+        logger.info(f"Updated workflow step with {event_name} events: {db_workflow_step.id}")
 
-    async def _update_step_data(self, step: WorkflowStepModel, payload: NotificationPayload) -> dict:
+    async def _update_step_data(self, event_name: str, step: WorkflowStepModel, payload: NotificationPayload) -> dict:
         """Update the payload for the event in the step data.
 
         Args:
+            event_name: The name of event to update.
             step: The workflow step to update.
             payload: The payload to update the step with.
 
@@ -81,7 +106,7 @@ class WorkflowStepService(SessionMixin):
             The updated step data or None if the update failed.
         """
         data = step.data
-        simulator_events = data.get("bud_simulator_events", {})
+        simulator_events = data.get(event_name, {})
         steps = simulator_events.get("steps", [])
 
         if not isinstance(steps, list):
