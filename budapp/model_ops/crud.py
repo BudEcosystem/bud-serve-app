@@ -175,18 +175,27 @@ class CloudModelDataManager(DataManagerUtils):
             json_filters["tasks"] = filters["tasks"]
             del filters["tasks"]
 
-        conditions = [CloudModel.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]]
+        # Create OR conditions for tags and tasks
+        conditions = [
+            or_(
+                *[CloudModel.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]],
+                *[CloudModel.tasks.cast(JSONB).contains([{"name": task_name}]) for task_name in json_filters["tasks"]],
+            )
+        ] if json_filters["tags"] or json_filters["tasks"] else []
 
-        conditions.extend(
-            [CloudModel.tasks.cast(JSONB).contains([{"name": task_name}]) for task_name in json_filters["tasks"]]
-        )
+        # Exclude models present in the Model table
+        excluded_uris_stmt = select(Model.uri)
+        excluded_uris = [uri for uri, in self.session.execute(excluded_uris_stmt)]
+        if excluded_uris:
+            conditions.append(~CloudModel.uri.in_(excluded_uris))
+
 
         # Generate statements according to search or filters
         if search:
             search_conditions = await self.generate_search_stmt(CloudModel, filters)
-            stmt = select(CloudModel).filter(or_(*search_conditions)).where(or_(*conditions))
+            stmt = select(CloudModel).filter(or_(*search_conditions)).where(and_(*conditions))
             count_stmt = (
-                select(func.count()).select_from(CloudModel).filter(or_(*search_conditions)).where(or_(*conditions))
+                select(func.count()).select_from(CloudModel).filter(or_(*search_conditions)).where(and_(*conditions))
             )
         else:
             stmt = select(CloudModel).filter_by(**filters).where(and_(*conditions))
