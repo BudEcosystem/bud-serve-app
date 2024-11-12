@@ -32,10 +32,11 @@ from budapp.project_ops.models import Project
 
 
 class Endpoint(Base):
-    """Endpoint model"""
+    """Endpoint model."""
 
     __tablename__ = "endpoint"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     project_id: Mapped[UUID] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), nullable=False)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id", ondelete="CASCADE"), nullable=False)

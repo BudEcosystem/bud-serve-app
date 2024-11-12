@@ -21,8 +21,12 @@ from typing import Any, Dict, List, Optional, Self, Union
 
 from pydantic import BaseModel, model_validator
 
+from budapp.commons import logging
 from budapp.commons.constants import NotificationCategory, NotificationType
 from budapp.commons.schemas import CloudEventBase, SuccessResponse
+
+
+logger = logging.get_logger(__name__)
 
 
 class IconBase(BaseModel):
@@ -80,6 +84,16 @@ class NotificationRequest(CloudEventBase):
     actor: Optional[str] = None
     topic_keys: Optional[Union[str, List[str]]] = None
     payload: NotificationPayload
+
+    @model_validator(mode="before")
+    def log_notification_hits(cls, data):
+        """Log the notification hits for debugging purposes."""
+        # TODO: remove this function after Debugging
+        logger.info("================================================")
+        logger.info("Received hit in notifications/:")
+        logger.info(f"{data}")
+        logger.info("================================================")
+        return data
 
     @model_validator(mode="after")
     def validate_notification_rules(self) -> Self:

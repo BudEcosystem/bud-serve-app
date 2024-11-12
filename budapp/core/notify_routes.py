@@ -73,29 +73,10 @@ async def receive_notification(
         Response: A response object containing the status of the notification receiving
         process and related information.
     """
-    logger.debug("Received request to receive a notification")
+    logger.debug("Received request to subscribe to bud-serve-app notifications")
     try:
-        logger.info("Received bud-serve-app notification successfully")
+        logger.info("Subscribed to bud-serve-app notifications successfully")
         payload = notification.payload
-        # TODO: remove this dummy payload
-        # example_payload = {
-        #     "category": "internal",
-        #     "type": "deployment_recommendation",
-        #     "event": "validation",
-        #     "workflow_id": "e43ae408-f750-4506-96f3-7756964cb9ec",
-        #     "source": "budsim",
-        #     "content": {
-        #         "title": "Identified compatible clusters",
-        #         "message": "All requirements and runtime compatibility are met for the clusters",
-        #         "status": "COMPLETED",
-        #         "primary_action": "",
-        #         "secondary_action": "",
-        #     }
-        # }
-        # payload = NotificationPayload(**example_payload)
-        logger.info("================================================")
-        logger.info(f"Received notification payload: {payload}")
-        logger.info("================================================")
 
         # Check if the notification is internal
         if payload.category == NotificationCategory.INTERNAL and payload.type == PayloadType.DEPLOYMENT_RECOMMENDATION:
