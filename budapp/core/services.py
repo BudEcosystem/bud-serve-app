@@ -17,9 +17,14 @@
 
 """Implements core services and business logic that power the microservices, including key functionality and integrations."""
 
+from datetime import datetime, timezone
+
 from budapp.commons import logging
-from budapp.commons.constants import BudServeWorkflowStepEventName
+from budapp.commons.constants import BudServeWorkflowStepEventName, EndpointStatusEnum
 from budapp.commons.db_utils import SessionMixin
+from budapp.endpoint_ops.crud import EndpointDataManager
+from budapp.endpoint_ops.models import Endpoint as EndpointModel
+from budapp.endpoint_ops.schemas import EndpointCreate
 
 from .crud import WorkflowStepDataManager
 from .models import WorkflowStep as WorkflowStepModel
@@ -56,6 +61,15 @@ class NotificationService(SessionMixin):
             None
         """
         await self._update_workflow_step_events(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value, payload)
+
+        # Create endpoint when deployment is completed
+        if (
+            payload.status == "COMPLETED"
+            and payload.content.result
+            and isinstance(payload.content.result, dict)
+            and "result" in payload.content.result
+        ):
+            await self._create_endpoint(payload)
 
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
         """Update the workflow step events for a workflow step.
@@ -121,3 +135,65 @@ class NotificationService(SessionMixin):
                 break
 
         return data if updated else None
+
+    async def _create_endpoint(self, payload: NotificationPayload) -> None:
+        """Create an endpoint when deployment is completed.
+
+        Args:
+            payload: The payload to create the endpoint with.
+        """
+        logger.debug("Received event for creating endpoint")
+
+        # Get namespace and deployment URL from event
+        namespace = payload.content.result.get("namespace")
+        deployment_url = payload.content.result["result"]["deployment_url"]
+
+        if not namespace or not deployment_url:
+            logger.warning("Namespace or deployment URL is missing from event")
+            return
+
+        # Get workflow steps
+        workflow_id = payload.workflow_id
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for endpoint creation
+        keys_of_interest = [
+            "model_id",
+            "project_id",
+            "cluster_id",
+            "endpoint_name",
+            "created_by",
+            "replicas",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        logger.debug("Collected required data from workflow steps")
+
+        # Create endpoint in database
+        endpoint_data = EndpointCreate(
+            model_id=required_data["model_id"],
+            project_id=required_data["project_id"],
+            cluster_id=required_data["cluster_id"],
+            name=required_data["endpoint_name"],
+            url=deployment_url,
+            namespace=namespace,
+            replicas=required_data["replicas"],
+            status=EndpointStatusEnum.DEPLOYING,
+            created_by=required_data["created_by"],
+            status_sync_at=datetime.now(tz=timezone.utc),
+        )
+
+        db_endpoint = await EndpointDataManager(self.session).insert_one(
+            EndpointModel(**endpoint_data.model_dump(exclude_unset=True, exclude_none=True))
+        )
+        logger.debug(f"Endpoint created successfully: {db_endpoint.id}")
+
+        return db_endpoint
