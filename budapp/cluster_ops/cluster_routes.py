@@ -16,9 +16,9 @@
 
 """The cluster ops package, containing essential business logic, services, and routing configurations for the model ops."""
 
-from typing import List, Union
+from typing import List, Union, Optional
 
-from .schemas import ClusterResponse
+from .schemas import ClusterListResponse, ClusterFilter
 from .services import ClusterService
 
 from fastapi import APIRouter, Depends, Query, status
@@ -29,6 +29,7 @@ from budapp.commons import logging
 from budapp.commons.dependencies import (
     get_current_active_user,
     get_session,
+    parse_ordering_fields,
 )
 from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
@@ -49,7 +50,7 @@ cluster_router = APIRouter(prefix="/clusters", tags=["cluster"])
             "description": "Service is unavailable due to client error",
         },
         status.HTTP_200_OK: {
-            "model": ClusterResponse,
+            "model": ClusterListResponse,
             "description": "Successfully listed all clusters",
         },
     },
@@ -58,24 +59,30 @@ cluster_router = APIRouter(prefix="/clusters", tags=["cluster"])
 async def list_clusters(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    filters: ClusterFilter = Depends(),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=0),
-) -> Union[ClusterResponse, ErrorResponse]:
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[ClusterListResponse, ErrorResponse]:
     """List all clusters."""
-    # Calculate offset
     offset = (page - 1) * limit
 
+    filters_dict = filters.model_dump(exclude_none=True)
+
     try:
-        clusters, total_count = await ClusterService().get_all_clusters(offset, limit)
+        db_clusters, count = await ClusterService(session).get_all_active_clusters(
+            offset, limit, filters_dict, order_by, search
+        )
     except Exception as e:
-        logger.exception(f"Failed to get all clusters: {e}")
+        logger.error(f"Error occurred while listing clusters: {str(e)}")
         return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get clusters"
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list clusters"
         ).to_http_response()
 
-    return ClusterResponse(
-        clusters=clusters,
-        total_record=total_count,
+    return ClusterListResponse(
+        clusters=db_clusters,
+        total_record=count,
         page=page,
         limit=limit,
         object="cluster.list",

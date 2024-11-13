@@ -22,26 +22,53 @@ from pydantic import (
     BaseModel,
     ConfigDict,
 )
+from uuid import UUID
 from typing import List, Dict
 from datetime import datetime
 
 from budapp.commons.schemas import PaginatedSuccessResponse
+from budapp.commons.constants import (
+    ClusterTypeEnum,
+    ClusterStatusEnum
+)
 
 
-class Cluster(BaseModel):
-    """Cluster schema."""
+class ClusterBase(BaseModel):
+    """Cluster base schema"""
 
-    id: UUID4
     name: str
-    icon: str
+    type: ClusterTypeEnum
+    total_workers: int
+    available_workers: int
+
+class ClusterResponse(ClusterBase):
+    """Cluster response schema"""
+
+    id: UUID
+    is_active: bool
+    status: ClusterStatusEnum
     created_at: datetime
+    modified_at: datetime
+
+    icon: str
     endpoint_count: int
-    status: str
     resources: Dict[str, int]
 
-class ClusterResponse(PaginatedSuccessResponse):
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ClusterFilter(BaseModel):
+    """Filter cluster schema"""
+
+    name: str | None = None
+    type: ClusterTypeEnum | None = None
+    total_workers: int | None = None
+    available_workers: int | None = None
+    
+
+class ClusterListResponse(PaginatedSuccessResponse):
     """Cluster response schema."""
 
     model_config = ConfigDict(extra="ignore")
 
-    clusters: List[Cluster]
+    clusters: List[ClusterResponse]

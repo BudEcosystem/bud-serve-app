@@ -16,58 +16,55 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the model ops."""
 
-from typing import List, Tuple
-
-from uuid import UUID
-
+from typing import List, Tuple, Dict
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 
+from sqlalchemy import and_, desc, func, or_, select
+
+from budapp.cluster_ops.models import Cluster
+from .schemas import ClusterResponse
 
 logger = logging.get_logger(__name__)
 
-from typing import List, Tuple
-from .schemas import Cluster
 
 class ClusterDataManager(DataManagerUtils):
     """Data manager for the Cluster model."""
 
-    async def get_all_clusters(self, offset: int = 0, limit: int = 10) -> Tuple[List[Cluster], int]:
-        """Get all clusters from dummy data."""
-        dummy_clusters = [
-            Cluster(
-                id=UUID("123e4567-e89b-42d3-a456-426614174000"),  # Updated to a valid UUID4
-                name="Cluster A",
-                icon="icons/clusters/cluster1.png",
-                created_at="2025-12-10T00:00:00Z",
-                endpoint_count=12,
-                status="Available",
-                resources={
-                    "available_nodes": 10,
-                    "total_nodes": 50,
-                    "gpu_count": 0,
-                    "cpu_count": 0,
-                    "hpu_count": 0,
-                },
-            ),
-            Cluster(
-                id=UUID("223e4567-e89b-42d3-a456-426614174000"),  # Updated to a valid UUID4
-                name="Cluster B",
-                icon="icons/clusters/cluster2.png",
-                created_at="2025-12-11T00:00:00Z",
-                endpoint_count=20,
-                status="Available",
-                resources={
-                    "available_nodes": 15,
-                    "total_nodes": 60,
-                    "gpu_count": 2,
-                    "cpu_count": 20,
-                    "hpu_count": 5,
-                },
-            ),
-        ]
-        # Apply limit and offset on the dummy data
-        total_count = len(dummy_clusters)
-        clusters = dummy_clusters[offset : offset + limit]
-        return clusters, total_count
+    async def get_all_clusters(
+        self,
+        offset: int,
+        limit: int,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[ClusterResponse], int]:
+        """List all clusters from the database."""
+
+        await self.validate_fields(Cluster, filters)
+
+        # Generate statements based on search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(Cluster, filters)
+            stmt = select(Cluster).filter(and_(*search_conditions))
+            count_stmt = select(func.count()).select_from(Cluster).filter(and_(*search_conditions))
+        else:
+            stmt = select(Cluster).filter_by(**filters)
+            count_stmt = select(func.count()).select_from(Cluster).filter_by(**filters)
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(Cluster, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.scalars_all(stmt)
+        print("cluster result:", result)
+
+        return result, count
