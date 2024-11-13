@@ -43,23 +43,23 @@ class ClusterService(SessionMixin):
          # Add dummy data and additional fields
         updated_clusters = []
         for cluster in clusters:
-            updated_cluster = ClusterResponse(**{
-                "id": cluster.id,
-                "cluster_id": cluster.cluster_id,
-                "name": cluster.name,
-                "icon": cluster.icon,
-                "created_at": cluster.created_at,
-                "modified_at": cluster.modified_at,
-                "endpoint_count": 12,
-                "status": cluster.status,
-                "resources": {
-                    "available_nodes": cluster.available_workers,
-                    "total_nodes": cluster.total_workers,     
-                    "gpu_count": 4,         
-                    "cpu_count": 8,         
-                    "hpu_count": 2,         
-                }
-            })
+            updated_cluster = ClusterResponse(
+                    id=cluster.id,
+                    cluster_id=cluster.cluster_id,
+                    name=cluster.name,
+                    icon=cluster.icon,
+                    created_at=cluster.created_at,
+                    modified_at=cluster.modified_at,
+                    endpoint_count=12,
+                    status=cluster.status,
+                    resources={
+                        "available_nodes": cluster.available_workers,
+                        "total_nodes": cluster.total_workers,
+                        "gpu_count": 4,
+                        "cpu_count": 8,
+                        "hpu_count": 2,
+                    }
+                )
             updated_clusters.append(updated_cluster)
 
         return updated_clusters, count
