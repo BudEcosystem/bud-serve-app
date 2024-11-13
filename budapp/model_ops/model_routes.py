@@ -17,11 +17,11 @@
 """The model ops package, containing essential business logic, services, and routing configurations for the model ops."""
 
 import json
+from json.decoder import JSONDecodeError
 from typing import List, Optional, Union
 from uuid import UUID
 
-from fastapi import Form, File, UploadFile
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Form, Query, UploadFile, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
@@ -39,17 +39,21 @@ from budapp.user_ops.schemas import User
 from .schemas import (
     CloudModelFilter,
     CloudModelResponse,
-    ModelDetailResponse,
     CreateCloudModelWorkflowRequest,
     CreateCloudModelWorkflowResponse,
     EditModel,
+    ModelDetailResponse,
     ProviderFilter,
     ProviderResponse,
     RecommendedTagsResponse,
     SearchTagsResponse,
 )
-from .services import CloudModelService, CloudModelWorkflowService, ProviderService, ModelService
-
+from .services import (
+    CloudModelService,
+    CloudModelWorkflowService,
+    ModelService,
+    ProviderService,
+)
 
 logger = logging.get_logger(__name__)
 
@@ -177,49 +181,59 @@ async def edit_model(
     description: Optional[str] = Form(None, max_length=500),
     tags: Optional[str] = Form(None),  # JSON string of tags
     tasks: Optional[str] = Form(None),  # JSON string of tasks
-    paper_urls: Optional[str] = Form(None),
+    paper_urls: Optional[list[str]] = Form(None),
     github_url: Optional[str] = Form(None),
     huggingface_url: Optional[str] = Form(None),
     website_url: Optional[str] = Form(None),
-    license_file: Optional[UploadFile] = File(None),
-    license_url: Optional[str] = Form(None)
+    license_file: UploadFile | None = None,
+    license_url: Optional[str] = Form(None),
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Edit cloud model with file upload"""
+    logger.info(
+        f"Received data: name={name}, description={description}, tags={tags}, tasks={tasks}, paper_urls={paper_urls}, github_url={github_url}, huggingface_url={huggingface_url}, website_url={website_url}, license_file={license_file}, license_url={license_url}"
+    )
     try:
         # Parse JSON strings for list fields
         tags = json.loads(tags) if tags else None
         tasks = json.loads(tasks) if tasks else None
-        paper_urls = json.loads(paper_urls) if paper_urls else None
 
-        print(f"Received data: name={name}, description={description}, tags={tags}, tasks={tasks}, paper_urls={paper_urls}, github_url={github_url}, huggingface_url={huggingface_url}, website_url={website_url}, license_file={license_file}, license_url={license_url}")
+        # Convert to list of multiple strings from a list of single string with comma separated values
+        if paper_urls and isinstance(paper_urls, list) and len(paper_urls) > 0:
+            paper_urls = [url.strip() for url in paper_urls[0].split(",")]
+
         try:
             # Convert to EditModel
             edit_model = EditModel(
-                name=name,
-                description=description,
-                tags=tags,
-                tasks=tasks,
-                paper_urls=paper_urls,
-                github_url=github_url,
-                huggingface_url=huggingface_url,
-                website_url=website_url,
-                license_url=license_url
+                name=name if name else None,
+                description=description if description else None,
+                tags=tags if tags else None,
+                tasks=tasks if tasks else None,
+                paper_urls=paper_urls if paper_urls else None,
+                github_url=github_url if github_url else None,
+                huggingface_url=huggingface_url if huggingface_url else None,
+                website_url=website_url if website_url else None,
+                license_url=license_url if license_url else None,
             )
         except ValidationError as e:
             logger.exception(f"Failed to edit cloud model: {e}")
-            return ErrorResponse(code=status.HTTP_422_UNPROCESSABLE_ENTITY, message='Validation error').to_http_response()
-        
+            return ErrorResponse(
+                code=status.HTTP_422_UNPROCESSABLE_ENTITY, message="Validation error"
+            ).to_http_response()
+
         # Pass file and edit_model data to your service
         await CloudModelWorkflowService(session).edit_cloud_model(
-            model_id=model_id,
-            data=edit_model.dict(exclude_unset=True),
-            file=license_file
+            model_id=model_id, data=edit_model.dict(exclude_unset=True, exclude_none=True), file=license_file
         )
 
         return SuccessResponse(message="Cloud model edited successfully", code=status.HTTP_200_OK).to_http_response()
     except ClientException as e:
         logger.exception(f"Failed to edit cloud model: {e}")
         return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except JSONDecodeError as e:
+        logger.exception(f"Failed to edit cloud model: {e}")
+        return ErrorResponse(
+            code=status.HTTP_422_UNPROCESSABLE_ENTITY, message="Failed to edit cloud model. Invalid input format."
+        ).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to edit cloud model: {e}")
         return ErrorResponse(
@@ -392,7 +406,7 @@ async def search_tags_by_name(
     name: Optional[str] = Query(default=None),
     current_user: User = Depends(get_current_active_user),
     page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=1)
+    limit: int = Query(10, ge=1),
 ) -> Union[SearchTagsResponse, ErrorResponse]:
     """Search tags by name with pagination support."""
     offset = (page - 1) * limit
@@ -400,10 +414,7 @@ async def search_tags_by_name(
     try:
         db_tags, count = await ModelService(session).search_tags_by_name(name or "", offset, limit)
     except Exception as e:
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message=str(e)
-        ).to_http_response()
+        return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)).to_http_response()
 
     return SearchTagsResponse(
         tags=db_tags,
@@ -413,6 +424,7 @@ async def search_tags_by_name(
         object="tags.search",
         code=status.HTTP_200_OK,
     ).to_http_response()
+
 
 @model_router.get(
     "/{model_id}",
@@ -439,7 +451,7 @@ async def get_model_details(
 ) -> Union[ModelDetailResponse, ErrorResponse]:
     """Retrieve details of a model by its ID."""
     try:
-        model_details = await ModelService(session).get_model_details(model_id)        
+        model_details = await ModelService(session).get_model_details(model_id)
     except ClientException as e:
         logger.exception(f"Failed to get model details: {e}")
         return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
@@ -449,5 +461,10 @@ async def get_model_details(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to retrieve model details",
         ).to_http_response()
-    
-    return ModelDetailResponse(**model_details, message="model details fetched successfully", code=status.HTTP_200_OK, object="ModelDetailResponse")
+
+    return ModelDetailResponse(
+        **model_details,
+        message="model details fetched successfully",
+        code=status.HTTP_200_OK,
+        object="ModelDetailResponse",
+    )

@@ -244,12 +244,6 @@ class EditModel(BaseModel):
     website_url: Optional[HttpUrl] = Field(None, description="URL to the model's official website")
     license_url: Optional[HttpUrl] = Field(None, description="License url")
 
-    @validator('name')
-    def validate_name(cls, v):
-        if v and not v.isalnum():
-            raise ValueError("Model name must be alphanumeric")
-        return v
-
     def dict(self, **kwargs):
         # Use the parent `dict()` method to get the original dictionary
         data = super().dict(**kwargs)
