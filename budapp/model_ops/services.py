@@ -17,12 +17,13 @@
 """The model ops services. Contains business logic for model ops."""
 
 import os
-import aiofiles
-import aiohttp
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
 
+import aiofiles
+import aiohttp
 from fastapi import UploadFile, status
+from pydantic import ValidationError
 
 from budapp.commons import logging
 from budapp.commons.constants import WorkflowStatusEnum
@@ -32,7 +33,11 @@ from budapp.core.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.core.models import Workflow as WorkflowModel
 from budapp.core.models import WorkflowStep as WorkflowStepModel
 
-from .crud import CloudModelDataManager, ModelDataManager, PaperPublishedDataManager, ProviderDataManager
+from .crud import (
+    CloudModelDataManager,
+    ModelDataManager,
+    ProviderDataManager,
+)
 from .models import CloudModel, Model, ModelLicenses, PaperPublished
 from .models import Provider as ProviderModel
 from .schemas import (
@@ -46,8 +51,6 @@ from .schemas import (
     PaperPublishedModel,
     Tag,
 )
-from pydantic import ValidationError
-
 
 
 logger = logging.get_logger(__name__)
@@ -221,7 +224,6 @@ class CloudModelWorkflowService(SessionMixin):
 
     async def edit_cloud_model(self, model_id: UUID, data: Dict[str, Any], file: UploadFile = None) -> None:
         """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
-
         # Retrieve existing model
         model = await ModelDataManager(self.session).retrieve_by_fields(model=Model, fields={"id": model_id})
         if not model:
@@ -270,13 +272,15 @@ class CloudModelWorkflowService(SessionMixin):
                     async with aiofiles.open(file_path, "wb") as f:
                         await f.write(content)
                 else:
-                    raise Exception("Failed to download the file from the provided URL")
+                    raise ClientException("Failed to download the file from the provided URL")
         return file_path, filename
 
     async def _create_or_update_license_entry(self, model_id: UUID, filename: str, file_path: str) -> None:
         """Create or update a license entry in the database."""
         # Check if a license entry with the given model_id exists
-        existing_license = await ModelDataManager(self.session).retrieve_by_fields(ModelLicenses, fields=dict(model_id=model_id), missing_ok=True)
+        existing_license = await ModelDataManager(self.session).retrieve_by_fields(
+            ModelLicenses, fields=dict(model_id=model_id), missing_ok=True
+        )
 
         if existing_license:
             # Update the existing license entry
@@ -286,13 +290,10 @@ class CloudModelWorkflowService(SessionMixin):
             ModelDataManager(self.session).update_one(existing_license)
         else:
             # Create a new license entry
-            license_entry = ModelLicensesModel(
-                id=uuid4(),
-                name=filename,
-                path=file_path,
-                model_id=model_id
+            license_entry = ModelLicensesModel(id=uuid4(), name=filename, path=file_path, model_id=model_id)
+            await ModelDataManager(self.session).insert_one(
+                ModelLicenses(**license_entry.model_dump(exclude_unset=True))
             )
-            await ModelDataManager(self.session).insert_one(ModelLicenses(**license_entry.model_dump(exclude_unset=True)))
 
     async def _validate_update_data(self, model: Model, data: Dict[str, Any]) -> Dict[str, Any]:
         """Validate and prepare update data using EditModel schema."""
@@ -307,10 +308,10 @@ class CloudModelWorkflowService(SessionMixin):
         """Add paper entries if paper URLs are provided."""
         for paper_url in paper_urls:
             paper_entry = PaperPublishedModel(id=uuid4(), title=None, url=paper_url, model_id=model_id)
-            await ModelDataManager(self.session).insert_one(PaperPublished(**paper_entry.model_dump(exclude_unset=True)))
+            await ModelDataManager(self.session).insert_one(
+                PaperPublished(**paper_entry.model_dump(exclude_unset=True))
+            )
 
-
-        
     async def _execute_add_cloud_model_workflow(self, data: Dict[str, Any], workflow_id: UUID) -> None:
         """Execute add cloud model workflow."""
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -691,33 +692,27 @@ class CloudModelService(SessionMixin):
     ) -> Tuple[List[CloudModel], int]:
         """Get all cloud models."""
         return await CloudModelDataManager(self.session).get_all_recommended_tags(offset, limit)
-    
+
+
 class ModelService(SessionMixin):
     """Cloud model service."""
+
     async def get_faqs(self) -> List[Dict[str, Any]]:
         """Dummy function to return FAQs for the license."""
         return [
-            {
-                "answer": True,
-                "question": "Are the weights of models are opensource?"
-            },
-            {
-                "answer": False,
-                "question": "Are the weights of models are opensource?"
-            }
+            {"answer": True, "question": "Are the weights of models are opensource?"},
+            {"answer": False, "question": "Are the weights of models are opensource?"},
         ]
+
     async def get_model_details(self, model_id: UUID) -> Model:
         """Retrieve model details by model ID."""
-        model_details = (
-            await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"id": model_id}, missing_ok=True)
-            )
-        paper_published_list = [
-            PaperPublishedModel.from_orm(paper) for paper in model_details.paper_published
-        ]        
+        model_details = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": model_id}, missing_ok=True
+        )
+        paper_published_list = [PaperPublishedModel.from_orm(paper) for paper in model_details.paper_published]
         license = ModelLicensesModel.from_orm(model_details.model_licenses)
         license_data = license.dict()
-        license_data['faqs'] = await self.get_faqs()
+        license_data["faqs"] = await self.get_faqs()
         response_data = {
             "id": model_details.id,
             "name": model_details.name,
@@ -729,10 +724,10 @@ class ModelService(SessionMixin):
             "huggingface_url": model_details.huggingface_url,
             "website_url": model_details.website_url,
             "paper_published": paper_published_list,
-            "license": license_data
+            "license": license_data,
         }
         return response_data
-    
+
     async def search_tags_by_name(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
         """Search model tags by name with pagination."""
         return await ModelDataManager(self.session).search_tags_by_name(name, offset, limit)
