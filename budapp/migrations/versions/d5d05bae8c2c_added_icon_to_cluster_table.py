@@ -1,8 +1,8 @@
-"""added icon field in cluster table
+"""added icon to cluster table
 
-Revision ID: f85337e4e652
-Revises: dac83b8cf76f
-Create Date: 2024-11-13 10:51:53.621480
+Revision ID: d5d05bae8c2c
+Revises: bcd1218837d9
+Create Date: 2024-11-13 16:52:43.088313
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'f85337e4e652'
-down_revision: Union[str, None] = 'dac83b8cf76f'
+revision: str = 'd5d05bae8c2c'
+down_revision: Union[str, None] = 'bcd1218837d9'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
