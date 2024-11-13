@@ -64,7 +64,7 @@ class NotificationService(SessionMixin):
 
         # Create endpoint when deployment is completed
         if (
-            payload.status == "COMPLETED"
+            payload.content.status == "COMPLETED"
             and payload.content.result
             and isinstance(payload.content.result, dict)
             and "result" in payload.content.result
