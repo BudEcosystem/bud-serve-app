@@ -43,26 +43,22 @@ class ClusterService(SessionMixin):
          # Add dummy data and additional fields
         updated_clusters = []
         for cluster in clusters:
-            updated_cluster = {
+            updated_cluster = ClusterResponse(**{
                 "id": cluster.id,
                 "name": cluster.name,
-                "type": cluster.type,
-                "total_workers": cluster.total_workers,
-                "available_workers": cluster.available_workers,
-                "is_active": cluster.is_active,
-                "status": cluster.status,
-                "created_at": cluster.created_at.isoformat() if cluster.created_at else "2025-12-10T00:00:00Z",
-                "modified_at": cluster.modified_at.isoformat() if cluster.modified_at else "2025-12-10T00:00:00Z",
-                "icon": cluster.icon if cluster.icon else "https://bud.studio/cluster_icon.png",
+                "icon": cluster.icon,
+                "created_at": cluster.created_at,
+                "modified_at": cluster.modified_at,
                 "endpoint_count": 12,
+                "status": cluster.status,
                 "resources": {
-                    "available_nodes": 10,  
-                    "total_nodes": 20,      
+                    "available_nodes": cluster.available_workers,
+                    "total_nodes": cluster.total_workers,     
                     "gpu_count": 4,         
                     "cpu_count": 8,         
                     "hpu_count": 2,         
                 }
-            }
+            })
             updated_clusters.append(updated_cluster)
 
         return updated_clusters, count

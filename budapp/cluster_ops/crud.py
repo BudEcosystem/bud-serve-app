@@ -14,7 +14,7 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""The crud package, containing essential business logic, services, and routing configurations for the model ops."""
+"""The crud package, containing essential business logic, services, and routing configurations for the cluster ops."""
 
 from typing import List, Tuple, Dict
 
@@ -36,7 +36,7 @@ class ClusterDataManager(DataManagerUtils):
         self,
         offset: int,
         limit: int,
-        filters: Dict = {},
+        filters: Dict = {}, #endpoint count need to consider in future
         order_by: List = [],
         search: bool = False,
     ) -> Tuple[List[ClusterResponse], int]:
@@ -65,6 +65,5 @@ class ClusterDataManager(DataManagerUtils):
             stmt = stmt.order_by(*sort_conditions)
 
         result = self.scalars_all(stmt)
-        print("cluster result:", result)
 
         return result, count

@@ -32,26 +32,16 @@ from budapp.commons.constants import (
     ClusterStatusEnum
 )
 
-
-class ClusterBase(BaseModel):
-    """Cluster base schema"""
-
-    name: str
-    type: ClusterTypeEnum
-    total_workers: int
-    available_workers: int
-
-class ClusterResponse(ClusterBase):
+class ClusterResponse(BaseModel):
     """Cluster response schema"""
 
     id: UUID
-    is_active: bool
-    status: ClusterStatusEnum
+    name: str
+    icon: str
     created_at: datetime
     modified_at: datetime
-
-    icon: str
     endpoint_count: int
+    status: ClusterStatusEnum
     resources: Dict[str, int]
 
     model_config = ConfigDict(from_attributes=True)

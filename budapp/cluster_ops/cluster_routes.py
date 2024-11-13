@@ -14,7 +14,7 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""The cluster ops package, containing essential business logic, services, and routing configurations for the model ops."""
+"""The cluster ops package, containing essential business logic, services, and routing configurations for the cluster ops."""
 
 from typing import List, Union, Optional
 
