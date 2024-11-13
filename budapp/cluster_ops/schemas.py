@@ -43,6 +43,7 @@ class ClusterResponse(BaseModel):
     endpoint_count: int
     status: ClusterStatusEnum
     resources: Dict[str, int]
+    cluster_id: UUID
 
     model_config = ConfigDict(from_attributes=True)
 

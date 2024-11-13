@@ -35,7 +35,7 @@ class ClusterService(SessionMixin):
     ) -> Tuple[List[ClusterResponse], int]:
         """Get all active clusters."""
         filters_dict = filters
-        # filters_dict["is_active"] = True
+        filters_dict["is_active"] = True
 
         clusters, count = await ClusterDataManager(self.session).get_all_clusters(
             offset, limit, filters_dict, order_by, search
@@ -45,6 +45,7 @@ class ClusterService(SessionMixin):
         for cluster in clusters:
             updated_cluster = ClusterResponse(**{
                 "id": cluster.id,
+                "cluster_id": cluster.cluster_id,
                 "name": cluster.name,
                 "icon": cluster.icon,
                 "created_at": cluster.created_at,
