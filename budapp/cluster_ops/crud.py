@@ -1,3 +1,6 @@
+#  -----------------------------------------------------------------------------
+#  Copyright (c) 2024 Bud Ecosystem Inc.
+#  #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
 #  You may obtain a copy of the License at
@@ -11,30 +14,16 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
+"""The crud package, containing essential business logic, services, and routing configurations for the cluster ops."""
 
-"""Contains core Pydantic schemas used for data validation and serialization within the core services."""
-
-from datetime import datetime
-
-from pydantic import UUID4, BaseModel
-
-from budapp.commons.constants import EndpointStatusEnum
+from budapp.commons import logging
+from budapp.commons.db_utils import DataManagerUtils
 
 
-# Endpoint schemas
+logger = logging.get_logger(__name__)
 
 
-class EndpointCreate(BaseModel):
-    """Create endpoint schema."""
+class ClusterDataManager(DataManagerUtils):
+    """Data manager for the Cluster model."""
 
-    project_id: UUID4
-    model_id: UUID4
-    cluster_id: UUID4
-    bud_cluster_id: UUID4
-    name: str
-    url: str
-    namespace: str
-    replicas: int
-    status: EndpointStatusEnum
-    created_by: UUID4
-    status_sync_at: datetime
+    pass

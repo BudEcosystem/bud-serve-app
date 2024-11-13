@@ -43,6 +43,7 @@ class Endpoint(Base):
     cache_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     cache_config: Mapped[str] = mapped_column(String, nullable=True)
     cluster_id: Mapped[UUID] = mapped_column(ForeignKey("cluster.id", ondelete="CASCADE"), nullable=False)
+    bud_cluster_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     url: Mapped[str] = mapped_column(String, nullable=False)
     namespace: Mapped[str] = mapped_column(String, nullable=False)
     replicas: Mapped[int] = mapped_column(Integer, nullable=False)
