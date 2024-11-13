@@ -30,6 +30,7 @@ class EndpointCreate(BaseModel):
     project_id: UUID4
     model_id: UUID4
     cluster_id: UUID4
+    bud_cluster_id: UUID4
     name: str
     url: str
     namespace: str
