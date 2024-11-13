@@ -19,6 +19,7 @@
 
 from datetime import datetime, timezone
 
+from budapp.cluster_ops.crud import ClusterDataManager
 from budapp.commons import logging
 from budapp.commons.constants import BudServeWorkflowStepEventName, EndpointStatusEnum
 from budapp.commons.db_utils import SessionMixin
@@ -162,7 +163,7 @@ class NotificationService(SessionMixin):
         keys_of_interest = [
             "model_id",
             "project_id",
-            "cluster_id",
+            "cluster_id",  # bud_cluster_id
             "endpoint_name",
             "created_by",
             "replicas",
@@ -177,11 +178,21 @@ class NotificationService(SessionMixin):
 
         logger.debug("Collected required data from workflow steps")
 
+        # Get cluster id
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            {"cluster_id": required_data["cluster_id"]}, missing_ok=True
+        )
+
+        if not db_cluster:
+            logger.error(f"Cluster with id {required_data['cluster_id']} not found")
+            return
+
         # Create endpoint in database
         endpoint_data = EndpointCreate(
             model_id=required_data["model_id"],
             project_id=required_data["project_id"],
-            cluster_id=required_data["cluster_id"],
+            cluster_id=db_cluster.id,
+            bud_cluster_id=required_data["cluster_id"],
             name=required_data["endpoint_name"],
             url=deployment_url,
             namespace=namespace,
