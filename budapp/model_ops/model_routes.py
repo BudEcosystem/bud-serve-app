@@ -55,7 +55,6 @@ from .services import (
     ProviderService,
 )
 
-
 logger = logging.get_logger(__name__)
 
 model_router = APIRouter(prefix="/models", tags=["model"])
@@ -182,11 +181,11 @@ async def edit_model(
     description: Optional[str] = Form(None, max_length=500),
     tags: Optional[str] = Form(None),  # JSON string of tags
     tasks: Optional[str] = Form(None),  # JSON string of tasks
-    paper_urls: Optional[str] = Form(None),
+    paper_urls: Optional[list[str]] = Form(None),
     github_url: Optional[str] = Form(None),
     huggingface_url: Optional[str] = Form(None),
     website_url: Optional[str] = Form(None),
-    license_file: Optional[UploadFile] = None,
+    license_file: UploadFile | None = None,
     license_url: Optional[str] = Form(None),
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Edit cloud model with file upload"""
@@ -197,7 +196,10 @@ async def edit_model(
         # Parse JSON strings for list fields
         tags = json.loads(tags) if tags else None
         tasks = json.loads(tasks) if tasks else None
-        paper_urls = json.loads(paper_urls) if paper_urls else None
+
+        # Convert to list of multiple strings from a list of single string with comma separated values
+        if paper_urls and isinstance(paper_urls, list) and len(paper_urls) > 0:
+            paper_urls = [url.strip() for url in paper_urls[0].split(",")]
 
         try:
             # Convert to EditModel
