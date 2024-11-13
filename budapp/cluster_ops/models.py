@@ -65,6 +65,7 @@ class Cluster(Base):
         ),
         nullable=False,
     )
+    icon: Mapped[str] = mapped_column(String, nullable=False)
     total_workers: Mapped[int] = mapped_column(Integer, default=0)
     available_workers: Mapped[int] = mapped_column(Integer, default=0)
     used_workers: Mapped[int] = mapped_column(Integer, default=0)

@@ -53,7 +53,7 @@ class ClusterService(SessionMixin):
                 "status": cluster.status,
                 "created_at": cluster.created_at.isoformat() if cluster.created_at else "2025-12-10T00:00:00Z",
                 "modified_at": cluster.modified_at.isoformat() if cluster.modified_at else "2025-12-10T00:00:00Z",
-                "icon": "https://bud.studio/cluster_icon.png",
+                "icon": cluster.icon if cluster.icon else "https://bud.studio/cluster_icon.png",
                 "endpoint_count": 12,
                 "resources": {
                     "available_nodes": 10,  
