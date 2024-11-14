@@ -21,6 +21,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 from uuid import UUID
+from fastapi.exceptions import HTTPException
+from fastapi import status
 
 
 from budapp.commons import logging
@@ -29,7 +31,7 @@ from budapp.commons.exceptions import DatabaseException
 from budapp.model_ops.models import CloudModel, PaperPublished
 from budapp.model_ops.models import Model
 from budapp.model_ops.models import CloudModel, Model
-from budapp.model_ops.models import Provider as ProviderModel
+from budapp.model_ops.models import Provider as ProviderModel, ModelTemplate
 
 
 logger = logging.get_logger(__name__)
@@ -252,3 +254,69 @@ class CloudModelDataManager(DataManagerUtils):
         result = self.execute_all(stmt)
 
         return result, count
+
+class ModelTemplateDataManager(DataManagerUtils):
+    """Model template data manager class responsible for operations over database."""
+
+    async def create_model_template(
+        self, model_template: ModelTemplate
+    ) -> ModelTemplate:
+        """Create a new model template in the database."""
+
+        return await self.add_one(model_template)
+
+    async def create_bulk_model_templates(
+        self, model_templates: List[ModelTemplate]
+    ) -> List[ModelTemplate]:
+        """Create a bulk model templates in the database."""
+
+        return self.add_all(model_templates)
+
+    async def get_all_model_templates(
+        self,
+        offset: int,
+        limit: int,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[ModelTemplate], int]:
+        """List all model templates in the database."""
+
+        # Validate filter fields
+        await self.validate_fields(ModelTemplate, filters)
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(ModelTemplate, filters)
+            stmt = select(
+                ModelTemplate,
+            ).filter(or_(*search_conditions))
+            count_stmt = (
+                select(func.count())
+                .select_from(ModelTemplate)
+                .filter(or_(*search_conditions))
+            )
+        else:
+            stmt = select(
+                ModelTemplate,
+            ).filter_by(**filters)
+            count_stmt = (
+                select(func.count()).select_from(ModelTemplate).filter_by(**filters)
+            )
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(ModelTemplate, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.scalars_all(stmt)
+
+        return result, count
+
+

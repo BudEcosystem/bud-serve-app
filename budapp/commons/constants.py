@@ -515,3 +515,16 @@ class EndpointStatusEnum(StrEnum):
     DEPLOYING = auto()
     UNHEALTHY = auto()
     DELETING = auto()
+
+class ModelTemplateTypeEnum(StrEnum):
+    """Model template types"""
+
+    SUMMARIZATION = auto()
+    CHAT = auto()
+    QUESTION_ANSWERING = auto()
+    RAG = auto()
+    CODE_GEN = auto()
+    CODE_TRANSLATION = auto()
+    ENTITY_EXTRACTION = auto()
+    SENTIMENT_ANALYSIS = auto()
+    DOCUMENT_ANALYSIS = auto()
