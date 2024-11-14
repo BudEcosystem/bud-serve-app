@@ -26,6 +26,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 
 from .auth import auth_routes
+from .cluster_ops import cluster_routes
 from .commons import logging
 from .commons.config import app_settings
 from .commons.constants import Environment
@@ -33,7 +34,7 @@ from .core import meta_routes, notify_routes
 from .initializers.seeder import seeders
 from .model_ops import model_routes
 from .user_ops import user_routes
-from .cluster_ops import cluster_routes
+from .workflow_ops import workflow_routes
 
 
 logger = logging.get_logger(__name__)
@@ -121,6 +122,7 @@ internal_router.include_router(model_routes.model_router)
 internal_router.include_router(user_routes.user_router)
 internal_router.include_router(notify_routes.notify_router)
 internal_router.include_router(cluster_routes.cluster_router)
+internal_router.include_router(workflow_routes.workflow_router)
 
 app.include_router(internal_router)
 
