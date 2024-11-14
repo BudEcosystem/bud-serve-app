@@ -258,20 +258,6 @@ class CloudModelDataManager(DataManagerUtils):
 class ModelTemplateDataManager(DataManagerUtils):
     """Model template data manager class responsible for operations over database."""
 
-    async def create_model_template(
-        self, model_template: ModelTemplate
-    ) -> ModelTemplate:
-        """Create a new model template in the database."""
-
-        return await self.add_one(model_template)
-
-    async def create_bulk_model_templates(
-        self, model_templates: List[ModelTemplate]
-    ) -> List[ModelTemplate]:
-        """Create a bulk model templates in the database."""
-
-        return self.add_all(model_templates)
-
     async def get_all_model_templates(
         self,
         offset: int,

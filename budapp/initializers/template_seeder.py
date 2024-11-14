@@ -101,7 +101,7 @@ class TemplateSeeder(BaseSeeder):
         # Create new templates in the database
         created_templates = await ModelTemplateDataManager(
             session
-        ).create_bulk_model_templates(template_data_to_seed)
+        ).insert_all(template_data_to_seed)
         logger.info(f"Created {len(created_templates)} templates")
 
     @staticmethod
