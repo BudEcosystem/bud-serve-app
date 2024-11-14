@@ -19,10 +19,10 @@
 
 from typing import Any, Dict, List, Optional, Self, Union
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, field_validator
 
 from budapp.commons import logging
-from budapp.commons.constants import NotificationCategory, NotificationType
+from budapp.commons.constants import NotificationCategory, NotificationType, ModelTemplateTypeEnum
 from budapp.commons.schemas import CloudEventBase, SuccessResponse
 
 
@@ -118,5 +118,34 @@ class NotificationRequest(CloudEventBase):
 
 class NotificationResponse(SuccessResponse):
     """Represents a notification response."""
+
+    pass
+
+class ModelTemplateCreate(BaseModel):
+    """Model template create schema"""
+
+    name: str
+    description: str
+    icon: str
+    template_type: ModelTemplateTypeEnum
+    avg_sequence_length: Optional[int] = None
+    avg_context_length: Optional[int] = None
+    per_session_tokens_per_sec: Optional[list[int]] = None
+    ttft: Optional[list[int]] = None
+    e2e_latency: Optional[list[int]] = None
+
+    @field_validator("per_session_tokens_per_sec", "ttft", "e2e_latency", mode="before")
+    @classmethod
+    def validate_int_range(cls, value):
+        if value is not None and (
+            not isinstance(value, list)
+            or len(value) != 2
+            or not all(isinstance(x, int) for x in value)
+        ):
+            raise ValueError("Must be a list of two integers")
+        return value
+
+class ModelTemplateUpdate(ModelTemplateCreate):
+    """Model template update schema"""
 
     pass

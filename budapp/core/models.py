@@ -18,12 +18,13 @@
 
 from datetime import datetime
 from uuid import UUID, uuid4
+from typing import Optional
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Uuid, ARRAY, Integer
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from budapp.commons.constants import WorkflowStatusEnum
+from budapp.commons.constants import WorkflowStatusEnum, ModelTemplateTypeEnum
 from budapp.commons.database import Base
 
 
@@ -79,3 +80,33 @@ class Icon(Base):
     name: Mapped[str] = mapped_column(String, index=True, nullable=False)
     file_path: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     category: Mapped[str] = mapped_column(String, index=True, nullable=False)
+
+
+class ModelTemplate(Base):
+    """Model template model"""
+
+    __tablename__ = "model_template"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=False)
+    icon: Mapped[str] = mapped_column(String, nullable=False)
+    template_type: Mapped[str] = mapped_column(
+        Enum(
+            ModelTemplateTypeEnum,
+            name="template_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        unique=True,
+    )
+    avg_sequence_length: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    avg_context_length: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    per_session_tokens_per_sec: Mapped[list[int]] = mapped_column(
+        ARRAY(Integer), nullable=True
+    )
+    ttft: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=True)
+    e2e_latency: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    modified_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )

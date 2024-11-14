@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from budapp.commons import logging
 from budapp.commons.database import engine
 
-from budapp.model_ops.models import ModelTemplate
-from budapp.model_ops.crud import ModelTemplateDataManager
-from budapp.model_ops.schemas import ModelTemplateCreate, ModelTemplateUpdate
+from budapp.core.models import ModelTemplate
+from budapp.core.crud import ModelTemplateDataManager
+from budapp.core.schemas import ModelTemplateCreate, ModelTemplateUpdate
 
 from .base_seeder import BaseSeeder
 
@@ -84,7 +84,7 @@ class TemplateSeeder(BaseSeeder):
                 ).update_by_fields(
                     db_template, update_template_data.model_dump(exclude_unset=True)
                 )
-                logger.info(f"Updated template: {db_updated_template.template_type}")
+                logger.debug(f"Updated template: {db_updated_template.template_type}")
 
                 # Remove the updated template from the mapping
                 del template_seeder_data_mapping[db_template.template_type.value]
