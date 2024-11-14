@@ -26,9 +26,9 @@ from budapp.commons.db_utils import SessionMixin
 from budapp.endpoint_ops.crud import EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.endpoint_ops.schemas import EndpointCreate
+from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
 from .crud import WorkflowStepDataManager
-from .models import WorkflowStep as WorkflowStepModel
 from .schemas import NotificationPayload
 
 

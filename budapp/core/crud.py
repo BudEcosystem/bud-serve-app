@@ -22,8 +22,7 @@ from sqlalchemy import select
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
-
-from .models import WorkflowStep as WorkflowStepModel
+from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
 
 logger = logging.get_logger(__name__)
