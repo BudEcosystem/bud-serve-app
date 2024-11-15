@@ -28,6 +28,7 @@ from budapp.model_ops.models import CloudModel, PaperPublished
 from budapp.model_ops.models import Model
 from budapp.model_ops.models import CloudModel, Model
 from budapp.model_ops.models import Provider as ProviderModel
+from budapp.model_ops.schemas import CloudModel as CloudModelSchema, Provider as ProviderSchema
 
 
 logger = logging.get_logger(__name__)
@@ -160,8 +161,8 @@ class CloudModelDataManager(DataManagerUtils):
         filters: Dict[str, Any] = {},
         order_by: List[Tuple[str, str]] = [],
         search: bool = False,
-    ) -> Tuple[List[CloudModel], int]:
-        """Get all cloud models from the database."""
+    ) -> Tuple[List[CloudModelSchema], int]:
+        """Get all cloud models with provider information."""
         await self.validate_fields(CloudModel, filters)
 
         # Tags and tasks are not filterable
@@ -179,32 +180,73 @@ class CloudModelDataManager(DataManagerUtils):
             [CloudModel.tasks.cast(JSONB).contains([{"name": task_name}]) for task_name in json_filters["tasks"]]
         )
 
-        # Generate statements according to search or filters
+        if "source" in filters:
+            source = filters.pop("source")
+            conditions.append(CloudModel.source == source)
+
+        if "modality" in filters:
+            modality = filters.pop("modality")
+            conditions.append(CloudModel.modality == modality)
+
+        if "model_size" in filters:
+            model_size = filters.pop("model_size")
+            conditions.append(CloudModel.model_size == model_size)
+
+        if "name" in filters:
+            name = filters.pop("name")
+            conditions.append(CloudModel.name.ilike(f"%{name}%")) 
+
         if search:
-            search_conditions = await self.generate_search_stmt(CloudModel, filters)
-            stmt = select(CloudModel).filter(or_(*search_conditions)).where(or_(*conditions))
+            # search_conditions = await self.generate_search_stmt(CloudModel, filters)
+            stmt = (
+                select(CloudModel, ProviderModel)
+                .join(ProviderModel, CloudModel.provider_id == ProviderModel.id)
+                # .filter(or_(*search_conditions))
+                .where(or_(*conditions))
+            )
             count_stmt = (
-                select(func.count()).select_from(CloudModel).filter(or_(*search_conditions)).where(or_(*conditions))
+                select(func.count())
+                .select_from(CloudModel)
+                .join(ProviderModel, CloudModel.provider_id == ProviderModel.id)
+                # .filter(or_(*search_conditions))
+                .where(or_(*conditions))
             )
         else:
-            stmt = select(CloudModel).filter_by(**filters).where(and_(*conditions))
-            count_stmt = select(func.count()).select_from(CloudModel).filter_by(**filters).where(and_(*conditions))
+            stmt = (
+                select(CloudModel, ProviderModel)
+                .join(ProviderModel, CloudModel.provider_id == ProviderModel.id)
+                .filter_by(**filters)
+                .where(and_(*conditions))
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(CloudModel)
+                .join(ProviderModel, CloudModel.provider_id == ProviderModel.id)
+                .filter_by(**filters)
+                .where(and_(*conditions))
+            )
 
-        # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)
-
-        # Apply limit and offset
         stmt = stmt.limit(limit).offset(offset)
 
-        # Apply sorting
         if order_by:
             sort_conditions = await self.generate_sorting_stmt(CloudModel, order_by)
             stmt = stmt.order_by(*sort_conditions)
 
-        result = self.scalars_all(stmt)
+        result = self.execute_all(stmt)
 
-        return result, count
-
+        # Combine CloudModel and Provider data
+        cloud_models = [
+            CloudModelSchema(
+                **{key: value for key, value in cloud_model.__dict__.items() if not key.startswith("_")},
+                provider=ProviderSchema(
+                    **{key: value for key, value in provider.__dict__.items() if not key.startswith("_")}
+                )
+            )
+            for cloud_model, provider in result
+        ]
+        return cloud_models, count
+    
     async def get_all_recommended_tags(
         self,
         offset: int = 0,

@@ -90,7 +90,6 @@ class CloudModel(BaseModel):
     id: UUID4
     name: str
     description: str | None = None
-    icon: str
     modality: ModalityEnum
     source: CredentialTypeEnum
     provider_type: ModelProviderTypeEnum
@@ -98,6 +97,7 @@ class CloudModel(BaseModel):
     model_size: int | None = None
     tags: list[Tag] | None = None
     tasks: list[Tag] | None = None
+    provider: Provider
 
 
 class PaperPublishedModel(BaseModel):

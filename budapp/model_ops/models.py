@@ -139,7 +139,6 @@ class CloudModel(Base):
     tasks: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
     author: Mapped[str] = mapped_column(String, nullable=True)
     model_size: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
-    icon: Mapped[Optional[str]] = mapped_column(String, nullable=False)
     github_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     huggingface_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     website_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)

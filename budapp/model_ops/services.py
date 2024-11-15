@@ -46,6 +46,7 @@ from .schemas import (
     ModelLicensesModel,
     PaperPublishedModel,
     Tag,
+    CloudModel as CloudModelSchema
 )
 
 
@@ -677,7 +678,7 @@ class CloudModelService(SessionMixin):
         filters: Dict = {},
         order_by: List = [],
         search: bool = False,
-    ) -> Tuple[List[CloudModel], int]:
+    ) -> Tuple[List[CloudModelSchema], int]:
         """Get all cloud models."""
         return await CloudModelDataManager(self.session).get_all_cloud_models(offset, limit, filters, order_by, search)
 
