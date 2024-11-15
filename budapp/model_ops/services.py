@@ -29,15 +29,11 @@ from budapp.commons import logging
 from budapp.commons.constants import WorkflowStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
-from budapp.core.crud import WorkflowDataManager, WorkflowStepDataManager
-from budapp.core.models import Workflow as WorkflowModel
-from budapp.core.models import WorkflowStep as WorkflowStepModel
+from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
+from budapp.workflow_ops.models import Workflow as WorkflowModel
+from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
-from .crud import (
-    CloudModelDataManager,
-    ModelDataManager,
-    ProviderDataManager,
-)
+from .crud import CloudModelDataManager, ModelDataManager, ProviderDataManager
 from .models import CloudModel, Model, ModelLicenses, PaperPublished
 from .models import Provider as ProviderModel
 from .schemas import (

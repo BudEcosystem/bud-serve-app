@@ -19,8 +19,6 @@
 from budapp.auth.models import Token as Token
 from budapp.cluster_ops.models import Cluster as Cluster
 from budapp.core.models import Icon as Icon
-from budapp.core.models import Workflow as Workflow
-from budapp.core.models import WorkflowStep as WorkflowStep
 from budapp.endpoint_ops.models import Endpoint as Endpoint
 from budapp.model_ops.models import CloudModel as CloudModel
 from budapp.model_ops.models import Model as Model
@@ -28,5 +26,7 @@ from budapp.model_ops.models import Provider as Provider
 from budapp.permissions.models import Permission as Permission
 from budapp.project_ops.models import Project as Project
 from budapp.user_ops.models import User as User
+from budapp.workflow_ops.models import Workflow as Workflow
+from budapp.workflow_ops.models import WorkflowStep as WorkflowStep
 
 from .database import Base as Base
