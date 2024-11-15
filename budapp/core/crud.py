@@ -23,7 +23,7 @@ from sqlalchemy import select
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 
-from .models import WorkflowStep as WorkflowStepModel, ModelTemplate
+from .models import ModelTemplate
 from sqlalchemy import func, or_, select
 
 

@@ -18,12 +18,12 @@
 
 from uuid import UUID, uuid4
 from typing import Optional
+from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Uuid, ARRAY, Integer
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import DateTime, Enum, Integer, String, Uuid, ARRAY, Integer
+from sqlalchemy.orm import Mapped, mapped_column
 
-from budapp.commons.constants import WorkflowStatusEnum, ModelTemplateTypeEnum
+from budapp.commons.constants import ModelTemplateTypeEnum
 from budapp.commons.database import Base
 
 
