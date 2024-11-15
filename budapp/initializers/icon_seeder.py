@@ -63,7 +63,7 @@ class IconSeeder(BaseSeeder):
                         )
 
                         if db_icon:
-                            icon_update_data = IconUpdate(name=name, category=category).model_dump(
+                            icon_update_data = IconUpdate(name=name, category=category, file_path=file_path).model_dump(
                                 exclude_unset=True, exclude_none=True
                             )
 
