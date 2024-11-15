@@ -1,0 +1,101 @@
+[
+    {
+      "name": "Summarization",
+      "description": "Condense large input text into brief, concise summaries.",
+      "icon": "icons/template/other.png",
+      "template_type": "summarization",
+      "avg_context_length": 500,
+      "avg_sequence_length": 100,
+      "ttft": [2000, 5000],
+      "e2e_latency": [30, 60],
+      "per_session_tokens_per_sec": [5, 25]
+    },
+    {
+      "name": "Chat",
+      "description": "Interactive chatbot responses with moderate input and extended conversational output.",
+      "icon": "icons/template/chat.png",
+      "template_type": "chat",
+      "avg_context_length": 50,
+      "avg_sequence_length": 100,
+      "ttft": [300, 1000],
+      "e2e_latency": [10, 30],
+      "per_session_tokens_per_sec": [5, 25]
+    },
+    {
+      "name": "Question Answering",
+      "description": "Quickly retrieve specific answers to user queries from a given context.",
+      "icon": "icons/template/synthetic_data_generation.png",
+      "template_type": "question_answering",
+      "avg_context_length": 100,
+      "avg_sequence_length": 50,
+      "ttft": [300, 1000],
+      "e2e_latency": [10, 30],
+      "per_session_tokens_per_sec": [5, 25]
+    },
+    {
+      "name": "Retrieval-Augmented Generation",
+      "description": "Enhance generated outputs with external knowledge retrieval.",
+      "icon": "icons/template/rag.png",
+      "template_type": "rag",
+      "avg_context_length": 500,
+      "avg_sequence_length": 100,
+      "ttft": [2000, 5000],
+      "e2e_latency": [30, 60],
+      "per_session_tokens_per_sec": [5, 25]
+    },
+    {
+      "name": "Code Generation",
+      "description": "Automatically generate code snippets based on concise user prompts.",
+      "icon": "icons/template/code_gen.png",
+      "template_type": "code_gen",
+      "avg_context_length": 30,
+      "avg_sequence_length": 200,
+      "ttft": [400, 1000],
+      "e2e_latency": [10, 30],
+      "per_session_tokens_per_sec": [5, 25]
+    },
+    {
+      "name": "Code Translation",
+      "description": "Convert code between programming languages efficiently.",
+      "icon": "icons/template/sql_gen.png",
+      "template_type": "code_translation",
+      "avg_context_length": 100,
+      "avg_sequence_length": 150,
+      "ttft": [400, 1500],
+      "e2e_latency": [10, 40],
+      "per_session_tokens_per_sec": [5, 25]
+    },
+    {
+      "name": "Entity Extraction",
+      "description": "Identify and extract relevant entities from large textual inputs.",
+      "icon": "icons/template/entity_extraction.png",
+      "template_type": "entity_extraction",
+      "avg_context_length": 500,
+      "avg_sequence_length": 50,
+      "ttft": [2000, 5000],
+      "e2e_latency": [5, 20],
+      "per_session_tokens_per_sec": [5, 25]
+    },
+    {
+      "name": "Sentiment Analysis",
+      "description": "Analyze text to determine and classify sentiment polarity.",
+      "icon": "icons/template/sentiment_analysis.png",
+      "template_type": "sentiment_analysis",
+      "avg_context_length": 200,
+      "avg_sequence_length": 10,
+      "ttft": [500, 1500],
+      "e2e_latency": [2, 6],
+      "per_session_tokens_per_sec": [5, 25]
+    },
+    {
+      "name": "Document Analysis",
+      "description": "Process and analyze long documents to extract key insights.",
+      "icon": "icons/template/other.png",
+      "template_type": "document_analysis",
+      "avg_context_length": 1000,
+      "avg_sequence_length": 300,
+      "ttft": [4000, 5000],
+      "e2e_latency": [40, 90],
+      "per_session_tokens_per_sec": [5, 25]
+    }
+  ]

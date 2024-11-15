@@ -16,12 +16,10 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the model ops."""
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
-from uuid import UUID
-
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
