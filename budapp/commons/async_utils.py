@@ -17,7 +17,7 @@
 """Provides utility functions for managing asynchronous tasks."""
 
 import asyncio
-from typing import Any, Awaitable, Callable, Tuple, TypeVar, Union
+from typing import Any, Awaitable, Callable, List, Tuple, TypeVar, Union
 
 
 T = TypeVar("T")
@@ -67,3 +67,25 @@ def dispatch_async(func: Callable[..., Any], *args: Tuple[Any], **kwargs: Any) -
         result = func(*args, **kwargs)
 
     return result
+
+
+async def check_file_extension(filename: str, allowed_extensions: List[str]) -> bool:
+    """Check if the file has an allowed extension.
+
+    Args:
+        filename (str): Name of the file to validate.
+        allowed_extensions (list[str]): List of allowed extensions (without dot, e.g. ['yaml', 'yml']).
+
+    Returns:
+        bool: True if file extension is allowed, False otherwise.
+    """
+    if not filename or "." not in filename:
+        return False
+
+    # Get the file extension from the filename
+    file_extension = filename.split(".")[-1].lower()
+
+    # Convert allowed extensions to lowercase for case-insensitive comparison
+    allowed_extensions = [ext.lower() for ext in allowed_extensions]
+
+    return file_extension in allowed_extensions
