@@ -17,20 +17,15 @@
 
 """Contains core Pydantic schemas used for data validation and serialization within the cluster ops services."""
 
-from pydantic import (
-    UUID4,
-    BaseModel,
-    ConfigDict,
-)
-from uuid import UUID
-from typing import List, Dict
 from datetime import datetime
+from typing import Dict, List
+from uuid import UUID
 
+from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict
+
+from budapp.commons.constants import ClusterStatusEnum, ClusterTypeEnum
 from budapp.commons.schemas import PaginatedSuccessResponse
-from budapp.commons.constants import (
-    ClusterTypeEnum,
-    ClusterStatusEnum
-)
+
 
 class ClusterResponse(BaseModel):
     """Cluster response schema"""
@@ -55,7 +50,7 @@ class ClusterFilter(BaseModel):
     type: ClusterTypeEnum | None = None
     total_workers: int | None = None
     available_workers: int | None = None
-    
+
 
 class ClusterListResponse(PaginatedSuccessResponse):
     """Cluster response schema."""
@@ -63,3 +58,22 @@ class ClusterListResponse(PaginatedSuccessResponse):
     model_config = ConfigDict(extra="ignore")
 
     clusters: List[ClusterResponse]
+
+
+class CreateClusterWorkflowRequest(BaseModel):
+    """Create cluster workflow request schema"""
+
+    name: str | None = None
+    ingress_url: str | None = None
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None
+    step_number: int | None = None
+    trigger_workflow: bool | None = None
+
+
+class CreateClusterWorkflowSteps(BaseModel):
+    """Create cluster workflow step data schema"""
+
+    name: str | None = None
+    ingress_url: AnyHttpUrl | None = None
+    configuration_yaml: dict | None = None
