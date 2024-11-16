@@ -148,9 +148,10 @@ class ClientException(Exception):
         message (str): The error message describing the database issue.
     """
 
-    def __init__(self, message: str):
+    def __init__(self, message: str, status_code: int = 400):
         """Initialize the ClientException with a message."""
         self.message = message
+        self.status_code = status_code
         super().__init__(self.message)
 
     def __str__(self):
