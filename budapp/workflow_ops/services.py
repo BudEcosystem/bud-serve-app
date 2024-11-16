@@ -57,8 +57,9 @@ class WorkflowService(SessionMixin):
         # Parse workflow step data response
         return await self._parse_workflow_step_data_response(required_data, db_workflow)
 
-    @staticmethod
-    async def _extract_required_data_from_workflow_steps(db_workflow_steps: List[WorkflowStepModel]) -> Dict[str, Any]:
+    async def _extract_required_data_from_workflow_steps(
+        self, db_workflow_steps: List[WorkflowStepModel]
+    ) -> Dict[str, Any]:
         """Get required data from workflow steps.
 
         Args:
@@ -68,21 +69,7 @@ class WorkflowService(SessionMixin):
             Dict of required data.
         """
         # Define the keys required data retrieval
-        keys_of_interest = [
-            "source",
-            "name",
-            "modality",
-            "uri",
-            "tags",
-            "icon",
-            "provider_type",
-            "provider_id",
-            "cloud_model_id",
-            "description",
-            "model_id",
-            "workflow_execution_status",
-            "leaderboard",
-        ]
+        keys_of_interest = await self._get_keys_of_interest()
 
         # from workflow steps extract necessary information
         required_data = {}
@@ -113,6 +100,8 @@ class WorkflowService(SessionMixin):
             model_id = required_data.get("model_id")
             workflow_execution_status = required_data.get("workflow_execution_status")
             leaderboard = required_data.get("leaderboard")
+            name = required_data.get("name")
+            ingress_url = required_data.get("ingress_url")
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -148,6 +137,8 @@ class WorkflowService(SessionMixin):
                 model_id=model_id if model_id else None,
                 workflow_execution_status=workflow_execution_status if workflow_execution_status else None,
                 leaderboard=leaderboard if leaderboard else None,
+                name=name if name else None,
+                ingress_url=ingress_url if ingress_url else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -163,3 +154,33 @@ class WorkflowService(SessionMixin):
             object="workflow.get",
             message="Workflow data retrieved successfully",
         )
+
+    @staticmethod
+    async def _get_keys_of_interest() -> List[str]:
+        """Get keys of interest as per different workflows."""
+        workflow_keys = {
+            "add_cloud_model": [
+                "source",
+                "name",
+                "modality",
+                "uri",
+                "tags",
+                "icon",
+                "provider_type",
+                "provider_id",
+                "cloud_model_id",
+                "description",
+                "model_id",
+                "workflow_execution_status",
+                "leaderboard",
+            ],
+            "create_cluster": [
+                "name",
+                "ingress_url",
+            ],
+        }
+
+        # Combine all lists using set union
+        all_keys = set().union(*workflow_keys.values())
+
+        return list(all_keys)
