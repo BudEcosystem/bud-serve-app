@@ -16,14 +16,18 @@
 
 """The cluster ops services. Contains business logic for model ops."""
 
+import json
+import tempfile
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
+import aiohttp
 import yaml
 from fastapi import UploadFile
 
 from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension
+from budapp.commons.config import app_settings
 from budapp.commons.constants import WorkflowStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
@@ -114,13 +118,13 @@ class ClusterService(SessionMixin):
                 configuration_yaml = yaml.safe_load(configuration_file.file)
             except yaml.YAMLError as e:
                 logger.exception(f"Invalid cluster configuration yaml file found: {e}")
-                raise ClientException("Invalid cluster configuration yaml file found")
+                raise ClientException("Invalid cluster configuration yaml file found") from e
 
         # Prepare workflow step data
         workflow_step_data = CreateClusterWorkflowSteps(
             name=cluster_name,
             ingress_url=ingress_url,
-            configuration_yaml=configuration_yaml,
+            configuration_yaml=configuration_yaml if configuration_file else None,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
@@ -179,6 +183,12 @@ class ClusterService(SessionMixin):
             # Update or create next workflow step
             db_workflow_step = await self._create_or_update_next_workflow_step(db_workflow.id, current_step_number, {})
 
+            # Update workflow step data in db
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"current_step": workflow_current_step},
+            )
+
             # TODO: Currently querying workflow steps again by ordering steps in ascending order
             # To ensure the latest step update is fetched, Consider excluding it later
             db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -209,6 +219,13 @@ class ClusterService(SessionMixin):
             # Trigger create cluster workflow by step
             await self._execute_create_cluster_workflow(required_data, db_workflow.id)
             logger.debug("Successfully executed create cluster workflow")
+
+            # Increment step number of workflow and workflow step
+            current_step_number = current_step_number + 1
+            workflow_current_step = current_step_number
+
+            # Create next step for storing success event
+            await self._create_or_update_next_workflow_step(db_workflow.id, current_step_number, {})
 
         # Update workflow step data in db
         db_workflow = await WorkflowDataManager(self.session).update_by_fields(
@@ -293,4 +310,94 @@ class ClusterService(SessionMixin):
             logger.error(f"Cluster {data['name']} already exists")
             raise ClientException(f"Cluster {data['name']} already exists")
 
-        return
+        # Create cluster in bud_cluster app
+        bud_cluster_response = await self._perform_create_cluster_request(data, workflow_id)
+
+        # Add payload dict to response
+        for step in bud_cluster_response["steps"]:
+            step["payload"] = {}
+
+        # Update workflow step with response
+        await WorkflowStepDataManager(self.session).update_by_fields(
+            db_latest_workflow_step, {"data": bud_cluster_response}
+        )
+
+    async def _perform_create_cluster_request(self, data: Dict[str, str], workflow_id: UUID) -> dict:
+        """Make async POST request to create cluster to budcluster app.
+
+        Args:
+            data (Dict[str, str]): Data to be sent in the request.
+
+        Returns:
+            dict: Response from the server.
+
+        Raises:
+            aiohttp.ClientError: If the request fails.
+        """
+        create_cluster_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster"
+        )
+        cluster_create_request = {
+            "enable_master_node": True,
+            "name": data["name"],
+            "ingress_url": data["ingress_url"],
+            "notification_metadata": {
+                "name": "bud-notification",
+                "subscriber_ids": data["created_by"],
+                "workflow_id": str(workflow_id),
+            },
+            "source_topic": f"{app_settings.source_topic}",
+        }
+
+        # Create temporary yaml file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".yaml", mode="w") as temp_file:
+            try:
+                # Write configuration yaml to temporary yaml file
+                yaml.safe_dump(data["configuration_yaml"], temp_file)
+
+                # Perform the request as a form data
+                async with aiohttp.ClientSession() as session:
+                    form = aiohttp.FormData()
+                    form.add_field("cluster_create_request", json.dumps(cluster_create_request))
+
+                    # Open the file for reading after writing is complete
+                    with open(temp_file.name, "rb") as config_file:
+                        form.add_field("configuration", config_file, filename=temp_file.name)
+                        try:
+                            async with session.post(create_cluster_endpoint, data=form) as response:
+                                response_data = await response.json()
+                                logger.debug(f"Response from budcluster service: {response_data}")
+
+                                if response.status >= 400:
+                                    error_message = response_data.get("detail", "Failed to create cluster")
+                                    logger.error(f"Failed to create cluster with external service: {error_message}")
+                                    raise ClientException(error_message)
+
+                                logger.debug("Successfully created cluster with budcluster service")
+                                return response_data
+
+                        except ClientException as e:
+                            raise e
+
+                        except Exception as e:
+                            logger.error(f"Failed to make request to budcluster service: {e}")
+                            raise ClientException("Unable to create cluster with external service") from e
+
+            except yaml.YAMLError as e:
+                logger.error(f"Failed to process YAML configuration: {e}")
+                raise ClientException("Invalid YAML configuration") from e
+
+            except IOError as e:
+                logger.error(f"Failed to write temporary file: {e}")
+                raise ClientException("Failed to process configuration file") from e
+
+            except ClientException as e:
+                raise e
+
+            except Exception as e:
+                logger.exception(f"Unexpected error during cluster creation request {e}")
+                raise ClientException("Unexpected error during cluster creation") from e
+
+            finally:
+                # Delete the temporary file
+                temp_file.close()

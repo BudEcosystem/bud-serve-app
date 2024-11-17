@@ -24,6 +24,7 @@ from typing import Annotated, Any, Dict, List, Optional
 
 from dapr.conf import settings as dapr_settings
 from pydantic import (
+    AnyHttpUrl,
     AnyUrl,
     BeforeValidator,
     ConfigDict,
@@ -221,6 +222,11 @@ class AppConfig(BaseConfig):
 
     # CORS
     cors_origins: Annotated[list[AnyUrl] | str, BeforeValidator(parse_cors)] = []
+
+    # Bud microservice
+    dapr_base_url: AnyHttpUrl = Field(alias="DAPR_BASE_URL")
+    bud_cluster_app_id: str = Field(alias="BUD_CLUSTER_APP_ID")
+    source_topic: str = Field(alias="SOURCE_TOPIC", default="budAppMessages")
 
     @computed_field
     def static_dir(self) -> str:
