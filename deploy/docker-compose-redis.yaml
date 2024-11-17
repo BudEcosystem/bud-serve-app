@@ -1,6 +1,6 @@
 services:
-  redis:
-    container_name: bud-mf-$NAMESPACE-redis
+  budapp-redis:
+    container_name: bud-serve-$NAMESPACE-redis
     image: redis:alpine
     ports:
       - "$REDIS_PORT:$REDIS_PORT"
@@ -13,9 +13,8 @@ services:
     healthcheck:
       test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
     volumes:
-      - redis_data:/data
+      - budapp_redis_data:/data
     networks:
       - bud-microframe-nw
-
 volumes:
-  redis_data:
+  budapp_redis_data:

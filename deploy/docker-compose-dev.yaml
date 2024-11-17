@@ -3,14 +3,14 @@ include:
   - ./docker-compose-postgres.yaml
 
 services:
-  app:
-    image: bud-microframe/$APP_NAME:$NAMESPACE
-    container_name: bud-mf-$NAMESPACE-$APP_NAME
+  budapp:
+    image: bud-serve/$APP_NAME:$NAMESPACE
+    container_name: bud-serve-$NAMESPACE-$APP_NAME
     build:
       context: ..
       dockerfile: ./deploy/Dockerfile
-    # command: [ "uvicorn", "$APP_NAME.main:app", "--host", "0.0.0.0", "--port", $APP_PORT ]
-    command: [ "sh", "/app/startup.sh" ]
+    command: [ "sh", "-c", "uvicorn $APP_NAME.main:app --host 0.0.0.0 --port $APP_PORT --reload" ]
+    # command: [ "sh", "-c", "alembic -c ./budapp/alembic.ini upgrade head && uvicorn $APP_NAME.main:app --host 0.0.0.0 --port $APP_PORT --reload" ]
     ports:
       - "$DAPR_GRPC_PORT:$DAPR_GRPC_PORT" # Dapr instances communicate over gRPC so gRPC port needs to be exposed
       - "$DAPR_HTTP_PORT:$DAPR_HTTP_PORT" # Expose Dapr HTTP port for service invocation
@@ -21,13 +21,13 @@ services:
       - path: ../.env
         required: true
     depends_on:
-      - redis
-      - placement
-      - postgres
+      - budapp-redis
+      - budapp-placement
+      - budapp-postgres
     networks:
       - bud-microframe-nw
-  sidecar:
-    container_name: bud-mf-$NAMESPACE-$APP_NAME-dapr
+  budapp-sidecar:
+    container_name: bud-serve-$NAMESPACE-$APP_NAME-dapr
     image: "daprio/daprd:edge"
     command: [
       "./daprd",
@@ -47,10 +47,10 @@ services:
       - "${DAPR_COMPONENTS:-../.dapr/components/}:/components" # Mount the components folder for the runtime to use. The mounted location must match the --resources-path argument.
       - "${DAPR_APP_CONFIG:-../.dapr/appconfig-dev.yaml}:/config/appconfig.yaml" # Mount the config file for the runtime to use. The mounted location must match the --config argument.
     depends_on:
-      - app
-    network_mode: "service:app" # Attach the sidecar service to the app network namespace
-  placement:
-    container_name: bud-mf-$NAMESPACE-placement
+      - budapp
+    network_mode: "service:budapp" # Attach the sidecar service to the app network namespace
+  budapp-placement:
+    container_name: bud-serve-$NAMESPACE-placement
     image: "daprio/placement:edge"
     command: [ "./placement", "--port", "50006" ]
     ports:
