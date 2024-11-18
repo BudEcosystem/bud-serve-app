@@ -443,6 +443,7 @@ class PayloadType(str, Enum):
 
     DEPLOYMENT_RECOMMENDATION = "deployment_recommendation"
     DEPLOY_MODEL = "deploy_model"
+    REGISTER_CLUSTER = "register_cluster"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -456,18 +457,6 @@ class BudServeWorkflowStepEventName(str, Enum):
     BUD_SIMULATOR_EVENTS = "bud_simulator_events"
     BUDSERVE_CLUSTER_EVENTS = "budserve_cluster_events"
     CREATE_CLUSTER_EVENTS = "create_cluster_events"
-
-
-class ClusterPlatformEnum(StrEnum):
-    """Cluster platform types.
-
-    Attributes:
-        KUBERNETES: Represents the Kubernetes platform.
-        OPENSHIFT: Represents the OpenShift platform.
-    """
-
-    KUBERNETES = auto()
-    OPENSHIFT = auto()
 
 
 class ClusterStatusEnum(StrEnum):
@@ -484,20 +473,6 @@ class ClusterStatusEnum(StrEnum):
     NOT_AVAILABLE = auto()
     REGISTERING = auto()
     ERROR = auto()
-
-
-class ClusterTypeEnum(StrEnum):
-    """Cluster types.
-
-    Attributes:
-        CPU: Represents the CPU cluster type.
-        GPU: Represents the GPU cluster type.
-        HPU: Represents the HPU cluster type.
-    """
-
-    CPU = auto()
-    GPU = auto()
-    HPU = auto()
 
 
 class EndpointStatusEnum(StrEnum):

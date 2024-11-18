@@ -23,7 +23,7 @@ from uuid import UUID
 
 from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict
 
-from budapp.commons.constants import ClusterStatusEnum, ClusterTypeEnum
+from budapp.commons.constants import ClusterStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse
 
 
@@ -47,9 +47,6 @@ class ClusterFilter(BaseModel):
     """Filter cluster schema"""
 
     name: str | None = None
-    type: ClusterTypeEnum | None = None
-    total_workers: int | None = None
-    available_workers: int | None = None
 
 
 class ClusterListResponse(PaginatedSuccessResponse):
