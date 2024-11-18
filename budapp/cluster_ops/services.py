@@ -28,7 +28,7 @@ from fastapi import UploadFile
 from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension
 from budapp.commons.config import app_settings
-from budapp.commons.constants import WorkflowStatusEnum
+from budapp.commons.constants import BudServeWorkflowStepEventName, WorkflowStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
@@ -317,9 +317,11 @@ class ClusterService(SessionMixin):
         for step in bud_cluster_response["steps"]:
             step["payload"] = {}
 
+        create_cluster_events = {BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value: bud_cluster_response}
+
         # Update workflow step with response
         await WorkflowStepDataManager(self.session).update_by_fields(
-            db_latest_workflow_step, {"data": bud_cluster_response}
+            db_latest_workflow_step, {"data": create_cluster_events}
         )
 
     async def _perform_create_cluster_request(self, data: Dict[str, str], workflow_id: UUID) -> dict:

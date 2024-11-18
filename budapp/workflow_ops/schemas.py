@@ -21,6 +21,7 @@ class RetrieveWorkflowStepData(BaseModel):
     leaderboard: list | None = None
     name: str | None = None
     ingress_url: str | None = None
+    create_cluster_events: dict | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):

@@ -22,6 +22,7 @@ from uuid import UUID
 from fastapi import status
 
 from budapp.commons import logging
+from budapp.commons.constants import BudServeWorkflowStepEventName
 from budapp.commons.db_utils import SessionMixin
 from budapp.model_ops.crud import (
     CloudModelDataManager,
@@ -102,6 +103,7 @@ class WorkflowService(SessionMixin):
             leaderboard = required_data.get("leaderboard")
             name = required_data.get("name")
             ingress_url = required_data.get("ingress_url")
+            create_cluster_events = required_data.get(BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value)
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -139,6 +141,7 @@ class WorkflowService(SessionMixin):
                 leaderboard=leaderboard if leaderboard else None,
                 name=name if name else None,
                 ingress_url=ingress_url if ingress_url else None,
+                create_cluster_events=create_cluster_events if create_cluster_events else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -177,6 +180,7 @@ class WorkflowService(SessionMixin):
             "create_cluster": [
                 "name",
                 "ingress_url",
+                BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value,
             ],
         }
 
