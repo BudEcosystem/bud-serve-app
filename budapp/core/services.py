@@ -20,8 +20,12 @@
 from datetime import datetime, timezone
 
 from budapp.cluster_ops.crud import ClusterDataManager
+from budapp.cluster_ops.services import ClusterService
 from budapp.commons import logging
-from budapp.commons.constants import BudServeWorkflowStepEventName, EndpointStatusEnum
+from budapp.commons.constants import (
+    BudServeWorkflowStepEventName,
+    EndpointStatusEnum,
+)
 from budapp.commons.db_utils import SessionMixin
 from budapp.endpoint_ops.crud import EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
@@ -71,6 +75,25 @@ class NotificationService(SessionMixin):
             and "result" in payload.content.result
         ):
             await self._create_endpoint(payload)
+
+    async def update_cluster_creation_events(self, payload: NotificationPayload) -> None:
+        """Update the cluster creation events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value, payload)
+
+        # Create cluster in database if node info fetched successfully
+        if (
+            payload.content.status == "COMPLETED"
+            and payload.content.result
+            and payload.content.title == "Fetching cluster nodes info successful"
+        ):
+            await ClusterService(self.session).create_cluster_from_notification_event(payload)
 
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
         """Update the workflow step events for a workflow step.

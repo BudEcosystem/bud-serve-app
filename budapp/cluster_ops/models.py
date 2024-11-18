@@ -24,39 +24,18 @@ from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Uui
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from budapp.commons.constants import (
-    ClusterPlatformEnum,
-    ClusterStatusEnum,
-    ClusterTypeEnum,
-)
+from budapp.commons.constants import ClusterStatusEnum
 from budapp.commons.database import Base
 
 
 class Cluster(Base):
-    """Cluster model"""
+    """Cluster model."""
 
     __tablename__ = "cluster"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    type: Mapped[str] = mapped_column(
-        Enum(
-            ClusterTypeEnum,
-            name="cluster_type_enum",
-            values_callable=lambda x: [e.value for e in x],
-        ),
-        nullable=False,
-    )
-    platform: Mapped[str] = mapped_column(
-        Enum(
-            ClusterPlatformEnum,
-            name="cluster_platform_enum",
-            values_callable=lambda x: [e.value for e in x],
-        ),
-        nullable=False,
-    )
-    configuration: Mapped[str] = mapped_column(String, nullable=False)
-    host: Mapped[str] = mapped_column(String, nullable=False)
+    ingress_url: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(
         Enum(
             ClusterStatusEnum,
@@ -66,20 +45,21 @@ class Cluster(Base):
         nullable=False,
     )
     icon: Mapped[str] = mapped_column(String, nullable=False)
-    total_workers: Mapped[int] = mapped_column(Integer, default=0)
-    available_workers: Mapped[int] = mapped_column(Integer, default=0)
-    used_workers: Mapped[int] = mapped_column(Integer, default=0)
-    kube_nodes: Mapped[int] = mapped_column(Integer, default=0)
-    kubernetes_metadata: Mapped[str] = mapped_column(String, nullable=True)
-    status_sync_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-    threads_per_core: Mapped[int] = mapped_column(Integer, nullable=True)
-    core_count: Mapped[int] = mapped_column(Integer, nullable=True)
-    enable_master_node: Mapped[bool] = mapped_column(Boolean, default=False)
+    cpu_count: Mapped[int] = mapped_column(Integer, default=0)
+    gpu_count: Mapped[int] = mapped_column(Integer, default=0)
+    hpu_count: Mapped[int] = mapped_column(Integer, default=0)
+    cpu_total_workers: Mapped[int] = mapped_column(Integer, default=0)
+    cpu_available_workers: Mapped[int] = mapped_column(Integer, default=0)
+    gpu_total_workers: Mapped[int] = mapped_column(Integer, default=0)
+    gpu_available_workers: Mapped[int] = mapped_column(Integer, default=0)
+    hpu_total_workers: Mapped[int] = mapped_column(Integer, default=0)
+    hpu_available_workers: Mapped[int] = mapped_column(Integer, default=0)
     reason: Mapped[str] = mapped_column(String, nullable=True)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
     cluster_id: Mapped[UUID] = mapped_column(Uuid, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    status_sync_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
     endpoints: Mapped[list["Endpoint"]] = relationship(
         "Endpoint",

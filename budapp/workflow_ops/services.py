@@ -16,13 +16,15 @@
 
 """The workflow ops services. Contains business logic for workflow ops."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastapi import status
 
 from budapp.commons import logging
+from budapp.commons.constants import BudServeWorkflowStepEventName, WorkflowStatusEnum
 from budapp.commons.db_utils import SessionMixin
+from budapp.commons.exceptions import ClientException
 from budapp.model_ops.crud import (
     CloudModelDataManager,
     ModelDataManager,
@@ -57,8 +59,9 @@ class WorkflowService(SessionMixin):
         # Parse workflow step data response
         return await self._parse_workflow_step_data_response(required_data, db_workflow)
 
-    @staticmethod
-    async def _extract_required_data_from_workflow_steps(db_workflow_steps: List[WorkflowStepModel]) -> Dict[str, Any]:
+    async def _extract_required_data_from_workflow_steps(
+        self, db_workflow_steps: List[WorkflowStepModel]
+    ) -> Dict[str, Any]:
         """Get required data from workflow steps.
 
         Args:
@@ -68,21 +71,7 @@ class WorkflowService(SessionMixin):
             Dict of required data.
         """
         # Define the keys required data retrieval
-        keys_of_interest = [
-            "source",
-            "name",
-            "modality",
-            "uri",
-            "tags",
-            "icon",
-            "provider_type",
-            "provider_id",
-            "cloud_model_id",
-            "description",
-            "model_id",
-            "workflow_execution_status",
-            "leaderboard",
-        ]
+        keys_of_interest = await self._get_keys_of_interest()
 
         # from workflow steps extract necessary information
         required_data = {}
@@ -113,6 +102,10 @@ class WorkflowService(SessionMixin):
             model_id = required_data.get("model_id")
             workflow_execution_status = required_data.get("workflow_execution_status")
             leaderboard = required_data.get("leaderboard")
+            name = required_data.get("name")
+            ingress_url = required_data.get("ingress_url")
+            create_cluster_events = required_data.get(BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value)
+            icon = required_data.get("icon")
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -148,6 +141,10 @@ class WorkflowService(SessionMixin):
                 model_id=model_id if model_id else None,
                 workflow_execution_status=workflow_execution_status if workflow_execution_status else None,
                 leaderboard=leaderboard if leaderboard else None,
+                name=name if name else None,
+                icon=icon if icon else None,
+                ingress_url=ingress_url if ingress_url else None,
+                create_cluster_events=create_cluster_events if create_cluster_events else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -163,3 +160,96 @@ class WorkflowService(SessionMixin):
             object="workflow.get",
             message="Workflow data retrieved successfully",
         )
+
+    @staticmethod
+    async def _get_keys_of_interest() -> List[str]:
+        """Get keys of interest as per different workflows."""
+        workflow_keys = {
+            "add_cloud_model": [
+                "source",
+                "name",
+                "modality",
+                "uri",
+                "tags",
+                "icon",
+                "provider_type",
+                "provider_id",
+                "cloud_model_id",
+                "description",
+                "model_id",
+                "workflow_execution_status",
+                "leaderboard",
+            ],
+            "create_cluster": [
+                "name",
+                "icon",
+                "ingress_url",
+                BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value,
+            ],
+        }
+
+        # Combine all lists using set union
+        all_keys = set().union(*workflow_keys.values())
+
+        return list(all_keys)
+
+    async def retrieve_or_create_workflow(
+        self, workflow_id: Optional[UUID], workflow_total_steps: Optional[int], current_user_id: UUID
+    ) -> None:
+        """Retrieve or create workflow."""
+        if workflow_id:
+            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+                WorkflowModel, {"id": workflow_id}
+            )
+
+            if db_workflow.status != WorkflowStatusEnum.IN_PROGRESS:
+                logger.error(f"Workflow {workflow_id} is not in progress")
+                raise ClientException("Workflow is not in progress")
+
+            if db_workflow.created_by != current_user_id:
+                logger.error(f"User {current_user_id} is not the creator of workflow {workflow_id}")
+                raise ClientException("User is not authorized to perform this action")
+        elif workflow_total_steps:
+            db_workflow = await WorkflowDataManager(self.session).insert_one(
+                WorkflowModel(total_steps=workflow_total_steps, created_by=current_user_id),
+            )
+        else:
+            raise ClientException("Either workflow_id or workflow_total_steps should be provided")
+
+        return db_workflow
+
+
+class WorkflowStepService(SessionMixin):
+    """Workflow step service."""
+
+    async def create_or_update_next_workflow_step(
+        self, workflow_id: UUID, step_number: int, data: Dict[str, Any]
+    ) -> None:
+        """Create or update next workflow step."""
+        # Check for workflow step exist or not
+        db_workflow_step = await WorkflowStepDataManager(self.session).retrieve_by_fields(
+            WorkflowStepModel,
+            {"workflow_id": workflow_id, "step_number": step_number},
+            missing_ok=True,
+        )
+
+        if db_workflow_step:
+            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                db_workflow_step,
+                {
+                    "workflow_id": workflow_id,
+                    "step_number": step_number,
+                    "data": data,
+                },
+            )
+        else:
+            # Create a new workflow step
+            db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+                WorkflowStepModel(
+                    workflow_id=workflow_id,
+                    step_number=step_number,
+                    data=data,
+                )
+            )
+
+        return db_workflow_step

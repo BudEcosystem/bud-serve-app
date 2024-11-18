@@ -19,6 +19,10 @@ class RetrieveWorkflowStepData(BaseModel):
     model: Model | None = None
     workflow_execution_status: dict | None = None
     leaderboard: list | None = None
+    name: str | None = None
+    ingress_url: str | None = None
+    create_cluster_events: dict | None = None
+    icon: str | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
