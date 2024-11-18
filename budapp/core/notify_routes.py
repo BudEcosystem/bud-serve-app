@@ -25,6 +25,7 @@ from budapp.commons import logging
 from budapp.commons.api_utils import pubsub_api_endpoint
 from budapp.commons.constants import NotificationCategory, PayloadType
 from budapp.commons.dependencies import get_session
+from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
 
 from .schemas import NotificationRequest, NotificationResponse
@@ -102,6 +103,9 @@ async def receive_notification(
                 object="notification",
                 message="Pubsub notification received",
             ).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to execute notification: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as err:
         logger.exception(f"Unexpected error occurred while receiving notification. {err}")
         return ErrorResponse(

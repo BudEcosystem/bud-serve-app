@@ -18,6 +18,7 @@
 
 import json
 import tempfile
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
@@ -28,9 +29,10 @@ from fastapi import UploadFile
 from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension
 from budapp.commons.config import app_settings
-from budapp.commons.constants import BudServeWorkflowStepEventName
+from budapp.commons.constants import BudServeWorkflowStepEventName, ClusterStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
+from budapp.core.schemas import NotificationPayload
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
@@ -38,6 +40,8 @@ from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 from .crud import ClusterDataManager
 from .models import Cluster as ClusterModel
 from .schemas import (
+    ClusterCreate,
+    ClusterResourcesInfo,
     ClusterResponse,
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
@@ -97,6 +101,16 @@ class ClusterService(SessionMixin):
         request: CreateClusterWorkflowRequest,
         configuration_file: UploadFile | None = None,
     ) -> None:
+        """Create a cluster workflow.
+
+        Args:
+            current_user_id: The current user id.
+            request: The request to create the cluster workflow with.
+            configuration_file: The configuration file to create the cluster with.
+
+        Raises:
+            ClientException: If the cluster already exists.
+        """
         # Get request data
         workflow_id = request.workflow_id
         workflow_total_steps = request.workflow_total_steps
@@ -357,3 +371,116 @@ class ClusterService(SessionMixin):
             finally:
                 # Delete the temporary file
                 temp_file.close()
+
+    async def create_cluster_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Create a cluster in database.
+
+        Args:
+            payload: The payload to create the cluster with.
+
+        Raises:
+            ClientException: If the cluster already exists.
+        """
+        logger.debug("Received event for creating cluster")
+
+        # Get workflow steps
+        workflow_id = payload.workflow_id
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for endpoint creation
+        keys_of_interest = [
+            "name",
+            "icon",
+            "ingress_url",
+            "created_by",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        logger.debug("Collected required data from workflow steps")
+
+        # Check duplicate cluster name
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            ClusterModel, {"name": required_data["name"], "is_active": True}, missing_ok=True
+        )
+
+        if db_cluster:
+            logger.error(f"Cluster {required_data['name']} already exists")
+            raise ClientException(f"Cluster {required_data['name']} already exists")
+
+        # Get cluster resources from event
+        cluster_resources = await self._calculate_cluster_resources(payload.content.result)
+        logger.debug("Cluster resources calculated.")
+
+        # Get bud cluster id from event
+        bud_cluster_id = payload.content.result["id"]
+
+        cluster_data = ClusterCreate(
+            name=required_data["name"],
+            icon=required_data["icon"],
+            ingress_url=required_data["ingress_url"],
+            created_by=UUID(required_data["created_by"]),
+            cluster_id=UUID(bud_cluster_id),
+            **cluster_resources.model_dump(exclude_unset=True, exclude_none=True),
+            status=ClusterStatusEnum.AVAILABLE,
+            status_sync_at=datetime.now(tz=timezone.utc),
+        )
+
+        db_cluster = await ClusterDataManager(self.session).insert_one(
+            ClusterModel(**cluster_data.model_dump(exclude_unset=True, exclude_none=True))
+        )
+        logger.debug(f"Cluster created successfully: {db_cluster.id}")
+
+    async def _calculate_cluster_resources(self, data: Dict[str, Any]) -> ClusterResourcesInfo:
+        """Calculate the cluster resources.
+
+        Args:
+            data: The data to calculate the cluster resources with.
+
+        Returns:
+            ClusterResourcesInfo: The cluster resources.
+        """
+        cpu_count = 0
+        gpu_count = 0
+        hpu_count = 0
+        cpu_total_workers = 0
+        gpu_total_workers = 0
+        hpu_total_workers = 0
+
+        # Iterate through each node
+        for node in data.get("nodes", []):
+            # Iterate through devices in each node
+            for device in node.get("devices", []):
+                # Get the available count and device type
+                worker_count = device.get("available_count", 0)
+                device_type = device.get("type", "").lower()
+
+                # Increment the appropriate counter
+                if device_type == "cpu":
+                    cpu_count += 1
+                    cpu_total_workers += worker_count
+                elif device_type == "gpu":
+                    gpu_count += 1
+                    gpu_total_workers += worker_count
+                elif device_type == "hpu":
+                    hpu_count += 1
+                    hpu_total_workers += worker_count
+
+        return ClusterResourcesInfo(
+            cpu_count=cpu_count,
+            gpu_count=gpu_count,
+            hpu_count=hpu_count,
+            cpu_total_workers=cpu_total_workers,
+            cpu_available_workers=cpu_total_workers,
+            gpu_total_workers=gpu_total_workers,
+            gpu_available_workers=gpu_total_workers,
+            hpu_total_workers=hpu_total_workers,
+            hpu_available_workers=hpu_total_workers,
+        )

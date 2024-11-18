@@ -18,16 +18,12 @@
 """Implements core services and business logic that power the microservices, including key functionality and integrations."""
 
 from datetime import datetime, timezone
-from typing import Any, Dict
-from uuid import UUID
 
 from budapp.cluster_ops.crud import ClusterDataManager
-from budapp.cluster_ops.models import Cluster as ClusterModel
-from budapp.cluster_ops.schemas import ClusterCreate, ClusterResourcesInfo
+from budapp.cluster_ops.services import ClusterService
 from budapp.commons import logging
 from budapp.commons.constants import (
     BudServeWorkflowStepEventName,
-    ClusterStatusEnum,
     EndpointStatusEnum,
 )
 from budapp.commons.db_utils import SessionMixin
@@ -97,7 +93,7 @@ class NotificationService(SessionMixin):
             and payload.content.result
             and payload.content.title == "Fetching cluster nodes info successful"
         ):
-            await self._create_cluster(payload)
+            await ClusterService(self.session).create_cluster_from_notification_event(payload)
 
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
         """Update the workflow step events for a workflow step.
@@ -235,101 +231,3 @@ class NotificationService(SessionMixin):
         logger.debug(f"Endpoint created successfully: {db_endpoint.id}")
 
         return db_endpoint
-
-    async def _create_cluster(self, payload: NotificationPayload) -> None:
-        """Create a cluster in database.
-
-        Args:
-            payload: The payload to create the cluster with.
-        """
-        logger.debug("Received event for creating cluster")
-
-        # Get workflow steps
-        workflow_id = payload.workflow_id
-        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
-            {"workflow_id": workflow_id}
-        )
-
-        # Define the keys required for endpoint creation
-        keys_of_interest = [
-            "name",
-            "icon",
-            "ingress_url",
-            "created_by",
-        ]
-
-        # from workflow steps extract necessary information
-        required_data = {}
-        for db_workflow_step in db_workflow_steps:
-            for key in keys_of_interest:
-                if key in db_workflow_step.data:
-                    required_data[key] = db_workflow_step.data[key]
-
-        logger.debug("Collected required data from workflow steps")
-
-        # Get cluster resources from event
-        cluster_resources = await self._calculate_cluster_resources(payload.content.result)
-        logger.debug("Cluster resources calculated.")
-
-        # Get bud cluster id from event
-        bud_cluster_id = payload.content.result["id"]
-
-        cluster_data = ClusterCreate(
-            name=required_data["name"],
-            icon=required_data["icon"],
-            ingress_url=required_data["ingress_url"],
-            created_by=UUID(required_data["created_by"]),
-            cluster_id=UUID(bud_cluster_id),
-            **cluster_resources.model_dump(exclude_unset=True, exclude_none=True),
-            status=ClusterStatusEnum.AVAILABLE,
-            status_sync_at=datetime.now(tz=timezone.utc),
-        )
-
-        db_cluster = await ClusterDataManager(self.session).insert_one(
-            ClusterModel(**cluster_data.model_dump(exclude_unset=True, exclude_none=True))
-        )
-        logger.debug(f"Cluster created successfully: {db_cluster.id}")
-
-    async def _calculate_cluster_resources(self, data: Dict[str, Any]) -> ClusterResourcesInfo:
-        """Calculate the cluster resources.
-
-        Args:
-            data: The data to calculate the cluster resources with.
-        """
-        cpu_count = 0
-        gpu_count = 0
-        hpu_count = 0
-        cpu_total_workers = 0
-        gpu_total_workers = 0
-        hpu_total_workers = 0
-
-        # Iterate through each node
-        for node in data.get("nodes", []):
-            # Iterate through devices in each node
-            for device in node.get("devices", []):
-                # Get the available count and device type
-                worker_count = device.get("available_count", 0)
-                device_type = device.get("type", "").lower()
-
-                # Increment the appropriate counter
-                if device_type == "cpu":
-                    cpu_count += 1
-                    cpu_total_workers += worker_count
-                elif device_type == "gpu":
-                    gpu_count += 1
-                    gpu_total_workers += worker_count
-                elif device_type == "hpu":
-                    hpu_count += 1
-                    hpu_total_workers += worker_count
-
-        return ClusterResourcesInfo(
-            cpu_count=cpu_count,
-            gpu_count=gpu_count,
-            hpu_count=hpu_count,
-            cpu_total_workers=cpu_total_workers,
-            cpu_available_workers=cpu_total_workers,
-            gpu_total_workers=gpu_total_workers,
-            gpu_available_workers=gpu_total_workers,
-            hpu_total_workers=hpu_total_workers,
-            hpu_available_workers=hpu_total_workers,
-        )
