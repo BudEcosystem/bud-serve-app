@@ -16,14 +16,15 @@
 
 """The workflow ops services. Contains business logic for workflow ops."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastapi import status
 
 from budapp.commons import logging
-from budapp.commons.constants import BudServeWorkflowStepEventName
+from budapp.commons.constants import BudServeWorkflowStepEventName, WorkflowStatusEnum
 from budapp.commons.db_utils import SessionMixin
+from budapp.commons.exceptions import ClientException
 from budapp.model_ops.crud import (
     CloudModelDataManager,
     ModelDataManager,
@@ -191,3 +192,64 @@ class WorkflowService(SessionMixin):
         all_keys = set().union(*workflow_keys.values())
 
         return list(all_keys)
+
+    async def retrieve_or_create_workflow(
+        self, workflow_id: Optional[UUID], workflow_total_steps: Optional[int], current_user_id: UUID
+    ) -> None:
+        """Retrieve or create workflow."""
+        if workflow_id:
+            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+                WorkflowModel, {"id": workflow_id}
+            )
+
+            if db_workflow.status != WorkflowStatusEnum.IN_PROGRESS:
+                logger.error(f"Workflow {workflow_id} is not in progress")
+                raise ClientException("Workflow is not in progress")
+
+            if db_workflow.created_by != current_user_id:
+                logger.error(f"User {current_user_id} is not the creator of workflow {workflow_id}")
+                raise ClientException("User is not authorized to perform this action")
+        elif workflow_total_steps:
+            db_workflow = await WorkflowDataManager(self.session).insert_one(
+                WorkflowModel(total_steps=workflow_total_steps, created_by=current_user_id),
+            )
+        else:
+            raise ClientException("Either workflow_id or workflow_total_steps should be provided")
+
+        return db_workflow
+
+
+class WorkflowStepService(SessionMixin):
+    """Workflow step service."""
+
+    async def create_or_update_next_workflow_step(
+        self, workflow_id: UUID, step_number: int, data: Dict[str, Any]
+    ) -> None:
+        """Create or update next workflow step."""
+        # Check for workflow step exist or not
+        db_workflow_step = await WorkflowStepDataManager(self.session).retrieve_by_fields(
+            WorkflowStepModel,
+            {"workflow_id": workflow_id, "step_number": step_number},
+            missing_ok=True,
+        )
+
+        if db_workflow_step:
+            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                db_workflow_step,
+                {
+                    "workflow_id": workflow_id,
+                    "step_number": step_number,
+                    "data": data,
+                },
+            )
+        else:
+            # Create a new workflow step
+            db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+                WorkflowStepModel(
+                    workflow_id=workflow_id,
+                    step_number=step_number,
+                    data=data,
+                )
+            )
+
+        return db_workflow_step

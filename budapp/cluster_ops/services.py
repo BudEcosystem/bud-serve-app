@@ -18,7 +18,7 @@
 
 import json
 import tempfile
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
 import aiohttp
@@ -28,12 +28,12 @@ from fastapi import UploadFile
 from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension
 from budapp.commons.config import app_settings
-from budapp.commons.constants import BudServeWorkflowStepEventName, WorkflowStatusEnum
+from budapp.commons.constants import BudServeWorkflowStepEventName
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
-from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
+from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 from .crud import ClusterDataManager
 from .models import Cluster as ClusterModel
@@ -109,7 +109,9 @@ class ClusterService(SessionMixin):
         current_step_number = step_number
 
         # Retrieve or create workflow
-        db_workflow = await self._retrieve_or_create_workflow(workflow_id, workflow_total_steps, current_user_id)
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id, workflow_total_steps, current_user_id
+        )
 
         # Validate the configuration file
         if configuration_file:
@@ -185,7 +187,9 @@ class ClusterService(SessionMixin):
             workflow_current_step = current_step_number
 
             # Update or create next workflow step
-            db_workflow_step = await self._create_or_update_next_workflow_step(db_workflow.id, current_step_number, {})
+            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                db_workflow.id, current_step_number, {}
+            )
 
             # Update workflow step data in db
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
@@ -230,7 +234,9 @@ class ClusterService(SessionMixin):
             workflow_current_step = current_step_number
 
             # Create next step for storing success event
-            await self._create_or_update_next_workflow_step(db_workflow.id, current_step_number, {})
+            await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                db_workflow.id, current_step_number, {}
+            )
 
         # Update workflow step data in db
         db_workflow = await WorkflowDataManager(self.session).update_by_fields(
@@ -239,63 +245,6 @@ class ClusterService(SessionMixin):
         )
 
         return db_workflow
-
-    async def _retrieve_or_create_workflow(
-        self, workflow_id: Optional[UUID], workflow_total_steps: Optional[int], current_user_id: UUID
-    ) -> None:
-        """Retrieve or create workflow."""
-        if workflow_id:
-            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
-                WorkflowModel, {"id": workflow_id}
-            )
-
-            if db_workflow.status != WorkflowStatusEnum.IN_PROGRESS:
-                logger.error(f"Workflow {workflow_id} is not in progress")
-                raise ClientException("Workflow is not in progress")
-
-            if db_workflow.created_by != current_user_id:
-                logger.error(f"User {current_user_id} is not the creator of workflow {workflow_id}")
-                raise ClientException("User is not authorized to perform this action")
-        elif workflow_total_steps:
-            db_workflow = await WorkflowDataManager(self.session).insert_one(
-                WorkflowModel(total_steps=workflow_total_steps, created_by=current_user_id),
-            )
-        else:
-            raise ClientException("Either workflow_id or workflow_total_steps should be provided")
-
-        return db_workflow
-
-    async def _create_or_update_next_workflow_step(
-        self, workflow_id: UUID, step_number: int, data: Dict[str, Any]
-    ) -> None:
-        """Create or update next workflow step."""
-        # Check for workflow step exist or not
-        db_workflow_step = await WorkflowStepDataManager(self.session).retrieve_by_fields(
-            WorkflowStepModel,
-            {"workflow_id": workflow_id, "step_number": step_number},
-            missing_ok=True,
-        )
-
-        if db_workflow_step:
-            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
-                db_workflow_step,
-                {
-                    "workflow_id": workflow_id,
-                    "step_number": step_number,
-                    "data": data,
-                },
-            )
-        else:
-            # Create a new workflow step
-            db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
-                WorkflowStepModel(
-                    workflow_id=workflow_id,
-                    step_number=step_number,
-                    data=data,
-                )
-            )
-
-        return db_workflow_step
 
     async def _execute_create_cluster_workflow(self, data: Dict[str, Any], workflow_id: UUID) -> None:
         """Execute create cluster workflow."""
