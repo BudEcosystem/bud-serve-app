@@ -16,15 +16,17 @@
 
 """The cluster ops package, containing essential business logic, services, and routing configurations for the cluster ops."""
 
+import os
 from typing import List, Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
-from pydantic import AnyHttpUrl, FilePath
+from pydantic import AnyHttpUrl
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
+from budapp.commons.config import app_settings
 from budapp.commons.dependencies import (
     get_current_active_user,
     get_session,
@@ -68,7 +70,7 @@ async def create_cluster_workflow(
     session: Annotated[Session, Depends(get_session)],
     step_number: Annotated[int, Form(gt=0)],
     name: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
-    icon: Annotated[FilePath | None, Form()] = None,
+    icon: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
     ingress_url: Annotated[AnyHttpUrl | None, Form()] = None,
     configuration_file: Annotated[
         UploadFile | None, File(description="The configuration file for the cluster")
@@ -100,12 +102,19 @@ async def create_cluster_workflow(
             message=f"At least one of {', '.join(required_fields)} is required when workflow_id is provided",
         )
 
+    # check if icon is a valid file path
+    if icon and not os.path.exists(os.path.join(app_settings.static_dir, icon)):
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            message="Invalid icon file path",
+        ).to_http_response()
+
     try:
         db_workflow = await ClusterService(session).create_cluster_workflow(
             current_user_id=current_user.id,
             request=CreateClusterWorkflowRequest(
                 name=name,
-                icon=icon.as_posix() if icon else None,
+                icon=icon,
                 ingress_url=str(ingress_url) if ingress_url else None,
                 workflow_id=workflow_id,
                 workflow_total_steps=workflow_total_steps,
