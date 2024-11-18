@@ -389,6 +389,9 @@ class ClusterService(SessionMixin):
             {"workflow_id": workflow_id}
         )
 
+        # Get last step
+        db_latest_workflow_step = db_workflow_steps[-1]
+
         # Define the keys required for endpoint creation
         keys_of_interest = [
             "name",
@@ -433,10 +436,21 @@ class ClusterService(SessionMixin):
             status_sync_at=datetime.now(tz=timezone.utc),
         )
 
-        db_cluster = await ClusterDataManager(self.session).insert_one(
-            ClusterModel(**cluster_data.model_dump(exclude_unset=True, exclude_none=True))
-        )
-        logger.debug(f"Cluster created successfully: {db_cluster.id}")
+        # Update status for last step
+        execution_status = {"status": "success", "message": "Cluster successfully created"}
+        try:
+            db_cluster = await ClusterDataManager(self.session).insert_one(
+                ClusterModel(**cluster_data.model_dump(exclude_unset=True, exclude_none=True))
+            )
+            logger.debug(f"Cluster created successfully: {db_cluster.id}")
+        except Exception as e:
+            logger.exception(f"Failed to create cluster: {e}")
+            execution_status.update({"status": "error", "message": "Failed to create cluster"})
+        finally:
+            execution_status_data = {"workflow_execution_status": execution_status}
+            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                db_latest_workflow_step, {"data": execution_status_data}
+            )
 
     async def _calculate_cluster_resources(self, data: Dict[str, Any]) -> ClusterResourcesInfo:
         """Calculate the cluster resources.
