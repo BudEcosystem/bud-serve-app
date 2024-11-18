@@ -706,9 +706,13 @@ class ModelService(SessionMixin):
             Model, {"id": model_id}, missing_ok=True
         )
         paper_published_list = [PaperPublishedModel.from_orm(paper) for paper in model_details.paper_published]
-        license = ModelLicensesModel.from_orm(model_details.model_licenses)
-        license_data = license.dict()
-        license_data["faqs"] = await self.get_faqs()
+        if model_details.model_licenses:
+            license = ModelLicensesModel.from_orm(model_details.model_licenses)
+            license_data = license.dict()
+            license_data["faqs"] = await self.get_faqs()
+        else:
+            license_data = None
+
         response_data = {
             "id": model_details.id,
             "name": model_details.name,
