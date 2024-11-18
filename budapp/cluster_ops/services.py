@@ -197,7 +197,7 @@ class ClusterService(SessionMixin):
                 {"workflow_id": db_workflow.id}
             )
 
-            # Define the keys required for model deployment
+            # Define the keys required for cluster creation
             keys_of_interest = [
                 "name",
                 "icon",

@@ -91,6 +91,12 @@ async def receive_notification(
                 object="notification",
                 message="Updated model deployment event in workflow step",
             ).to_http_response()
+        if payload.category == NotificationCategory.INTERNAL and payload.type == PayloadType.REGISTER_CLUSTER:
+            await NotificationService(session).update_cluster_creation_events(payload)
+            return NotificationResponse(
+                object="notification",
+                message="Updated cluster creation event in workflow step",
+            ).to_http_response()
         else:
             return NotificationResponse(
                 object="notification",

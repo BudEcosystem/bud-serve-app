@@ -76,3 +76,43 @@ class CreateClusterWorkflowSteps(BaseModel):
     icon: str | None = None
     ingress_url: AnyHttpUrl | None = None
     configuration_yaml: dict | None = None
+
+
+class ClusterBase(BaseModel):
+    """Cluster base schema."""
+
+    name: str
+    ingress_url: str
+    icon: str
+
+
+class ClusterCreate(ClusterBase):
+    """Cluster create schema."""
+
+    status: ClusterStatusEnum
+    cpu_count: int
+    gpu_count: int
+    hpu_count: int
+    cpu_total_workers: int
+    cpu_available_workers: int
+    gpu_total_workers: int
+    gpu_available_workers: int
+    hpu_total_workers: int
+    hpu_available_workers: int
+    created_by: UUID4
+    cluster_id: UUID4
+    status_sync_at: datetime
+
+
+class ClusterResourcesInfo(BaseModel):
+    """Cluster resources schema."""
+
+    cpu_count: int
+    gpu_count: int
+    hpu_count: int
+    cpu_total_workers: int
+    cpu_available_workers: int
+    gpu_total_workers: int
+    gpu_available_workers: int
+    hpu_total_workers: int
+    hpu_available_workers: int
