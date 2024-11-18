@@ -18,64 +18,13 @@
 """Contains core Pydantic schemas used for data validation and serialization within the cluster ops services."""
 
 from datetime import datetime
-from typing import Dict, List
+from typing import List
 from uuid import UUID
 
-from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict
+from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, computed_field
 
 from budapp.commons.constants import ClusterStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse
-
-
-class ClusterResponse(BaseModel):
-    """Cluster response schema"""
-
-    id: UUID
-    name: str
-    icon: str
-    created_at: datetime
-    modified_at: datetime
-    endpoint_count: int
-    status: ClusterStatusEnum
-    resources: Dict[str, int]
-    cluster_id: UUID
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ClusterFilter(BaseModel):
-    """Filter cluster schema"""
-
-    name: str | None = None
-
-
-class ClusterListResponse(PaginatedSuccessResponse):
-    """Cluster response schema."""
-
-    model_config = ConfigDict(extra="ignore")
-
-    clusters: List[ClusterResponse]
-
-
-class CreateClusterWorkflowRequest(BaseModel):
-    """Create cluster workflow request schema."""
-
-    name: str | None = None
-    icon: str | None = None
-    ingress_url: str | None = None
-    workflow_id: UUID4 | None = None
-    workflow_total_steps: int | None = None
-    step_number: int | None = None
-    trigger_workflow: bool | None = None
-
-
-class CreateClusterWorkflowSteps(BaseModel):
-    """Create cluster workflow step data schema."""
-
-    name: str | None = None
-    icon: str | None = None
-    ingress_url: AnyHttpUrl | None = None
-    configuration_yaml: dict | None = None
 
 
 class ClusterBase(BaseModel):
@@ -116,3 +65,74 @@ class ClusterResourcesInfo(BaseModel):
     gpu_available_workers: int
     hpu_total_workers: int
     hpu_available_workers: int
+
+
+class ClusterResponse(BaseModel):
+    """Cluster response schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    icon: str
+    created_at: datetime
+    modified_at: datetime
+    endpoint_count: int
+    status: ClusterStatusEnum
+    cluster_id: UUID
+    cpu_count: int
+    gpu_count: int
+    hpu_count: int
+    cpu_total_workers: int
+    cpu_available_workers: int
+    gpu_total_workers: int
+    gpu_available_workers: int
+    hpu_total_workers: int
+    hpu_available_workers: int
+
+    @computed_field
+    @property
+    def total_nodes(self) -> int:
+        """Total nodes."""
+        return self.cpu_total_workers + self.gpu_total_workers + self.hpu_total_workers
+
+    @computed_field
+    @property
+    def available_nodes(self) -> int:
+        """Available nodes."""
+        return self.cpu_available_workers + self.gpu_available_workers + self.hpu_available_workers
+
+
+class ClusterFilter(BaseModel):
+    """Filter cluster schema."""
+
+    name: str | None = None
+
+
+class ClusterListResponse(PaginatedSuccessResponse):
+    """Cluster response schema."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    clusters: List[ClusterResponse]
+
+
+class CreateClusterWorkflowRequest(BaseModel):
+    """Create cluster workflow request schema."""
+
+    name: str | None = None
+    icon: str | None = None
+    ingress_url: str | None = None
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None
+    step_number: int | None = None
+    trigger_workflow: bool | None = None
+
+
+class CreateClusterWorkflowSteps(BaseModel):
+    """Create cluster workflow step data schema."""
+
+    name: str | None = None
+    icon: str | None = None
+    ingress_url: AnyHttpUrl | None = None
+    configuration_yaml: dict | None = None

@@ -75,15 +75,17 @@ class ClusterService(SessionMixin):
                 icon=cluster.icon,
                 created_at=cluster.created_at,
                 modified_at=cluster.modified_at,
-                endpoint_count=12,
+                endpoint_count=12,  # TODO: Add endpoint count
                 status=cluster.status,
-                resources={
-                    "available_nodes": cluster.available_workers,
-                    "total_nodes": cluster.total_workers,
-                    "gpu_count": 4,
-                    "cpu_count": 8,
-                    "hpu_count": 2,
-                },
+                gpu_count=cluster.gpu_count,
+                cpu_count=cluster.cpu_count,
+                hpu_count=cluster.hpu_count,
+                cpu_total_workers=cluster.cpu_total_workers,
+                cpu_available_workers=cluster.cpu_available_workers,
+                gpu_total_workers=cluster.gpu_total_workers,
+                gpu_available_workers=cluster.gpu_available_workers,
+                hpu_total_workers=cluster.hpu_total_workers,
+                hpu_available_workers=cluster.hpu_available_workers,
             )
             updated_clusters.append(updated_cluster)
 
