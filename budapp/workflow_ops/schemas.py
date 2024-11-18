@@ -22,6 +22,7 @@ class RetrieveWorkflowStepData(BaseModel):
     name: str | None = None
     ingress_url: str | None = None
     create_cluster_events: dict | None = None
+    icon: str | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):

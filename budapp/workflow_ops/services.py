@@ -104,6 +104,7 @@ class WorkflowService(SessionMixin):
             name = required_data.get("name")
             ingress_url = required_data.get("ingress_url")
             create_cluster_events = required_data.get(BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value)
+            icon = required_data.get("icon")
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -140,6 +141,7 @@ class WorkflowService(SessionMixin):
                 workflow_execution_status=workflow_execution_status if workflow_execution_status else None,
                 leaderboard=leaderboard if leaderboard else None,
                 name=name if name else None,
+                icon=icon if icon else None,
                 ingress_url=ingress_url if ingress_url else None,
                 create_cluster_events=create_cluster_events if create_cluster_events else None,
             )
@@ -179,6 +181,7 @@ class WorkflowService(SessionMixin):
             ],
             "create_cluster": [
                 "name",
+                "icon",
                 "ingress_url",
                 BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value,
             ],

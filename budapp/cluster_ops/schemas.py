@@ -61,9 +61,10 @@ class ClusterListResponse(PaginatedSuccessResponse):
 
 
 class CreateClusterWorkflowRequest(BaseModel):
-    """Create cluster workflow request schema"""
+    """Create cluster workflow request schema."""
 
     name: str | None = None
+    icon: str | None = None
     ingress_url: str | None = None
     workflow_id: UUID4 | None = None
     workflow_total_steps: int | None = None
@@ -72,8 +73,9 @@ class CreateClusterWorkflowRequest(BaseModel):
 
 
 class CreateClusterWorkflowSteps(BaseModel):
-    """Create cluster workflow step data schema"""
+    """Create cluster workflow step data schema."""
 
     name: str | None = None
+    icon: str | None = None
     ingress_url: AnyHttpUrl | None = None
     configuration_yaml: dict | None = None

@@ -20,6 +20,7 @@ from typing import List, Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from pydantic import AnyHttpUrl, FilePath
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -67,7 +68,8 @@ async def create_cluster_workflow(
     session: Annotated[Session, Depends(get_session)],
     step_number: Annotated[int, Form(gt=0)],
     name: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
-    ingress_url: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
+    icon: Annotated[FilePath | None, Form()] = None,
+    ingress_url: Annotated[AnyHttpUrl | None, Form()] = None,
     configuration_file: Annotated[
         UploadFile | None, File(description="The configuration file for the cluster")
     ] = None,
@@ -103,7 +105,8 @@ async def create_cluster_workflow(
             current_user_id=current_user.id,
             request=CreateClusterWorkflowRequest(
                 name=name,
-                ingress_url=ingress_url,
+                icon=icon.as_posix() if icon else None,
+                ingress_url=str(ingress_url) if ingress_url else None,
                 workflow_id=workflow_id,
                 workflow_total_steps=workflow_total_steps,
                 step_number=step_number,

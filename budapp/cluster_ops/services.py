@@ -100,6 +100,7 @@ class ClusterService(SessionMixin):
         workflow_total_steps = request.workflow_total_steps
         step_number = request.step_number
         cluster_name = request.name
+        cluster_icon = request.icon
         ingress_url = request.ingress_url
         trigger_workflow = request.trigger_workflow
 
@@ -123,6 +124,7 @@ class ClusterService(SessionMixin):
         # Prepare workflow step data
         workflow_step_data = CreateClusterWorkflowSteps(
             name=cluster_name,
+            icon=cluster_icon,
             ingress_url=ingress_url,
             configuration_yaml=configuration_yaml if configuration_file else None,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
@@ -198,6 +200,7 @@ class ClusterService(SessionMixin):
             # Define the keys required for model deployment
             keys_of_interest = [
                 "name",
+                "icon",
                 "ingress_url",
                 "configuration_yaml",
                 "created_by",
@@ -211,7 +214,7 @@ class ClusterService(SessionMixin):
                         required_data[key] = db_workflow_step.data[key]
 
             # Check if all required keys are present
-            required_keys = ["name", "ingress_url", "configuration_yaml", "created_by"]
+            required_keys = ["name", "icon", "ingress_url", "configuration_yaml", "created_by"]
             missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
