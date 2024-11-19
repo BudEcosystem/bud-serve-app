@@ -494,7 +494,7 @@ class EndpointStatusEnum(StrEnum):
 
 
 class ModelTemplateTypeEnum(StrEnum):
-    """Model template types"""
+    """Model template types."""
 
     SUMMARIZATION = auto()
     CHAT = auto()
@@ -505,3 +505,4 @@ class ModelTemplateTypeEnum(StrEnum):
     ENTITY_EXTRACTION = auto()
     SENTIMENT_ANALYSIS = auto()
     DOCUMENT_ANALYSIS = auto()
+    OTHER = auto()

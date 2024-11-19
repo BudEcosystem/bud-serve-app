@@ -19,6 +19,7 @@
 from budapp.auth.models import Token as Token
 from budapp.cluster_ops.models import Cluster as Cluster
 from budapp.core.models import Icon as Icon
+from budapp.core.models import ModelTemplate as ModelTemplate
 from budapp.endpoint_ops.models import Endpoint as Endpoint
 from budapp.model_ops.models import CloudModel as CloudModel
 from budapp.model_ops.models import Model as Model

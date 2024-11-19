@@ -30,7 +30,7 @@ from .cluster_ops import cluster_routes
 from .commons import logging
 from .commons.config import app_settings
 from .commons.constants import Environment
-from .core import meta_routes, notify_routes
+from .core import common_routes, meta_routes, notify_routes
 from .initializers.seeder import seeders
 from .model_ops import model_routes
 from .user_ops import user_routes
@@ -103,6 +103,7 @@ app = FastAPI(
     openapi_url=None if app_settings.env == Environment.PRODUCTION else "/openapi.json",
 )
 
+# Serve static files
 app.mount("/static", StaticFiles(directory=app_settings.static_dir), name="static")
 
 # Set all CORS enabled origins
@@ -116,12 +117,13 @@ if app_settings.cors_origins:
     )
 
 internal_router = APIRouter()
-internal_router.include_router(meta_routes.meta_router)
 internal_router.include_router(auth_routes.auth_router)
-internal_router.include_router(model_routes.model_router)
-internal_router.include_router(user_routes.user_router)
-internal_router.include_router(notify_routes.notify_router)
 internal_router.include_router(cluster_routes.cluster_router)
+internal_router.include_router(common_routes.common_router)
+internal_router.include_router(meta_routes.meta_router)
+internal_router.include_router(model_routes.model_router)
+internal_router.include_router(notify_routes.notify_router)
+internal_router.include_router(user_routes.user_router)
 internal_router.include_router(workflow_routes.workflow_router)
 
 app.include_router(internal_router)

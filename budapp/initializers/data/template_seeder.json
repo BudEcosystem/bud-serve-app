@@ -2,7 +2,7 @@
     {
       "name": "Summarization",
       "description": "Condense large input text into brief, concise summaries.",
-      "icon": "icons/template/other.png",
+      "icon": "icons/template/summarization.png",
       "template_type": "summarization",
       "avg_context_length": 500,
       "avg_sequence_length": 100,
@@ -24,7 +24,7 @@
     {
       "name": "Question Answering",
       "description": "Quickly retrieve specific answers to user queries from a given context.",
-      "icon": "icons/template/synthetic_data_generation.png",
+      "icon": "icons/template/question_answering.png",
       "template_type": "question_answering",
       "avg_context_length": 100,
       "avg_sequence_length": 50,
@@ -57,7 +57,7 @@
     {
       "name": "Code Translation",
       "description": "Convert code between programming languages efficiently.",
-      "icon": "icons/template/sql_gen.png",
+      "icon": "icons/template/code_translation.png",
       "template_type": "code_translation",
       "avg_context_length": 100,
       "avg_sequence_length": 150,
@@ -90,8 +90,19 @@
     {
       "name": "Document Analysis",
       "description": "Process and analyze long documents to extract key insights.",
-      "icon": "icons/template/other.png",
+      "icon": "icons/template/document_analysis.png",
       "template_type": "document_analysis",
+      "avg_context_length": 1000,
+      "avg_sequence_length": 300,
+      "ttft": [4000, 5000],
+      "e2e_latency": [40, 90],
+      "per_session_tokens_per_sec": [5, 25]
+    },
+    {
+      "name": "Other",
+      "description": "Custom template for unique use cases.",
+      "icon": "icons/template/other.png",
+      "template_type": "other",
       "avg_context_length": 1000,
       "avg_sequence_length": 300,
       "ttft": [4000, 5000],
