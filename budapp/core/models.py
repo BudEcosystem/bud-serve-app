@@ -16,11 +16,12 @@
 
 """The core package, containing essential business logic, services, and routing configurations for the microservices."""
 
-from uuid import UUID, uuid4
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum, Integer, String, Uuid, ARRAY, Integer
+from sqlalchemy import ARRAY, DateTime, Integer, String, Uuid
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.orm import Mapped, mapped_column
 
 from budapp.commons.constants import ModelTemplateTypeEnum
@@ -39,7 +40,7 @@ class Icon(Base):
 
 
 class ModelTemplate(Base):
-    """Model template model"""
+    """Model template model."""
 
     __tablename__ = "model_template"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
@@ -47,7 +48,7 @@ class ModelTemplate(Base):
     description: Mapped[str] = mapped_column(String, nullable=False)
     icon: Mapped[str] = mapped_column(String, nullable=False)
     template_type: Mapped[str] = mapped_column(
-        Enum(
+        PG_ENUM(
             ModelTemplateTypeEnum,
             name="template_type_enum",
             values_callable=lambda x: [e.value for e in x],
@@ -57,12 +58,8 @@ class ModelTemplate(Base):
     )
     avg_sequence_length: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     avg_context_length: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    per_session_tokens_per_sec: Mapped[list[int]] = mapped_column(
-        ARRAY(Integer), nullable=True
-    )
+    per_session_tokens_per_sec: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=True)
     ttft: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=True)
     e2e_latency: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
