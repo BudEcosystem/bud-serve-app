@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import ModelProviderTypeEnum
+from budapp.commons.constants import ModelProviderTypeEnum, ModelSourceEnum
 from budapp.commons.database import engine
 from budapp.model_ops.crud import CloudModelDataManager, ProviderDataManager
 from budapp.model_ops.models import CloudModel
@@ -25,6 +25,8 @@ CURRENT_FILE_PATH = os.path.dirname(os.path.abspath(__file__))
 # seeder file path
 CLOUD_MODEL_SEEDER_FILE_PATH = os.path.join(CURRENT_FILE_PATH, "data", "cloud_model_seeder.json")
 
+
+MODEL_SOURCES = [member.value for member in ModelSourceEnum]
 
 class CloudModelSeeder(BaseSeeder):
     """Cloud model seeder."""
@@ -51,6 +53,8 @@ class CloudModelSeeder(BaseSeeder):
             logger.debug(f"Seeding cloud models for {len(cloud_model_data)} providers")
 
             for provider, model_data in cloud_model_data.items():
+                if provider not in MODEL_SOURCES:
+                    continue
                 db_provider = await ProviderDataManager(session).retrieve_by_fields(
                     ProviderModel,
                     {"type": provider},
