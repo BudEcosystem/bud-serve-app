@@ -37,7 +37,7 @@ from budapp.commons.constants import (
     ModelProviderTypeEnum,
     WorkflowStatusEnum,
 )
-from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 
 
 class ProviderFilter(BaseModel):
@@ -64,20 +64,6 @@ class ProviderResponse(PaginatedSuccessResponse):
     model_config = ConfigDict(extra="ignore")
 
     providers: list[Provider] = []
-
-
-class Tag(BaseModel):
-    """Tag schema with name and color."""
-
-    name: str = Field(..., min_length=1)
-    color: str = Field(..., pattern="^#[0-9A-Fa-f]{6}$")
-
-    @field_validator("color")
-    def validate_hex_color(cls, v: str) -> str:
-        """Validate that color is a valid hex color code."""
-        if not re.match(r"^#[0-9A-Fa-f]{6}$", v):
-            raise ValueError("Color must be a valid hex color code (e.g., #FF0000)")
-        return v.upper()  # Normalize to uppercase
 
 
 class CloudModel(BaseModel):
