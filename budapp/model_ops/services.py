@@ -553,6 +553,7 @@ class CloudModelWorkflowService(SessionMixin):
                 provider_type=provider_type,
                 uri=db_cloud_model.uri,
                 created_by=UUID(created_by),
+                provider_id=provider_id,
             )
         else:
             model_data = ModelCreate(
@@ -564,6 +565,7 @@ class CloudModelWorkflowService(SessionMixin):
                 provider_type=provider_type,
                 icon=icon,
                 created_by=UUID(created_by),
+                provider_id=provider_id,
             )
 
         return model_data
