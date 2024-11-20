@@ -736,6 +736,8 @@ class ModelService(SessionMixin):
             "website_url": model_details.website_url,
             "paper_published": paper_published_list,
             "license": license_data,
+            "provider_type": model_details.provider_type,
+            "provider": model_details.provider if model_details.provider else None,
         }
         return response_data
 

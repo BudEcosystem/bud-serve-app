@@ -173,12 +173,14 @@ class ModelDetailResponse(SuccessResponse):
     description: Optional[str] = None
     tags: Optional[List[Tag]] = None
     tasks: Optional[List[Tag]] = None
-    icon: str
+    icon: str | None = None
     github_url: Optional[str] = None
     huggingface_url: Optional[str] = None
     website_url: Optional[str] = None
     paper_published: Optional[List[PaperPublishedModel]] = []
     license: Optional[dict] = None
+    provider_type: ModelProviderTypeEnum
+    provider: Provider | None = None
 
 
 class CreateCloudModelWorkflowRequest(BaseModel):
