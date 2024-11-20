@@ -415,7 +415,7 @@ async def search_tags_by_name(
     offset = (page - 1) * limit
 
     try:
-        db_tags, count = await ModelService(session).search_tags_or_tasks_by_name("tags", name or "", offset, limit)
+        db_tags, count = await ModelService(session).search_tags_by_name(name or "", offset, limit)
     except Exception as e:
         return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)).to_http_response()
 
@@ -458,7 +458,7 @@ async def search_tasks_by_name(
     offset = (page - 1) * limit
 
     try:
-        db_tags, count = await ModelService(session).search_tags_or_tasks_by_name("tasks", name or "", offset, limit)
+        db_tags, count = await ModelService(session).search_tasks_by_name(name or "", offset, limit)
     except Exception as e:
         return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)).to_http_response()
 
