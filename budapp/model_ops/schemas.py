@@ -38,7 +38,7 @@ from budapp.commons.constants import (
     WorkflowStatusEnum,
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
-from budapp.user_ops.schemas import UserResponse
+from budapp.user_ops.schemas import UserInfo
 
 
 class ProviderFilter(BaseModel):
@@ -262,7 +262,7 @@ class ModelResponse(BaseModel):
     modality: ModalityEnum
     source: str
     uri: str
-    created_user: UserResponse | None = None
+    created_user: UserInfo | None = None
     model_size: int | None = None
     tasks: list[Task] | None = None
     tags: list[Tag] | None = None

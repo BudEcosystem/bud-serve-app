@@ -680,9 +680,6 @@ class CloudModelService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[CloudModel], int]:
         """Get all cloud models."""
-        # remove table_source from filters
-        filters.pop("table_source", None)
-
         db_cloud_models, count = await CloudModelDataManager(self.session).get_all_cloud_models(
             offset, limit, filters, order_by, search
         )
@@ -745,3 +742,26 @@ class ModelService(SessionMixin):
     async def search_tags_by_name(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
         """Search model tags by name with pagination."""
         return await ModelDataManager(self.session).search_tags_by_name(name, offset, limit)
+
+    async def get_all_active_models(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[Model], int]:
+        """Get all active models."""
+        filters_dict = filters
+
+        results, count = await ModelDataManager(self.session).get_all_models(
+            offset, limit, filters_dict, order_by, search
+        )
+
+        # Parse the results to model list response
+        db_models_response = []
+        for result in results:
+            model_response = ModelResponse.model_validate(result[0])
+            db_models_response.append(ModelListResponse(model=model_response, endpoints_count=result[1]))
+
+        return db_models_response, count
