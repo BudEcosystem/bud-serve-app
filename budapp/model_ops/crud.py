@@ -24,9 +24,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.commons.exceptions import DatabaseException
-from budapp.model_ops.models import CloudModel, PaperPublished
-from budapp.model_ops.models import Model
-from budapp.model_ops.models import CloudModel, Model
+from budapp.endpoint_ops.models import Endpoint
+from budapp.model_ops.models import CloudModel, Model, PaperPublished
 from budapp.model_ops.models import Provider as ProviderModel
 
 
@@ -142,6 +141,75 @@ class ModelDataManager(DataManagerUtils):
         total_count = self.session.execute(total_query).scalar()
 
         return tags, total_count
+
+    async def get_all_models(
+        self,
+        offset: int,
+        limit: int,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[Model], int]:
+        """List all models in the database."""
+        await self.validate_fields(Model, filters)
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(Model, filters)
+            stmt = (
+                select(
+                    Model,
+                    func.count(Endpoint.id)
+                    .filter(Endpoint.is_active == True)
+                    .label("endpoints_count"),
+                )
+                .select_from(Model)
+                .filter(or_(*search_conditions))
+                .filter(Model.is_active == True)
+                .outerjoin(Endpoint, Endpoint.model_id == Model.id)
+                .group_by(Model.id)
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(Model)
+                .filter(or_(*search_conditions))
+                .filter(Model.is_active == True)
+            )
+        else:
+            stmt = (
+                select(
+                    Model,
+                    func.count(Endpoint.id)
+                    .filter(Endpoint.is_active == True)
+                    .label("endpoints_count"),
+                )
+                .select_from(Model)
+                .filter_by(**filters)
+                .filter(Model.is_active == True)
+                .outerjoin(Endpoint, Endpoint.model_id == Model.id)
+                .group_by(Model.id)
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(Model)
+                .filter_by(**filters)
+                .filter(Model.is_active == True)
+            )
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(Model, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.execute_all(stmt)
+
+        return result, count
 
 
 
