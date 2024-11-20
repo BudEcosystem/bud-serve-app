@@ -363,4 +363,4 @@ class SearchTagsResponse(PaginatedSuccessResponse):
 class SearchAuthorResponse(PaginatedSuccessResponse):
     """Response schema for searching tags by name."""
 
-    tags: List[str] = Field(..., description="List of matching authors")
+    authors: List[str] = Field(..., description="List of matching authors")
