@@ -17,7 +17,7 @@
 """The model ops package, containing essential business logic, services, and routing configurations for the model ops."""
 
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, String, Uuid
@@ -68,17 +68,18 @@ class Model(Base):
         nullable=False,
     )
     uri: Mapped[str] = mapped_column(String, nullable=False)
+    provider_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("provider.id"), nullable=True)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     endpoints: Mapped[list["Endpoint"]] = relationship(back_populates="model")
     # benchmarks: Mapped[list["Benchmark"]] = relationship(back_populates="model")
-
     created_user: Mapped["User"] = relationship(back_populates="created_models", foreign_keys=[created_by])
-
     paper_published: Mapped[List["PaperPublished"]] = relationship("PaperPublished", back_populates="model")
     model_licenses: Mapped["ModelLicenses"] = relationship("ModelLicenses", back_populates="model")
+    provider: Mapped[Optional["Provider"]] = relationship("Provider", back_populates="models")
+
 
 class PaperPublished(Base):
     """Model for Paper Published."""
@@ -94,6 +95,7 @@ class PaperPublished(Base):
 
     model: Mapped["Model"] = relationship("Model", back_populates="paper_published")
 
+
 class ModelLicenses(Base):
     """Model for a AI model licenses."""
 
@@ -107,6 +109,7 @@ class ModelLicenses(Base):
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     model: Mapped["Model"] = relationship("Model", back_populates="model_licenses")
+
 
 class Provider(Base):
     """Model for a AI model provider."""
@@ -125,6 +128,9 @@ class Provider(Base):
     )
     description: Mapped[str] = mapped_column(String, nullable=True)
     icon: Mapped[Optional[str]] = mapped_column(String, nullable=False)
+
+    models: Mapped[Optional[list["Model"]]] = relationship("Model", back_populates="provider")
+    cloud_models: Mapped[list["CloudModel"]] = relationship("CloudModel", back_populates="provider")
 
 
 class CloudModel(Base):
@@ -167,3 +173,5 @@ class CloudModel(Base):
     provider_id: Mapped[UUID] = mapped_column(ForeignKey("provider.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    provider: Mapped[Optional["Provider"]] = relationship("Provider", back_populates="cloud_models")
