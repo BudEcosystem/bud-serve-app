@@ -171,6 +171,7 @@ class NotificationService(SessionMixin):
         # Get namespace and deployment URL from event
         namespace = payload.content.result.get("namespace")
         deployment_url = payload.content.result["result"]["deployment_url"]
+        credential_id = payload.content.result.get("credential_id")
 
         if not namespace or not deployment_url:
             logger.warning("Namespace or deployment URL is missing from event")
@@ -223,6 +224,7 @@ class NotificationService(SessionMixin):
             status=EndpointStatusEnum.DEPLOYING,
             created_by=required_data["created_by"],
             status_sync_at=datetime.now(tz=timezone.utc),
+            credential_id=credential_id,
         )
 
         db_endpoint = await EndpointDataManager(self.session).insert_one(
