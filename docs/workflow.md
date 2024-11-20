@@ -5,6 +5,8 @@
 
 [Deploy Model](#deploy-model)
 
+[Add Cluster](#add-cluster)
+
 ## Add Model
 
 ### Add cloud model workflow
@@ -21,21 +23,21 @@
 
 // Select provider
 {
-  "workflow_id": "a9a2e989-238a-4d5f-b655-4332cbea2b42",
+  "workflow_id": "f65a1394-df93-46ab-9e08-899f8b49b14c",
   "step_number": 2,
   "provider_id": "1c64b7bf-7302-45f1-bd3d-2405a23a9111"
 }
 
 // Select cloud model
 {
-  "workflow_id": "a9a2e989-238a-4d5f-b655-4332cbea2b42",
+  "workflow_id": "f65a1394-df93-46ab-9e08-899f8b49b14c",
   "step_number": 3,
   "cloud_model_id": null
 }
 
 // Add model details
 {
-  "workflow_id": "a9a2e989-238a-4d5f-b655-4332cbea2b42",
+  "workflow_id": "f65a1394-df93-46ab-9e08-899f8b49b14c",
   "step_number": 4,
   "name": "abc",
   "uri": "openai/gpt7",
@@ -132,4 +134,19 @@
   "trigger_workflow": true,
   "cluster_id": "538072a1-634b-4f8f-bd3b-d2fe6bfe7a50"
 }
+```
+
+## Add Cluster
+### Add cluster workflow using form data
+```curl
+curl --location 'https://<base_url>/clusters/clusters' \
+--header 'accept: application/json' \
+--header 'Authorization: Bearer <token>' \
+--form 'step_number="1"' \
+--form 'name="Xeon Dev"' \
+--form 'icon="icons/providers/openai.png"' \
+--form 'ingress_url="https://20.244.107.114:10001"' \
+--form 'configuration_file=@"<path_to_yaml>"' \
+--form 'workflow_total_steps="3"' \
+--form 'trigger_workflow="true"'
 ```
