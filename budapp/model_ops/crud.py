@@ -24,9 +24,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.commons.exceptions import DatabaseException
-from budapp.model_ops.models import CloudModel, PaperPublished
-from budapp.model_ops.models import Model
-from budapp.model_ops.models import CloudModel, Model
+from budapp.model_ops.models import CloudModel, Model, PaperPublished
 from budapp.model_ops.models import Provider as ProviderModel
 
 
@@ -110,7 +108,6 @@ class ModelDataManager(DataManagerUtils):
         limit: int = 10,
     ) -> Tuple[List[dict], int]:
         """Search tags by name with pagination, or fetch all tags if no search value is provided."""
-
         subquery = (
             select(func.jsonb_array_elements(Model.tags).label("tag"))
             .where(Model.is_active == True)
@@ -148,6 +145,51 @@ class ModelDataManager(DataManagerUtils):
         total_count = self.session.execute(total_query).scalar()
 
         return tags, total_count
+
+    async def search_tasks_by_name(
+        self,
+        search_value: str = "",
+        offset: int = 0,
+        limit: int = 10,
+    ) -> Tuple[List[dict], int]:
+        """Search tasks by name with pagination, or fetch all tags if no search value is provided."""
+        subquery = (
+            select(func.jsonb_array_elements(Model.tasks).label("task"))
+            .where(Model.is_active)
+            .where(Model.tasks.isnot(None))
+        ).subquery()
+
+        # Build the final query
+        final_query = (
+            select(
+                func.jsonb_extract_path_text(subquery.c.task, "name").label("name"),
+                func.min(func.jsonb_extract_path_text(subquery.c.task, "color")).label("color"),
+            )
+            .group_by("name")
+            .order_by("name")
+            .offset(offset)
+            .limit(limit)
+        )
+
+        # Add the WHERE clause only if a search_value is provided
+        if search_value:
+            final_query = final_query.where(
+                func.jsonb_extract_path_text(subquery.c.task, "name").ilike(f"{search_value}%")
+            )
+
+        # Execute the query
+        results = self.session.execute(final_query).all()
+        tasks = [{"name": res.name, "color": res.color} for res in results] if results else []
+
+        # Total count query, adjusted to conditionally apply the search filter
+        total_query = select(func.count(func.distinct(func.jsonb_extract_path_text(subquery.c.task, "name"))))
+        if search_value:
+            total_query = total_query.where(
+                func.jsonb_extract_path_text(subquery.c.task, "name").ilike(f"{search_value}%")
+            )
+        total_count = self.session.execute(total_query).scalar()
+
+        return tasks, total_count
 
     async def search_author_by_name(
         self,
