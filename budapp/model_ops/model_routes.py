@@ -507,6 +507,49 @@ async def search_tags_by_name(
 
 
 @model_router.get(
+    "/tasks",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SearchTagsResponse,
+            "description": "Successfully searched tags by name",
+        },
+    },
+    description="Search model tags by name with pagination",
+)
+async def search_tasks_by_name(
+    session: Annotated[Session, Depends(get_session)],
+    name: Optional[str] = Query(default=None),
+    current_user: User = Depends(get_current_active_user),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1),
+) -> Union[SearchTagsResponse, ErrorResponse]:
+    """Search tasks by name with pagination support."""
+    offset = (page - 1) * limit
+
+    try:
+        db_tags, count = await ModelService(session).search_tasks_by_name(name or "", offset, limit)
+    except Exception as e:
+        return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)).to_http_response()
+
+    return SearchTagsResponse(
+        tags=db_tags,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="tasks.search",
+        code=status.HTTP_200_OK,
+    ).to_http_response()
+
+
+@model_router.get(
     "/{model_id}",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {

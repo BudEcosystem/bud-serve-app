@@ -743,6 +743,10 @@ class ModelService(SessionMixin):
         """Search model tags by name with pagination."""
         return await ModelDataManager(self.session).search_tags_by_name(name, offset, limit)
 
+    async def search_tasks_by_name(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
+        """Search model tasks by name with pagination."""
+        return await ModelDataManager(self.session).search_tasks_by_name(name, offset, limit)
+
     async def get_all_active_models(
         self,
         offset: int = 0,
