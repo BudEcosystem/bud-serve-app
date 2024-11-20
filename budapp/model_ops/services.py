@@ -45,6 +45,8 @@ from .schemas import (
     EditModel,
     ModelCreate,
     ModelLicensesModel,
+    ModelListResponse,
+    ModelResponse,
     PaperPublishedModel,
 )
 
@@ -531,7 +533,6 @@ class CloudModelWorkflowService(SessionMixin):
         db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
             ProviderModel, {"id": provider_id}, missing_ok=True
         )
-        icon = db_provider.icon
 
         if cloud_model_id:
             db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
@@ -544,7 +545,6 @@ class CloudModelWorkflowService(SessionMixin):
                 tasks=db_cloud_model.tasks,
                 author=db_cloud_model.author,
                 model_size=db_cloud_model.model_size,
-                icon=icon,
                 github_url=db_cloud_model.github_url,
                 huggingface_url=db_cloud_model.huggingface_url,
                 website_url=db_cloud_model.website_url,
@@ -563,7 +563,6 @@ class CloudModelWorkflowService(SessionMixin):
                 uri=uri,
                 tags=tags,
                 provider_type=provider_type,
-                icon=icon,
                 created_by=UUID(created_by),
                 provider_id=provider_id,
             )
@@ -681,7 +680,20 @@ class CloudModelService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[CloudModel], int]:
         """Get all cloud models."""
-        return await CloudModelDataManager(self.session).get_all_cloud_models(offset, limit, filters, order_by, search)
+        # remove table_source from filters
+        filters.pop("table_source", None)
+
+        db_cloud_models, count = await CloudModelDataManager(self.session).get_all_cloud_models(
+            offset, limit, filters, order_by, search
+        )
+
+        # convert db_cloud_models to cloud model list response
+        db_cloud_models_response = []
+        for db_cloud_model in db_cloud_models:
+            model_response = ModelResponse.model_validate(db_cloud_model)
+            db_cloud_models_response.append(ModelListResponse(model=model_response))
+
+        return db_cloud_models_response, count
 
     async def get_all_recommended_tags(
         self,
