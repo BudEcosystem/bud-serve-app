@@ -507,7 +507,7 @@ async def search_author_by_name(
         return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)).to_http_response()
 
     return SearchAuthorResponse(
-        tags=db_authors,
+        authors=db_authors,
         total_record=count,
         page=page,
         limit=limit,
