@@ -40,8 +40,6 @@ from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
 from .schemas import (
-    CloudModelFilter,
-    CloudModelResponse,
     CreateCloudModelWorkflowRequest,
     CreateCloudModelWorkflowResponse,
     EditModel,
@@ -366,64 +364,64 @@ async def edit_model(
 #         ).to_http_response()
 
 
-@model_router.get(
-    "/cloud-models",
-    responses={
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
-        status.HTTP_200_OK: {
-            "model": ProviderResponse,
-            "description": "Successfully list all providers",
-        },
-    },
-    description="List all cloud models",
-)
-async def list_cloud_models(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
-    filters: Annotated[CloudModelFilter, Depends()],
-    tags: List[str] = Query(default_factory=list),
-    tasks: List[str] = Query(default_factory=list),
-    page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=0),
-    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
-    search: bool = False,
-) -> Union[CloudModelResponse, ErrorResponse]:
-    """List all cloud models."""
-    # Calculate offset
-    offset = (page - 1) * limit
+# @model_router.get(
+#     "/cloud-models",
+#     responses={
+#         status.HTTP_500_INTERNAL_SERVER_ERROR: {
+#             "model": ErrorResponse,
+#             "description": "Service is unavailable due to server error",
+#         },
+#         status.HTTP_400_BAD_REQUEST: {
+#             "model": ErrorResponse,
+#             "description": "Service is unavailable due to client error",
+#         },
+#         status.HTTP_200_OK: {
+#             "model": ProviderResponse,
+#             "description": "Successfully list all providers",
+#         },
+#     },
+#     description="List all cloud models",
+# )
+# async def list_cloud_models(
+#     current_user: Annotated[User, Depends(get_current_active_user)],
+#     session: Annotated[Session, Depends(get_session)],
+#     filters: Annotated[CloudModelFilter, Depends()],
+#     tags: List[str] = Query(default_factory=list),
+#     tasks: List[str] = Query(default_factory=list),
+#     page: int = Query(1, ge=1),
+#     limit: int = Query(10, ge=0),
+#     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+#     search: bool = False,
+# ) -> Union[CloudModelResponse, ErrorResponse]:
+#     """List all cloud models."""
+#     # Calculate offset
+#     offset = (page - 1) * limit
 
-    # Convert UserFilter to dictionary
-    filters_dict = filters.model_dump(exclude_none=True)
-    if tags:
-        filters_dict["tags"] = tags
-    if tasks:
-        filters_dict["tasks"] = tasks
+#     # Convert UserFilter to dictionary
+#     filters_dict = filters.model_dump(exclude_none=True)
+#     if tags:
+#         filters_dict["tags"] = tags
+#     if tasks:
+#         filters_dict["tasks"] = tasks
 
-    try:
-        db_models, count = await CloudModelService(session).get_all_cloud_models(
-            offset, limit, filters_dict, order_by, search
-        )
-    except Exception as e:
-        logger.exception(f"Failed to get all cloud models: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all cloud models"
-        ).to_http_response()
+#     try:
+#         db_models, count = await CloudModelService(session).get_all_cloud_models(
+#             offset, limit, filters_dict, order_by, search
+#         )
+#     except Exception as e:
+#         logger.exception(f"Failed to get all cloud models: {e}")
+#         return ErrorResponse(
+#             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all cloud models"
+#         ).to_http_response()
 
-    return CloudModelResponse(
-        cloud_models=db_models,
-        total_record=count,
-        page=page,
-        limit=limit,
-        object="cloud_models.list",
-        code=status.HTTP_200_OK,
-    ).to_http_response()
+#     return CloudModelResponse(
+#         cloud_models=db_models,
+#         total_record=count,
+#         page=page,
+#         limit=limit,
+#         object="cloud_models.list",
+#         code=status.HTTP_200_OK,
+#     ).to_http_response()
 
 
 @model_router.get(
