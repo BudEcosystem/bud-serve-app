@@ -23,24 +23,23 @@
 
 // Select provider
 {
-  "workflow_id": "f65a1394-df93-46ab-9e08-899f8b49b14c",
+  "workflow_id": "bba793c4-0827-41d1-b463-61ef3ab8800d",
   "step_number": 2,
-  "provider_id": "1c64b7bf-7302-45f1-bd3d-2405a23a9111"
+  "provider_id": "081ffafb-3e72-4c97-ab24-de4e722940b7"
 }
 
 // Select cloud model
 {
-  "workflow_id": "f65a1394-df93-46ab-9e08-899f8b49b14c",
+  "workflow_id": "bba793c4-0827-41d1-b463-61ef3ab8800d",
   "step_number": 3,
-  "cloud_model_id": null
+  "cloud_model_id": "eed59dff-cbed-445d-85e0-298ef0b53591"
 }
 
 // Add model details
 {
-  "workflow_id": "f65a1394-df93-46ab-9e08-899f8b49b14c",
+  "workflow_id": "bba793c4-0827-41d1-b463-61ef3ab8800d",
   "step_number": 4,
   "name": "abc",
-  "uri": "openai/gpt7",
   "tags": [{"name": "Tag1", "color": "#000000"}, {"name": "Tag2", "color": "#000000"}],
   "modality": "llm",
   "trigger_workflow": true
