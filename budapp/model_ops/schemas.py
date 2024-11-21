@@ -19,7 +19,7 @@
 
 import re
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import List, Literal, Optional, Tuple
 
 from pydantic import (
     UUID4,
@@ -37,7 +37,8 @@ from budapp.commons.constants import (
     ModelProviderTypeEnum,
     WorkflowStatusEnum,
 )
-from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
+from budapp.user_ops.schemas import UserInfo
 
 
 class ProviderFilter(BaseModel):
@@ -66,20 +67,6 @@ class ProviderResponse(PaginatedSuccessResponse):
     providers: list[Provider] = []
 
 
-class Tag(BaseModel):
-    """Tag schema with name and color."""
-
-    name: str = Field(..., min_length=1)
-    color: str = Field(..., pattern="^#[0-9A-Fa-f]{6}$")
-
-    @field_validator("color")
-    def validate_hex_color(cls, v: str) -> str:
-        """Validate that color is a valid hex color code."""
-        if not re.match(r"^#[0-9A-Fa-f]{6}$", v):
-            raise ValueError("Color must be a valid hex color code (e.g., #FF0000)")
-        return v.upper()  # Normalize to uppercase
-
-
 class CloudModel(BaseModel):
     """Cloud model schema."""
 
@@ -88,7 +75,6 @@ class CloudModel(BaseModel):
     id: UUID4
     name: str
     description: str | None = None
-    icon: str
     modality: ModalityEnum
     source: CredentialTypeEnum
     provider_type: ModelProviderTypeEnum
@@ -96,6 +82,7 @@ class CloudModel(BaseModel):
     model_size: int | None = None
     tags: list[Tag] | None = None
     tasks: list[Tag] | None = None
+    is_present_in_model: bool = False
 
 
 class PaperPublishedModel(BaseModel):
@@ -144,7 +131,6 @@ class ModelBase(BaseModel):
     description: Optional[str] = None
     tags: Optional[List[Tag]] = None
     tasks: Optional[List[Tag]] = None
-    icon: str
     github_url: Optional[str] = None
     huggingface_url: Optional[str] = None
     website_url: Optional[str] = None
@@ -154,6 +140,7 @@ class Model(ModelBase):
     """Model schema."""
 
     id: UUID4
+    icon: str | None = None
     modality: ModalityEnum
     source: CredentialTypeEnum
     provider_type: ModelProviderTypeEnum
@@ -163,6 +150,7 @@ class Model(ModelBase):
     author: Optional[str] = None
     created_at: datetime
     modified_at: datetime
+    provider: Provider | None = None
 
 
 class ModelCreate(ModelBase):
@@ -175,6 +163,7 @@ class ModelCreate(ModelBase):
     model_size: Optional[int] = None
     created_by: UUID4
     author: Optional[str] = None
+    provider_id: UUID4 | None = None
 
 
 class ModelDetailResponse(SuccessResponse):
@@ -185,12 +174,14 @@ class ModelDetailResponse(SuccessResponse):
     description: Optional[str] = None
     tags: Optional[List[Tag]] = None
     tasks: Optional[List[Tag]] = None
-    icon: str
+    icon: str | None = None
     github_url: Optional[str] = None
     huggingface_url: Optional[str] = None
     website_url: Optional[str] = None
     paper_published: Optional[List[PaperPublishedModel]] = []
     license: Optional[dict] = None
+    provider_type: ModelProviderTypeEnum
+    provider: Provider | None = None
 
 
 class CreateCloudModelWorkflowRequest(BaseModel):
@@ -261,6 +252,73 @@ class EditModel(BaseModel):
         if data.get("paper_urls") is not None:
             data["paper_urls"] = [str(url) for url in data["paper_urls"]]
         return data
+
+
+class ModelResponse(BaseModel):
+    """Model response schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: UUID4
+    name: str
+    author: str | None = None
+    modality: ModalityEnum
+    source: str
+    uri: str
+    created_user: UserInfo | None = None
+    model_size: int | None = None
+    tasks: list[Task] | None = None
+    tags: list[Tag] | None = None
+    icon: str | None = None
+    description: str | None = None
+    provider_type: ModelProviderTypeEnum
+    created_at: datetime
+    modified_at: datetime
+    provider: Provider | None = None
+    is_present_in_model: bool | None = None
+
+
+class ModelListResponse(BaseModel):
+    """Model list response schema."""
+
+    model: ModelResponse
+    endpoints_count: int | None = None
+
+
+class ModelPaginatedResponse(PaginatedSuccessResponse):
+    """Model paginated response schema."""
+
+    models: list[ModelListResponse] = []
+
+
+class ModelFilter(BaseModel):
+    """Filter model schema for filtering models based on specific criteria."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    name: str | None = None
+    source: CredentialTypeEnum | None = None
+    model_size_min: int | None = Field(None, ge=0, le=10)
+    model_size_max: int | None = Field(None, ge=0, le=10)
+    provider_type: ModelProviderTypeEnum | None = None
+    table_source: Literal["cloud_model", "model"] = "cloud_model"
+
+    @field_validator("source")
+    @classmethod
+    def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
+        """Convert the source enum value to a string."""
+        return v.value if v else None
+
+    @field_validator("model_size_min", "model_size_max")
+    @classmethod
+    def convert_to_billions(cls, v: Optional[int]) -> Optional[int]:
+        """Convert the input value to billions."""
+        if v is not None:
+            return v * 1000000000  # Convert to billions
+        return v
+
+
+# Cloud model related schemas
 
 
 class CreateCloudModelWorkflowSteps(BaseModel):

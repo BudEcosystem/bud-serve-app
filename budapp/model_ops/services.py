@@ -29,6 +29,7 @@ from budapp.commons import logging
 from budapp.commons.constants import WorkflowStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
+from budapp.commons.schemas import Tag
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
@@ -44,8 +45,9 @@ from .schemas import (
     EditModel,
     ModelCreate,
     ModelLicensesModel,
+    ModelListResponse,
+    ModelResponse,
     PaperPublishedModel,
-    Tag,
 )
 
 
@@ -102,6 +104,9 @@ class CloudModelWorkflowService(SessionMixin):
             db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
                 CloudModel, {"id": cloud_model_id}
             )
+
+            if db_cloud_model.is_present_in_model:
+                raise ClientException("Cloud model is already present in model")
 
         # Prepare workflow step data
         workflow_step_data = CreateCloudModelWorkflowSteps(
@@ -317,8 +322,16 @@ class CloudModelWorkflowService(SessionMixin):
         # Latest step
         db_latest_workflow_step = db_workflow_steps[-1]
 
+        # if cloud model id is provided, retrieve cloud model
+        cloud_model_id = data.get("cloud_model_id")
+        db_cloud_model = None
+        if cloud_model_id:
+            db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
+                CloudModel, {"id": cloud_model_id}, missing_ok=True
+            )
+
         # Prepare model creation data from input
-        model_data = await self._prepare_model_data(data)
+        model_data = await self._prepare_model_data(data, db_cloud_model)
 
         # Check for duplicate model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
@@ -352,6 +365,11 @@ class CloudModelWorkflowService(SessionMixin):
             db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
                 db_latest_workflow_step, {"data": execution_status_data}
             )
+
+            if db_cloud_model:
+                await CloudModelDataManager(self.session).update_by_fields(
+                    db_cloud_model, {"is_present_in_model": True}
+                )
 
             # leaderboard data. TODO: Need to add service for leaderboard
             leaderboard_data = await self._get_leaderboard_data()
@@ -516,9 +534,8 @@ class CloudModelWorkflowService(SessionMixin):
             },
         ]
 
-    async def _prepare_model_data(self, data: Dict[str, Any]) -> None:
+    async def _prepare_model_data(self, data: Dict[str, Any], db_cloud_model: Optional[CloudModel] = None) -> None:
         """Prepare model data."""
-        cloud_model_id = data.get("cloud_model_id")
         source = data.get("source")
         name = data.get("name")
         modality = data.get("modality")
@@ -528,15 +545,7 @@ class CloudModelWorkflowService(SessionMixin):
         provider_id = data.get("provider_id")
         created_by = data.get("created_by")
 
-        db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
-            ProviderModel, {"id": provider_id}, missing_ok=True
-        )
-        icon = db_provider.icon
-
-        if cloud_model_id:
-            db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
-                CloudModel, {"id": cloud_model_id}, missing_ok=True
-            )
+        if db_cloud_model:
             model_data = ModelCreate(
                 name=name,
                 description=db_cloud_model.description,
@@ -544,7 +553,6 @@ class CloudModelWorkflowService(SessionMixin):
                 tasks=db_cloud_model.tasks,
                 author=db_cloud_model.author,
                 model_size=db_cloud_model.model_size,
-                icon=icon,
                 github_url=db_cloud_model.github_url,
                 huggingface_url=db_cloud_model.huggingface_url,
                 website_url=db_cloud_model.website_url,
@@ -553,6 +561,7 @@ class CloudModelWorkflowService(SessionMixin):
                 provider_type=provider_type,
                 uri=db_cloud_model.uri,
                 created_by=UUID(created_by),
+                provider_id=provider_id,
             )
         else:
             model_data = ModelCreate(
@@ -562,8 +571,8 @@ class CloudModelWorkflowService(SessionMixin):
                 uri=uri,
                 tags=tags,
                 provider_type=provider_type,
-                icon=icon,
                 created_by=UUID(created_by),
+                provider_id=provider_id,
             )
 
         return model_data
@@ -679,7 +688,17 @@ class CloudModelService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[CloudModel], int]:
         """Get all cloud models."""
-        return await CloudModelDataManager(self.session).get_all_cloud_models(offset, limit, filters, order_by, search)
+        db_cloud_models, count = await CloudModelDataManager(self.session).get_all_cloud_models(
+            offset, limit, filters, order_by, search
+        )
+
+        # convert db_cloud_models to cloud model list response
+        db_cloud_models_response = []
+        for db_cloud_model in db_cloud_models:
+            model_response = ModelResponse.model_validate(db_cloud_model)
+            db_cloud_models_response.append(ModelListResponse(model=model_response))
+
+        return db_cloud_models_response, count
 
     async def get_all_recommended_tags(
         self,
@@ -725,6 +744,8 @@ class ModelService(SessionMixin):
             "website_url": model_details.website_url,
             "paper_published": paper_published_list,
             "license": license_data,
+            "provider_type": model_details.provider_type,
+            "provider": model_details.provider if model_details.provider else None,
         }
         return response_data
 
@@ -735,6 +756,29 @@ class ModelService(SessionMixin):
     async def search_tasks_by_name(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
         """Search model tasks by name with pagination."""
         return await ModelDataManager(self.session).search_tasks_by_name(name, offset, limit)
+
+    async def get_all_active_models(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[Model], int]:
+        """Get all active models."""
+        filters_dict = filters
+
+        results, count = await ModelDataManager(self.session).get_all_models(
+            offset, limit, filters_dict, order_by, search
+        )
+
+        # Parse the results to model list response
+        db_models_response = []
+        for result in results:
+            model_response = ModelResponse.model_validate(result[0])
+            db_models_response.append(ModelListResponse(model=model_response, endpoints_count=result[1]))
+
+        return db_models_response, count
 
     async def list_all_model_authors(
         self,
