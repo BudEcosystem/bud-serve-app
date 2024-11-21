@@ -191,41 +191,56 @@ class ModelDataManager(DataManagerUtils):
 
         return tasks, total_count
 
-    async def search_author_by_name(
+    async def list_all_model_authors(
         self,
-        search_value: str = "",
         offset: int = 0,
         limit: int = 10,
+        filters: Dict[str, Any] = {},
+        order_by: List[Tuple[str, str]] = [],
+        search: bool = False,  # Search flag to enable search functionality
     ) -> Tuple[List[str], int]:
-        """
-        Search authors by name with pagination, or fetch all authors if no search value is provided.
-        """
+        """Get all authors with filter, search, and pagination support."""
+        await self.validate_fields(Model, filters)
 
-        # Build the base query for authors
-        query = (
-            select(Model.author)
-            .where(Model.is_active == True)
-            .distinct()
-            .order_by(Model.author)
-            .offset(offset)
-            .limit(limit)
+        # Extract JSON filters for tags and tasks
+        json_filters = {"tags": [], "tasks": []}
+        if "tags" in filters:
+            json_filters["tags"] = filters["tags"]
+            del filters["tags"]
+        if "tasks" in filters:
+            json_filters["tasks"] = filters["tasks"]
+            del filters["tasks"]
+
+        # Build conditions for tags and tasks
+        conditions = [Model.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]]
+        conditions.extend(
+            [Model.tasks.cast(JSONB).contains([{"name": task_name}]) for task_name in json_filters["tasks"]]
         )
 
-        # Add a WHERE clause if a search_value is provided
-        if search_value:
-            query = query.where(Model.author.ilike(f"{search_value}%"))
+        if search:
+            search_conditions = await self.generate_search_stmt(Model, filters)
+            stmt = select(Model).filter(or_(*search_conditions)).where(or_(*conditions))
+            count_stmt = (
+                select(func.count()).select_from(Model).filter(or_(*search_conditions)).where(or_(*conditions))
+            )
+        else:
+            stmt = select(Model).filter_by(**filters).where(and_(*conditions))
+            count_stmt = select(func.count()).select_from(Model).filter_by(**filters).where(and_(*conditions))
 
-        # Execute the query
-        results = self.session.execute(query).scalars().all()
-        authors = results if results else []
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
 
-        # Total count query, adjusted to conditionally apply the search filter
-        total_query = select(func.count(func.distinct(Model.author)))
-        if search_value:
-            total_query = total_query.where(Model.author.ilike(f"{search_value}%"))
-        total_count = self.session.execute(total_query).scalar()
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
 
-        return authors, total_count
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(Model, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.scalars_all(stmt)
+        authors = [model.author for model in result]
+        return authors, count
 
 
 class CloudModelDataManager(DataManagerUtils):

@@ -360,7 +360,23 @@ class SearchTagsResponse(PaginatedSuccessResponse):
     tags: List[Tag] = Field(..., description="List of matching tags")
 
 
-class SearchAuthorResponse(PaginatedSuccessResponse):
+class ModelAuthorResponse(PaginatedSuccessResponse):
     """Response schema for searching tags by name."""
 
     authors: List[str] = Field(..., description="List of matching authors")
+
+
+class ModelAuthorFilter(BaseModel):
+    """Filter schema for model authors."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    source: CredentialTypeEnum | None = None
+    modality: ModalityEnum | None = None
+    model_size: int | None = None
+    author: str | None = None
+
+    @field_validator("source")
+    def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
+        """Change the source to a string."""
+        return v.value if v else None

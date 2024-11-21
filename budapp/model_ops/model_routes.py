@@ -49,7 +49,8 @@ from .schemas import (
     ProviderResponse,
     RecommendedTagsResponse,
     SearchTagsResponse,
-    SearchAuthorResponse,
+    ModelAuthorResponse,
+    ModelAuthorFilter,
 )
 from .services import (
     CloudModelService,
@@ -485,33 +486,46 @@ async def search_tasks_by_name(
             "description": "Service is unavailable due to client error",
         },
         status.HTTP_200_OK: {
-            "model": SearchAuthorResponse,
+            "model": ModelAuthorResponse,
             "description": "Successfully searched author by name",
         },
     },
     description="Search model author by name with pagination",
 )
-async def search_author_by_name(
+async def list_all_model_authors(
     session: Annotated[Session, Depends(get_session)],
-    name: Optional[str] = Query(default=None),
+    filters: Annotated[ModelAuthorFilter, Depends()],
     current_user: User = Depends(get_current_active_user),
+    tags: List[str] = Query(default_factory=list),
+    tasks: List[str] = Query(default_factory=list),
+    search: bool = False,
     page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=1),
-) -> Union[SearchAuthorResponse, ErrorResponse]:
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+) -> Union[ModelAuthorResponse, ErrorResponse]:
     """Search author by name with pagination support."""
+
     offset = (page - 1) * limit
 
+    filters_dict = filters.model_dump(exclude_none=True)
+    if tags:
+        filters_dict["tags"] = tags
+    if tasks:
+        filters_dict["tasks"] = tasks
+
     try:
-        db_authors, count = await ModelService(session).search_author_by_name(name or "", offset, limit)
+        db_authors, count = await ModelService(session).list_all_model_authors(
+            offset, limit, filters_dict, order_by, search
+        )
     except Exception as e:
         return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)).to_http_response()
 
-    return SearchAuthorResponse(
+    return ModelAuthorResponse(
         authors=db_authors,
         total_record=count,
         page=page,
         limit=limit,
-        object="author.search",
+        object="author.list",
         code=status.HTTP_200_OK,
     ).to_http_response()
 

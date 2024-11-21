@@ -736,6 +736,13 @@ class ModelService(SessionMixin):
         """Search model tasks by name with pagination."""
         return await ModelDataManager(self.session).search_tasks_by_name(name, offset, limit)
 
-    async def search_author_by_name(self, name: str, offset: int = 0, limit: int = 10) -> Tuple[List[str], int]:
+    async def list_all_model_authors(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[str], int]:
         """Search author by name with pagination support."""
-        return await ModelDataManager(self.session).search_author_by_name(name, offset, limit)
+        return await ModelDataManager(self.session).list_all_model_authors(offset, limit, filters, order_by, search)
