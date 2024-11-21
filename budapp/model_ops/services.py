@@ -105,6 +105,9 @@ class CloudModelWorkflowService(SessionMixin):
                 CloudModel, {"id": cloud_model_id}
             )
 
+            if db_cloud_model.is_present_in_model:
+                raise ClientException("Cloud model is already present in model")
+
         # Prepare workflow step data
         workflow_step_data = CreateCloudModelWorkflowSteps(
             provider_type=provider_type,
@@ -319,8 +322,16 @@ class CloudModelWorkflowService(SessionMixin):
         # Latest step
         db_latest_workflow_step = db_workflow_steps[-1]
 
+        # if cloud model id is provided, retrieve cloud model
+        cloud_model_id = data.get("cloud_model_id")
+        db_cloud_model = None
+        if cloud_model_id:
+            db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
+                CloudModel, {"id": cloud_model_id}, missing_ok=True
+            )
+
         # Prepare model creation data from input
-        model_data = await self._prepare_model_data(data)
+        model_data = await self._prepare_model_data(data, db_cloud_model)
 
         # Check for duplicate model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
@@ -354,6 +365,11 @@ class CloudModelWorkflowService(SessionMixin):
             db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
                 db_latest_workflow_step, {"data": execution_status_data}
             )
+
+            if db_cloud_model:
+                await CloudModelDataManager(self.session).update_by_fields(
+                    db_cloud_model, {"is_present_in_model": True}
+                )
 
             # leaderboard data. TODO: Need to add service for leaderboard
             leaderboard_data = await self._get_leaderboard_data()
@@ -518,9 +534,8 @@ class CloudModelWorkflowService(SessionMixin):
             },
         ]
 
-    async def _prepare_model_data(self, data: Dict[str, Any]) -> None:
+    async def _prepare_model_data(self, data: Dict[str, Any], db_cloud_model: Optional[CloudModel] = None) -> None:
         """Prepare model data."""
-        cloud_model_id = data.get("cloud_model_id")
         source = data.get("source")
         name = data.get("name")
         modality = data.get("modality")
@@ -530,14 +545,7 @@ class CloudModelWorkflowService(SessionMixin):
         provider_id = data.get("provider_id")
         created_by = data.get("created_by")
 
-        db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
-            ProviderModel, {"id": provider_id}, missing_ok=True
-        )
-
-        if cloud_model_id:
-            db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
-                CloudModel, {"id": cloud_model_id}, missing_ok=True
-            )
+        if db_cloud_model:
             model_data = ModelCreate(
                 name=name,
                 description=db_cloud_model.description,

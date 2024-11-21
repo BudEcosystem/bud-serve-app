@@ -82,6 +82,7 @@ class CloudModel(BaseModel):
     model_size: int | None = None
     tags: list[Tag] | None = None
     tasks: list[Tag] | None = None
+    is_present_in_model: bool = False
 
 
 class PaperPublishedModel(BaseModel):
@@ -274,6 +275,7 @@ class ModelResponse(BaseModel):
     created_at: datetime
     modified_at: datetime
     provider: Provider | None = None
+    is_present_in_model: bool | None = None
 
 
 class ModelListResponse(BaseModel):
