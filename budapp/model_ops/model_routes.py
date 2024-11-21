@@ -580,8 +580,6 @@ async def list_all_model_authors(
     session: Annotated[Session, Depends(get_session)],
     filters: Annotated[ModelAuthorFilter, Depends()],
     current_user: User = Depends(get_current_active_user),
-    tags: List[str] = Query(default_factory=list),
-    tasks: List[str] = Query(default_factory=list),
     search: bool = False,
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=0),
@@ -592,10 +590,6 @@ async def list_all_model_authors(
     offset = (page - 1) * limit
 
     filters_dict = filters.model_dump(exclude_none=True)
-    if tags:
-        filters_dict["tags"] = tags
-    if tasks:
-        filters_dict["tasks"] = tasks
 
     try:
         db_authors, count = await ModelService(session).list_all_model_authors(

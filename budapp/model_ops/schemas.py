@@ -427,14 +427,4 @@ class ModelAuthorResponse(PaginatedSuccessResponse):
 class ModelAuthorFilter(BaseModel):
     """Filter schema for model authors."""
 
-    model_config = ConfigDict(protected_namespaces=())
-
-    source: CredentialTypeEnum | None = None
-    modality: ModalityEnum | None = None
-    model_size: int | None = None
     author: str | None = None
-
-    @field_validator("source")
-    def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
-        """Change the source to a string."""
-        return v.value if v else None

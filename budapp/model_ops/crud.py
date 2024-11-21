@@ -313,35 +313,19 @@ class ModelDataManager(DataManagerUtils):
         limit: int = 10,
         filters: Dict[str, Any] = {},
         order_by: List[Tuple[str, str]] = [],
-        search: bool = False,  # Search flag to enable search functionality
-    ) -> Tuple[List[str], int]:
-        """Get all authors with filter, search, and pagination support."""
+        search: bool = False,
+    ) -> Tuple[List[Model], int]:
+        """Get all authors from the database."""
         await self.validate_fields(Model, filters)
 
-        # Extract JSON filters for tags and tasks
-        json_filters = {"tags": [], "tasks": []}
-        if "tags" in filters:
-            json_filters["tags"] = filters["tags"]
-            del filters["tags"]
-        if "tasks" in filters:
-            json_filters["tasks"] = filters["tasks"]
-            del filters["tasks"]
-
-        # Build conditions for tags and tasks
-        conditions = [Model.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]]
-        conditions.extend(
-            [Model.tasks.cast(JSONB).contains([{"name": task_name}]) for task_name in json_filters["tasks"]]
-        )
-
+        # Generate statements according to search or filters
         if search:
             search_conditions = await self.generate_search_stmt(Model, filters)
-            stmt = select(Model).filter(or_(*search_conditions)).where(or_(*conditions))
-            count_stmt = (
-                select(func.count()).select_from(Model).filter(or_(*search_conditions)).where(or_(*conditions))
-            )
+            stmt = select(Model).filter(and_(*search_conditions))
+            count_stmt = select(func.count()).select_from(Model).filter(and_(*search_conditions))
         else:
-            stmt = select(Model).filter_by(**filters).where(and_(*conditions))
-            count_stmt = select(func.count()).select_from(Model).filter_by(**filters).where(and_(*conditions))
+            stmt = select(Model).filter_by(**filters)
+            count_stmt = select(func.count()).select_from(Model).filter_by(**filters)
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)
@@ -355,8 +339,8 @@ class ModelDataManager(DataManagerUtils):
             stmt = stmt.order_by(*sort_conditions)
 
         result = self.scalars_all(stmt)
-        authors = [model.author for model in result]
-        return authors, count
+
+        return result, count
 
 
 class CloudModelDataManager(DataManagerUtils):

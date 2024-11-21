@@ -789,4 +789,11 @@ class ModelService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[str], int]:
         """Search author by name with pagination support."""
-        return await ModelDataManager(self.session).list_all_model_authors(offset, limit, filters, order_by, search)
+
+        filters["is_active"] = True
+        db_models, count = await ModelDataManager(self.session).list_all_model_authors(
+            offset, limit, filters, order_by, search
+        )
+        db_authors = [model.author for model in db_models]
+
+        return db_authors, count
