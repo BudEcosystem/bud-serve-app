@@ -267,33 +267,69 @@ class CloudModelDataManager(DataManagerUtils):
         search: bool = False,
     ) -> Tuple[List[CloudModel], int]:
         """Get all cloud models from the database."""
+        # Tags and tasks are not filterable
+        # Also remove from filters dict
+        explicit_conditions = []
+        json_filters = {"tags": filters.pop("tags", []), "tasks": filters.pop("tasks", [])}
+        explicit_filters = {
+            "modality": filters.pop("modality", []),
+            "author": filters.pop("author", []),
+            "model_size_min": filters.pop("model_size_min", None),
+            "model_size_max": filters.pop("model_size_max", None),
+        }
+
+        # Validate the remaining filters
         await self.validate_fields(CloudModel, filters)
 
-        # Tags and tasks are not filterable
-        json_filters = {"tags": [], "tasks": []}
-        if "tags" in filters:
-            json_filters["tags"] = filters["tags"]
-            del filters["tags"]
-        if "tasks" in filters:
-            json_filters["tasks"] = filters["tasks"]
-            del filters["tasks"]
+        if json_filters["tags"]:
+            # Either TagA or TagB exist in tag field
+            tag_conditions = or_(
+                *[CloudModel.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]]
+            )
+            explicit_conditions.append(tag_conditions)
 
-        conditions = [CloudModel.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]]
+        if json_filters["tasks"]:
+            # Either TaskA or TaskB exist in task field
+            task_conditions = or_(
+                *[CloudModel.tasks.cast(JSONB).contains([{"name": task_name}]) for task_name in json_filters["tasks"]]
+            )
+            explicit_conditions.append(task_conditions)
 
-        conditions.extend(
-            [CloudModel.tasks.cast(JSONB).contains([{"name": task_name}]) for task_name in json_filters["tasks"]]
-        )
+        if explicit_filters["modality"]:
+            # Check any of modality present in the field
+            modality_condition = CloudModel.modality.in_(explicit_filters["modality"])
+            explicit_conditions.append(modality_condition)
+
+        if explicit_filters["author"]:
+            # Check any of author present in the field
+            author_condition = CloudModel.modality.in_(explicit_filters["author"])
+            explicit_conditions.append(author_condition)
+
+        if explicit_filters["model_size_min"] is not None or explicit_filters["model_size_max"] is not None:
+            # Add model size range condition
+            size_conditions = []
+            if explicit_filters["model_size_min"] is not None:
+                size_conditions.append(CloudModel.model_size >= explicit_filters["model_size_min"])
+            if explicit_filters["model_size_max"] is not None:
+                size_conditions.append(CloudModel.model_size <= explicit_filters["model_size_max"])
+            size_condition = and_(*size_conditions)
+            explicit_conditions.append(size_condition)
 
         # Generate statements according to search or filters
         if search:
             search_conditions = await self.generate_search_stmt(CloudModel, filters)
-            stmt = select(CloudModel).filter(or_(*search_conditions)).where(or_(*conditions))
+            stmt = select(CloudModel).filter(or_(*search_conditions)).where(or_(*explicit_conditions))
             count_stmt = (
-                select(func.count()).select_from(CloudModel).filter(or_(*search_conditions)).where(or_(*conditions))
+                select(func.count())
+                .select_from(CloudModel)
+                .filter(or_(*search_conditions))
+                .where(or_(*explicit_conditions))
             )
         else:
-            stmt = select(CloudModel).filter_by(**filters).where(and_(*conditions))
-            count_stmt = select(func.count()).select_from(CloudModel).filter_by(**filters).where(and_(*conditions))
+            stmt = select(CloudModel).filter_by(**filters).where(and_(*explicit_conditions))
+            count_stmt = (
+                select(func.count()).select_from(CloudModel).filter_by(**filters).where(and_(*explicit_conditions))
+            )
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)

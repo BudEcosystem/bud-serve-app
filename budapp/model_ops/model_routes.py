@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
+from budapp.commons.constants import ModalityEnum
 from budapp.commons.dependencies import (
     get_current_active_user,
     get_session,
@@ -87,6 +88,8 @@ async def list_all_models(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     filters: Annotated[ModelFilter, Depends()],
+    author: List[str] = Query(default_factory=list),
+    modality: List[ModalityEnum] = Query(default_factory=list),
     tags: List[str] = Query(default_factory=list),
     tasks: List[str] = Query(default_factory=list),
     page: int = Query(1, ge=1),
@@ -100,16 +103,22 @@ async def list_all_models(
 
     # Convert UserFilter to dictionary
     filters_dict = filters.model_dump(exclude_none=True, exclude={"table_source"})
-    if tags:
-        filters_dict["tags"] = tags
-    if tasks:
-        filters_dict["tasks"] = tasks
+
+    # Update filters_dict only for non-empty lists
+    filter_updates = {"tags": tags, "tasks": tasks, "author": author, "modality": modality}
+    filters_dict.update({k: v for k, v in filter_updates.items() if v})
 
     # Perform router level validation
-    if filters.table_source == "cloud_model" and filters.author is not None:
+    if filters.table_source == "cloud_model" and filter_updates["author"]:
         return ErrorResponse(
             code=status.HTTP_400_BAD_REQUEST,
             message="Author is not allowed for cloud models.",
+        ).to_http_response()
+
+    if filters.model_size_min and filters.model_size_max and filters.model_size_min > filters.model_size_max:
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            message="Model size min is greater than model size max.",
         ).to_http_response()
 
     try:

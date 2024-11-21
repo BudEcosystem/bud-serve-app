@@ -295,10 +295,9 @@ class ModelFilter(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     name: str | None = None
-    author: str | None = None
-    modality: ModalityEnum | None = None
     source: CredentialTypeEnum | None = None
-    model_size: int | None = None  # Size in bytes
+    model_size_min: int | None = Field(None, ge=0, le=10)
+    model_size_max: int | None = Field(None, ge=0, le=10)
     provider_type: ModelProviderTypeEnum | None = None
     table_source: Literal["cloud_model", "model"] = "cloud_model"
 
@@ -307,6 +306,14 @@ class ModelFilter(BaseModel):
     def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
         """Convert the source enum value to a string."""
         return v.value if v else None
+
+    @field_validator("model_size_min", "model_size_max")
+    @classmethod
+    def convert_to_billions(cls, v: Optional[int]) -> Optional[int]:
+        """Convert the input value to billions."""
+        if v is not None:
+            return v * 1000000000  # Convert to billions
+        return v
 
 
 # Cloud model related schemas
