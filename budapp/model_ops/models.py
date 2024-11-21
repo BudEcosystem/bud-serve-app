@@ -172,5 +172,6 @@ class CloudModel(Base):
     provider_id: Mapped[UUID] = mapped_column(ForeignKey("provider.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_present_in_model: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     provider: Mapped[Optional["Provider"]] = relationship("Provider", back_populates="cloud_models")
