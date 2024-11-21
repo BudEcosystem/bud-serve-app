@@ -201,7 +201,53 @@ class ModelDataManager(DataManagerUtils):
         search: bool = False,
     ) -> Tuple[List[Model], int]:
         """List all models in the database."""
+        # Tags and tasks are not filterable
+        # Also remove from filters dict
+        explicit_conditions = []
+        json_filters = {"tags": filters.pop("tags", []), "tasks": filters.pop("tasks", [])}
+        explicit_filters = {
+            "modality": filters.pop("modality", []),
+            "author": filters.pop("author", []),
+            "model_size_min": filters.pop("model_size_min", None),
+            "model_size_max": filters.pop("model_size_max", None),
+        }
+
+        # Validate the remaining filters
         await self.validate_fields(Model, filters)
+
+        if json_filters["tags"]:
+            # Either TagA or TagB exist in tag field
+            tag_conditions = or_(
+                *[Model.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]]
+            )
+            explicit_conditions.append(tag_conditions)
+
+        if json_filters["tasks"]:
+            # Either TaskA or TaskB exist in task field
+            task_conditions = or_(
+                *[Model.tasks.cast(JSONB).contains([{"name": task_name}]) for task_name in json_filters["tasks"]]
+            )
+            explicit_conditions.append(task_conditions)
+
+        if explicit_filters["modality"]:
+            # Check any of modality present in the field
+            modality_condition = Model.modality.in_(explicit_filters["modality"])
+            explicit_conditions.append(modality_condition)
+
+        if explicit_filters["author"]:
+            # Check any of author present in the field
+            author_condition = Model.author.in_(explicit_filters["author"])
+            explicit_conditions.append(author_condition)
+
+        if explicit_filters["model_size_min"] is not None or explicit_filters["model_size_max"] is not None:
+            # Add model size range condition
+            size_conditions = []
+            if explicit_filters["model_size_min"] is not None:
+                size_conditions.append(Model.model_size >= explicit_filters["model_size_min"])
+            if explicit_filters["model_size_max"] is not None:
+                size_conditions.append(Model.model_size <= explicit_filters["model_size_max"])
+            size_condition = and_(*size_conditions)
+            explicit_conditions.append(size_condition)
 
         # Generate statements according to search or filters
         if search:
@@ -213,12 +259,17 @@ class ModelDataManager(DataManagerUtils):
                 )
                 .select_from(Model)
                 .filter(or_(*search_conditions))
+                .where(or_(*explicit_conditions))
                 .filter(Model.is_active == True)
                 .outerjoin(Endpoint, Endpoint.model_id == Model.id)
                 .group_by(Model.id)
             )
             count_stmt = (
-                select(func.count()).select_from(Model).filter(or_(*search_conditions)).filter(Model.is_active == True)
+                select(func.count())
+                .select_from(Model)
+                .filter(or_(*search_conditions))
+                .where(or_(*explicit_conditions))
+                .filter(Model.is_active == True)
             )
         else:
             stmt = (
@@ -228,11 +279,18 @@ class ModelDataManager(DataManagerUtils):
                 )
                 .select_from(Model)
                 .filter_by(**filters)
+                .where(and_(*explicit_conditions))
                 .filter(Model.is_active == True)
                 .outerjoin(Endpoint, Endpoint.model_id == Model.id)
                 .group_by(Model.id)
             )
-            count_stmt = select(func.count()).select_from(Model).filter_by(**filters).filter(Model.is_active == True)
+            count_stmt = (
+                select(func.count())
+                .select_from(Model)
+                .filter_by(**filters)
+                .where(and_(*explicit_conditions))
+                .filter(Model.is_active == True)
+            )
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)
