@@ -154,18 +154,24 @@ class ModelDataManager(DataManagerUtils):
         limit: int = 10,
     ) -> Tuple[List[dict], int]:
         """Search tasks by name with pagination, or fetch all tags if no search value is provided."""
+        # Ensure only valid JSON arrays are processed
         subquery = (
             select(func.jsonb_array_elements(Model.tasks).label("task"))
             .where(Model.is_active)
-            .where(Model.tasks.isnot(None))
+            .where(Model.tasks.is_not(None))  # Exclude null tasks
+            .where(func.jsonb_typeof(Model.tasks) == "array")  # Ensure tasks is a JSON array
         ).subquery()
+
+        # Ensure task is a JSONB object
+        filtered_subquery = select(subquery.c.task).where(func.jsonb_typeof(subquery.c.task) == "object").subquery()
 
         # Build the final query
         final_query = (
             select(
-                func.jsonb_extract_path_text(subquery.c.task, "name").label("name"),
-                func.min(func.jsonb_extract_path_text(subquery.c.task, "color")).label("color"),
+                func.jsonb_extract_path_text(filtered_subquery.c.task, "name").label("name"),
+                func.min(func.jsonb_extract_path_text(filtered_subquery.c.task, "color")).label("color"),
             )
+            .where(func.jsonb_extract_path_text(filtered_subquery.c.task, "name").is_not(None))  # Exclude null names
             .group_by("name")
             .order_by("name")
             .offset(offset)
@@ -175,18 +181,21 @@ class ModelDataManager(DataManagerUtils):
         # Add the WHERE clause only if a search_value is provided
         if search_value:
             final_query = final_query.where(
-                func.jsonb_extract_path_text(subquery.c.task, "name").ilike(f"{search_value}%")
+                func.jsonb_extract_path_text(filtered_subquery.c.task, "name").ilike(f"{search_value}%")
             )
 
         # Execute the query
         results = self.session.execute(final_query).all()
         tasks = [{"name": res.name, "color": res.color} for res in results] if results else []
 
-        # Total count query, adjusted to conditionally apply the search filter
-        total_query = select(func.count(func.distinct(func.jsonb_extract_path_text(subquery.c.task, "name"))))
+        # Total count query
+        total_query = select(func.count(func.distinct(func.jsonb_extract_path_text(filtered_subquery.c.task, "name"))))
+        total_query = total_query.where(
+            func.jsonb_extract_path_text(filtered_subquery.c.task, "name").is_not(None)  # Exclude null names
+        )
         if search_value:
             total_query = total_query.where(
-                func.jsonb_extract_path_text(subquery.c.task, "name").ilike(f"{search_value}%")
+                func.jsonb_extract_path_text(filtered_subquery.c.task, "name").ilike(f"{search_value}%")
             )
         total_count = self.session.execute(total_query).scalar()
 
