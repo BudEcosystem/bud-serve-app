@@ -755,7 +755,20 @@ class ModelService(SessionMixin):
 
     async def search_tasks_by_name(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
         """Search model tasks by name with pagination."""
-        return await ModelDataManager(self.session).search_tasks_by_name(name, offset, limit)
+        db_models, count = await ModelDataManager(self.session).search_tasks_by_name(name, offset, limit)
+        db_tasks = (
+            [
+                {"name": task["name"], "color": task["color"]}
+                for model in db_models
+                if model.tasks  # Ensure tasks is not None
+                for task in model.tasks  # Iterate over tasks if they exist
+                if task.get("name") and task.get("color")  # Ensure the task has both name and color
+            ]
+            if db_models
+            else []
+        )
+
+        return db_tasks, count
 
     async def get_all_active_models(
         self,
