@@ -29,7 +29,7 @@ from budapp.commons import logging
 from budapp.commons.constants import WorkflowStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
-from budapp.commons.schemas import Tag
+from budapp.commons.schemas import Tag, Task
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
@@ -751,37 +751,17 @@ class ModelService(SessionMixin):
 
     async def list_model_tags(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
         """Search model tags by name with pagination."""
-        db_models, count = await ModelDataManager(self.session).list_model_tags(name, offset, limit)
-        db_tags = (
-            [
-                {"name": tag["name"], "color": tag["color"]}
-                for model in db_models
-                if model.tags  # Ensure tags is not None
-                for tag in model.tags  # Iterate over tags if they exist
-                if tag.get("name") and tag.get("color")  # Ensure the tag has both name and color
-            ]
-            if db_models
-            else []
-        )
+        tags_result, count = await ModelDataManager(self.session).list_model_tags(name, offset, limit)
+        tags = [Tag(name=row.name, color=row.color) for row in tags_result]
 
-        return db_tags, count
+        return tags, count
 
-    async def list_model_tasks(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Model], int]:
+    async def list_model_tasks(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Task], int]:
         """Search model tasks by name with pagination."""
-        db_models, count = await ModelDataManager(self.session).list_model_tasks(name, offset, limit)
-        db_tasks = (
-            [
-                {"name": task["name"], "color": task["color"]}
-                for model in db_models
-                if model.tasks  # Ensure tasks is not None
-                for task in model.tasks  # Iterate over tasks if they exist
-                if task.get("name") and task.get("color")  # Ensure the task has both name and color
-            ]
-            if db_models
-            else []
-        )
+        tasks_result, count = await ModelDataManager(self.session).list_model_tasks(name, offset, limit)
+        tasks = [Task(name=row.name, color=row.color) for row in tasks_result]
 
-        return db_tasks, count
+        return tasks, count
 
     async def get_all_active_models(
         self,
