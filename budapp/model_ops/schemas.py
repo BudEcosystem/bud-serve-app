@@ -421,8 +421,6 @@ class SearchTagsResponse(PaginatedSuccessResponse):
 class TasksListResponse(PaginatedSuccessResponse):
     """Response schema for tasks list."""
 
-    # tasks: List[Tag] = Field(..., description="List of matching tasks")
-
     tasks: List[Task] = []
 
 
