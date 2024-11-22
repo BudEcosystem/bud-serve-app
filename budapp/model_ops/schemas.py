@@ -413,9 +413,15 @@ class RecommendedTagsResponse(PaginatedSuccessResponse):
 
 
 class SearchTagsResponse(PaginatedSuccessResponse):
-    """Response schema for searching tags by name."""
+    """Response schema for tags list."""
 
     tags: List[Tag] = Field(..., description="List of matching tags")
+
+
+class TasksListResponse(PaginatedSuccessResponse):
+    """Response schema for tasks list."""
+
+    tasks: List[Task] = []
 
 
 class ModelAuthorResponse(PaginatedSuccessResponse):
