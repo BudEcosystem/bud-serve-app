@@ -307,6 +307,41 @@ class ModelDataManager(DataManagerUtils):
 
         return result, count
 
+    async def list_all_model_authors(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict[str, Any] = {},
+        order_by: List[Tuple[str, str]] = [],
+        search: bool = False,
+    ) -> Tuple[List[Model], int]:
+        """Get all authors from the database."""
+        await self.validate_fields(Model, filters)
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(Model, filters)
+            stmt = select(Model).filter(and_(*search_conditions))
+            count_stmt = select(func.count()).select_from(Model).filter(and_(*search_conditions))
+        else:
+            stmt = select(Model).filter_by(**filters)
+            count_stmt = select(func.count()).select_from(Model).filter_by(**filters)
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(Model, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.scalars_all(stmt)
+
+        return result, count
+
 
 class CloudModelDataManager(DataManagerUtils):
     """Data manager for the CloudModel model."""
