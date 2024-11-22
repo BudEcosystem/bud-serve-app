@@ -766,9 +766,22 @@ class ModelService(SessionMixin):
 
         return db_tags, count
 
-    async def search_tasks_by_name(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
+    async def list_model_tasks(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Model], int]:
         """Search model tasks by name with pagination."""
-        return await ModelDataManager(self.session).search_tasks_by_name(name, offset, limit)
+        db_models, count = await ModelDataManager(self.session).list_model_tasks(name, offset, limit)
+        db_tasks = (
+            [
+                {"name": task["name"], "color": task["color"]}
+                for model in db_models
+                if model.tasks  # Ensure tasks is not None
+                for task in model.tasks  # Iterate over tasks if they exist
+                if task.get("name") and task.get("color")  # Ensure the task has both name and color
+            ]
+            if db_models
+            else []
+        )
+
+        return db_tasks, count
 
     async def get_all_active_models(
         self,
@@ -792,3 +805,21 @@ class ModelService(SessionMixin):
             db_models_response.append(ModelListResponse(model=model_response, endpoints_count=result[1]))
 
         return db_models_response, count
+
+    async def list_all_model_authors(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[str], int]:
+        """Search author by name with pagination support."""
+
+        filters["is_active"] = True
+        db_models, count = await ModelDataManager(self.session).list_all_model_authors(
+            offset, limit, filters, order_by, search
+        )
+        db_authors = [model.author for model in db_models]
+
+        return db_authors, count

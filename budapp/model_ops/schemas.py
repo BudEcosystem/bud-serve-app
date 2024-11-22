@@ -413,6 +413,24 @@ class RecommendedTagsResponse(PaginatedSuccessResponse):
 
 
 class SearchTagsResponse(PaginatedSuccessResponse):
-    """Response schema for searching tags by name."""
+    """Response schema for tags list."""
 
     tags: List[Tag] = Field(..., description="List of matching tags")
+
+
+class TasksListResponse(PaginatedSuccessResponse):
+    """Response schema for tasks list."""
+
+    tasks: List[Task] = []
+
+
+class ModelAuthorResponse(PaginatedSuccessResponse):
+    """Response schema for searching tags by name."""
+
+    authors: List[str] = Field(..., description="List of matching authors")
+
+
+class ModelAuthorFilter(BaseModel):
+    """Filter schema for model authors."""
+
+    author: str | None = None
