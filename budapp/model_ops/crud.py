@@ -147,7 +147,7 @@ class ModelDataManager(DataManagerUtils):
 
         return tags, total_count
 
-    async def search_tasks_by_name(
+    async def list_model_tasks(
         self,
         search_value: str = "",
         offset: int = 0,

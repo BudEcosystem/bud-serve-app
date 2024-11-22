@@ -50,6 +50,7 @@ from .schemas import (
     ProviderResponse,
     RecommendedTagsResponse,
     SearchTagsResponse,
+    TasksListResponse,
 )
 from .services import (
     CloudModelService,
@@ -525,34 +526,33 @@ async def search_tags_by_name(
             "description": "Service is unavailable due to client error",
         },
         status.HTTP_200_OK: {
-            "model": SearchTagsResponse,
-            "description": "Successfully searched tags by name",
+            "model": TasksListResponse,
+            "description": "Successfully listed tasks",
         },
     },
     description="Search model tags by name with pagination",
 )
-async def search_tasks_by_name(
+async def list_model_tasks(
     session: Annotated[Session, Depends(get_session)],
     name: Optional[str] = Query(default=None),
     current_user: User = Depends(get_current_active_user),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1),
-) -> Union[SearchTagsResponse, ErrorResponse]:
-    """Search tasks by name with pagination support."""
+) -> Union[TasksListResponse, ErrorResponse]:
+    """list tasks by name with pagination support."""
     offset = (page - 1) * limit
 
     try:
-        db_tasks, count = await ModelService(session).search_tasks_by_name(name or "", offset, limit)
+        db_tasks, count = await ModelService(session).list_model_tasks(name or "", offset, limit)
     except Exception as e:
-        print(e)
         return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)).to_http_response()
 
-    return SearchTagsResponse(
-        tags=db_tasks,
+    return TasksListResponse(
+        tasks=db_tasks,
         total_record=count,
         page=page,
         limit=limit,
-        object="tasks.search",
+        object="tasks.list",
         code=status.HTTP_200_OK,
     ).to_http_response()
 
