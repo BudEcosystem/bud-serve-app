@@ -751,7 +751,20 @@ class ModelService(SessionMixin):
 
     async def search_tags_by_name(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
         """Search model tags by name with pagination."""
-        return await ModelDataManager(self.session).search_tags_by_name(name, offset, limit)
+        db_models, count = await ModelDataManager(self.session).search_tags_by_name(name, offset, limit)
+        db_tags = (
+            [
+                {"name": tag["name"], "color": tag["color"]}
+                for model in db_models
+                if model.tags  # Ensure tags is not None
+                for tag in model.tags  # Iterate over tags if they exist
+                if tag.get("name") and tag.get("color")  # Ensure the tag has both name and color
+            ]
+            if db_models
+            else []
+        )
+
+        return db_tags, count
 
     async def search_tasks_by_name(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
         """Search model tasks by name with pagination."""

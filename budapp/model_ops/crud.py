@@ -107,45 +107,68 @@ class ModelDataManager(DataManagerUtils):
         search_value: str = "",
         offset: int = 0,
         limit: int = 10,
-    ) -> Tuple[List[dict], int]:
+    ) -> Tuple[List[Model], int]:
         """Search tags by name with pagination, or fetch all tags if no search value is provided."""
+        # Ensure only valid JSON arrays are processed
         subquery = (
             select(func.jsonb_array_elements(Model.tags).label("tag"))
-            .where(Model.is_active == True)
-            .where(Model.tags.isnot(None))
+            .where(Model.is_active)
+            .where(Model.tags.is_not(None))  # Exclude null tags
+            .where(func.jsonb_typeof(Model.tags) == "array")  # Ensure tags is a JSON array
         ).subquery()
 
-        # Build the final query
-        final_query = (
-            select(
-                func.jsonb_extract_path_text(subquery.c.tag, "name").label("name"),
-                func.min(func.jsonb_extract_path_text(subquery.c.tag, "color")).label("color"),
+        # Ensure tag is a JSONB object
+        filtered_subquery = select(subquery.c.tag).where(func.jsonb_typeof(subquery.c.tag) == "object").subquery()
+
+        # Alias for the filtered subquery
+        tag_alias = filtered_subquery.alias()
+
+        # Query to fetch Model records filtered by tag names
+        model_query = (
+            select(Model)
+            .where(Model.is_active)  # Ensure the model is active
+            .where(Model.tags.is_not(None))  # Exclude models with null tags
+            .where(
+                func.exists(
+                    select(1)
+                    .select_from(tag_alias)
+                    .where(
+                        func.jsonb_extract_path_text(tag_alias.c.tag, "name").is_not(None),  # Exclude null tag names
+                        func.jsonb_extract_path_text(tag_alias.c.tag, "name").ilike(f"{search_value}%")
+                        if search_value
+                        else True,
+                    )
+                )
             )
-            .group_by("name")
-            .order_by("name")
             .offset(offset)
             .limit(limit)
         )
 
-        # Add the WHERE clause only if a search_value is provided
-        if search_value:
-            final_query = final_query.where(
-                func.jsonb_extract_path_text(subquery.c.tag, "name").ilike(f"{search_value}%")
-            )
+        # Execute the query to fetch models
+        models = self.session.execute(model_query).scalars().all()
 
-        # Execute the query
-        results = self.session.execute(final_query).all()
-        tags = [{"name": res.name, "color": res.color} for res in results] if results else []
-
-        # Total count query, adjusted to conditionally apply the search filter
-        total_query = select(func.count(func.distinct(func.jsonb_extract_path_text(subquery.c.tag, "name"))))
-        if search_value:
-            total_query = total_query.where(
-                func.jsonb_extract_path_text(subquery.c.tag, "name").ilike(f"{search_value}%")
+        # Total count query
+        total_query = (
+            select(func.count(Model.id))
+            .where(Model.is_active)  # Ensure the model is active
+            .where(Model.tags.is_not(None))  # Exclude models with null tags
+            .where(
+                func.exists(
+                    select(1)
+                    .select_from(tag_alias)
+                    .where(
+                        func.jsonb_extract_path_text(tag_alias.c.tag, "name").is_not(None),  # Exclude null tag names
+                        func.jsonb_extract_path_text(tag_alias.c.tag, "name").ilike(f"{search_value}%")
+                        if search_value
+                        else True,
+                    )
+                )
             )
+        )
+
         total_count = self.session.execute(total_query).scalar()
 
-        return tags, total_count
+        return models, total_count
 
     async def search_tasks_by_name(
         self,
