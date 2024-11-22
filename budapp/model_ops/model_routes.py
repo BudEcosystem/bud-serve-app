@@ -49,7 +49,7 @@ from .schemas import (
     ProviderFilter,
     ProviderResponse,
     RecommendedTagsResponse,
-    SearchTagsResponse,
+    TagsListResponse,
     ModelAuthorResponse,
     ModelAuthorFilter,
     TasksListResponse,
@@ -485,28 +485,28 @@ async def list_cloud_model_recommended_tags(
             "description": "Service is unavailable due to client error",
         },
         status.HTTP_200_OK: {
-            "model": SearchTagsResponse,
+            "model": TagsListResponse,
             "description": "Successfully searched tags by name",
         },
     },
     description="Search model tags by name with pagination",
 )
-async def search_tags_by_name(
+async def list_model_tags(
     session: Annotated[Session, Depends(get_session)],
     name: Optional[str] = Query(default=None),
     current_user: User = Depends(get_current_active_user),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1),
-) -> Union[SearchTagsResponse, ErrorResponse]:
-    """Search tags by name with pagination support."""
+) -> Union[TagsListResponse, ErrorResponse]:
+    """list tags by name with pagination support."""
     offset = (page - 1) * limit
 
     try:
-        db_tags, count = await ModelService(session).search_tags_by_name(name or "", offset, limit)
+        db_tags, count = await ModelService(session).list_model_tags(name or "", offset, limit)
     except Exception as e:
         return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)).to_http_response()
 
-    return SearchTagsResponse(
+    return TagsListResponse(
         tags=db_tags,
         total_record=count,
         page=page,

@@ -412,7 +412,7 @@ class RecommendedTagsResponse(PaginatedSuccessResponse):
         return [TagWithCount(name=tag[0], color=tag[1], count=tag[2]) for tag in v]
 
 
-class SearchTagsResponse(PaginatedSuccessResponse):
+class TagsListResponse(PaginatedSuccessResponse):
     """Response schema for tags list."""
 
     tags: List[Tag] = Field(..., description="List of matching tags")

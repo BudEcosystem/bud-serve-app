@@ -102,7 +102,7 @@ class PaperPublishedDataManager(DataManagerUtils):
 class ModelDataManager(DataManagerUtils):
     """Data manager for the Model model."""
 
-    async def search_tags_by_name(
+    async def list_model_tags(
         self,
         search_value: str = "",
         offset: int = 0,
