@@ -792,3 +792,21 @@ class ModelService(SessionMixin):
             db_models_response.append(ModelListResponse(model=model_response, endpoints_count=result[1]))
 
         return db_models_response, count
+
+    async def list_all_model_authors(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[str], int]:
+        """Search author by name with pagination support."""
+
+        filters["is_active"] = True
+        db_models, count = await ModelDataManager(self.session).list_all_model_authors(
+            offset, limit, filters, order_by, search
+        )
+        db_authors = [model.author for model in db_models]
+
+        return db_authors, count

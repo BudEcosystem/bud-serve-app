@@ -424,3 +424,15 @@ class TasksListResponse(PaginatedSuccessResponse):
     # tasks: List[Tag] = Field(..., description="List of matching tasks")
 
     tasks: List[Task] = []
+
+
+class ModelAuthorResponse(PaginatedSuccessResponse):
+    """Response schema for searching tags by name."""
+
+    authors: List[str] = Field(..., description="List of matching authors")
+
+
+class ModelAuthorFilter(BaseModel):
+    """Filter schema for model authors."""
+
+    author: str | None = None

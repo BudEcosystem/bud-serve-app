@@ -50,6 +50,8 @@ from .schemas import (
     ProviderResponse,
     RecommendedTagsResponse,
     SearchTagsResponse,
+    ModelAuthorResponse,
+    ModelAuthorFilter,
     TasksListResponse,
 )
 from .services import (
@@ -553,6 +555,56 @@ async def list_model_tasks(
         page=page,
         limit=limit,
         object="tasks.list",
+        code=status.HTTP_200_OK,
+    ).to_http_response()
+
+
+@model_router.get(
+    "/authors",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ModelAuthorResponse,
+            "description": "Successfully searched author by name",
+        },
+    },
+    description="Search model author by name with pagination",
+)
+async def list_all_model_authors(
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[ModelAuthorFilter, Depends()],
+    current_user: User = Depends(get_current_active_user),
+    search: bool = False,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+) -> Union[ModelAuthorResponse, ErrorResponse]:
+    """Search author by name with pagination support."""
+
+    offset = (page - 1) * limit
+
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    try:
+        db_authors, count = await ModelService(session).list_all_model_authors(
+            offset, limit, filters_dict, order_by, search
+        )
+    except Exception as e:
+        return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)).to_http_response()
+
+    return ModelAuthorResponse(
+        authors=db_authors,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="author.list",
         code=status.HTTP_200_OK,
     ).to_http_response()
 
