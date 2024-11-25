@@ -33,12 +33,12 @@ from budapp.commons.dependencies import (
     parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
-from budapp.commons.schemas import ErrorResponse
+from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
-from .schemas import ClusterFilter, ClusterListResponse, CreateClusterWorkflowRequest
+from .schemas import ClusterFilter, ClusterListResponse, CreateClusterWorkflowRequest, ClusterBase, EditCluster
 from .services import ClusterService
 
 
@@ -185,3 +185,42 @@ async def list_clusters(
         object="cluster.list",
         code=status.HTTP_200_OK,
     ).to_http_response()
+
+
+@cluster_router.patch(
+    "/{cluster_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ClusterBase,  # have to verify
+            "description": "Successfully edited cluster",
+        },
+    },
+    description="Edit cluster",
+)
+async def edit_cluster(
+    cluster_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    edit_cluster: EditCluster,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Edit cluster workflow."""
+    try:
+        await ClusterService(session).edit_cluster(
+            cluster_id=cluster_id, data=edit_cluster.dict(exclude_unset=True, exclude_none=True)
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to edit cluster: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to edit cluster: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit cluster"
+        ).to_http_response()

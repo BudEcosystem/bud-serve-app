@@ -136,3 +136,8 @@ class CreateClusterWorkflowSteps(BaseModel):
     icon: str | None = None
     ingress_url: AnyHttpUrl | None = None
     configuration_yaml: dict | None = None
+
+
+class EditCluster(BaseModel):
+    name: str | None = None
+    ingress_url: AnyHttpUrl | None = None

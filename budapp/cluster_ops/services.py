@@ -25,6 +25,7 @@ from uuid import UUID
 import aiohttp
 import yaml
 from fastapi import UploadFile
+from pydantic import ValidationError
 
 from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension
@@ -45,6 +46,7 @@ from .schemas import (
     ClusterResponse,
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
+    EditCluster,
 )
 
 
@@ -498,3 +500,26 @@ class ClusterService(SessionMixin):
             hpu_total_workers=hpu_total_workers,
             hpu_available_workers=hpu_total_workers,
         )
+
+    async def edit_cluster(self, cluster_id: UUID, data: Dict[str, Any]) -> None:
+        """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
+        # Retrieve existing model
+        cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            model=ClusterModel, fields={"id": cluster_id}
+        )
+        if not cluster:
+            raise ValueError(f"Model with ID {cluster_id} not found")
+
+        validated_data = await self._validate_update_data(cluster, data)
+
+        # Update model with validated data
+        await ClusterDataManager(self.session).update_by_fields(cluster, validated_data)
+
+    async def _validate_update_data(self, model: ClusterModel, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate and prepare update data using EditModel schema."""
+        model_data = {key: getattr(model, key) for key in model.__table__.columns.keys()}
+        updated_data = {**model_data, **data}
+        try:
+            return EditCluster(**updated_data).dict(exclude_unset=True, exclude_none=True)
+        except ValidationError as e:
+            raise ValueError(f"Validation error: {e}")
