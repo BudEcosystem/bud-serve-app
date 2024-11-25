@@ -20,7 +20,6 @@ from typing import Any, Dict, List, Tuple
 
 from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.sql import text
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
