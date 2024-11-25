@@ -128,7 +128,7 @@ class ModelDataManager(DataManagerUtils):
             .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "color").is_not(None))  # Valid colors
         ).subquery()
 
-        # Apply DISTINCT ON to get unique tags by name, selecting the first color
+        # Apply DISTINCT to get unique tags by name, selecting the first color
         distinct_on_name_query = (
             select(
                 distinct_tags_query.c.name,
@@ -194,7 +194,7 @@ class ModelDataManager(DataManagerUtils):
             .where(func.jsonb_extract_path_text(tasks_subquery.c.task, "color").is_not(None))  # Valid colors
         ).subquery()
 
-        # Apply DISTINCT ON to get unique tasks by name, selecting the first color
+        # Apply DISTINCT to get unique tasks by name, selecting the first color
         distinct_on_name_query = (
             select(
                 distinct_tasks_query.c.name,
