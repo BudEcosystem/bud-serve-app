@@ -126,23 +126,31 @@ class ModelDataManager(DataManagerUtils):
             .where(func.jsonb_typeof(tags_subquery.c.tag) == "object")  # Ensure valid JSONB objects
             .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "name").is_not(None))  # Valid names
             .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "color").is_not(None))  # Valid colors
+        ).subquery()
+
+        # Apply DISTINCT to get unique tags by name, selecting the first color
+        distinct_on_name_query = (
+            select(
+                distinct_tags_query.c.name,
+                distinct_tags_query.c.color,
+            )
+            .distinct(distinct_tags_query.c.name)
+            .order_by(distinct_tags_query.c.name, distinct_tags_query.c.color)  # Ensure deterministic order
         )
 
         # Apply search filter if provided
         if search_value:
-            distinct_tags_query = distinct_tags_query.where(
-                func.jsonb_extract_path_text(tags_subquery.c.tag, "name").ilike(f"{search_value}%")
-            )
+            distinct_on_name_query = distinct_on_name_query.where(distinct_tags_query.c.name.ilike(f"{search_value}%"))
 
-        # Add DISTINCT clause and pagination
-        distinct_tags_with_pagination = distinct_tags_query.distinct().offset(offset).limit(limit)
+        # Add pagination
+        distinct_tags_with_pagination = distinct_on_name_query.offset(offset).limit(limit)
 
         # Execute the paginated query
         tags_result = self.session.execute(distinct_tags_with_pagination)
 
-        # Count total distinct tags
+        # Count total distinct tag names
         distinct_count_query = (
-            select(func.count(func.distinct(func.jsonb_extract_path_text(tags_subquery.c.tag, "name"))))
+            select(func.count(func.distinct(distinct_tags_query.c.name)))
             .where(func.jsonb_typeof(tags_subquery.c.tag) == "object")  # Ensure valid JSONB objects
             .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "name").is_not(None))  # Valid names
             .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "color").is_not(None))  # Valid colors
@@ -167,7 +175,6 @@ class ModelDataManager(DataManagerUtils):
         limit: int = 10,
     ) -> Tuple[List[Model], int]:
         """Search tasks by name with pagination, or fetch all tasks if no search value is provided."""
-
         # Ensure only valid JSON arrays are processed
         tasks_subquery = (
             select(func.jsonb_array_elements(Model.tasks).label("task"))
@@ -185,23 +192,33 @@ class ModelDataManager(DataManagerUtils):
             .where(func.jsonb_typeof(tasks_subquery.c.task) == "object")  # Ensure valid JSONB objects
             .where(func.jsonb_extract_path_text(tasks_subquery.c.task, "name").is_not(None))  # Valid names
             .where(func.jsonb_extract_path_text(tasks_subquery.c.task, "color").is_not(None))  # Valid colors
+        ).subquery()
+
+        # Apply DISTINCT to get unique tasks by name, selecting the first color
+        distinct_on_name_query = (
+            select(
+                distinct_tasks_query.c.name,
+                distinct_tasks_query.c.color,
+            )
+            .distinct(distinct_tasks_query.c.name)
+            .order_by(distinct_tasks_query.c.name, distinct_tasks_query.c.color)  # Ensure deterministic order
         )
 
         # Apply search filter if provided
         if search_value:
-            distinct_tasks_query = distinct_tasks_query.where(
-                func.jsonb_extract_path_text(tasks_subquery.c.task, "name").ilike(f"{search_value}%")
+            distinct_on_name_query = distinct_on_name_query.where(
+                distinct_tasks_query.c.name.ilike(f"{search_value}%")
             )
 
-        # Add DISTINCT clause and pagination
-        distinct_tasks_with_pagination = distinct_tasks_query.distinct().offset(offset).limit(limit)
+        # Add pagination
+        distinct_tasks_with_pagination = distinct_on_name_query.offset(offset).limit(limit)
 
         # Execute the paginated query
         tasks_result = self.session.execute(distinct_tasks_with_pagination)
 
-        # Count total distinct tasks
+        # Count total distinct task names
         distinct_count_query = (
-            select(func.count(func.distinct(func.jsonb_extract_path_text(tasks_subquery.c.task, "name"))))
+            select(func.count(func.distinct(distinct_tasks_query.c.name)))
             .where(func.jsonb_typeof(tasks_subquery.c.task) == "object")  # Ensure valid JSONB objects
             .where(func.jsonb_extract_path_text(tasks_subquery.c.task, "name").is_not(None))  # Valid names
             .where(func.jsonb_extract_path_text(tasks_subquery.c.task, "color").is_not(None))  # Valid colors
