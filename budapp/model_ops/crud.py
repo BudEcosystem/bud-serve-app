@@ -365,13 +365,18 @@ class ModelDataManager(DataManagerUtils):
         # Generate statements according to search or filters
         if search:
             search_conditions = await self.generate_search_stmt(Model, filters)
-            stmt = select(Model).filter(and_(*search_conditions, Model.author.is_not(None)))
-            count_stmt = (
-                select(func.count()).select_from(Model).filter(and_(*search_conditions, Model.author.is_not(None)))
+            stmt = select(Model).distinct(Model.author).filter(and_(*search_conditions, Model.author.is_not(None)))
+            count_stmt = select(func.count().label("count")).select_from(
+                select(Model.author)
+                .distinct()
+                .filter(and_(*search_conditions, Model.author.is_not(None)))
+                .alias("distinct_authors")
             )
         else:
-            stmt = select(Model).filter_by(**filters).filter(Model.author.is_not(None))
-            count_stmt = select(func.count()).select_from(Model).filter_by(**filters).filter(Model.author.is_not(None))
+            stmt = select(Model).distinct(Model.author).filter_by(**filters).filter(Model.author.is_not(None))
+            count_stmt = select(func.count().label("count")).select_from(
+                select(Model.author).distinct().filter(Model.author.is_not(None)).alias("distinct_authors")
+            )
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)
