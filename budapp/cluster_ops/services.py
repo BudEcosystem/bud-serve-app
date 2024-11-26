@@ -47,7 +47,7 @@ from .schemas import (
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
     EditCluster,
-    ClusterResponseForListing,
+    ClusterResponseWithEndpointCount,
 )
 
 
@@ -64,7 +64,7 @@ class ClusterService(SessionMixin):
         filters: Dict = {},
         order_by: List = [],
         search: bool = False,
-    ) -> Tuple[List[ClusterResponseForListing], int]:
+    ) -> Tuple[List[ClusterResponseWithEndpointCount], int]:
         """Get all active clusters."""
         filters_dict = filters
         filters_dict["is_active"] = True
@@ -75,7 +75,7 @@ class ClusterService(SessionMixin):
         # Add dummy data and additional fields
         updated_clusters = []
         for cluster in clusters:
-            updated_cluster = ClusterResponseForListing(
+            updated_cluster = ClusterResponseWithEndpointCount(
                 id=cluster.id,
                 cluster_id=cluster.cluster_id,
                 name=cluster.name,
@@ -511,66 +511,19 @@ class ClusterService(SessionMixin):
         if not cluster:
             raise ValueError(f"Model with ID {cluster_id} not found")
 
-        validated_data = await self._validate_update_data(cluster, data)
+        if data.get("ingress_url"):
+            data["ingress_url"] = str(data["ingress_url"])
 
-        # Update model with validated data
-        updated_cluster = await ClusterDataManager(self.session).update_by_fields(cluster, validated_data)
-        updated_cluster = ClusterResponse(
-            id=updated_cluster.id,
-            cluster_id=updated_cluster.cluster_id,
-            name=updated_cluster.name,
-            icon=updated_cluster.icon,
-            created_at=updated_cluster.created_at,
-            modified_at=updated_cluster.modified_at,
-            status=updated_cluster.status,
-            gpu_count=updated_cluster.gpu_count,
-            cpu_count=updated_cluster.cpu_count,
-            hpu_count=updated_cluster.hpu_count,
-            cpu_total_workers=updated_cluster.cpu_total_workers,
-            cpu_available_workers=updated_cluster.cpu_available_workers,
-            gpu_total_workers=updated_cluster.gpu_total_workers,
-            gpu_available_workers=updated_cluster.gpu_available_workers,
-            hpu_total_workers=updated_cluster.hpu_total_workers,
-            hpu_available_workers=updated_cluster.hpu_available_workers,
-        )
+        updated_cluster = await ClusterDataManager(self.session).update_by_fields(cluster, data)
+        updated_cluster = ClusterResponse.model_validate(updated_cluster)
 
         return updated_cluster
-
-    async def _validate_update_data(self, model: ClusterModel, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate and prepare update data using EditModel schema."""
-        model_data = {key: getattr(model, key) for key in model.__table__.columns.keys()}
-        updated_data = {**model_data, **data}
-        try:
-            validated_data = EditCluster(**updated_data).dict(exclude_unset=True, exclude_none=True)
-            if "ingress_url" in validated_data and validated_data["ingress_url"]:
-                validated_data["ingress_url"] = str(validated_data["ingress_url"])
-
-            return validated_data
-        except ValidationError as e:
-            raise ValueError(f"Validation error: {e}")
 
     async def get_cluster_details(self, cluster_id: UUID) -> ClusterModel:
         """Retrieve model details by model ID."""
         cluster_details = await ClusterDataManager(self.session).retrieve_by_fields(
             ClusterModel, {"id": cluster_id}, missing_ok=True
         )
-        cluster_details = ClusterResponse(
-            id=cluster_details.id,
-            cluster_id=cluster_details.cluster_id,
-            name=cluster_details.name,
-            icon=cluster_details.icon,
-            created_at=cluster_details.created_at,
-            modified_at=cluster_details.modified_at,
-            status=cluster_details.status,
-            gpu_count=cluster_details.gpu_count,
-            cpu_count=cluster_details.cpu_count,
-            hpu_count=cluster_details.hpu_count,
-            cpu_total_workers=cluster_details.cpu_total_workers,
-            cpu_available_workers=cluster_details.cpu_available_workers,
-            gpu_total_workers=cluster_details.gpu_total_workers,
-            gpu_available_workers=cluster_details.gpu_available_workers,
-            hpu_total_workers=cluster_details.hpu_total_workers,
-            hpu_available_workers=cluster_details.hpu_available_workers,
-        )
+        cluster_details = ClusterResponse.model_validate(cluster_details)
 
         return cluster_details

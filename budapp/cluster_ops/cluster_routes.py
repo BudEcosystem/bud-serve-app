@@ -293,5 +293,5 @@ async def get_cluster_details(
         cluster=cluster_details,
         message="Cluster details fetched successfully",
         code=status.HTTP_200_OK,
-        object="ClusterDetailResponse",
+        object="SingleClusterResponse",
     )

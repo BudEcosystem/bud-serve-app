@@ -102,7 +102,7 @@ class ClusterResponse(BaseModel):
         return self.cpu_available_workers + self.gpu_available_workers + self.hpu_available_workers
 
 
-class ClusterResponseForListing(ClusterResponse):
+class ClusterResponseWithEndpointCount(ClusterResponse):
     endpoint_count: int
 
 
@@ -117,7 +117,7 @@ class ClusterListResponse(PaginatedSuccessResponse):
 
     model_config = ConfigDict(extra="ignore")
 
-    clusters: List[ClusterResponseForListing]
+    clusters: List[ClusterResponseWithEndpointCount]
 
 
 class CreateClusterWorkflowRequest(BaseModel):
