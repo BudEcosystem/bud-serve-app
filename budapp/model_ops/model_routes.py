@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
+from budapp.commons.constants import ModalityEnum
 from budapp.commons.dependencies import (
     get_current_active_user,
     get_session,
@@ -39,16 +40,19 @@ from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
 from .schemas import (
-    CloudModelFilter,
-    CloudModelResponse,
     CreateCloudModelWorkflowRequest,
     CreateCloudModelWorkflowResponse,
     EditModel,
     ModelDetailResponse,
+    ModelFilter,
+    ModelPaginatedResponse,
     ProviderFilter,
     ProviderResponse,
     RecommendedTagsResponse,
-    SearchTagsResponse,
+    TagsListResponse,
+    ModelAuthorResponse,
+    ModelAuthorFilter,
+    TasksListResponse,
 )
 from .services import (
     CloudModelService,
@@ -61,6 +65,89 @@ from .services import (
 logger = logging.get_logger(__name__)
 
 model_router = APIRouter(prefix="/models", tags=["model"])
+
+
+@model_router.get(
+    "/",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ModelPaginatedResponse,
+            "description": "Successfully list all models",
+        },
+    },
+    description="List all models",
+)
+async def list_all_models(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[ModelFilter, Depends()],
+    author: List[str] = Query(default=[]),
+    modality: List[ModalityEnum] = Query(default=[]),
+    tags: List[str] = Query(default=[]),
+    tasks: List[str] = Query(default=[]),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[ModelPaginatedResponse, ErrorResponse]:
+    """List all models."""
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Convert UserFilter to dictionary
+    filters_dict = filters.model_dump(exclude_none=True, exclude={"table_source"})
+
+    # Update filters_dict only for non-empty lists
+    filter_updates = {"tags": tags, "tasks": tasks, "author": author, "modality": modality}
+    filters_dict.update({k: v for k, v in filter_updates.items() if v})
+
+    # Perform router level validation
+    if filters.table_source == "cloud_model" and filter_updates["author"]:
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            message="Author is not allowed for cloud models.",
+        ).to_http_response()
+
+    if filters.model_size_min and filters.model_size_max and filters.model_size_min > filters.model_size_max:
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            message="Model size min is greater than model size max.",
+        ).to_http_response()
+
+    try:
+        if filters.table_source == "cloud_model":
+            db_models, count = await CloudModelService(session).get_all_cloud_models(
+                offset, limit, filters_dict, order_by, search
+            )
+        else:
+            db_models, count = await ModelService(session).get_all_active_models(
+                offset, limit, filters_dict, order_by, search
+            )
+    except ClientException as e:
+        logger.exception(f"Failed to get all models: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get all models: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all cloud models"
+        ).to_http_response()
+
+    return ModelPaginatedResponse(
+        models=db_models,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="models.list",
+        code=status.HTTP_200_OK,
+    ).to_http_response()
 
 
 @model_router.get(
@@ -280,64 +367,64 @@ async def edit_model(
 #         ).to_http_response()
 
 
-@model_router.get(
-    "/cloud-models",
-    responses={
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
-        status.HTTP_200_OK: {
-            "model": ProviderResponse,
-            "description": "Successfully list all providers",
-        },
-    },
-    description="List all cloud models",
-)
-async def list_cloud_models(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
-    filters: Annotated[CloudModelFilter, Depends()],
-    tags: List[str] = Query(default_factory=list),
-    tasks: List[str] = Query(default_factory=list),
-    page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=0),
-    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
-    search: bool = False,
-) -> Union[CloudModelResponse, ErrorResponse]:
-    """List all cloud models."""
-    # Calculate offset
-    offset = (page - 1) * limit
+# @model_router.get(
+#     "/cloud-models",
+#     responses={
+#         status.HTTP_500_INTERNAL_SERVER_ERROR: {
+#             "model": ErrorResponse,
+#             "description": "Service is unavailable due to server error",
+#         },
+#         status.HTTP_400_BAD_REQUEST: {
+#             "model": ErrorResponse,
+#             "description": "Service is unavailable due to client error",
+#         },
+#         status.HTTP_200_OK: {
+#             "model": ProviderResponse,
+#             "description": "Successfully list all providers",
+#         },
+#     },
+#     description="List all cloud models",
+# )
+# async def list_cloud_models(
+#     current_user: Annotated[User, Depends(get_current_active_user)],
+#     session: Annotated[Session, Depends(get_session)],
+#     filters: Annotated[CloudModelFilter, Depends()],
+#     tags: List[str] = Query(default_factory=list),
+#     tasks: List[str] = Query(default_factory=list),
+#     page: int = Query(1, ge=1),
+#     limit: int = Query(10, ge=0),
+#     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+#     search: bool = False,
+# ) -> Union[CloudModelResponse, ErrorResponse]:
+#     """List all cloud models."""
+#     # Calculate offset
+#     offset = (page - 1) * limit
 
-    # Convert UserFilter to dictionary
-    filters_dict = filters.model_dump(exclude_none=True)
-    if tags:
-        filters_dict["tags"] = tags
-    if tasks:
-        filters_dict["tasks"] = tasks
+#     # Convert UserFilter to dictionary
+#     filters_dict = filters.model_dump(exclude_none=True)
+#     if tags:
+#         filters_dict["tags"] = tags
+#     if tasks:
+#         filters_dict["tasks"] = tasks
 
-    try:
-        db_models, count = await CloudModelService(session).get_all_cloud_models(
-            offset, limit, filters_dict, order_by, search
-        )
-    except Exception as e:
-        logger.exception(f"Failed to get all cloud models: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all cloud models"
-        ).to_http_response()
+#     try:
+#         db_models, count = await CloudModelService(session).get_all_cloud_models(
+#             offset, limit, filters_dict, order_by, search
+#         )
+#     except Exception as e:
+#         logger.exception(f"Failed to get all cloud models: {e}")
+#         return ErrorResponse(
+#             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all cloud models"
+#         ).to_http_response()
 
-    return CloudModelResponse(
-        cloud_models=db_models,
-        total_record=count,
-        page=page,
-        limit=limit,
-        object="cloud_models.list",
-        code=status.HTTP_200_OK,
-    ).to_http_response()
+#     return CloudModelResponse(
+#         cloud_models=db_models,
+#         total_record=count,
+#         page=page,
+#         limit=limit,
+#         object="cloud_models.list",
+#         code=status.HTTP_200_OK,
+#     ).to_http_response()
 
 
 @model_router.get(
@@ -398,33 +485,126 @@ async def list_cloud_model_recommended_tags(
             "description": "Service is unavailable due to client error",
         },
         status.HTTP_200_OK: {
-            "model": SearchTagsResponse,
+            "model": TagsListResponse,
             "description": "Successfully searched tags by name",
         },
     },
     description="Search model tags by name with pagination",
 )
-async def search_tags_by_name(
+async def list_model_tags(
     session: Annotated[Session, Depends(get_session)],
     name: Optional[str] = Query(default=None),
     current_user: User = Depends(get_current_active_user),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1),
-) -> Union[SearchTagsResponse, ErrorResponse]:
-    """Search tags by name with pagination support."""
+) -> Union[TagsListResponse, ErrorResponse]:
+    """list tags by name with pagination support."""
     offset = (page - 1) * limit
 
     try:
-        db_tags, count = await ModelService(session).search_tags_by_name(name or "", offset, limit)
+        db_tags, count = await ModelService(session).list_model_tags(name or "", offset, limit)
     except Exception as e:
         return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)).to_http_response()
 
-    return SearchTagsResponse(
+    return TagsListResponse(
         tags=db_tags,
         total_record=count,
         page=page,
         limit=limit,
         object="tags.search",
+        code=status.HTTP_200_OK,
+    ).to_http_response()
+
+
+@model_router.get(
+    "/tasks",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": TasksListResponse,
+            "description": "Successfully listed tasks",
+        },
+    },
+    description="Search model tags by name with pagination",
+)
+async def list_model_tasks(
+    session: Annotated[Session, Depends(get_session)],
+    name: Optional[str] = Query(default=None),
+    current_user: User = Depends(get_current_active_user),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1),
+) -> Union[TasksListResponse, ErrorResponse]:
+    """list tasks by name with pagination support."""
+    offset = (page - 1) * limit
+
+    try:
+        db_tasks, count = await ModelService(session).list_model_tasks(name or "", offset, limit)
+    except Exception as e:
+        return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)).to_http_response()
+
+    return TasksListResponse(
+        tasks=db_tasks,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="tasks.list",
+        code=status.HTTP_200_OK,
+    ).to_http_response()
+
+
+@model_router.get(
+    "/authors",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ModelAuthorResponse,
+            "description": "Successfully searched author by name",
+        },
+    },
+    description="Search model author by name with pagination",
+)
+async def list_all_model_authors(
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[ModelAuthorFilter, Depends()],
+    current_user: User = Depends(get_current_active_user),
+    search: bool = False,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+) -> Union[ModelAuthorResponse, ErrorResponse]:
+    """Search author by name with pagination support."""
+
+    offset = (page - 1) * limit
+
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    try:
+        db_authors, count = await ModelService(session).list_all_model_authors(
+            offset, limit, filters_dict, order_by, search
+        )
+    except Exception as e:
+        return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e)).to_http_response()
+
+    return ModelAuthorResponse(
+        authors=db_authors,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="author.list",
         code=status.HTTP_200_OK,
     ).to_http_response()
 

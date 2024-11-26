@@ -24,9 +24,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.commons.exceptions import DatabaseException
-from budapp.model_ops.models import CloudModel, PaperPublished
-from budapp.model_ops.models import Model
-from budapp.model_ops.models import CloudModel, Model
+from budapp.endpoint_ops.models import Endpoint
+from budapp.model_ops.models import CloudModel, Model, PaperPublished
 from budapp.model_ops.models import Provider as ProviderModel
 
 
@@ -91,58 +90,308 @@ class PaperPublishedDataManager(DataManagerUtils):
         for field, value in update_data.items():
             if hasattr(paper_published, field):
                 setattr(paper_published, field, value)
-        
+
         # Use the update_one method to commit and refresh
         try:
             return self.update_one(paper_published)
         except DatabaseException as e:
             logger.error(f"Failed to update paper by id: {e}")
             raise
-    
+
 
 class ModelDataManager(DataManagerUtils):
     """Data manager for the Model model."""
 
-    async def search_tags_by_name(
+    async def list_model_tags(
         self,
         search_value: str = "",
         offset: int = 0,
         limit: int = 10,
-    ) -> Tuple[List[dict], int]:
+    ) -> Tuple[List[Model], int]:
         """Search tags by name with pagination, or fetch all tags if no search value is provided."""
-
-        subquery = (
+        # Ensure only valid JSON arrays are processed
+        tags_subquery = (
             select(func.jsonb_array_elements(Model.tags).label("tag"))
-            .where(Model.is_active == True)
-            .where(Model.tags.isnot(None))
+            .where(Model.is_active)
+            .where(Model.tags.is_not(None))  # Exclude null tags
+            .where(func.jsonb_typeof(Model.tags) == "array")  # Ensure tags is a JSON array
         ).subquery()
 
-        # Build the final query
-        final_query = select(
-            func.jsonb_extract_path_text(subquery.c.tag, 'name').label('name'),
-            func.min(func.jsonb_extract_path_text(subquery.c.tag, 'color')).label('color')
-        ).group_by('name').order_by('name').offset(offset).limit(limit)
+        # Extract name and color as jsonb
+        distinct_tags_query = (
+            select(
+                func.jsonb_extract_path_text(tags_subquery.c.tag, "name").label("name"),
+                func.jsonb_extract_path_text(tags_subquery.c.tag, "color").label("color"),
+            )
+            .where(func.jsonb_typeof(tags_subquery.c.tag) == "object")  # Ensure valid JSONB objects
+            .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "name").is_not(None))  # Valid names
+            .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "color").is_not(None))  # Valid colors
+        ).subquery()
 
-        # Add the WHERE clause only if a search_value is provided
+        # Apply DISTINCT to get unique tags by name, selecting the first color
+        distinct_on_name_query = (
+            select(
+                distinct_tags_query.c.name,
+                distinct_tags_query.c.color,
+            )
+            .distinct(distinct_tags_query.c.name)
+            .order_by(distinct_tags_query.c.name, distinct_tags_query.c.color)  # Ensure deterministic order
+        )
+
+        # Apply search filter if provided
         if search_value:
-            final_query = final_query.where(
-                func.jsonb_extract_path_text(subquery.c.tag, 'name').ilike(f'{search_value}%')
+            distinct_on_name_query = distinct_on_name_query.where(distinct_tags_query.c.name.ilike(f"{search_value}%"))
+
+        # Add pagination
+        distinct_tags_with_pagination = distinct_on_name_query.offset(offset).limit(limit)
+
+        # Execute the paginated query
+        tags_result = self.session.execute(distinct_tags_with_pagination)
+
+        # Count total distinct tag names
+        distinct_count_query = (
+            select(func.count(func.distinct(distinct_tags_query.c.name)))
+            .where(func.jsonb_typeof(tags_subquery.c.tag) == "object")  # Ensure valid JSONB objects
+            .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "name").is_not(None))  # Valid names
+            .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "color").is_not(None))  # Valid colors
+        )
+
+        # Apply search filter to the count query
+        if search_value:
+            distinct_count_query = distinct_count_query.where(
+                func.jsonb_extract_path_text(tags_subquery.c.tag, "name").ilike(f"{search_value}%")
             )
 
-        # Execute the query
-        results = self.session.execute(final_query).all()
-        tags = [{'name': res.name, 'color': res.color} for res in results] if results else []
+        # Execute the count query
+        distinct_count_result = self.session.execute(distinct_count_query)
+        total_count = distinct_count_result.scalar()
 
-        # Total count query, adjusted to conditionally apply the search filter
-        total_query = select(func.count(func.distinct(func.jsonb_extract_path_text(subquery.c.tag, 'name'))))
-        if search_value:
-            total_query = total_query.where(
-                func.jsonb_extract_path_text(subquery.c.tag, 'name').ilike(f'{search_value}%')
+        return tags_result, total_count
+
+    async def list_model_tasks(
+        self,
+        search_value: str = "",
+        offset: int = 0,
+        limit: int = 10,
+    ) -> Tuple[List[Model], int]:
+        """Search tasks by name with pagination, or fetch all tasks if no search value is provided."""
+        # Ensure only valid JSON arrays are processed
+        tasks_subquery = (
+            select(func.jsonb_array_elements(Model.tasks).label("task"))
+            .where(Model.is_active)
+            .where(Model.tasks.is_not(None))  # Exclude null tasks
+            .where(func.jsonb_typeof(Model.tasks) == "array")  # Ensure tasks is a JSON array
+        ).subquery()
+
+        # Extract name and color as jsonb
+        distinct_tasks_query = (
+            select(
+                func.jsonb_extract_path_text(tasks_subquery.c.task, "name").label("name"),
+                func.jsonb_extract_path_text(tasks_subquery.c.task, "color").label("color"),
             )
-        total_count = self.session.execute(total_query).scalar()
+            .where(func.jsonb_typeof(tasks_subquery.c.task) == "object")  # Ensure valid JSONB objects
+            .where(func.jsonb_extract_path_text(tasks_subquery.c.task, "name").is_not(None))  # Valid names
+            .where(func.jsonb_extract_path_text(tasks_subquery.c.task, "color").is_not(None))  # Valid colors
+        ).subquery()
 
-        return tags, total_count
+        # Apply DISTINCT to get unique tasks by name, selecting the first color
+        distinct_on_name_query = (
+            select(
+                distinct_tasks_query.c.name,
+                distinct_tasks_query.c.color,
+            )
+            .distinct(distinct_tasks_query.c.name)
+            .order_by(distinct_tasks_query.c.name, distinct_tasks_query.c.color)  # Ensure deterministic order
+        )
 
+        # Apply search filter if provided
+        if search_value:
+            distinct_on_name_query = distinct_on_name_query.where(
+                distinct_tasks_query.c.name.ilike(f"{search_value}%")
+            )
+
+        # Add pagination
+        distinct_tasks_with_pagination = distinct_on_name_query.offset(offset).limit(limit)
+
+        # Execute the paginated query
+        tasks_result = self.session.execute(distinct_tasks_with_pagination)
+
+        # Count total distinct task names
+        distinct_count_query = (
+            select(func.count(func.distinct(distinct_tasks_query.c.name)))
+            .where(func.jsonb_typeof(tasks_subquery.c.task) == "object")  # Ensure valid JSONB objects
+            .where(func.jsonb_extract_path_text(tasks_subquery.c.task, "name").is_not(None))  # Valid names
+            .where(func.jsonb_extract_path_text(tasks_subquery.c.task, "color").is_not(None))  # Valid colors
+        )
+
+        # Apply search filter to the count query
+        if search_value:
+            distinct_count_query = distinct_count_query.where(
+                func.jsonb_extract_path_text(tasks_subquery.c.task, "name").ilike(f"{search_value}%")
+            )
+
+        # Execute the count query
+        distinct_count_result = self.session.execute(distinct_count_query)
+        total_count = distinct_count_result.scalar()
+
+        return tasks_result, total_count
+
+    async def get_all_models(
+        self,
+        offset: int,
+        limit: int,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[Model], int]:
+        """List all models in the database."""
+        # Tags and tasks are not filterable
+        # Also remove from filters dict
+        explicit_conditions = []
+        json_filters = {"tags": filters.pop("tags", []), "tasks": filters.pop("tasks", [])}
+        explicit_filters = {
+            "modality": filters.pop("modality", []),
+            "author": filters.pop("author", []),
+            "model_size_min": filters.pop("model_size_min", None),
+            "model_size_max": filters.pop("model_size_max", None),
+        }
+
+        # Validate the remaining filters
+        await self.validate_fields(Model, filters)
+
+        if json_filters["tags"]:
+            # Either TagA or TagB exist in tag field
+            tag_conditions = or_(
+                *[Model.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]]
+            )
+            explicit_conditions.append(tag_conditions)
+
+        if json_filters["tasks"]:
+            # Either TaskA or TaskB exist in task field
+            task_conditions = or_(
+                *[Model.tasks.cast(JSONB).contains([{"name": task_name}]) for task_name in json_filters["tasks"]]
+            )
+            explicit_conditions.append(task_conditions)
+
+        if explicit_filters["modality"]:
+            # Check any of modality present in the field
+            modality_condition = Model.modality.in_(explicit_filters["modality"])
+            explicit_conditions.append(modality_condition)
+
+        if explicit_filters["author"]:
+            # Check any of author present in the field
+            author_condition = Model.author.in_(explicit_filters["author"])
+            explicit_conditions.append(author_condition)
+
+        if explicit_filters["model_size_min"] is not None or explicit_filters["model_size_max"] is not None:
+            # Add model size range condition
+            size_conditions = []
+            if explicit_filters["model_size_min"] is not None:
+                size_conditions.append(Model.model_size >= explicit_filters["model_size_min"])
+            if explicit_filters["model_size_max"] is not None:
+                size_conditions.append(Model.model_size <= explicit_filters["model_size_max"])
+            size_condition = and_(*size_conditions)
+            explicit_conditions.append(size_condition)
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(Model, filters)
+            stmt = (
+                select(
+                    Model,
+                    func.count(Endpoint.id).filter(Endpoint.is_active == True).label("endpoints_count"),
+                )
+                .select_from(Model)
+                .filter(or_(*search_conditions))
+                .where(or_(*explicit_conditions))
+                .filter(Model.is_active == True)
+                .outerjoin(Endpoint, Endpoint.model_id == Model.id)
+                .group_by(Model.id)
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(Model)
+                .filter(or_(*search_conditions))
+                .where(or_(*explicit_conditions))
+                .filter(Model.is_active == True)
+            )
+        else:
+            stmt = (
+                select(
+                    Model,
+                    func.count(Endpoint.id).filter(Endpoint.is_active == True).label("endpoints_count"),
+                )
+                .select_from(Model)
+                .filter_by(**filters)
+                .where(and_(*explicit_conditions))
+                .filter(Model.is_active == True)
+                .outerjoin(Endpoint, Endpoint.model_id == Model.id)
+                .group_by(Model.id)
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(Model)
+                .filter_by(**filters)
+                .where(and_(*explicit_conditions))
+                .filter(Model.is_active == True)
+            )
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(Model, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.execute_all(stmt)
+
+        return result, count
+
+    async def list_all_model_authors(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict[str, Any] = {},
+        order_by: List[Tuple[str, str]] = [],
+        search: bool = False,
+    ) -> Tuple[List[Model], int]:
+        """Get all authors from the database."""
+        await self.validate_fields(Model, filters)
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(Model, filters)
+            stmt = select(Model).distinct(Model.author).filter(and_(*search_conditions, Model.author.is_not(None)))
+            count_stmt = select(func.count().label("count")).select_from(
+                select(Model.author)
+                .distinct()
+                .filter(and_(*search_conditions, Model.author.is_not(None)))
+                .alias("distinct_authors")
+            )
+        else:
+            stmt = select(Model).distinct(Model.author).filter_by(**filters).filter(Model.author.is_not(None))
+            count_stmt = select(func.count().label("count")).select_from(
+                select(Model.author).distinct().filter(Model.author.is_not(None)).alias("distinct_authors")
+            )
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(Model, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.scalars_all(stmt)
+
+        return result, count
 
 
 class CloudModelDataManager(DataManagerUtils):
@@ -162,33 +411,69 @@ class CloudModelDataManager(DataManagerUtils):
         search: bool = False,
     ) -> Tuple[List[CloudModel], int]:
         """Get all cloud models from the database."""
+        # Tags and tasks are not filterable
+        # Also remove from filters dict
+        explicit_conditions = []
+        json_filters = {"tags": filters.pop("tags", []), "tasks": filters.pop("tasks", [])}
+        explicit_filters = {
+            "modality": filters.pop("modality", []),
+            "author": filters.pop("author", []),
+            "model_size_min": filters.pop("model_size_min", None),
+            "model_size_max": filters.pop("model_size_max", None),
+        }
+
+        # Validate the remaining filters
         await self.validate_fields(CloudModel, filters)
 
-        # Tags and tasks are not filterable
-        json_filters = {"tags": [], "tasks": []}
-        if "tags" in filters:
-            json_filters["tags"] = filters["tags"]
-            del filters["tags"]
-        if "tasks" in filters:
-            json_filters["tasks"] = filters["tasks"]
-            del filters["tasks"]
+        if json_filters["tags"]:
+            # Either TagA or TagB exist in tag field
+            tag_conditions = or_(
+                *[CloudModel.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]]
+            )
+            explicit_conditions.append(tag_conditions)
 
-        conditions = [CloudModel.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]]
+        if json_filters["tasks"]:
+            # Either TaskA or TaskB exist in task field
+            task_conditions = or_(
+                *[CloudModel.tasks.cast(JSONB).contains([{"name": task_name}]) for task_name in json_filters["tasks"]]
+            )
+            explicit_conditions.append(task_conditions)
 
-        conditions.extend(
-            [CloudModel.tasks.cast(JSONB).contains([{"name": task_name}]) for task_name in json_filters["tasks"]]
-        )
+        if explicit_filters["modality"]:
+            # Check any of modality present in the field
+            modality_condition = CloudModel.modality.in_(explicit_filters["modality"])
+            explicit_conditions.append(modality_condition)
+
+        if explicit_filters["author"]:
+            # Check any of author present in the field
+            author_condition = CloudModel.modality.in_(explicit_filters["author"])
+            explicit_conditions.append(author_condition)
+
+        if explicit_filters["model_size_min"] is not None or explicit_filters["model_size_max"] is not None:
+            # Add model size range condition
+            size_conditions = []
+            if explicit_filters["model_size_min"] is not None:
+                size_conditions.append(CloudModel.model_size >= explicit_filters["model_size_min"])
+            if explicit_filters["model_size_max"] is not None:
+                size_conditions.append(CloudModel.model_size <= explicit_filters["model_size_max"])
+            size_condition = and_(*size_conditions)
+            explicit_conditions.append(size_condition)
 
         # Generate statements according to search or filters
         if search:
             search_conditions = await self.generate_search_stmt(CloudModel, filters)
-            stmt = select(CloudModel).filter(or_(*search_conditions)).where(or_(*conditions))
+            stmt = select(CloudModel).filter(or_(*search_conditions)).where(or_(*explicit_conditions))
             count_stmt = (
-                select(func.count()).select_from(CloudModel).filter(or_(*search_conditions)).where(or_(*conditions))
+                select(func.count())
+                .select_from(CloudModel)
+                .filter(or_(*search_conditions))
+                .where(or_(*explicit_conditions))
             )
         else:
-            stmt = select(CloudModel).filter_by(**filters).where(and_(*conditions))
-            count_stmt = select(func.count()).select_from(CloudModel).filter_by(**filters).where(and_(*conditions))
+            stmt = select(CloudModel).filter_by(**filters).where(and_(*explicit_conditions))
+            count_stmt = (
+                select(func.count()).select_from(CloudModel).filter_by(**filters).where(and_(*explicit_conditions))
+            )
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)

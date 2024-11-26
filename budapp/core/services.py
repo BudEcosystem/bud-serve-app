@@ -18,14 +18,12 @@
 """Implements core services and business logic that power the microservices, including key functionality and integrations."""
 
 from datetime import datetime, timezone
+from typing import Dict, List, Tuple
 
 from budapp.cluster_ops.crud import ClusterDataManager
 from budapp.cluster_ops.services import ClusterService
 from budapp.commons import logging
-from budapp.commons.constants import (
-    BudServeWorkflowStepEventName,
-    EndpointStatusEnum,
-)
+from budapp.commons.constants import BudServeWorkflowStepEventName, EndpointStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.endpoint_ops.crud import EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
@@ -33,6 +31,8 @@ from budapp.endpoint_ops.schemas import EndpointCreate
 from budapp.workflow_ops.crud import WorkflowStepDataManager
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
+from .crud import IconDataManager
+from .models import Icon as IconModel
 from .schemas import NotificationPayload
 
 
@@ -233,3 +233,18 @@ class NotificationService(SessionMixin):
         logger.debug(f"Endpoint created successfully: {db_endpoint.id}")
 
         return db_endpoint
+
+
+class IconService(SessionMixin):
+    """Service for managing icons."""
+
+    async def get_all_icons(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[IconModel], int]:
+        """Get all icon icons."""
+        return await IconDataManager(self.session).get_all_icons(offset, limit, filters, order_by, search)

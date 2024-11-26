@@ -30,6 +30,7 @@ from pydantic import (
     StringConstraints,
     computed_field,
     create_model,
+    field_validator,
     model_validator,
 )
 from typing_extensions import Annotated
@@ -345,3 +346,29 @@ class ErrorResponse(ResponseBase):
         data["message"] = data.get("message") or HTTPStatus(data["code"]).description
 
         return data
+
+
+# Schemas related to Tag
+
+
+class Tag(BaseModel):
+    """Tag schema with name and color."""
+
+    name: str = Field(..., min_length=1)
+    color: str = Field(..., pattern="^#[0-9A-Fa-f]{6}$")
+
+    @field_validator("color")
+    def validate_hex_color(cls, v: str) -> str:
+        """Validate that color is a valid hex color code."""
+        if not re.match(r"^#[0-9A-Fa-f]{6}$", v):
+            raise ValueError("Color must be a valid hex color code (e.g., #FF0000)")
+        return v.upper()
+
+
+# Schemas related to task
+
+
+class Task(Tag):
+    """Task schema with name and description."""
+
+    pass

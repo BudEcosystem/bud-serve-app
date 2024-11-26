@@ -78,7 +78,6 @@ class CloudModelSeeder(BaseSeeder):
                         "modality": provider_model[existing_model.uri]["modality"],
                         "source": provider_model[existing_model.uri]["source"],
                         "uri": provider_model[existing_model.uri]["uri"],
-                        "icon": provider_model[existing_model.uri]["icon"],
                         "provider_type": ModelProviderTypeEnum.CLOUD_MODEL.value,
                         "provider_id": db_provider.id,
                     }

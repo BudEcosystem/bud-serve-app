@@ -19,16 +19,25 @@
 
 from typing import Any, Dict, List, Optional, Self, Union
 
-from pydantic import BaseModel, model_validator, field_validator
+from pydantic import UUID4, BaseModel, ConfigDict, field_validator, model_validator
 
 from budapp.commons import logging
-from budapp.commons.constants import NotificationCategory, NotificationType, ModelTemplateTypeEnum
-from budapp.commons.schemas import CloudEventBase, SuccessResponse
+from budapp.commons.constants import (
+    ModelTemplateTypeEnum,
+    NotificationCategory,
+    NotificationType,
+)
+from budapp.commons.schemas import (
+    CloudEventBase,
+    PaginatedSuccessResponse,
+    SuccessResponse,
+)
 
 
 logger = logging.get_logger(__name__)
 
 
+# Schemas related to icons
 class IconBase(BaseModel):
     """Base icon schema."""
 
@@ -48,6 +57,27 @@ class IconUpdate(BaseModel):
 
     category: str
     name: str
+
+
+class IconResponse(IconBase):
+    """Icon response schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+
+
+class IconFilter(BaseModel):
+    """Icon filter schema."""
+
+    name: str | None = None
+    category: str | None = None
+
+
+class IconListResponse(PaginatedSuccessResponse):
+    """Icon list response schema."""
+
+    icons: List[IconResponse]
 
 
 # Schemas related to notifications
@@ -121,8 +151,9 @@ class NotificationResponse(SuccessResponse):
 
     pass
 
+
 class ModelTemplateCreate(BaseModel):
-    """Model template create schema"""
+    """Model template create schema."""
 
     name: str
     description: str
@@ -138,14 +169,13 @@ class ModelTemplateCreate(BaseModel):
     @classmethod
     def validate_int_range(cls, value):
         if value is not None and (
-            not isinstance(value, list)
-            or len(value) != 2
-            or not all(isinstance(x, int) for x in value)
+            not isinstance(value, list) or len(value) != 2 or not all(isinstance(x, int) for x in value)
         ):
             raise ValueError("Must be a list of two integers")
         return value
 
+
 class ModelTemplateUpdate(ModelTemplateCreate):
-    """Model template update schema"""
+    """Model template update schema."""
 
     pass
