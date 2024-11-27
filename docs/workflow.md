@@ -84,7 +84,53 @@
 
 ## Deploy Model
 
-### Deploy model workflow
+### Deploy cloud model workflow
+
+```json
+// First Screen
+{
+  "workflow_total_steps": 7,
+  "step_number": 1,
+  "trigger_workflow": false,
+  "project_id": "ffeb0cbe-8caa-461a-aacc-9b7422f44131",
+  "model_id": "318dc142-cf44-407d-9b9d-baa47fe4a456"
+}
+// Second Screen
+{
+  "workflow_id": "0d9bd0d9-8f11-4a01-bda2-7bfab4735842",
+  "step_number": 2,
+  "trigger_workflow": false,
+  "credential_id": "891f8697-8053-45cf-887f-f2d9cd8cb1ee"
+}
+// Third Screen
+{
+  "workflow_id": "0d9bd0d9-8f11-4a01-bda2-7bfab4735842",
+  "step_number": 3,
+  "trigger_workflow": false,
+  "template_id": "891f8697-8053-45cf-887f-f2d9cd8cb1ed"
+}
+// Fourth Screen
+{
+  "workflow_id": "0d9bd0d9-8f11-4a01-bda2-7bfab4735842",
+  "step_number": 4,
+  "trigger_workflow": false,
+  "endpoint_name": "test endpoint",
+  "deploy_config": {
+    "concurrent_requests": 10,
+    "avg_sequence_length": 100,
+    "avg_context_length": 102
+  }
+}
+// Final Screen
+{
+  "workflow_id": "0d9bd0d9-8f11-4a01-bda2-7bfab4735842",
+  "step_number": 6,
+  "trigger_workflow": true,
+  "cluster_id": "538072a1-634b-4f8f-bd3b-d2fe6bfe7a50"
+}
+```
+
+### Deploy local model workflow
 
 ```json
 // First Screen

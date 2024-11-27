@@ -338,6 +338,13 @@ class ClusterService(SessionMixin):
                         form.add_field("configuration", config_file, filename=temp_file.name)
                         try:
                             async with session.post(create_cluster_endpoint, data=form) as response:
+                                if response.status != 200:
+                                    error_text = await response.text()
+                                    logger.error(f"Cluster service error: Status={response.status}, Response={error_text}")
+                                    raise ClientException(
+                                        f"External cluster service error (HTTP {response.status}): {error_text[:200]}"
+                                    )
+
                                 response_data = await response.json()
                                 logger.debug(f"Response from budcluster service: {response_data}")
 

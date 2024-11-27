@@ -38,3 +38,4 @@ class EndpointCreate(BaseModel):
     status: EndpointStatusEnum
     created_by: UUID4
     status_sync_at: datetime
+    credential_id: UUID4 | None
