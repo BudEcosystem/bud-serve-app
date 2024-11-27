@@ -25,6 +25,7 @@ from uuid import UUID
 import aiohttp
 import yaml
 from fastapi import UploadFile
+from pydantic import ValidationError
 
 from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension
@@ -45,6 +46,8 @@ from .schemas import (
     ClusterResponse,
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
+    EditCluster,
+    ClusterResponseWithEndpointCount,
 )
 
 
@@ -61,7 +64,7 @@ class ClusterService(SessionMixin):
         filters: Dict = {},
         order_by: List = [],
         search: bool = False,
-    ) -> Tuple[List[ClusterResponse], int]:
+    ) -> Tuple[List[ClusterResponseWithEndpointCount], int]:
         """Get all active clusters."""
         filters_dict = filters
         filters_dict["is_active"] = True
@@ -72,7 +75,7 @@ class ClusterService(SessionMixin):
         # Add dummy data and additional fields
         updated_clusters = []
         for cluster in clusters:
-            updated_cluster = ClusterResponse(
+            updated_cluster = ClusterResponseWithEndpointCount(
                 id=cluster.id,
                 cluster_id=cluster.cluster_id,
                 name=cluster.name,
@@ -498,3 +501,29 @@ class ClusterService(SessionMixin):
             hpu_total_workers=hpu_total_workers,
             hpu_available_workers=hpu_total_workers,
         )
+
+    async def edit_cluster(self, cluster_id: UUID, data: Dict[str, Any]) -> ClusterResponse:
+        """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
+        # Retrieve existing model
+        cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            model=ClusterModel, fields={"id": cluster_id}
+        )
+        if not cluster:
+            raise ValueError(f"Model with ID {cluster_id} not found")
+
+        if data.get("ingress_url"):
+            data["ingress_url"] = str(data["ingress_url"])
+
+        updated_cluster = await ClusterDataManager(self.session).update_by_fields(cluster, data)
+        updated_cluster = ClusterResponse.model_validate(updated_cluster)
+
+        return updated_cluster
+
+    async def get_cluster_details(self, cluster_id: UUID) -> ClusterModel:
+        """Retrieve model details by model ID."""
+        cluster_details = await ClusterDataManager(self.session).retrieve_by_fields(
+            ClusterModel, {"id": cluster_id}, missing_ok=True
+        )
+        cluster_details = ClusterResponse.model_validate(cluster_details)
+
+        return cluster_details

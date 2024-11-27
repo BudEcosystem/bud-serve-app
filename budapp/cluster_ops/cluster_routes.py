@@ -38,7 +38,13 @@ from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
-from .schemas import ClusterFilter, ClusterListResponse, CreateClusterWorkflowRequest
+from .schemas import (
+    ClusterFilter,
+    ClusterListResponse,
+    CreateClusterWorkflowRequest,
+    SingleClusterResponse,
+    EditCluster,
+)
 from .services import ClusterService
 
 
@@ -185,3 +191,107 @@ async def list_clusters(
         object="cluster.list",
         code=status.HTTP_200_OK,
     ).to_http_response()
+
+
+@cluster_router.patch(
+    "/{cluster_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SingleClusterResponse,
+            "description": "Successfully edited cluster",
+        },
+    },
+    description="Edit cluster",
+)
+async def edit_cluster(
+    cluster_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    edit_cluster: EditCluster,
+) -> Union[SingleClusterResponse, ErrorResponse]:
+    """Edit cluster."""
+
+    data = edit_cluster.dict(exclude_unset=True, exclude_none=True)
+
+    # check if icon is a valid file path
+    image_extensions = [".png", ".jpg", ".jpeg"]
+    if data.get("icon"):
+        if not any(data.get("icon").lower().endswith(ext) for ext in image_extensions):
+            return ErrorResponse(
+                code=status.HTTP_400_BAD_REQUEST,
+                message=f"Icon must be a valid image file with extensions: {', '.join(image_extensions)}.",
+            ).to_http_response()
+        if not os.path.exists(os.path.join(app_settings.static_dir, data.get("icon"))):
+            return ErrorResponse(
+                code=status.HTTP_400_BAD_REQUEST,
+                message="Invalid icon file path",
+            ).to_http_response()
+
+    try:
+        updated_cluster_info = await ClusterService(session).edit_cluster(cluster_id=cluster_id, data=data)
+        return SingleClusterResponse(
+            cluster=updated_cluster_info,
+            message="Cluster details updated successfully",
+            code=status.HTTP_200_OK,
+            object="SingleClusterResponse",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to edit cluster: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to edit cluster: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit cluster"
+        ).to_http_response()
+
+
+@cluster_router.get(
+    "/{cluster_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request parameters",
+        },
+        status.HTTP_200_OK: {
+            "model": SingleClusterResponse,
+            "description": "Successfully retrieved cluster details",
+        },
+    },
+    description="Retrieve details of a cluster by ID",
+)
+async def get_cluster_details(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    cluster_id: UUID,
+) -> Union[SingleClusterResponse, ErrorResponse]:
+    """Retrieve details of a cluster by its ID."""
+    try:
+        cluster_details = await ClusterService(session).get_cluster_details(cluster_id)
+    except ClientException as e:
+        logger.exception(f"Failed to get cluster details: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get cluster details: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to retrieve cluster details",
+        ).to_http_response()
+
+    return SingleClusterResponse(
+        cluster=cluster_details,
+        message="Cluster details fetched successfully",
+        code=status.HTTP_200_OK,
+        object="SingleClusterResponse",
+    )

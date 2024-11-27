@@ -24,7 +24,6 @@ from budapp.commons.db_utils import DataManagerUtils
 from sqlalchemy import and_, desc, func, or_, select
 
 from budapp.cluster_ops.models import Cluster
-from .schemas import ClusterResponse
 
 logger = logging.get_logger(__name__)
 
@@ -36,10 +35,10 @@ class ClusterDataManager(DataManagerUtils):
         self,
         offset: int,
         limit: int,
-        filters: Dict = {}, #endpoint count need to consider in future
+        filters: Dict = {},  # endpoint count need to consider in future
         order_by: List = [],
         search: bool = False,
-    ) -> Tuple[List[ClusterResponse], int]:
+    ) -> Tuple[List[Cluster], int]:
         """List all clusters from the database."""
 
         await self.validate_fields(Cluster, filters)

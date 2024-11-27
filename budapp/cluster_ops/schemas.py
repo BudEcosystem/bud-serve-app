@@ -21,10 +21,10 @@ from datetime import datetime
 from typing import List
 from uuid import UUID
 
-from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, computed_field
+from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, computed_field, Field, validator
 
 from budapp.commons.constants import ClusterStatusEnum
-from budapp.commons.schemas import PaginatedSuccessResponse
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 
 
 class ClusterBase(BaseModel):
@@ -77,7 +77,6 @@ class ClusterResponse(BaseModel):
     icon: str
     created_at: datetime
     modified_at: datetime
-    endpoint_count: int
     status: ClusterStatusEnum
     cluster_id: UUID
     cpu_count: int
@@ -103,6 +102,10 @@ class ClusterResponse(BaseModel):
         return self.cpu_available_workers + self.gpu_available_workers + self.hpu_available_workers
 
 
+class ClusterResponseWithEndpointCount(ClusterResponse):
+    endpoint_count: int
+
+
 class ClusterFilter(BaseModel):
     """Filter cluster schema."""
 
@@ -114,7 +117,7 @@ class ClusterListResponse(PaginatedSuccessResponse):
 
     model_config = ConfigDict(extra="ignore")
 
-    clusters: List[ClusterResponse]
+    clusters: List[ClusterResponseWithEndpointCount]
 
 
 class CreateClusterWorkflowRequest(BaseModel):
@@ -136,3 +139,25 @@ class CreateClusterWorkflowSteps(BaseModel):
     icon: str | None = None
     ingress_url: AnyHttpUrl | None = None
     configuration_yaml: dict | None = None
+
+
+class EditCluster(BaseModel):
+    name: str | None = Field(
+        None,
+        min_length=1,
+        max_length=100,
+        description="Name of the cluster, must be non-empty and at most 100 characters.",
+    )
+    icon: str | None = Field(None, description="URL or path of the cluster icon.")
+    ingress_url: AnyHttpUrl | None = Field(None, description="ingress_url.")
+
+    @validator("name", pre=True, always=True)
+    def validate_name(cls, value: str | None) -> str | None:
+        """Ensure the name is not empty or only whitespace."""
+        if value is not None and not value.strip():
+            raise ValueError("Cluster name cannot be empty or only whitespace.")
+        return value
+
+
+class SingleClusterResponse(SuccessResponse):
+    cluster: ClusterResponse
