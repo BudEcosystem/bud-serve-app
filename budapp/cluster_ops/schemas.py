@@ -75,6 +75,7 @@ class ClusterResponse(BaseModel):
     id: UUID
     name: str
     icon: str
+    ingress_url: str
     created_at: datetime
     modified_at: datetime
     status: ClusterStatusEnum

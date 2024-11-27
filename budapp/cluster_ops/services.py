@@ -80,6 +80,7 @@ class ClusterService(SessionMixin):
                 cluster_id=cluster.cluster_id,
                 name=cluster.name,
                 icon=cluster.icon,
+                ingress_url=cluster.ingress_url,
                 created_at=cluster.created_at,
                 modified_at=cluster.modified_at,
                 endpoint_count=12,  # TODO: Add endpoint count
