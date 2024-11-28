@@ -444,6 +444,7 @@ class PayloadType(str, Enum):
     DEPLOYMENT_RECOMMENDATION = "deployment_recommendation"
     DEPLOY_MODEL = "deploy_model"
     REGISTER_CLUSTER = "register_cluster"
+    PERFORM_MODEL_EXTRACTION = "perform_model_extraction"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -507,3 +508,15 @@ class ModelTemplateTypeEnum(StrEnum):
     SENTIMENT_ANALYSIS = auto()
     DOCUMENT_ANALYSIS = auto()
     OTHER = auto()
+
+
+class DropdownBackgroundColor(str, Enum):
+    """Background hex color for dropdown."""
+
+    COLOR_1 = "#D1B854"
+
+    @classmethod
+    def get_random_color(cls) -> str:
+        """Get a random color."""
+        colors = list(cls)
+        return random.choice(colors).value
