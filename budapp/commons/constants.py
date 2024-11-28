@@ -453,6 +453,8 @@ class BudServeWorkflowStepEventName(str, Enum):
     Attributes:
         BUD_SIMULATOR_EVENTS: Represents the Bud simulator workflow step event name.
         BUDSERVE_CLUSTER_EVENTS: Represents the Budserve cluster workflow step event name.
+        CREATE_CLUSTER_EVENTS: Represents the create cluster workflow step event name.
+        MODEL_EXTRACTION_EVENTS: Represents the model extraction workflow step event name.
     """
 
     BUD_SIMULATOR_EVENTS = "bud_simulator_events"
