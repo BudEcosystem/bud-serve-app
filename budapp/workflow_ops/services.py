@@ -105,7 +105,11 @@ class WorkflowService(SessionMixin):
             name = required_data.get("name")
             ingress_url = required_data.get("ingress_url")
             create_cluster_events = required_data.get(BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value)
+            model_extraction_events = required_data.get(BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value)
             icon = required_data.get("icon")
+            uri = required_data.get("uri")
+            author = required_data.get("author")
+            tags = required_data.get("tags")
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -145,6 +149,10 @@ class WorkflowService(SessionMixin):
                 icon=icon if icon else None,
                 ingress_url=ingress_url if ingress_url else None,
                 create_cluster_events=create_cluster_events if create_cluster_events else None,
+                uri=uri if uri else None,
+                author=author if author else None,
+                tags=tags if tags else None,
+                model_extraction_events=model_extraction_events if model_extraction_events else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -185,6 +193,17 @@ class WorkflowService(SessionMixin):
                 "icon",
                 "ingress_url",
                 BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value,
+            ],
+            "add_local_model": [
+                "name",
+                "uri",
+                "author",
+                "tags",
+                "icon",
+                "provider_type",
+                "provider_id",
+                BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value,
+                "model_id",
             ],
         }
 

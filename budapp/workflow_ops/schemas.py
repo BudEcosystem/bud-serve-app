@@ -1,7 +1,7 @@
 from pydantic import UUID4, BaseModel, ConfigDict
 
 from budapp.commons.constants import ModelProviderTypeEnum, WorkflowStatusEnum
-from budapp.commons.schemas import SuccessResponse
+from budapp.commons.schemas import SuccessResponse, Tag
 from budapp.model_ops.schemas import CloudModel, Model, Provider
 
 
@@ -23,6 +23,10 @@ class RetrieveWorkflowStepData(BaseModel):
     ingress_url: str | None = None
     create_cluster_events: dict | None = None
     icon: str | None = None
+    uri: str | None = None
+    author: str | None = None
+    tags: list[Tag] | None = None
+    model_extraction_events: dict | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
