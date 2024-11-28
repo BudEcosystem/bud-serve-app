@@ -226,6 +226,7 @@ class AppConfig(BaseConfig):
     # Bud microservice
     dapr_base_url: AnyHttpUrl = Field(alias="DAPR_BASE_URL")
     bud_cluster_app_id: str = Field(alias="BUD_CLUSTER_APP_ID")
+    bud_model_app_id: str = Field(alias="BUD_MODEL_APP_ID")
     source_topic: str = Field(alias="SOURCE_TOPIC", default="budAppMessages")
 
     @computed_field
