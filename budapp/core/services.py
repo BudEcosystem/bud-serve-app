@@ -111,7 +111,7 @@ class NotificationService(SessionMixin):
         if (
             payload.content.status == "COMPLETED"
             and payload.content.result
-            and payload.content.title == "The model extraction results are ready"
+            and payload.content.title == "Model Extraction Results"
         ):
             await LocalModelWorkflowService(self.session).create_model_from_notification_event(payload)
 
