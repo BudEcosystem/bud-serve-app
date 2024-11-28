@@ -17,7 +17,9 @@
 """Provides helper functions for the project."""
 
 from enum import Enum
-from typing import List
+from typing import Dict, List, Optional
+
+from .constants import DropdownBackgroundColor
 
 
 def create_dynamic_enum(enum_name: str, enum_values: List[str]) -> Enum:
@@ -44,3 +46,42 @@ def create_dynamic_enum(enum_name: str, enum_values: List[str]) -> Enum:
     # creating enum dynamically from a list of values
     # converting enum name to upper assuming no spaces or special characters
     return Enum(enum_name, {val.upper(): val for val in enum_values})
+
+
+def assign_random_colors_to_names(names: List[str]) -> List[Dict]:
+    """Assign random colors to a list of names, trying to avoid color repetition.
+
+    Args:
+        names: List of strings to assign colors to
+
+    Returns:
+        List of dictionaries containing name and color pairs
+        Example: [{"name": "example", "color": "#E57333"}]
+    """
+    result = []
+
+    for name in names:
+        result.append(
+            {
+                "name": name,
+                "color": DropdownBackgroundColor.get_random_color(),
+            }
+        )
+
+    return result
+
+
+def get_normalized_string_or_none(value: Optional[str]) -> Optional[str]:
+    """Get a normalized string from a value, removing leading and trailing spaces.
+
+    Args:
+        value: The value to normalize
+
+    Returns:
+        The normalized string or None if the value is None
+    """
+    if value is None:
+        return None
+
+    stripped_value = value.strip()
+    return stripped_value if stripped_value else None
