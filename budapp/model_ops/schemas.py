@@ -164,6 +164,7 @@ class ModelCreate(ModelBase):
     created_by: UUID4
     author: Optional[str] = None
     provider_id: UUID4 | None = None
+    local_path: str | None = None
 
 
 class ModelDetailResponse(SuccessResponse):

@@ -27,10 +27,17 @@ from pydantic import ValidationError
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import BudServeWorkflowStepEventName, ModelProviderTypeEnum, WorkflowStatusEnum
+from budapp.commons.constants import (
+    BudServeWorkflowStepEventName,
+    CredentialTypeEnum,
+    ModelProviderTypeEnum,
+    WorkflowStatusEnum,
+)
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
+from budapp.commons.helpers import assign_random_colors_to_names, get_normalized_string_or_none
 from budapp.commons.schemas import Tag, Task
+from budapp.core.schemas import NotificationPayload
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
@@ -706,10 +713,9 @@ class LocalModelWorkflowService(SessionMixin):
         )
 
         # Validate proprietary credential id
-        if proprietary_credential_id:
-            if provider_type != ModelProviderTypeEnum.HUGGING_FACE:
-                raise ClientException("Proprietary credential only supported for HuggingFace models")
-            # TODO: Validate proprietary credential id
+        if proprietary_credential_id and provider_type != ModelProviderTypeEnum.HUGGING_FACE:
+            raise ClientException("Proprietary credential only supported for HuggingFace models")
+        # TODO: Validate proprietary credential id
 
         # Validate model name to be unique
         if name:
@@ -775,7 +781,7 @@ class LocalModelWorkflowService(SessionMixin):
         workflow_current_step = max(current_step_number, db_max_workflow_step_number)
         logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
 
-        if uri:
+        if trigger_workflow:
             # query workflow steps again to get latest data
             db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
                 {"workflow_id": db_workflow.id}
@@ -806,29 +812,143 @@ class LocalModelWorkflowService(SessionMixin):
             # Create or update new workflow step for model extraction
             current_step_number = current_step_number + 1
 
-            # Perform model extraction
-            await self._perform_model_extraction(db_workflow.id, current_step_number, required_data)
+            try:
+                # Perform model extraction
+                await self._perform_model_extraction(db_workflow.id, current_step_number, required_data)
+            except ClientException as e:
+                workflow_current_step = current_step_number
+                db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                    db_workflow,
+                    {"current_step": workflow_current_step},
+                )
+                logger.debug("Workflow updated with latest step")
+                raise e
 
             # Create next workflow step to store model extraction response
             current_step_number = current_step_number + 1
             workflow_current_step = current_step_number
 
             # Update or create next workflow step
+            # NOTE: The when extraction is done, the subscriber will create model and update model_id to the step
             db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                workflow_id, current_step_number, {"local_path": ""}
+                workflow_id, current_step_number, {}
             )
 
-            # NOTE: The when extraction is done, the subscriber will
-
-        # Update workflow happen only when trigger workflow is true
-        # This will ensure the step number is updated to the latest step number
-        if not trigger_workflow:
-            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-                db_workflow,
-                {"current_step": workflow_current_step},
-            )
+        # This will ensure workflow step number is updated to the latest step number
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": workflow_current_step},
+        )
 
         return db_workflow
+
+    async def create_model_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Create a local model from notification event."""
+        logger.debug("Received event for creating local model")
+
+        # Get workflow steps
+        workflow_id = payload.workflow_id
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Get last step
+        db_latest_workflow_step = db_workflow_steps[-1]
+
+        # Define the keys required for endpoint creation
+        keys_of_interest = [
+            "provider_type",
+            "name",
+            "uri",
+            "author",
+            "tags",
+            "icon",
+            "created_by",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+        logger.debug("Collected required data from workflow steps")
+
+        # Check for model with duplicate name
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"name": required_data["name"]}, missing_ok=True
+        )
+        if db_model:
+            logger.error(f"Unable to create model with name {required_data['name']} as it already exists")
+            raise ClientException("Model name should be unique")
+
+        model_info = payload.content.result["model_info"]
+        local_path = payload.content.result["local_path"]
+
+        # Extract and finalize tags and tasks author
+        given_tags = required_data.get("tags", [])
+        extracted_tags = model_info.get("tags", [])
+        if extracted_tags:
+            # assign random colors to extracted tags
+            extracted_tags = assign_random_colors_to_names(extracted_tags)
+
+            # remove duplicate tags
+            existing_tag_names = [tag["name"] for tag in given_tags]
+            extracted_tags = [tag for tag in extracted_tags if tag["name"] not in existing_tag_names]
+
+        extracted_tags.extend(given_tags)
+
+        extracted_tasks = model_info.get("tasks", [])
+        if extracted_tasks:
+            extracted_tasks = assign_random_colors_to_names(extracted_tasks)
+
+        extracted_author = required_data.get("author")
+        if not extracted_author:
+            extracted_author = get_normalized_string_or_none(model_info.get("author", None))
+
+        # Finalize model details
+        model_description = get_normalized_string_or_none(model_info.get("description", None))
+        model_github_url = get_normalized_string_or_none(model_info.get("huggingface_url", None))
+        model_huggingface_url = get_normalized_string_or_none(model_info.get("huggingface_url", None))
+        model_website_url = get_normalized_string_or_none(model_info.get("website_url", None))
+
+        # Set provider id
+        provider_id = None
+        source = CredentialTypeEnum.local
+        if required_data["provider_type"] == ModelProviderTypeEnum.HUGGING_FACE.value:
+            source = CredentialTypeEnum.huggingface
+            db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                ProviderModel, {"type": "huggingface"}
+            )
+            provider_id = db_provider.id
+
+        model_data = ModelCreate(
+            name=required_data["name"],
+            description=model_description,
+            tags=extracted_tags,
+            tasks=extracted_tasks,
+            github_url=model_github_url,
+            huggingface_url=model_huggingface_url,
+            website_url=model_website_url,
+            modality=model_info["modality"],
+            source=source,
+            provider_type=required_data["provider_type"],
+            uri=required_data["uri"],
+            created_by=required_data["created_by"],
+            author=extracted_author,
+            provider_id=provider_id,
+            local_path=local_path,
+        )
+
+        # Create model
+        db_model = await ModelDataManager(self.session).insert_one(Model(**model_data.model_dump()))
+        logger.debug(f"Model created with id {db_model.id}")
+
+        # Update to workflow step
+        await WorkflowStepDataManager(self.session).update_by_fields(
+            db_latest_workflow_step, {"data": {"model_id": db_model.id}}
+        )
+        logger.debug(f"Workflow step updated with model id {db_model.id}")
 
     async def _verify_hugging_face_uri_duplication(
         self,
