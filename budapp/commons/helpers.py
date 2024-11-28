@@ -19,8 +19,6 @@
 from enum import Enum
 from typing import Dict, List, Optional
 
-from .constants import DropdownBackgroundColor
-
 
 def create_dynamic_enum(enum_name: str, enum_values: List[str]) -> Enum:
     """Create a dynamic Enum class from a list of values.
@@ -58,6 +56,8 @@ def assign_random_colors_to_names(names: List[str]) -> List[Dict]:
         List of dictionaries containing name and color pairs
         Example: [{"name": "example", "color": "#E57333"}]
     """
+    from .constants import DropdownBackgroundColor
+
     result = []
 
     for name in names:
