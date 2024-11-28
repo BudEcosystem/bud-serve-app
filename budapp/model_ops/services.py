@@ -29,8 +29,8 @@ from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import (
     BudServeWorkflowStepEventName,
-    CredentialTypeEnum,
     ModelProviderTypeEnum,
+    ModelSourceEnum,
     WorkflowStatusEnum,
 )
 from budapp.commons.db_utils import SessionMixin
@@ -713,9 +713,9 @@ class LocalModelWorkflowService(SessionMixin):
         )
 
         # Validate proprietary credential id
-        if proprietary_credential_id and provider_type != ModelProviderTypeEnum.HUGGING_FACE:
-            raise ClientException("Proprietary credential only supported for HuggingFace models")
-        # TODO: Validate proprietary credential id
+        if proprietary_credential_id:
+            pass
+            # TODO: Validate proprietary credential id
 
         # Validate model name to be unique
         if name:
@@ -885,7 +885,7 @@ class LocalModelWorkflowService(SessionMixin):
         model_info = payload.content.result["model_info"]
         local_path = payload.content.result["local_path"]
 
-        # Extract and finalize tags and tasks author
+        # Extract and finalize tags, tasks and author
         given_tags = required_data.get("tags", [])
         extracted_tags = model_info.get("tags", [])
         if extracted_tags:
@@ -912,11 +912,13 @@ class LocalModelWorkflowService(SessionMixin):
         model_huggingface_url = get_normalized_string_or_none(model_info.get("huggingface_url", None))
         model_website_url = get_normalized_string_or_none(model_info.get("website_url", None))
 
-        # Set provider id
+        # Set provider id and icon
         provider_id = None
-        source = CredentialTypeEnum.local
+        icon = required_data.get("icon")
         if required_data["provider_type"] == ModelProviderTypeEnum.HUGGING_FACE.value:
-            source = CredentialTypeEnum.huggingface
+            # icon is not supported for hugging face models
+            # Add provider id for hugging face models to retrieve icon for frontend
+            icon = None
             db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
                 ProviderModel, {"type": "huggingface"}
             )
@@ -931,13 +933,14 @@ class LocalModelWorkflowService(SessionMixin):
             huggingface_url=model_huggingface_url,
             website_url=model_website_url,
             modality=model_info["modality"],
-            source=source,
+            source=ModelSourceEnum.LOCAL,
             provider_type=required_data["provider_type"],
             uri=required_data["uri"],
-            created_by=required_data["created_by"],
+            created_by=UUID(required_data["created_by"]),
             author=extracted_author,
             provider_id=provider_id,
             local_path=local_path,
+            icon=icon,
         )
 
         # Create model
@@ -946,7 +949,7 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Update to workflow step
         await WorkflowStepDataManager(self.session).update_by_fields(
-            db_latest_workflow_step, {"data": {"model_id": db_model.id}}
+            db_latest_workflow_step, {"data": {"model_id": str(db_model.id)}}
         )
         logger.debug(f"Workflow step updated with model id {db_model.id}")
 
