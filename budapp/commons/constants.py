@@ -457,6 +457,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     BUD_SIMULATOR_EVENTS = "bud_simulator_events"
     BUDSERVE_CLUSTER_EVENTS = "budserve_cluster_events"
     CREATE_CLUSTER_EVENTS = "create_cluster_events"
+    MODEL_EXTRACTION_EVENTS = "model_extraction_events"
 
 
 class ClusterStatusEnum(StrEnum):

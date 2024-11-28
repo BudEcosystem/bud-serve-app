@@ -228,6 +228,71 @@ class CreateCloudModelWorkflowRequest(BaseModel):
         return self
 
 
+class CreateLocalModelWorkflowRequest(BaseModel):
+    """Local model workflow request schema."""
+
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None
+    step_number: int = Field(..., gt=0)
+    trigger_workflow: bool = False
+    provider_type: ModelProviderTypeEnum | None = None
+    proprietary_credential_id: UUID4 | None = None
+    name: str | None = None
+    uri: str | None = None
+    author: str | None = None
+    tags: list[Tag] | None = None
+    icon: str | None = None
+
+    @model_validator(mode="after")
+    def validate_fields(self) -> "CreateLocalModelWorkflowRequest":
+        """Validate the fields of the request."""
+        if self.workflow_id is None and self.workflow_total_steps is None:
+            raise ValueError("workflow_total_steps is required when workflow_id is not provided")
+
+        if self.workflow_id is not None and self.workflow_total_steps is not None:
+            raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
+
+        # Validate proprietary_credential_id based on provider_type
+        if (
+            self.provider_type is not None
+            and self.provider_type != ModelProviderTypeEnum.HUGGING_FACE
+            and self.proprietary_credential_id is not None
+        ):
+            raise ValueError("proprietary_credential_id should be None for non-HuggingFace providers")
+
+        # Validate provider type
+        if self.provider_type and self.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            raise ValueError("Cloud model provider type not supported for local model workflow")
+
+        # Check if at least one of the other fields is provided
+        other_fields = [
+            self.provider_type,
+            self.proprietary_credential_id,
+            self.name,
+            self.uri,
+            self.author,
+            self.tags,
+            self.icon,
+        ]
+        required_fields = ["provider_type", "proprietary_credential_id", "name", "uri", "author", "tags", "icon"]
+        if not any(other_fields):
+            raise ValueError(f"At least one of {', '.join(required_fields)} is required when workflow_id is provided")
+
+        return self
+
+
+class CreateLocalModelWorkflowSteps(BaseModel):
+    """Create cluster workflow step data schema."""
+
+    provider_type: ModelProviderTypeEnum | None = None
+    proprietary_credential_id: UUID4 | None = None
+    name: str | None = None
+    icon: str | None = None
+    uri: str | None = None
+    author: str | None = None
+    tags: list[Tag] | None = None
+
+
 class EditModel(BaseModel):
     """Schema for editing a model with optional fields and validations."""
 

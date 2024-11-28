@@ -42,7 +42,10 @@ from budapp.workflow_ops.services import WorkflowService
 from .schemas import (
     CreateCloudModelWorkflowRequest,
     CreateCloudModelWorkflowResponse,
+    CreateLocalModelWorkflowRequest,
     EditModel,
+    ModelAuthorFilter,
+    ModelAuthorResponse,
     ModelDetailResponse,
     ModelFilter,
     ModelPaginatedResponse,
@@ -50,13 +53,12 @@ from .schemas import (
     ProviderResponse,
     RecommendedTagsResponse,
     TagsListResponse,
-    ModelAuthorResponse,
-    ModelAuthorFilter,
     TasksListResponse,
 )
 from .services import (
     CloudModelService,
     CloudModelWorkflowService,
+    LocalModelWorkflowService,
     ModelService,
     ProviderService,
 )
@@ -216,7 +218,7 @@ async def list_providers(
             "description": "Service is unavailable due to client error",
         },
         status.HTTP_200_OK: {
-            "model": CreateCloudModelWorkflowResponse,
+            "model": RetrieveWorkflowDataResponse,
             "description": "Successfully add cloud model workflow",
         },
     },
@@ -242,6 +244,47 @@ async def add_cloud_model_workflow(
         logger.exception(f"Failed to add cloud model workflow: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add cloud model workflow"
+        ).to_http_response()
+
+
+@model_router.post(
+    "/local-model-workflow",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RetrieveWorkflowDataResponse,
+            "description": "Successfully add local model workflow",
+        },
+    },
+    description="Add local model workflow",
+)
+async def add_local_model_workflow(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: CreateLocalModelWorkflowRequest,
+) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
+    """Add local model workflow."""
+    try:
+        db_workflow = await LocalModelWorkflowService(session).add_local_model_workflow(
+            current_user_id=current_user.id,
+            request=request,
+        )
+
+        return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
+    except ClientException as e:
+        logger.exception(f"Failed to add local model workflow: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to add local model workflow: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add local model workflow"
         ).to_http_response()
 
 
@@ -498,7 +541,7 @@ async def list_model_tags(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1),
 ) -> Union[TagsListResponse, ErrorResponse]:
-    """list tags by name with pagination support."""
+    """List tags by name with pagination support."""
     offset = (page - 1) * limit
 
     try:
@@ -541,7 +584,7 @@ async def list_model_tasks(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1),
 ) -> Union[TasksListResponse, ErrorResponse]:
-    """list tasks by name with pagination support."""
+    """List tasks by name with pagination support."""
     offset = (page - 1) * limit
 
     try:
@@ -587,7 +630,6 @@ async def list_all_model_authors(
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
 ) -> Union[ModelAuthorResponse, ErrorResponse]:
     """Search author by name with pagination support."""
-
     offset = (page - 1) * limit
 
     filters_dict = filters.model_dump(exclude_none=True)
