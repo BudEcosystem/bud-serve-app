@@ -261,6 +261,13 @@ class CreateLocalModelWorkflowRequest(BaseModel):
         ):
             raise ValueError("proprietary_credential_id should be None for non-HuggingFace providers")
 
+        if (
+            self.provider_type is not None
+            and self.provider_type == ModelProviderTypeEnum.HUGGING_FACE
+            and self.icon is not None
+        ):
+            raise ValueError("Icon is not supported for HuggingFace models")
+
         # Validate provider type
         if self.provider_type and self.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
             raise ValueError("Cloud model provider type not supported for local model workflow")
