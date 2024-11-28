@@ -98,6 +98,12 @@ async def receive_notification(
                 object="notification",
                 message="Updated cluster creation event in workflow step",
             ).to_http_response()
+        if payload.category == NotificationCategory.INTERNAL and payload.type == PayloadType.PERFORM_MODEL_EXTRACTION:
+            await NotificationService(session).update_model_extraction_events(payload)
+            return NotificationResponse(
+                object="notification",
+                message="Updated model extraction event in workflow step",
+            ).to_http_response()
         else:
             return NotificationResponse(
                 object="notification",
