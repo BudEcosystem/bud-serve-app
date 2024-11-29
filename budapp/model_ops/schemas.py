@@ -35,6 +35,7 @@ from budapp.commons.constants import (
     CredentialTypeEnum,
     ModalityEnum,
     ModelProviderTypeEnum,
+    ModelSourceEnum,
     WorkflowStatusEnum,
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
@@ -142,7 +143,7 @@ class Model(ModelBase):
     id: UUID4
     icon: str | None = None
     modality: ModalityEnum
-    source: CredentialTypeEnum
+    source: ModelSourceEnum
     provider_type: ModelProviderTypeEnum
     uri: str
     model_size: Optional[int] = None
@@ -164,6 +165,7 @@ class ModelCreate(ModelBase):
     created_by: UUID4
     author: Optional[str] = None
     provider_id: UUID4 | None = None
+    local_path: str | None = None
 
 
 class ModelDetailResponse(SuccessResponse):
@@ -226,6 +228,65 @@ class CreateCloudModelWorkflowRequest(BaseModel):
             raise ValueError(f"At least one of {', '.join(required_fields)} is required when workflow_id is provided")
 
         return self
+
+
+class CreateLocalModelWorkflowRequest(BaseModel):
+    """Local model workflow request schema."""
+
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None
+    step_number: int = Field(..., gt=0)
+    trigger_workflow: bool = False
+    provider_type: ModelProviderTypeEnum | None = None
+    proprietary_credential_id: UUID4 | None = None
+    name: str | None = None
+    uri: str | None = None
+    author: str | None = None
+    tags: list[Tag] | None = None
+    icon: str | None = None
+
+    @model_validator(mode="after")
+    def validate_fields(self) -> "CreateLocalModelWorkflowRequest":
+        """Validate the fields of the request."""
+        if self.workflow_id is None and self.workflow_total_steps is None:
+            raise ValueError("workflow_total_steps is required when workflow_id is not provided")
+
+        if self.workflow_id is not None and self.workflow_total_steps is not None:
+            raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
+
+        # Validate proprietary_credential_id based on provider_type
+        if (
+            self.provider_type is not None
+            and self.provider_type != ModelProviderTypeEnum.HUGGING_FACE
+            and self.proprietary_credential_id is not None
+        ):
+            raise ValueError("proprietary_credential_id should be None for non-HuggingFace providers")
+
+        if (
+            self.provider_type is not None
+            and self.provider_type == ModelProviderTypeEnum.HUGGING_FACE
+            and self.icon is not None
+        ):
+            raise ValueError("Icon is not supported for HuggingFace models")
+
+        # Validate provider type
+        if self.provider_type and self.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            raise ValueError("Cloud model provider type not supported for local model workflow")
+
+        return self
+
+
+class CreateLocalModelWorkflowSteps(BaseModel):
+    """Create cluster workflow step data schema."""
+
+    provider_type: ModelProviderTypeEnum | None = None
+    proprietary_credential_id: UUID4 | None = None
+    name: str | None = None
+    icon: str | None = None
+    uri: str | None = None
+    author: str | None = None
+    tags: list[Tag] | None = None
+    provider_id: UUID4 | None
 
 
 class EditModel(BaseModel):

@@ -28,6 +28,7 @@ from budapp.commons.db_utils import SessionMixin
 from budapp.endpoint_ops.crud import EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.endpoint_ops.schemas import EndpointCreate
+from budapp.model_ops.services import LocalModelWorkflowService
 from budapp.workflow_ops.crud import WorkflowStepDataManager
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
@@ -94,6 +95,25 @@ class NotificationService(SessionMixin):
             and payload.content.title == "Fetching cluster nodes info successful"
         ):
             await ClusterService(self.session).create_cluster_from_notification_event(payload)
+
+    async def update_model_extraction_events(self, payload: NotificationPayload) -> None:
+        """Update the model extraction events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value, payload)
+
+        # Create cluster in database if node info fetched successfully
+        if (
+            payload.content.status == "COMPLETED"
+            and payload.content.result
+            and payload.content.title == "Model Extraction Results"
+        ):
+            await LocalModelWorkflowService(self.session).create_model_from_notification_event(payload)
 
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
         """Update the workflow step events for a workflow step.
