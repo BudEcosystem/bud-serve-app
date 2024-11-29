@@ -110,6 +110,7 @@ class WorkflowService(SessionMixin):
             uri = required_data.get("uri")
             author = required_data.get("author")
             tags = required_data.get("tags")
+            description = required_data.get("description")
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -153,6 +154,7 @@ class WorkflowService(SessionMixin):
                 author=author if author else None,
                 tags=tags if tags else None,
                 model_extraction_events=model_extraction_events if model_extraction_events else None,
+                description=description if description else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -204,6 +206,8 @@ class WorkflowService(SessionMixin):
                 "provider_id",
                 BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value,
                 "model_id",
+                "leaderboard",
+                "description",
             ],
         }
 

@@ -35,6 +35,7 @@ from budapp.commons.constants import (
     CredentialTypeEnum,
     ModalityEnum,
     ModelProviderTypeEnum,
+    ModelSourceEnum,
     WorkflowStatusEnum,
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
@@ -142,7 +143,7 @@ class Model(ModelBase):
     id: UUID4
     icon: str | None = None
     modality: ModalityEnum
-    source: CredentialTypeEnum
+    source: ModelSourceEnum
     provider_type: ModelProviderTypeEnum
     uri: str
     model_size: Optional[int] = None
@@ -272,20 +273,6 @@ class CreateLocalModelWorkflowRequest(BaseModel):
         if self.provider_type and self.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
             raise ValueError("Cloud model provider type not supported for local model workflow")
 
-        # Check if at least one of the other fields is provided
-        other_fields = [
-            self.provider_type,
-            self.proprietary_credential_id,
-            self.name,
-            self.uri,
-            self.author,
-            self.tags,
-            self.icon,
-        ]
-        required_fields = ["provider_type", "proprietary_credential_id", "name", "uri", "author", "tags", "icon"]
-        if not any(other_fields):
-            raise ValueError(f"At least one of {', '.join(required_fields)} is required when workflow_id is provided")
-
         return self
 
 
@@ -299,6 +286,7 @@ class CreateLocalModelWorkflowSteps(BaseModel):
     uri: str | None = None
     author: str | None = None
     tags: list[Tag] | None = None
+    provider_id: UUID4 | None
 
 
 class EditModel(BaseModel):

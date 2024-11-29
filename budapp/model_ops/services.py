@@ -29,6 +29,7 @@ from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import (
     BudServeWorkflowStepEventName,
+    CredentialTypeEnum,
     ModelProviderTypeEnum,
     ModelSourceEnum,
     WorkflowStatusEnum,
@@ -726,6 +727,14 @@ class LocalModelWorkflowService(SessionMixin):
             if db_model:
                 raise ClientException("Model name should be unique")
 
+        # Add provider_id for HuggingFace provider type
+        provider_id = None
+        if provider_type == ModelProviderTypeEnum.HUGGING_FACE:
+            db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                ProviderModel, {"type": CredentialTypeEnum.HUGGINGFACE}
+            )
+            provider_id = db_provider.id
+
         # Prepare workflow step data
         workflow_step_data = CreateLocalModelWorkflowSteps(
             provider_type=provider_type,
@@ -735,6 +744,7 @@ class LocalModelWorkflowService(SessionMixin):
             author=author,
             tags=tags,
             icon=icon,
+            provider_id=provider_id,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
@@ -950,9 +960,18 @@ class LocalModelWorkflowService(SessionMixin):
         db_model = await ModelDataManager(self.session).insert_one(Model(**model_data.model_dump()))
         logger.debug(f"Model created with id {db_model.id}")
 
+        # Get leaderboard data
+        leaderboard_data = await CloudModelWorkflowService(self.session)._get_leaderboard_data()
+
         # Update to workflow step
+        workflow_update_data = {
+            "model_id": str(db_model.id),
+            "tags": extracted_tags,
+            "description": model_description,
+            "leaderboard": leaderboard_data,
+        }
         await WorkflowStepDataManager(self.session).update_by_fields(
-            db_latest_workflow_step, {"data": {"model_id": str(db_model.id)}}
+            db_latest_workflow_step, {"data": workflow_update_data}
         )
         logger.debug(f"Workflow step updated with model id {db_model.id}")
 

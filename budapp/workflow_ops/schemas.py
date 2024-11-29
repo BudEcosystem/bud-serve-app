@@ -27,6 +27,7 @@ class RetrieveWorkflowStepData(BaseModel):
     author: str | None = None
     tags: list[Tag] | None = None
     model_extraction_events: dict | None = None
+    description: str | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
