@@ -26,7 +26,7 @@ from fastapi import UploadFile, status
 from pydantic import ValidationError
 
 from budapp.commons import logging
-from budapp.commons.constants import WorkflowStatusEnum
+from budapp.commons.constants import WorkflowStatusEnum, ModelProviderTypeEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import Tag, Task
@@ -634,6 +634,10 @@ class ModelService(SessionMixin):
         model_details = await ModelDataManager(self.session).retrieve_by_fields(
             Model, {"id": model_id}, missing_ok=True
         )
+
+        if not model_details:
+            raise ClientException(message="Model not found", status_code=404)
+
         paper_published_list = [PaperPublishedModel.from_orm(paper) for paper in model_details.paper_published]
         if model_details.model_licenses:
             license = ModelLicensesModel.from_orm(model_details.model_licenses)
@@ -718,12 +722,17 @@ class ModelService(SessionMixin):
     async def edit_cloud_model(self, model_id: UUID, data: Dict[str, Any], file: UploadFile = None) -> None:
         """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
         # Retrieve existing model
-        model = await ModelDataManager(self.session).retrieve_by_fields(
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
             model=Model, fields={"id": model_id}
         )  # TODO: chnage name to db_model
-        if not model:
-            raise ValueError(f"Model with ID {model_id} not found")  # TODO: not req
+        if not db_model:
+            raise ClientException(message="Model not found", status_code=404)  # TODO: not req
 
+        if data.get("icon") and db_model.provider_type in [
+            ModelProviderTypeEnum.CLOUD_MODEL,
+            ModelProviderTypeEnum.HUGGING_FACE,
+        ]:
+            data.pop("icon")
         # Handle file upload if provided
         # TODO: consider dapr local storage
         if file:
@@ -741,10 +750,10 @@ class ModelService(SessionMixin):
             await self._add_papers(model_id, data.pop("paper_urls"))
 
         # Validate and update fields
-        validated_data = await self._validate_update_data(model, data)
+        validated_data = await self._validate_update_data(db_model, data)
 
         # Update model with validated data
-        await ModelDataManager(self.session).update_by_fields(model, validated_data)
+        await ModelDataManager(self.session).update_by_fields(db_model, validated_data)
 
     async def _save_uploaded_file(self, file: UploadFile) -> str:
         """Save uploaded file and return file path."""

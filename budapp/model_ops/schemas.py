@@ -242,23 +242,23 @@ class EditModel(BaseModel):
     website_url: Optional[HttpUrl] = Field(None, description="URL to the model's official website")
     license_url: Optional[HttpUrl] = Field(None, description="License url")
 
-    def dict(self, **kwargs):
-        # Use the parent `dict()` method to get the original dictionary
-        data = super().dict(**kwargs)
-        # Convert all HttpUrl fields to strings for compatibility with SQLAlchemy
-        for key in ["github_url", "huggingface_url", "website_url", "license_url"]:
-            if data.get(key) is not None:
-                data[key] = str(data[key])
-        # Handle `paper_urls` as a list of URLs
-        if data.get("paper_urls") is not None:
-            data["paper_urls"] = [str(url) for url in data["paper_urls"]]
-        return data
+    # def dict(self, **kwargs):
+    #     # Use the parent `dict()` method to get the original dictionary
+    #     data = super().dict(**kwargs)
+    #     # Convert all HttpUrl fields to strings for compatibility with SQLAlchemy
+    #     for key in ["github_url", "huggingface_url", "website_url", "license_url"]:
+    #         if data.get(key) is not None:
+    #             data[key] = str(data[key])
+    #     # Handle `paper_urls` as a list of URLs
+    #     if data.get("paper_urls") is not None:
+    #         data["paper_urls"] = [str(url) for url in data["paper_urls"]]
+    #     return data
 
     @field_validator("name", mode="before")
     def validate_name(cls, value: str | None) -> str | None:
         """Ensure the name is not empty or only whitespace."""
         if value is not None and not value.strip():
-            raise ValueError("Cluster name cannot be empty or only whitespace.")
+            raise ValueError("Model name cannot be empty or only whitespace.")
         return value
 
 

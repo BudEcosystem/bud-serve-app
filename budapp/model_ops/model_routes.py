@@ -22,7 +22,7 @@ from typing import List, Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Query, UploadFile, status
-from pydantic import ValidationError
+from pydantic import ValidationError, HttpUrl
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -34,7 +34,7 @@ from budapp.commons.dependencies import (
     parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
-from budapp.commons.schemas import ErrorResponse, SuccessResponse
+from budapp.commons.schemas import ErrorResponse, SuccessResponse, Tag, Task
 from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
@@ -245,6 +245,17 @@ async def add_cloud_model_workflow(
         ).to_http_response()
 
 
+def validate_url(url: Optional[str]) -> Optional[HttpUrl]:
+    if url:
+        try:
+            # Parse and validate the URL
+            valid_url = HttpUrl.validate(url)
+            return valid_url
+        except ValueError:
+            raise ClientException(message="Invalid URL format")
+    return None  # check if req
+
+
 @model_router.patch(
     "/{model_id}",
     responses={
@@ -273,26 +284,34 @@ async def edit_model(
     tasks: Optional[str] = Form(None),  # JSON string of tasks
     icon: Optional[str] = Form(None),
     paper_urls: Optional[list[str]] = Form(None),
-    github_url: Optional[str] = Form(None),
-    huggingface_url: Optional[str] = Form(None),
-    website_url: Optional[str] = Form(None),
+    github_url: Optional[HttpUrl] = Form(None),
+    huggingface_url: Optional[HttpUrl] = Form(None),
+    website_url: Optional[HttpUrl] = Form(None),
     license_file: UploadFile | None = None,
-    license_url: Optional[str] = Form(None),
+    license_url: Optional[HttpUrl] = Form(None),
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Edit cloud model with file upload"""
     logger.info(
         f"Received data: name={name}, description={description}, tags={tags}, tasks={tasks}, paper_urls={paper_urls}, github_url={github_url}, huggingface_url={huggingface_url}, website_url={website_url}, license_file={license_file}, license_url={license_url}"
     )
     try:
+        # validate name
+        if name is not None and not name.strip():
+            raise ValidationError("Cluster name cannot be empty or only whitespace.")
+
         # Parse JSON strings for list fields
         tags = json.loads(tags) if tags else None  # TODO: tags validation using schema
-        tasks = json.loads(tasks) if tasks else None
+        tags = [Tag(**task) for task in tags] if tags else None
 
-        # Convert to list of multiple strings from a list of single string with comma separated values
-        if (
-            paper_urls and isinstance(paper_urls, list) and len(paper_urls) > 0
-        ):  # TODO: is it possible to add list oof strings directly with form data
-            paper_urls = [url.strip() for url in paper_urls[0].split(",")]
+        tasks = json.loads(tasks) if tasks else None
+        tasks = [Tag(**tag) for tag in tasks] if tasks else None
+
+        if paper_urls and isinstance(paper_urls, list) and len(paper_urls) > 0:
+            # Split the first element into a list of URLs and validate each URL in one loop
+            paper_urls = [
+                validate_url(url.strip())  # Strip and validate each URL in one step
+                for url in paper_urls[0].split(",")
+            ]
 
         # Convert to EditModel
         edit_model = EditModel(
@@ -642,7 +661,9 @@ async def get_model_details(
         model_details = await ModelService(session).get_model_details(model_id)
     except ClientException as e:
         logger.exception(f"Failed to get model details: {e}")
-        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+        return ErrorResponse(
+            code=e.status_code if e.status_code else status.HTTP_400_BAD_REQUEST, message=e.message
+        ).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to get model details: {e}")
         return ErrorResponse(
