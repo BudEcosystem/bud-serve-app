@@ -235,6 +235,7 @@ class EditModel(BaseModel):
     description: Optional[str] = Field(None, max_length=500, description="Brief model description")
     tags: Optional[List[Tag]] = None
     tasks: Optional[List[Tag]] = None
+    icon: Optional[str] = Field(None, description="Icon")
     paper_urls: Optional[List[HttpUrl]] = None
     github_url: Optional[HttpUrl] = Field(None, description="URL to the model's GitHub repository")
     huggingface_url: Optional[HttpUrl] = Field(None, description="URL to the model's Hugging Face page")
@@ -252,6 +253,13 @@ class EditModel(BaseModel):
         if data.get("paper_urls") is not None:
             data["paper_urls"] = [str(url) for url in data["paper_urls"]]
         return data
+
+    @field_validator("name", mode="before")
+    def validate_name(cls, value: str | None) -> str | None:
+        """Ensure the name is not empty or only whitespace."""
+        if value is not None and not value.strip():
+            raise ValueError("Cluster name cannot be empty or only whitespace.")
+        return value
 
 
 class ModelResponse(BaseModel):

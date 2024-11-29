@@ -271,6 +271,7 @@ async def edit_model(
     description: Optional[str] = Form(None, max_length=500),
     tags: Optional[str] = Form(None),  # JSON string of tags
     tasks: Optional[str] = Form(None),  # JSON string of tasks
+    icon: Optional[str] = Form(None),
     paper_urls: Optional[list[str]] = Form(None),
     github_url: Optional[str] = Form(None),
     huggingface_url: Optional[str] = Form(None),
@@ -284,34 +285,31 @@ async def edit_model(
     )
     try:
         # Parse JSON strings for list fields
-        tags = json.loads(tags) if tags else None
+        tags = json.loads(tags) if tags else None  # TODO: tags validation using schema
         tasks = json.loads(tasks) if tasks else None
 
         # Convert to list of multiple strings from a list of single string with comma separated values
-        if paper_urls and isinstance(paper_urls, list) and len(paper_urls) > 0:
+        if (
+            paper_urls and isinstance(paper_urls, list) and len(paper_urls) > 0
+        ):  # TODO: is it possible to add list oof strings directly with form data
             paper_urls = [url.strip() for url in paper_urls[0].split(",")]
 
-        try:
-            # Convert to EditModel
-            edit_model = EditModel(
-                name=name if name else None,
-                description=description if description else None,
-                tags=tags if tags else None,
-                tasks=tasks if tasks else None,
-                paper_urls=paper_urls if paper_urls else None,
-                github_url=github_url if github_url else None,
-                huggingface_url=huggingface_url if huggingface_url else None,
-                website_url=website_url if website_url else None,
-                license_url=license_url if license_url else None,
-            )
-        except ValidationError as e:
-            logger.exception(f"Failed to edit cloud model: {e}")
-            return ErrorResponse(
-                code=status.HTTP_422_UNPROCESSABLE_ENTITY, message="Validation error"
-            ).to_http_response()
+        # Convert to EditModel
+        edit_model = EditModel(
+            name=name if name else None,
+            description=description if description else None,
+            tags=tags if tags else None,
+            tasks=tasks if tasks else None,
+            icon=icon if icon else None,
+            paper_urls=[] if paper_urls == [] else paper_urls if paper_urls is not None else None,
+            github_url=github_url if github_url else None,
+            huggingface_url=huggingface_url if huggingface_url else None,
+            website_url=website_url if website_url else None,
+            license_url=license_url if license_url else None,
+        )
 
         # Pass file and edit_model data to your service
-        await CloudModelWorkflowService(session).edit_cloud_model(
+        await ModelService(session).edit_cloud_model(  # TODO: model dump
             model_id=model_id, data=edit_model.dict(exclude_unset=True, exclude_none=True), file=license_file
         )
 
@@ -319,6 +317,13 @@ async def edit_model(
     except ClientException as e:
         logger.exception(f"Failed to edit cloud model: {e}")
         return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except ValidationError as e:
+        logger.exception(f"Failed to edit cloud model: {e}")
+        field_errors = [{"field": err["loc"][0], "error": err["msg"]} for err in e.errors()]
+        return ErrorResponse(
+            code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            message=f"Validation errors: {field_errors}",
+        ).to_http_response()
     except JSONDecodeError as e:
         logger.exception(f"Failed to edit cloud model: {e}")
         return ErrorResponse(

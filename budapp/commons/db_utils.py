@@ -386,3 +386,73 @@ class DataManagerUtils(SQLAlchemyMixin):
             setattr(model, field, value)
 
         return self.update_one(model)
+
+    async def delete_by_fields(self, model: Type[DeclarativeBase], fields: Dict[str, Any]) -> None:
+        """Delete a model instance(s) based on the given fields.
+
+        This method queries the database for the provided model class using the specified fields
+        as filters and deletes all matching records.
+
+        Args:
+            model (Type[DeclarativeBase]): The SQLAlchemy model class to delete instances from.
+            fields (Dict): A dictionary of field names and their values to filter the records to delete.
+
+        Raises:
+            DatabaseException: If there's an error in field validation or database operation.
+        """
+        try:
+            # Validate the fields before querying
+            await self.validate_fields(model, fields)
+
+            # Query for matching records
+            query = self.session.query(model).filter_by(**fields)
+
+            # Check if any records exist to delete
+            if not query.count():
+                logger.info(f"No records found for deletion in {model.__name__} with filters: {fields}")
+                return
+
+            # Delete records
+            query.delete(synchronize_session=False)
+
+            # Commit the transaction
+            self.session.commit()
+            logger.info(f"Successfully deleted records from {model.__name__} with filters: {fields}")
+        except (Exception, SQLAlchemyError) as e:
+            # Rollback the transaction on error
+            self.session.rollback()
+            logger.exception(f"Failed to delete records from {model.__name__}: {e}")
+            raise DatabaseException(f"Unable to delete records from {model.__name__}") from e
+
+    async def retrieve_all_by_fields(
+        self, model: Type[DeclarativeBase], fields: Dict[str, Any], missing_ok: bool = False
+    ) -> Optional[List[DeclarativeBase]]:
+        """Retrieve all model instances from the database based on the given fields.
+
+        This method queries the database for all model instances matching the provided fields.
+        If no instances are found and missing_ok is False, it raises an HTTPException.
+
+        Args:
+            model (Type[DeclarativeBase]): The SQLAlchemy model class to query.
+            fields (Dict): A dictionary of field names and their values to filter by.
+            missing_ok (bool, optional): If True, return an empty list when no instances are found
+                                        instead of raising an exception. Defaults to False.
+
+        Returns:
+            Optional[List[DeclarativeBase]]: A list of found model instances, or an empty list if not found
+                                            and missing_ok is True.
+
+        Raises:
+            HTTPException: If no model instances are found and missing_ok is False.
+            DatabaseException: If there's an error in field validation or database operation.
+        """
+        await self.validate_fields(model, fields)
+
+        stmt = select(model).filter_by(**fields)
+        db_models = self.scalars_all(stmt)
+
+        if not missing_ok and not db_models:
+            logger.info(f"No {model.__name__} records found in database")
+            raise ClientException(f"No {model.__name__} records found")
+
+        return db_models if db_models else []
