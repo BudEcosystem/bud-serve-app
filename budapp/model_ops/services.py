@@ -38,6 +38,8 @@ from budapp.commons.exceptions import ClientException
 from budapp.commons.helpers import assign_random_colors_to_names, get_normalized_string_or_none
 from budapp.commons.schemas import Tag, Task
 from budapp.core.schemas import NotificationPayload
+from budapp.credential_ops.crud import ProprietaryCredentialDataManager
+from budapp.credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
@@ -714,8 +716,9 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Validate proprietary credential id
         if proprietary_credential_id:
-            pass
-            # TODO: Validate proprietary credential id
+            await ProprietaryCredentialDataManager(self.session).retrieve_by_fields(
+                ProprietaryCredentialModel, {"id": proprietary_credential_id}
+            )
 
         # Validate model name to be unique
         if name:
@@ -1029,7 +1032,18 @@ class LocalModelWorkflowService(SessionMixin):
         )
 
         # TODO: get proprietary credential from db
+        proprietary_credential_id = data.get("proprietary_credential_id")
+
         hf_token = None
+        if proprietary_credential_id:
+            db_proprietary_credential = await ProprietaryCredentialDataManager(self.session).retrieve_by_fields(
+                ProprietaryCredentialModel, {"id": proprietary_credential_id}
+            )
+            hf_token = db_proprietary_credential.other_provider_creds.get("api_key")
+
+            # TODO: remove this after implementing token decryption, decryption not required here
+            # Send decrypted token to model extraction endpoint
+            hf_token = await self._get_decrypted_token(proprietary_credential_id)
 
         model_extraction_request = {
             "model_name": data["name"],
@@ -1057,6 +1071,21 @@ class LocalModelWorkflowService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to perform model extraction request: {e}")
             raise ClientException("unable to perform model extraction request") from e
+
+    @staticmethod
+    async def _get_decrypted_token(credential_id: UUID) -> str:
+        """Get decrypted token."""
+        # TODO: remove this function after implementing dapr decryption
+        url = f"https://api-dev.bud.studio/proprietary/credentials/{credential_id}/details"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                response_data = await response.json()
+                try:
+                    decrypted_token = response_data["result"]["other_provider_creds"]["api_key"]
+                    return decrypted_token
+                except (KeyError, TypeError):
+                    raise ClientException("Unable to get decrypted token")
 
 
 class CloudModelService(SessionMixin):
