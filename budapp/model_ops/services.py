@@ -723,7 +723,9 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Validate model name to be unique
         if name:
-            db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"name": name}, missing_ok=True)
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"name": name, "is_active": True}, missing_ok=True
+            )
             if db_model:
                 raise ClientException("Model name should be unique")
 
@@ -889,7 +891,7 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Check for model with duplicate name
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"name": required_data["name"]}, missing_ok=True
+            Model, {"name": required_data["name"], "is_active": True}, missing_ok=True
         )
         if db_model:
             logger.error(f"Unable to create model with name {required_data['name']} as it already exists")
@@ -1016,7 +1018,7 @@ class LocalModelWorkflowService(SessionMixin):
         if query_uri and query_provider_type and query_provider_type == ModelProviderTypeEnum.HUGGING_FACE.value:
             # Check duplicate hugging face uri
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"uri": query_uri, "provider_type": query_provider_type}, missing_ok=True
+                Model, {"uri": query_uri, "provider_type": query_provider_type, "is_active": True}, missing_ok=True
             )
             if db_model:
                 raise ClientException("Duplicate hugging face uri found")
