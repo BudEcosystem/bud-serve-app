@@ -26,10 +26,10 @@ from typing_extensions import Annotated
 from budapp.commons import logging
 from budapp.commons.dependencies import get_current_active_user, get_session
 from budapp.commons.exceptions import ClientException
-from budapp.commons.schemas import ErrorResponse
+from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 
-from .schemas import RetrieveWorkflowDataResponse
+from .schemas import RetrieveWorkflowDataResponse, WorkflowResponse
 from .services import WorkflowService
 
 
@@ -71,4 +71,99 @@ async def retrieve_workflow_data(
         logger.exception(f"Failed to retrieve workflow data: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve workflow data"
+        ).to_http_response()
+
+
+@workflow_router.patch(
+    "/{workflow_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Resource not found",
+        },
+        status.HTTP_200_OK: {
+            "model": WorkflowResponse,
+            "description": "Successfully mark workflow as completed",
+        },
+    },
+    description="Mark workflow as completed",
+)
+async def mark_workflow_as_completed(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    workflow_id: UUID,
+) -> Union[WorkflowResponse, ErrorResponse]:
+    """Mark workflow as completed."""
+    try:
+        db_workflow = await WorkflowService(session).mark_workflow_as_completed(workflow_id, current_user.id)
+        return WorkflowResponse(
+            id=db_workflow.id,
+            total_steps=db_workflow.total_steps,
+            status=db_workflow.status,
+            current_step=db_workflow.current_step,
+            reason=db_workflow.reason,
+            code=status.HTTP_200_OK,
+            object="workflow.get",
+            message="Workflow marked as completed",
+        ).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to mark workflow as completed: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to mark workflow as completed: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to mark workflow as completed"
+        ).to_http_response()
+
+
+@workflow_router.delete(
+    "/{workflow_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Resource not found",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully delete workflow",
+        },
+    },
+    description="Delete workflow",
+)
+async def delete_workflow(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    workflow_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete workflow."""
+    try:
+        await WorkflowService(session).delete_workflow(workflow_id, current_user.id)
+        return SuccessResponse(
+            code=status.HTTP_200_OK,
+            object="workflow.delete",
+            message="Workflow deleted",
+        ).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to delete workflow: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete workflow: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete workflow"
         ).to_http_response()

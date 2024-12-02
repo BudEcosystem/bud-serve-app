@@ -359,8 +359,8 @@ class ModelFilter(BaseModel):
 
     name: str | None = None
     source: CredentialTypeEnum | None = None
-    model_size_min: int | None = Field(None, ge=0, le=10)
-    model_size_max: int | None = Field(None, ge=0, le=10)
+    model_size_min: int | None = Field(None, ge=0, le=500)
+    model_size_max: int | None = Field(None, ge=0, le=500)
     provider_type: ModelProviderTypeEnum | None = None
     table_source: Literal["cloud_model", "model"] = "cloud_model"
 

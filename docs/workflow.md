@@ -82,6 +82,41 @@
 }
 ```
 
+### Add local model workflow
+
+```json
+// Select provider type
+{
+    "workflow_total_steps": 5,
+    "step_number": 1,
+    "trigger_workflow": false,
+    "provider_type": "hugging_face"
+}
+// Add model details
+{
+    "workflow_id": "ee7881a5-31dd-4480-b12d-79c8fcb76106",
+    "step_number": 2,
+    "trigger_workflow": false,
+    "name": "Microsoft phi local",
+    "uri": "microsoft/Phi-3.5-mini-instruct",
+    "author": "microsoft",
+    "tags": [
+        {
+        "name": "text-generation",
+        "color": "#66d1DF"
+        }
+    ],
+    "icon": null // icon need to provide for model from disk or url
+}
+// Select proprietary credential if required
+{
+    "workflow_id": "ee7881a5-31dd-4480-b12d-79c8fcb76106",
+    "step_number": 3,
+    "trigger_workflow": true,
+    "proprietary_credential_id": "915b5233-85d1-44a4-a694-6d3ecd36b8c6" // not required for public, url, disk models
+}
+```
+
 ## Deploy Model
 
 ### Deploy cloud model workflow

@@ -1,4 +1,4 @@
-from pydantic import UUID4, BaseModel, ConfigDict
+from pydantic import UUID4, BaseModel, ConfigDict, Field
 
 from budapp.commons.constants import ModelProviderTypeEnum, WorkflowStatusEnum
 from budapp.commons.schemas import SuccessResponse, Tag
@@ -39,3 +39,17 @@ class RetrieveWorkflowDataResponse(SuccessResponse):
     total_steps: int
     reason: str | None = None
     workflow_steps: RetrieveWorkflowStepData | None = None
+
+
+class WorkflowResponse(SuccessResponse):
+    """Workflow response schema."""
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+
+    id: UUID4 = Field(alias="workflow_id")
+    total_steps: int = Field(..., gt=0)
+    status: WorkflowStatusEnum
+    current_step: int
+    reason: str | None = None
