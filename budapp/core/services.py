@@ -23,13 +23,14 @@ from typing import Dict, List, Tuple
 from budapp.cluster_ops.crud import ClusterDataManager
 from budapp.cluster_ops.services import ClusterService
 from budapp.commons import logging
-from budapp.commons.constants import BudServeWorkflowStepEventName, EndpointStatusEnum
+from budapp.commons.constants import BudServeWorkflowStepEventName, EndpointStatusEnum, WorkflowStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.endpoint_ops.crud import EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.endpoint_ops.schemas import EndpointCreate
 from budapp.model_ops.services import LocalModelWorkflowService
-from budapp.workflow_ops.crud import WorkflowStepDataManager
+from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
+from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
 from .crud import IconDataManager
@@ -251,6 +252,11 @@ class NotificationService(SessionMixin):
             EndpointModel(**endpoint_data.model_dump(exclude_unset=True, exclude_none=True))
         )
         logger.debug(f"Endpoint created successfully: {db_endpoint.id}")
+
+        # Mark workflow as completed
+        logger.debug(f"Marking workflow as completed: {workflow_id}")
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
 
         return db_endpoint
 

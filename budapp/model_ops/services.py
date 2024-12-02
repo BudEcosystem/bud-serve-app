@@ -369,6 +369,10 @@ class CloudModelWorkflowService(SessionMixin):
             logger.info(f"Model {model_data.uri} with {model_data.source} already exists")
             raise ClientException("Duplicate model uri and source found")
 
+        # Mark workflow completed
+        logger.debug(f"Updating workflow status: {workflow_id}")
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+
         execution_status_data = {
             "workflow_execution_status": {
                 "status": "success",
@@ -387,6 +391,9 @@ class CloudModelWorkflowService(SessionMixin):
             execution_status_data["model_id"] = None
             db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
                 db_latest_workflow_step, {"data": execution_status_data}
+            )
+            await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"status": WorkflowStatusEnum.FAILED, "reason": str(e)}
             )
         else:
             execution_status_data["model_id"] = str(db_model.id)
@@ -410,13 +417,10 @@ class CloudModelWorkflowService(SessionMixin):
                 workflow_id, end_step_number, {"leaderboard": leaderboard_data}
             )
 
-            # Update workflow current step
-            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
-                WorkflowModel, {"id": workflow_id}
-            )
+            # Update workflow current step and status
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
                 db_workflow,
-                {"current_step": end_step_number},
+                {"current_step": end_step_number, "status": WorkflowStatusEnum.COMPLETED},
             )
         return db_model
 
@@ -990,6 +994,11 @@ class LocalModelWorkflowService(SessionMixin):
             db_latest_workflow_step, {"data": workflow_update_data}
         )
         logger.debug(f"Workflow step updated with model id {db_model.id}")
+
+        # Mark workflow as completed
+        logger.debug(f"Updating workflow status: {workflow_id}")
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
 
     async def _verify_hugging_face_uri_duplication(
         self,

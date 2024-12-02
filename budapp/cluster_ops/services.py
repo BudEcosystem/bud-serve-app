@@ -29,11 +29,12 @@ from fastapi import UploadFile
 from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension
 from budapp.commons.config import app_settings
-from budapp.commons.constants import BudServeWorkflowStepEventName, ClusterStatusEnum
+from budapp.commons.constants import BudServeWorkflowStepEventName, ClusterStatusEnum, WorkflowStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.core.schemas import NotificationPayload
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
+from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
@@ -462,6 +463,10 @@ class ClusterService(SessionMixin):
             status_sync_at=datetime.now(tz=timezone.utc),
         )
 
+        # Mark workflow as completed
+        logger.debug(f"Updating workflow status: {workflow_id}")
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+
         # Update status for last step
         execution_status = {"status": "success", "message": "Cluster successfully created"}
         try:
@@ -472,11 +477,15 @@ class ClusterService(SessionMixin):
         except Exception as e:
             logger.exception(f"Failed to create cluster: {e}")
             execution_status.update({"status": "error", "message": "Failed to create cluster"})
+            workflow_data = {"status": WorkflowStatusEnum.FAILED, "reason": str(e)}
+        else:
+            workflow_data = {"status": WorkflowStatusEnum.COMPLETED}
         finally:
             execution_status_data = {"workflow_execution_status": execution_status}
             db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
                 db_latest_workflow_step, {"data": execution_status_data}
             )
+            await WorkflowDataManager(self.session).update_by_fields(db_workflow, workflow_data)
 
     async def _calculate_cluster_resources(self, data: Dict[str, Any]) -> ClusterResourcesInfo:
         """Calculate the cluster resources.
