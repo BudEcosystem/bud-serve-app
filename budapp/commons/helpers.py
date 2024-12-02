@@ -17,10 +17,7 @@
 """Provides helper functions for the project."""
 
 from enum import Enum
-from typing import List, Optional
-from pydantic import HttpUrl
-
-from budapp.commons.exceptions import ClientException
+from typing import List
 
 
 def create_dynamic_enum(enum_name: str, enum_values: List[str]) -> Enum:
@@ -47,14 +44,3 @@ def create_dynamic_enum(enum_name: str, enum_values: List[str]) -> Enum:
     # creating enum dynamically from a list of values
     # converting enum name to upper assuming no spaces or special characters
     return Enum(enum_name, {val.upper(): val for val in enum_values})
-
-
-def validate_url(url: Optional[str]) -> Optional[HttpUrl]:
-    if url:
-        try:
-            # Parse and validate the URL
-            valid_url = HttpUrl(url)
-            return str(valid_url)
-        except ValueError:
-            raise ClientException(message="Invalid URL format")
-    return None

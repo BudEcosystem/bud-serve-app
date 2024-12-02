@@ -35,7 +35,6 @@ from budapp.commons.dependencies import (
     parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
-from budapp.commons.helpers import validate_url
 from budapp.commons.schemas import ErrorResponse, SuccessResponse, Tag, Task
 from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
@@ -269,16 +268,16 @@ async def edit_model(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     name: Optional[str] = Form(None, min_length=1, max_length=100),
-    description: Optional[str] = Form(None, max_length=500),
+    description: Optional[str] = Form(None, max_length=300),
     tags: Optional[str] = Form(None),  # JSON string of tags
     tasks: Optional[str] = Form(None),  # JSON string of tasks
     icon: Optional[str] = Form(None),
     paper_urls: Optional[list[str]] = Form(None),
-    github_url: Optional[str] = Form(None),
-    huggingface_url: Optional[str] = Form(None),
-    website_url: Optional[str] = Form(None),
+    github_url: Optional[HttpUrl] = Form(None),
+    huggingface_url: Optional[HttpUrl] = Form(None),
+    website_url: Optional[HttpUrl] = Form(None),
     license_file: UploadFile | None = None,
-    license_url: Optional[str] = Form(None),
+    license_url: Optional[HttpUrl] = Form(None),
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Edit cloud model with file upload"""
     logger.info(
@@ -299,18 +298,9 @@ async def edit_model(
         if paper_urls and isinstance(paper_urls, list) and len(paper_urls) > 0:
             # Split the first element into a list of URLs and validate each URL in one loop
             paper_urls = [
-                validate_url(url.strip())  # Strip and validate each URL in one step
+                str(HttpUrl(url.strip()))  # Strip and validate each URL in one step
                 for url in paper_urls[0].split(",")
             ]
-
-        if github_url:
-            github_url = validate_url(github_url.strip())
-        if huggingface_url:
-            huggingface_url = validate_url(huggingface_url.strip())
-        if website_url:
-            website_url = validate_url(website_url.strip())
-        if license_url:
-            license_url = validate_url(license_url.strip())
 
         if license_file:
             if not await check_file_extension(license_file.filename, ["pdf", "txt", "doc", "docx", "md"]):
@@ -324,10 +314,10 @@ async def edit_model(
             "tasks": tasks if tasks else None,
             "icon": icon if icon else None,
             "paper_urls": [] if paper_urls == [] else paper_urls if paper_urls is not None else None,
-            "github_url": github_url if github_url else None,
-            "huggingface_url": huggingface_url if huggingface_url else None,
-            "website_url": website_url if website_url else None,
-            "license_url": license_url if license_url else None,
+            "github_url": str(github_url) if github_url else None,
+            "huggingface_url": str(huggingface_url) if huggingface_url else None,
+            "website_url": str(website_url) if website_url else None,
+            "license_url": str(license_url) if license_url else None,
         }
 
         # Pass file and edit_model data to your service
@@ -339,10 +329,9 @@ async def edit_model(
         return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
     except ValidationError as e:
         logger.exception(f"Failed to edit cloud model: {e}")
-        field_errors = [{"field": err["loc"][0], "error": err["msg"]} for err in e.errors()]
         return ErrorResponse(
             code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            message=f"{field_errors}",
+            message=e,
         ).to_http_response()
     except JSONDecodeError as e:
         logger.exception(f"Failed to edit cloud model: {e}")
