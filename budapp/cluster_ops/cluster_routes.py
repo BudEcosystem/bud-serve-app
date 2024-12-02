@@ -221,20 +221,6 @@ async def edit_cluster(
 
     data = edit_cluster.dict(exclude_unset=True, exclude_none=True)
 
-    # check if icon is a valid file path
-    image_extensions = [".png", ".jpg", ".jpeg"]
-    if data.get("icon"):
-        if not any(data.get("icon").lower().endswith(ext) for ext in image_extensions):
-            return ErrorResponse(
-                code=status.HTTP_400_BAD_REQUEST,
-                message=f"Icon must be a valid image file with extensions: {', '.join(image_extensions)}.",
-            ).to_http_response()
-        if not os.path.exists(os.path.join(app_settings.static_dir, data.get("icon"))):
-            return ErrorResponse(
-                code=status.HTTP_400_BAD_REQUEST,
-                message="Invalid icon file path",
-            ).to_http_response()
-
     try:
         updated_cluster_info = await ClusterService(session).edit_cluster(cluster_id=cluster_id, data=data)
         return SingleClusterResponse(
@@ -293,5 +279,5 @@ async def get_cluster_details(
         cluster=cluster_details,
         message="Cluster details fetched successfully",
         code=status.HTTP_200_OK,
-        object="SingleClusterResponse",
+        object="cluster.get",
     )

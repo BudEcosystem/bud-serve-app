@@ -47,7 +47,7 @@ from .schemas import (
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
     EditCluster,
-    ClusterResponseWithEndpointCount,
+    ClusterPaginatedResponse,
 )
 
 
@@ -64,7 +64,7 @@ class ClusterService(SessionMixin):
         filters: Dict = {},
         order_by: List = [],
         search: bool = False,
-    ) -> Tuple[List[ClusterResponseWithEndpointCount], int]:
+    ) -> Tuple[List[ClusterPaginatedResponse], int]:
         """Get all active clusters."""
         filters_dict = filters
         filters_dict["is_active"] = True
@@ -75,11 +75,12 @@ class ClusterService(SessionMixin):
         # Add dummy data and additional fields
         updated_clusters = []
         for cluster in clusters:
-            updated_cluster = ClusterResponseWithEndpointCount(
+            updated_cluster = ClusterPaginatedResponse(
                 id=cluster.id,
                 cluster_id=cluster.cluster_id,
                 name=cluster.name,
                 icon=cluster.icon,
+                ingress_url=cluster.ingress_url,
                 created_at=cluster.created_at,
                 modified_at=cluster.modified_at,
                 endpoint_count=12,  # TODO: Add endpoint count
@@ -338,6 +339,13 @@ class ClusterService(SessionMixin):
                         form.add_field("configuration", config_file, filename=temp_file.name)
                         try:
                             async with session.post(create_cluster_endpoint, data=form) as response:
+                                if response.status != 200:
+                                    error_text = await response.text()
+                                    logger.error(f"Cluster service error: Status={response.status}, Response={error_text}")
+                                    raise ClientException(
+                                        f"External cluster service error (HTTP {response.status}): {error_text[:200]}"
+                                    )
+
                                 response_data = await response.json()
                                 logger.debug(f"Response from budcluster service: {response_data}")
 

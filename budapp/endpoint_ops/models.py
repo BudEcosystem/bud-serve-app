@@ -18,6 +18,7 @@
 
 import json
 from datetime import datetime
+from typing import Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
@@ -58,6 +59,7 @@ class Endpoint(Base):
         ),
         nullable=False,
     )
+    credential_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("proprietary_credential.id"), nullable=True)
     status_sync_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     model: Mapped[Model] = relationship("Model", back_populates="endpoints", foreign_keys=[model_id])
@@ -71,6 +73,9 @@ class Endpoint(Base):
 
     cluster: Mapped[Cluster] = relationship("Cluster", back_populates="endpoints", foreign_keys=[cluster_id])
     created_user: Mapped["User"] = relationship(back_populates="created_endpoints", foreign_keys=[created_by])
+    credential: Mapped[Optional["ProprietaryCredential"]] = relationship(
+        "ProprietaryCredential", back_populates="endpoints"
+    )
 
     @hybrid_property
     def cache_config_dict(self):

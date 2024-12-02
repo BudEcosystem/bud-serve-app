@@ -75,6 +75,7 @@ class ClusterResponse(BaseModel):
     id: UUID
     name: str
     icon: str
+    ingress_url: str
     created_at: datetime
     modified_at: datetime
     status: ClusterStatusEnum
@@ -102,7 +103,7 @@ class ClusterResponse(BaseModel):
         return self.cpu_available_workers + self.gpu_available_workers + self.hpu_available_workers
 
 
-class ClusterResponseWithEndpointCount(ClusterResponse):
+class ClusterPaginatedResponse(ClusterResponse):
     endpoint_count: int
 
 
@@ -117,7 +118,7 @@ class ClusterListResponse(PaginatedSuccessResponse):
 
     model_config = ConfigDict(extra="ignore")
 
-    clusters: List[ClusterResponseWithEndpointCount]
+    clusters: List[ClusterPaginatedResponse]
 
 
 class CreateClusterWorkflowRequest(BaseModel):

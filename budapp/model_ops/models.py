@@ -68,6 +68,7 @@ class Model(Base):
         nullable=False,
     )
     uri: Mapped[str] = mapped_column(String, nullable=False)
+    local_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     provider_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("provider.id"), nullable=True)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

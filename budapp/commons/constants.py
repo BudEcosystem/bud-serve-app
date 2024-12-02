@@ -444,6 +444,7 @@ class PayloadType(str, Enum):
     DEPLOYMENT_RECOMMENDATION = "deployment_recommendation"
     DEPLOY_MODEL = "deploy_model"
     REGISTER_CLUSTER = "register_cluster"
+    PERFORM_MODEL_EXTRACTION = "perform_model_extraction"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -452,11 +453,14 @@ class BudServeWorkflowStepEventName(str, Enum):
     Attributes:
         BUD_SIMULATOR_EVENTS: Represents the Bud simulator workflow step event name.
         BUDSERVE_CLUSTER_EVENTS: Represents the Budserve cluster workflow step event name.
+        CREATE_CLUSTER_EVENTS: Represents the create cluster workflow step event name.
+        MODEL_EXTRACTION_EVENTS: Represents the model extraction workflow step event name.
     """
 
     BUD_SIMULATOR_EVENTS = "bud_simulator_events"
     BUDSERVE_CLUSTER_EVENTS = "budserve_cluster_events"
     CREATE_CLUSTER_EVENTS = "create_cluster_events"
+    MODEL_EXTRACTION_EVENTS = "model_extraction_events"
 
 
 class ClusterStatusEnum(StrEnum):
@@ -506,3 +510,15 @@ class ModelTemplateTypeEnum(StrEnum):
     SENTIMENT_ANALYSIS = auto()
     DOCUMENT_ANALYSIS = auto()
     OTHER = auto()
+
+
+class DropdownBackgroundColor(str, Enum):
+    """Background hex color for dropdown."""
+
+    COLOR_1 = "#D1B854"
+
+    @classmethod
+    def get_random_color(cls) -> str:
+        """Get a random color."""
+        colors = list(cls)
+        return random.choice(colors).value
