@@ -16,10 +16,13 @@
 
 """Defines constant values used throughout the project, including application-specific constants."""
 
+import json
+import os
 import random
 from enum import Enum, StrEnum, auto
 from typing import List
 
+from .config import app_settings
 from .helpers import create_dynamic_enum
 
 
@@ -522,3 +525,9 @@ class DropdownBackgroundColor(str, Enum):
         """Get a random color."""
         colors = list(cls)
         return random.choice(colors).value
+
+
+# Proprietary credential data
+proprietary_credential_data_path = os.path.join(app_settings.base_dir, "budapp", "initializers", "proprietary_provider.json")
+with open(proprietary_credential_data_path, "r") as f:
+    PROPRIETARY_CREDENTIAL_DATA = json.load(f)
