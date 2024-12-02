@@ -122,6 +122,13 @@ class CloudModelWorkflowService(SessionMixin):
             if db_cloud_model.is_present_in_model:
                 raise ClientException("Cloud model is already present in model")
 
+        if name:
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"name": name, "is_active": True}, missing_ok=True
+            )
+            if db_model:
+                raise ClientException("Model name already exists")
+
         # Prepare workflow step data
         workflow_step_data = CreateCloudModelWorkflowSteps(
             provider_type=provider_type,
@@ -230,6 +237,13 @@ class CloudModelWorkflowService(SessionMixin):
             missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
+
+            # Check duplicate name exist in model
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"name": required_data["name"], "is_active": True}, missing_ok=True
+            )
+            if db_model:
+                raise ClientException("Model name already exists")
 
             # Trigger deploy model by step
             db_model = await self._execute_add_cloud_model_workflow(required_data, db_workflow.id)
