@@ -740,7 +740,6 @@ class ModelService(SessionMixin):
             await self._create_or_update_license_entry(model_id, filename, file_path)
 
         # Add papers if provided
-        # data["paper_urls"]=[] #haveto remove
         if data.get("paper_urls") or data["paper_urls"] == []:
             await self._update_papers(model_id, data.pop("paper_urls"))
 

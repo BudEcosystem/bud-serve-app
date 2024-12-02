@@ -35,6 +35,7 @@ from budapp.commons.dependencies import (
     parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
+from budapp.commons.helpers import validate_url
 from budapp.commons.schemas import ErrorResponse, SuccessResponse, Tag, Task
 from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
@@ -43,7 +44,6 @@ from budapp.workflow_ops.services import WorkflowService
 from .schemas import (
     CreateCloudModelWorkflowRequest,
     CreateCloudModelWorkflowResponse,
-    EditModel,
     ModelDetailResponse,
     ModelFilter,
     ModelPaginatedResponse,
@@ -246,17 +246,6 @@ async def add_cloud_model_workflow(
         ).to_http_response()
 
 
-def validate_url(url: Optional[str]) -> Optional[HttpUrl]:
-    if url:
-        try:
-            # Parse and validate the URL
-            valid_url = HttpUrl(url)
-            return str(valid_url)
-        except ValueError:
-            raise ClientException(message="Invalid URL format")
-    return None  # check if req
-
-
 @model_router.patch(
     "/{model_id}",
     responses={
@@ -301,11 +290,11 @@ async def edit_model(
             raise ValidationError("Cluster name cannot be empty or only whitespace.")
 
         # Parse JSON strings for list fields
-        tags = json.loads(tags) if tags else None  # TODO: tags validation using schema
-        tags = [Tag(**task) for task in tags] if tags else None
+        tags = json.loads(tags) if tags else None
+        tags = [Tag(**task).model_dump() for task in tags] if tags else None
 
         tasks = json.loads(tasks) if tasks else None
-        tasks = [Task(**task) for task in tasks] if tasks else None
+        tasks = [Task(**task).model_dump() for task in tasks] if tasks else None
 
         if paper_urls and isinstance(paper_urls, list) and len(paper_urls) > 0:
             # Split the first element into a list of URLs and validate each URL in one loop
@@ -326,7 +315,7 @@ async def edit_model(
         if license_file:
             if not await check_file_extension(license_file.filename, ["pdf", "txt", "doc", "docx", "md"]):
                 logger.error("Invalid file extension for license file")
-                raise ClientException("Invalid file extension for license file")
+                raise ClientException("Invalid file extension for license file")  # this also validation error?
         # Convert to EditModel
         edit_model = {
             "name": name if name else None,
@@ -353,7 +342,7 @@ async def edit_model(
         field_errors = [{"field": err["loc"][0], "error": err["msg"]} for err in e.errors()]
         return ErrorResponse(
             code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            message=f"Validation errors: {field_errors}",
+            message=f"{field_errors}",
         ).to_http_response()
     except JSONDecodeError as e:
         logger.exception(f"Failed to edit cloud model: {e}")
