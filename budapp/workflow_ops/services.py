@@ -241,6 +241,22 @@ class WorkflowService(SessionMixin):
 
         return db_workflow
 
+    async def mark_workflow_as_completed(self, workflow_id: UUID, current_user_id: UUID) -> WorkflowModel:
+        """Mark workflow as completed."""
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+            WorkflowModel, {"id": workflow_id, "created_by": current_user_id}
+        )
+        logger.debug(f"Workflow found: {db_workflow.id}")
+
+        # Update status to completed only if workflow is not failed
+        if db_workflow.status == WorkflowStatusEnum.FAILED:
+            logger.error(f"Workflow {workflow_id} is failed")
+            raise ClientException("Workflow is failed")
+
+        return await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"status": WorkflowStatusEnum.COMPLETED}
+        )
+
 
 class WorkflowStepService(SessionMixin):
     """Workflow step service."""

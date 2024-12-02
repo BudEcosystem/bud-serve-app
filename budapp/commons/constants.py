@@ -405,6 +405,7 @@ class WorkflowStatusEnum(StrEnum):
     IN_PROGRESS = auto()
     COMPLETED = auto()
     FAILED = auto()
+    # Cancelled status not required since workflow delete api delete record
 
 
 class NotificationType(Enum):
