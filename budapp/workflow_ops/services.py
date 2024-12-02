@@ -257,6 +257,14 @@ class WorkflowService(SessionMixin):
             db_workflow, {"status": WorkflowStatusEnum.COMPLETED}
         )
 
+    async def delete_workflow(self, workflow_id: UUID, current_user_id: UUID) -> None:
+        """Delete workflow."""
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+            WorkflowModel, {"id": workflow_id, "created_by": current_user_id}
+        )
+
+        await WorkflowDataManager(self.session).delete_one(db_workflow)
+
 
 class WorkflowStepService(SessionMixin):
     """Workflow step service."""

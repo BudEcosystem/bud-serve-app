@@ -159,6 +159,25 @@ class SQLAlchemyMixin(SessionMixin):
             logger.exception(f"Failed to update one model in database: {e}")
             raise DatabaseException("Unable to update model in database") from e
 
+    def delete_model(self, model: object) -> None:
+        """Delete a single model instance from the database.
+
+        This method commits the current session, and then deletes the model from the database.
+
+        Args:
+            model (Any): The SQLAlchemy model instance to be deleted from the database.
+
+        Raises:
+            DatabaseException: If there's an error during the database operation.
+        """
+        try:
+            self.session.delete(model)
+            self.session.commit()
+        except (Exception, SQLAlchemyError) as e:
+            self.session.rollback()
+            logger.exception(f"Failed to delete one model in database: {e}")
+            raise DatabaseException("Unable to delete model in database") from e
+
     def scalars_all(self, stmt: Executable) -> object:
         """Scalars a SQL statement and return a single result or None.
 
@@ -387,3 +406,7 @@ class DataManagerUtils(SQLAlchemyMixin):
             setattr(model, field, value)
 
         return self.update_one(model)
+
+    async def delete_one(self, model: Type[DeclarativeBase]) -> None:
+        """Delete a model instance from the database."""
+        self.delete_model(model)
