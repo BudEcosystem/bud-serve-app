@@ -316,6 +316,7 @@ async def edit_model(
     tasks: Optional[str] = Form(None),  # JSON string of tasks
     icon: Optional[str] = Form(None),
     paper_urls: Optional[list[str]] = Form(None),
+    delete_all_papers: Optional[bool] = Form(False),
     github_url: Optional[HttpUrl] = Form(None),
     huggingface_url: Optional[HttpUrl] = Form(None),
     website_url: Optional[HttpUrl] = Form(None),
@@ -338,7 +339,9 @@ async def edit_model(
         tasks = json.loads(tasks) if tasks else None
         tasks = [Task(**task).model_dump() for task in tasks] if tasks else None
 
-        if paper_urls and isinstance(paper_urls, list) and len(paper_urls) > 0:
+        if delete_all_papers:
+            paper_urls = []
+        elif paper_urls and isinstance(paper_urls, list) and len(paper_urls) > 0:
             # Split the first element into a list of URLs and validate each URL in one loop
             paper_urls = [
                 str(HttpUrl(url.strip()))  # Strip and validate each URL in one step
@@ -356,7 +359,7 @@ async def edit_model(
             "tags": tags if tags else None,
             "tasks": tasks if tasks else None,
             "icon": icon if icon else None,
-            "paper_urls": [] if paper_urls == [] else paper_urls if paper_urls is not None else None,
+            "paper_urls": paper_urls if type(paper_urls) == list else None,
             "github_url": str(github_url) if github_url else None,
             "huggingface_url": str(huggingface_url) if huggingface_url else None,
             "website_url": str(website_url) if website_url else None,

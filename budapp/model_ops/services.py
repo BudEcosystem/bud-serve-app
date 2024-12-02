@@ -1155,7 +1155,6 @@ class ModelService(SessionMixin):
         """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
         # Retrieve existing model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(model=Model, fields={"id": model_id})
-
         if data.get("icon") and db_model.provider_type in [
             ModelProviderTypeEnum.CLOUD_MODEL,
             ModelProviderTypeEnum.HUGGING_FACE,
@@ -1180,8 +1179,6 @@ class ModelService(SessionMixin):
             key: data[key] if key in data and data[key] is not None else getattr(db_model, key)
             for key in db_model.__table__.columns.keys()
         }
-
-        logger.info(f"model data:{updated_data}")
 
         # Update model with validated data
         await ModelDataManager(self.session).update_by_fields(db_model, updated_data)
