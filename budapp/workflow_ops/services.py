@@ -262,6 +262,10 @@ class WorkflowService(SessionMixin):
             WorkflowModel, {"id": workflow_id, "created_by": current_user_id}
         )
 
+        if db_workflow.status != WorkflowStatusEnum.IN_PROGRESS:
+            logger.error("Unable to delete failed or completed workflow")
+            raise ClientException("Workflow is not in progress state")
+
         await WorkflowDataManager(self.session).delete_one(db_workflow)
 
 
