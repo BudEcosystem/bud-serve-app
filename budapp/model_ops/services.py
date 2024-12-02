@@ -718,15 +718,10 @@ class ModelService(SessionMixin):
 
         return db_authors, count
 
-    # TODO: move to model service- DONE
     async def edit_cloud_model(self, model_id: UUID, data: Dict[str, Any], file: UploadFile = None) -> None:
         """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
         # Retrieve existing model
-        db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            model=Model, fields={"id": model_id}
-        )  # TODO: chnage name to db_model
-        if not db_model:
-            raise ClientException(message="Model not found", status_code=404)  # TODO: not req
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(model=Model, fields={"id": model_id})
 
         if data.get("icon") and db_model.provider_type in [
             ModelProviderTypeEnum.CLOUD_MODEL,
@@ -747,13 +742,17 @@ class ModelService(SessionMixin):
         # Add papers if provided
         # data["paper_urls"]=[] #haveto remove
         if data.get("paper_urls") or data["paper_urls"] == []:
-            await self._add_papers(model_id, data.pop("paper_urls"))
+            await self._update_papers(model_id, data.pop("paper_urls"))
 
-        # Validate and update fields
-        validated_data = await self._validate_update_data(db_model, data)
+        updated_data = {
+            key: data[key] if key in data and data[key] is not None else getattr(db_model, key)
+            for key in db_model.__table__.columns.keys()
+        }
+
+        logger.info(f"model data:{updated_data}")
 
         # Update model with validated data
-        await ModelDataManager(self.session).update_by_fields(db_model, validated_data)
+        await ModelDataManager(self.session).update_by_fields(db_model, updated_data)
 
     async def _save_uploaded_file(self, file: UploadFile) -> str:
         """Save uploaded file and return file path."""
@@ -789,6 +788,9 @@ class ModelService(SessionMixin):
         )
 
         if existing_license:
+            if existing_license.path and os.path.exists(existing_license.path):
+                os.remove(existing_license.path)
+
             # Update the existing license entry
             existing_license.name = filename
             existing_license.path = file_path
@@ -801,16 +803,7 @@ class ModelService(SessionMixin):
                 ModelLicenses(**license_entry.model_dump(exclude_unset=True))
             )
 
-    async def _validate_update_data(self, model: Model, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate and prepare update data using EditModel schema."""
-        model_data = {key: getattr(model, key) for key in model.__table__.columns.keys()}
-        updated_data = {**model_data, **data}
-        try:
-            return EditModel(**updated_data).dict(exclude_unset=True, exclude_none=True)
-        except ValidationError as e:
-            raise ValueError(f"Validation error: {e}")
-
-    async def _add_papers(self, model_id: UUID, paper_urls: list[str]) -> None:
+    async def _update_papers(self, model_id: UUID, paper_urls: list[str]) -> None:
         """Update paper entries for the given model by adding new URLs and removing old ones."""
         # Fetch existing paper URLs for the model
         existing_papers = await ModelDataManager(self.session).retrieve_all_by_fields(
@@ -822,9 +815,7 @@ class ModelService(SessionMixin):
         input_urls = set(paper_urls)
         urls_to_add = input_urls - existing_urls
         urls_to_remove = existing_urls - input_urls
-        logger.info(
-            f"hii: {input_urls}, urls_to_add: {urls_to_add}, urls_to_remove: {urls_to_remove}"
-        )  # haveto remove
+        logger.debug(f"paper info: {input_urls}, urls_to_add: {urls_to_add}, urls_to_remove: {urls_to_remove}")
 
         # Add new paper URLs
         for paper_url in urls_to_add:

@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
+from budapp.commons.async_utils import check_file_extension
 from budapp.commons.constants import ModalityEnum
 from budapp.commons.dependencies import (
     get_current_active_user,
@@ -249,8 +250,8 @@ def validate_url(url: Optional[str]) -> Optional[HttpUrl]:
     if url:
         try:
             # Parse and validate the URL
-            valid_url = HttpUrl.validate(url)
-            return valid_url
+            valid_url = HttpUrl(url)
+            return str(valid_url)
         except ValueError:
             raise ClientException(message="Invalid URL format")
     return None  # check if req
@@ -284,11 +285,11 @@ async def edit_model(
     tasks: Optional[str] = Form(None),  # JSON string of tasks
     icon: Optional[str] = Form(None),
     paper_urls: Optional[list[str]] = Form(None),
-    github_url: Optional[HttpUrl] = Form(None),
-    huggingface_url: Optional[HttpUrl] = Form(None),
-    website_url: Optional[HttpUrl] = Form(None),
+    github_url: Optional[str] = Form(None),
+    huggingface_url: Optional[str] = Form(None),
+    website_url: Optional[str] = Form(None),
     license_file: UploadFile | None = None,
-    license_url: Optional[HttpUrl] = Form(None),
+    license_url: Optional[str] = Form(None),
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Edit cloud model with file upload"""
     logger.info(
@@ -304,7 +305,7 @@ async def edit_model(
         tags = [Tag(**task) for task in tags] if tags else None
 
         tasks = json.loads(tasks) if tasks else None
-        tasks = [Tag(**tag) for tag in tasks] if tasks else None
+        tasks = [Task(**task) for task in tasks] if tasks else None
 
         if paper_urls and isinstance(paper_urls, list) and len(paper_urls) > 0:
             # Split the first element into a list of URLs and validate each URL in one loop
@@ -313,24 +314,35 @@ async def edit_model(
                 for url in paper_urls[0].split(",")
             ]
 
+        if github_url:
+            github_url = validate_url(github_url.strip())
+        if huggingface_url:
+            huggingface_url = validate_url(huggingface_url.strip())
+        if website_url:
+            website_url = validate_url(website_url.strip())
+        if license_url:
+            license_url = validate_url(license_url.strip())
+
+        if license_file:
+            if not await check_file_extension(license_file.filename, ["pdf", "txt", "doc", "docx", "md"]):
+                logger.error("Invalid file extension for license file")
+                raise ClientException("Invalid file extension for license file")
         # Convert to EditModel
-        edit_model = EditModel(
-            name=name if name else None,
-            description=description if description else None,
-            tags=tags if tags else None,
-            tasks=tasks if tasks else None,
-            icon=icon if icon else None,
-            paper_urls=[] if paper_urls == [] else paper_urls if paper_urls is not None else None,
-            github_url=github_url if github_url else None,
-            huggingface_url=huggingface_url if huggingface_url else None,
-            website_url=website_url if website_url else None,
-            license_url=license_url if license_url else None,
-        )
+        edit_model = {
+            "name": name if name else None,
+            "description": description if description else None,
+            "tags": tags if tags else None,
+            "tasks": tasks if tasks else None,
+            "icon": icon if icon else None,
+            "paper_urls": [] if paper_urls == [] else paper_urls if paper_urls is not None else None,
+            "github_url": github_url if github_url else None,
+            "huggingface_url": huggingface_url if huggingface_url else None,
+            "website_url": website_url if website_url else None,
+            "license_url": license_url if license_url else None,
+        }
 
         # Pass file and edit_model data to your service
-        await ModelService(session).edit_cloud_model(  # TODO: model dump
-            model_id=model_id, data=edit_model.dict(exclude_unset=True, exclude_none=True), file=license_file
-        )
+        await ModelService(session).edit_cloud_model(model_id=model_id, data=edit_model, file=license_file)
 
         return SuccessResponse(message="Cloud model edited successfully", code=status.HTTP_200_OK).to_http_response()
     except ClientException as e:
