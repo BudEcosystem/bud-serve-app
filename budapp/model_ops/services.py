@@ -980,15 +980,11 @@ class LocalModelWorkflowService(SessionMixin):
         db_model = await ModelDataManager(self.session).insert_one(Model(**model_data.model_dump()))
         logger.debug(f"Model created with id {db_model.id}")
 
-        # Get leaderboard data
-        leaderboard_data = await CloudModelWorkflowService(self.session)._get_leaderboard_data()
-
         # Update to workflow step
         workflow_update_data = {
             "model_id": str(db_model.id),
             "tags": extracted_tags,
             "description": model_description,
-            "leaderboard": leaderboard_data,
         }
         await WorkflowStepDataManager(self.session).update_by_fields(
             db_latest_workflow_step, {"data": workflow_update_data}

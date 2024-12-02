@@ -206,7 +206,6 @@ class WorkflowService(SessionMixin):
                 "provider_id",
                 BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value,
                 "model_id",
-                "leaderboard",
                 "description",
             ],
         }
