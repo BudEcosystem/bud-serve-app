@@ -25,16 +25,16 @@ from uuid import UUID
 import aiohttp
 import yaml
 from fastapi import UploadFile
-from pydantic import ValidationError
 
 from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension
 from budapp.commons.config import app_settings
-from budapp.commons.constants import BudServeWorkflowStepEventName, ClusterStatusEnum
+from budapp.commons.constants import BudServeWorkflowStepEventName, ClusterStatusEnum, WorkflowStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.core.schemas import NotificationPayload
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
+from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
@@ -42,12 +42,11 @@ from .crud import ClusterDataManager
 from .models import Cluster as ClusterModel
 from .schemas import (
     ClusterCreate,
+    ClusterPaginatedResponse,
     ClusterResourcesInfo,
     ClusterResponse,
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
-    EditCluster,
-    ClusterPaginatedResponse,
 )
 
 
@@ -142,6 +141,14 @@ class ClusterService(SessionMixin):
             except yaml.YAMLError as e:
                 logger.exception(f"Invalid cluster configuration yaml file found: {e}")
                 raise ClientException("Invalid cluster configuration yaml file found") from e
+
+        if cluster_name:
+            # Check duplicate cluster name
+            db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+                ClusterModel, {"name": cluster_name, "is_active": True}, missing_ok=True
+            )
+            if db_cluster:
+                raise ClientException("Cluster name already exists")
 
         # Prepare workflow step data
         workflow_step_data = CreateClusterWorkflowSteps(
@@ -243,6 +250,13 @@ class ClusterService(SessionMixin):
             if missing_keys:
                 raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
 
+            # Check duplicate cluster name
+            db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+                ClusterModel, {"name": required_data["name"], "is_active": True}, missing_ok=True
+            )
+            if db_cluster:
+                raise ClientException("Cluster name already exists")
+
             # Trigger create cluster workflow by step
             await self._execute_create_cluster_workflow(required_data, db_workflow.id)
             logger.debug("Successfully executed create cluster workflow")
@@ -341,7 +355,9 @@ class ClusterService(SessionMixin):
                             async with session.post(create_cluster_endpoint, data=form) as response:
                                 if response.status != 200:
                                     error_text = await response.text()
-                                    logger.error(f"Cluster service error: Status={response.status}, Response={error_text}")
+                                    logger.error(
+                                        f"Cluster service error: Status={response.status}, Response={error_text}"
+                                    )
                                     raise ClientException(
                                         f"External cluster service error (HTTP {response.status}): {error_text[:200]}"
                                     )
@@ -447,6 +463,10 @@ class ClusterService(SessionMixin):
             status_sync_at=datetime.now(tz=timezone.utc),
         )
 
+        # Mark workflow as completed
+        logger.debug(f"Updating workflow status: {workflow_id}")
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+
         # Update status for last step
         execution_status = {"status": "success", "message": "Cluster successfully created"}
         try:
@@ -457,11 +477,15 @@ class ClusterService(SessionMixin):
         except Exception as e:
             logger.exception(f"Failed to create cluster: {e}")
             execution_status.update({"status": "error", "message": "Failed to create cluster"})
+            workflow_data = {"status": WorkflowStatusEnum.FAILED, "reason": str(e)}
+        else:
+            workflow_data = {"status": WorkflowStatusEnum.COMPLETED}
         finally:
             execution_status_data = {"workflow_execution_status": execution_status}
             db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
                 db_latest_workflow_step, {"data": execution_status_data}
             )
+            await WorkflowDataManager(self.session).update_by_fields(db_workflow, workflow_data)
 
     async def _calculate_cluster_resources(self, data: Dict[str, Any]) -> ClusterResourcesInfo:
         """Calculate the cluster resources.
