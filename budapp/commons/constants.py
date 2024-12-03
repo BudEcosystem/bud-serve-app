@@ -523,3 +523,15 @@ class DropdownBackgroundColor(str, Enum):
         """Get a random color."""
         colors = list(cls)
         return random.choice(colors).value
+
+
+class StatusEnum(StrEnum):
+    """Enumeration of entity statuses in the system.
+
+    Attributes:
+        ACTIVE: Represents an active entity.
+        DELETED: Represents an deleted entity.
+    """
+
+    ACTIVE = auto()
+    DELETED = auto()

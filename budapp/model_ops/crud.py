@@ -23,6 +23,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
+from budapp.commons.constants import StatusEnum
 from budapp.commons.exceptions import DatabaseException
 from budapp.endpoint_ops.models import Endpoint
 from budapp.model_ops.models import CloudModel, Model, PaperPublished
@@ -112,7 +113,7 @@ class ModelDataManager(DataManagerUtils):
         # Ensure only valid JSON arrays are processed
         tags_subquery = (
             select(func.jsonb_array_elements(Model.tags).label("tag"))
-            .where(Model.is_active)
+            .where(Model.model_status == StatusEnum.ACTIVE)
             .where(Model.tags.is_not(None))  # Exclude null tags
             .where(func.jsonb_typeof(Model.tags) == "array")  # Ensure tags is a JSON array
         ).subquery()
@@ -178,7 +179,7 @@ class ModelDataManager(DataManagerUtils):
         # Ensure only valid JSON arrays are processed
         tasks_subquery = (
             select(func.jsonb_array_elements(Model.tasks).label("task"))
-            .where(Model.is_active)
+            .where(Model.model_status == StatusEnum.ACTIVE)
             .where(Model.tasks.is_not(None))  # Exclude null tasks
             .where(func.jsonb_typeof(Model.tasks) == "array")  # Ensure tasks is a JSON array
         ).subquery()
@@ -304,7 +305,7 @@ class ModelDataManager(DataManagerUtils):
                 .select_from(Model)
                 .filter(or_(*search_conditions))
                 .where(or_(*explicit_conditions))
-                .filter(Model.is_active == True)
+                .filter(Model.model_status == StatusEnum.ACTIVE)
                 .outerjoin(Endpoint, Endpoint.model_id == Model.id)
                 .group_by(Model.id)
             )
@@ -313,7 +314,7 @@ class ModelDataManager(DataManagerUtils):
                 .select_from(Model)
                 .filter(or_(*search_conditions))
                 .where(or_(*explicit_conditions))
-                .filter(Model.is_active == True)
+                .filter(Model.model_status == StatusEnum.ACTIVE)
             )
         else:
             stmt = (
@@ -324,7 +325,7 @@ class ModelDataManager(DataManagerUtils):
                 .select_from(Model)
                 .filter_by(**filters)
                 .where(and_(*explicit_conditions))
-                .filter(Model.is_active == True)
+                .filter(Model.model_status == StatusEnum.ACTIVE)
                 .outerjoin(Endpoint, Endpoint.model_id == Model.id)
                 .group_by(Model.id)
             )
@@ -333,7 +334,7 @@ class ModelDataManager(DataManagerUtils):
                 .select_from(Model)
                 .filter_by(**filters)
                 .where(and_(*explicit_conditions))
-                .filter(Model.is_active == True)
+                .filter(Model.model_status == StatusEnum.ACTIVE)
             )
 
         # Calculate count before applying limit and offset

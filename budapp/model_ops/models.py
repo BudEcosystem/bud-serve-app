@@ -25,11 +25,7 @@ from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from budapp.commons.constants import (
-    CredentialTypeEnum,
-    ModalityEnum,
-    ModelProviderTypeEnum,
-)
+from budapp.commons.constants import CredentialTypeEnum, ModalityEnum, ModelProviderTypeEnum, StatusEnum
 from budapp.commons.database import Base
 
 
@@ -49,7 +45,15 @@ class Model(Base):
     github_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     huggingface_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     website_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    model_status: Mapped[str] = mapped_column(
+        Enum(
+            StatusEnum,
+            name="status_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+    )
     modality: Mapped[str] = mapped_column(
         Enum(
             ModalityEnum,
