@@ -1170,7 +1170,7 @@ class ModelService(SessionMixin):
 
         return db_authors, count
 
-    async def edit_cloud_model(self, model_id: UUID, data: Dict[str, Any], file: UploadFile = None) -> None:
+    async def edit_model(self, model_id: UUID, data: Dict[str, Any], file: UploadFile = None) -> None:
         """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
         # Retrieve existing model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(model=Model, fields={"id": model_id})
@@ -1242,7 +1242,7 @@ class ModelService(SessionMixin):
             # Update the existing license entry
             existing_license.name = filename
             existing_license.path = file_path
-            print(existing_license)
+            logger.debug(f"existing_license: {existing_license}")
             ModelDataManager(self.session).update_one(existing_license)
         else:
             # Create a new license entry
@@ -1254,8 +1254,8 @@ class ModelService(SessionMixin):
     async def _update_papers(self, model_id: UUID, paper_urls: list[str]) -> None:
         """Update paper entries for the given model by adding new URLs and removing old ones."""
         # Fetch existing paper URLs for the model
-        existing_papers = await ModelDataManager(self.session).retrieve_all_by_fields(
-            model=PaperPublished, fields={"model_id": model_id}, missing_ok=True
+        existing_papers = await ModelDataManager(self.session).get_all_by_fields(
+            model=PaperPublished, fields={"model_id": model_id}
         )
         existing_urls = {paper.url for paper in existing_papers}
 
@@ -1266,16 +1266,15 @@ class ModelService(SessionMixin):
         logger.debug(f"paper info: {input_urls}, urls_to_add: {urls_to_add}, urls_to_remove: {urls_to_remove}")
 
         # Add new paper URLs
-        for paper_url in urls_to_add:
-            paper_entry = PaperPublishedModel(id=uuid4(), title=None, url=paper_url, model_id=model_id)
-            await ModelDataManager(self.session).insert_one(
-                PaperPublished(**paper_entry.model_dump(exclude_unset=True))
-            )
+        if urls_to_add:
+            urls_to_add = [
+                PaperPublished(id=uuid4(), title=None, url=paper_url, model_id=model_id) for paper_url in urls_to_add
+            ]
+            await ModelDataManager(self.session).insert_all(urls_to_add)
 
         # Remove old paper URLs
         if urls_to_remove:
-            for paper_url in urls_to_remove:
-                # Iterate through the URLs to remove and delete each matching entry by 'url' and 'model_id'
-                await ModelDataManager(self.session).delete_by_fields(
-                    model=PaperPublished, fields={"url": paper_url, "model_id": model_id}
-                )
+            # Delete all matching entries for the given URLs and model_id in one query
+            await ModelDataManager(self.session).delete_all_by_fields(
+                model=PaperPublished, fields={"model_id": model_id}, multi_fields={"url": urls_to_remove}
+            )
