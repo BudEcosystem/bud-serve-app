@@ -226,7 +226,7 @@ class NotificationService(SessionMixin):
 
         # Get cluster id
         db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel, {"id": required_data["cluster_id"]}, missing_ok=True
+            ClusterModel, {"cluster_id": required_data["cluster_id"]}, missing_ok=True
         )
 
         if not db_cluster:
