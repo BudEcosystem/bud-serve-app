@@ -304,5 +304,11 @@
         "type": "petals",
         "description": "Here we can add a description about the provider",
         "icon": "icons/providers/petals.png"
+    },
+    "anthropic": {
+        "name": "Anthropic",
+        "type": "anthropic",
+        "description": "Here we can add a description about the provider",
+        "icon": "icons/providers/anthropic.png"
     }
 }
