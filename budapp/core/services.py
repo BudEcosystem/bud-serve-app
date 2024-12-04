@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Tuple
 
 from budapp.cluster_ops.crud import ClusterDataManager
+from budapp.cluster_ops.models import Cluster as ClusterModel
 from budapp.cluster_ops.services import ClusterService
 from budapp.commons import logging
 from budapp.commons.constants import BudServeWorkflowStepEventName, EndpointStatusEnum, WorkflowStatusEnum
@@ -225,7 +226,7 @@ class NotificationService(SessionMixin):
 
         # Get cluster id
         db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            {"cluster_id": required_data["cluster_id"]}, missing_ok=True
+            ClusterModel, {"id": required_data["cluster_id"]}, missing_ok=True
         )
 
         if not db_cluster:
