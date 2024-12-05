@@ -315,8 +315,7 @@ async def edit_model(
     tags: Optional[str] = Form(None),  # JSON string of tags
     tasks: Optional[str] = Form(None),  # JSON string of tasks
     icon: Optional[str] = Form(None),
-    paper_urls: Optional[list[str]] = Form(None),
-    delete_all_papers: Optional[bool] = Form(False),
+    paper_urls: Optional[str] = Form(None),
     github_url: Optional[HttpUrl] = Form(None),
     huggingface_url: Optional[HttpUrl] = Form(None),
     website_url: Optional[HttpUrl] = Form(None),
@@ -329,35 +328,56 @@ async def edit_model(
     )
     try:
         # validate name
-        if name is not None and not name.strip():
-            raise ValidationError("Cluster name cannot be empty or only whitespace.")
-
+        if name is not None:
+            name = name.strip()
+            if len(name) == 0:
+                # raise ValidationError("Cluster name cannot be empty or only whitespace.")
+                line_errors = [
+                    {
+                        "loc": ["body", "name"],
+                        "msg": "Cluster name cannot be empty or only whitespace.",
+                        "type": "string_too_short",
+                        "input": name,
+                        "ctx": {"min_length": 1},
+                    }
+                ]
+                raise ValidationError.from_exception_data(
+                    title="Validation Error",
+                    line_errors=line_errors,
+                    input_type="python",
+                )
         # Parse JSON strings for list fields
-        tags = json.loads(tags) if tags else None
-        tags = [Tag(**task).model_dump() for task in tags] if tags else None
+        if type(tags) == str and len(tags) == 0:
+            tags = []
+        else:
+            tags = json.loads(tags) if tags else None
+            tags = [Tag(**task).model_dump() for task in tags] if tags else None
+        if type(tasks) == str and len(tasks) == 0:
+            tasks = []
+        else:
+            tasks = json.loads(tasks) if tasks else None
+            tasks = [Task(**task).model_dump() for task in tasks] if tasks else None
 
-        tasks = json.loads(tasks) if tasks else None
-        tasks = [Task(**task).model_dump() for task in tasks] if tasks else None
-
-        if delete_all_papers:
+        if type(paper_urls) == str and len(paper_urls) == 0:
             paper_urls = []
-        elif paper_urls and isinstance(paper_urls, list) and len(paper_urls) > 0:
+        elif isinstance(paper_urls, str) and len(paper_urls) > 0:
             # Split the first element into a list of URLs and validate each URL in one loop
             paper_urls = [
                 str(HttpUrl(url.strip()))  # Strip and validate each URL in one step
-                for url in paper_urls[0].split(",")
+                for url in paper_urls.split(",")
             ]
-
+        if license_file and license_url:
+            raise ClientException("Please provide either a license file or a license URL, but not both.")
         if license_file:
             if not await check_file_extension(license_file.filename, ["pdf", "txt", "doc", "docx", "md"]):
                 logger.error("Invalid file extension for license file")
-                raise ClientException("Invalid file extension for license file")  # this also validation error?
+                raise ClientException("Invalid file extension for license file")
         # Convert to EditModel
         edit_model = {
             "name": name if name else None,
             "description": description if description else None,
-            "tags": tags if tags else None,
-            "tasks": tasks if tasks else None,
+            "tags": tags if type(tags) == list else None,
+            "tasks": tasks if type(tasks) == list else None,
             "icon": icon if icon else None,
             "paper_urls": paper_urls if type(paper_urls) == list else None,
             "github_url": str(github_url) if github_url else None,
@@ -374,10 +394,10 @@ async def edit_model(
         logger.exception(f"Failed to edit cloud model: {e}")
         return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
     except ValidationError as e:
-        logger.exception(f"Failed to edit cloud model: {e}")
+        logger.exception(f"Failed to edit cloud model: {str(e)}")
         return ErrorResponse(
             code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            message=e,
+            message=str(e),
         ).to_http_response()
     except JSONDecodeError as e:
         logger.exception(f"Failed to edit cloud model: {e}")

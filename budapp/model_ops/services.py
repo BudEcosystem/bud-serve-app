@@ -1182,20 +1182,25 @@ class ModelService(SessionMixin):
         # Handle file upload if provided
         # TODO: consider dapr local storage
         if file:
+            # If a file is provided, save it locally and update the DB with the local path
             file_path = await self._save_uploaded_file(file)
-            await self._create_or_update_license_entry(model_id, file.filename, file_path)
+            await self._create_or_update_license_entry(model_id, file.filename, file_path, None)
 
-        # Handle license URL if provided
         elif data.get("license_url"):
-            file_path, filename = await self._download_license_file(data.pop("license_url"))
-            await self._create_or_update_license_entry(model_id, filename, file_path)
+            # If a license URL is provided, store the URL in the DB instead of the file path
+            filename = data["license_url"].split("/")[-1]  # Extract filename from the URL
+            await self._create_or_update_license_entry(
+                model_id, filename if filename else "sample license", None, data["license_url"]
+            )  # TODO: modify filename arg when license service implemented
 
         # Add papers if provided
         if data.get("paper_urls") or data["paper_urls"] == []:
             await self._update_papers(model_id, data.pop("paper_urls"))
 
         updated_data = {
-            key: data[key] if key in data and data[key] is not None else getattr(db_model, key)
+            key: (None if data[key] == [] else data[key])
+            if key in data and (data[key] is not None or isinstance(data[key], list))
+            else getattr(db_model, key)
             for key in db_model.__table__.columns.keys()
         }
 
@@ -1212,41 +1217,35 @@ class ModelService(SessionMixin):
             await f.write(content)
         return file_path
 
-    async def _download_license_file(self, license_url: str) -> tuple[str, str]:
-        """Download file from URL and save locally, returning file path and name."""
-        file_directory = "static/licenses"
-        os.makedirs(file_directory, exist_ok=True)
-        filename = license_url.split("/")[-1]
-        file_path = os.path.join(file_directory, filename)
-        async with aiohttp.ClientSession() as session:
-            async with session.get(license_url) as response:
-                if response.status == 200:
-                    content = await response.read()
-                    async with aiofiles.open(file_path, "wb") as f:
-                        await f.write(content)
-                else:
-                    raise ClientException("Failed to download the file from the provided URL")
-        return file_path, filename
-
-    async def _create_or_update_license_entry(self, model_id: UUID, filename: str, file_path: str) -> None:
+    async def _create_or_update_license_entry(
+        self, model_id: UUID, filename: str, file_path: str, license_url: str
+    ) -> None:
         """Create or update a license entry in the database."""
         # Check if a license entry with the given model_id exists
         existing_license = await ModelDataManager(self.session).retrieve_by_fields(
             ModelLicenses, fields=dict(model_id=model_id), missing_ok=True
         )
-
+        logger.info(f"existing license: {existing_license}")
         if existing_license:
             if existing_license.path and os.path.exists(existing_license.path):
                 os.remove(existing_license.path)
 
-            # Update the existing license entry
-            existing_license.name = filename
-            existing_license.path = file_path
+            update_license_data = {
+                "name": filename,
+                "path": file_path if file_path else None,
+                "url": license_url if license_url else None,
+            }
             logger.debug(f"existing_license: {existing_license}")
-            ModelDataManager(self.session).update_one(existing_license)
+            await ModelDataManager(self.session).update_by_fields(existing_license, update_license_data)
         else:
             # Create a new license entry
-            license_entry = ModelLicensesModel(id=uuid4(), name=filename, path=file_path, model_id=model_id)
+            license_entry = ModelLicensesModel(
+                id=uuid4(),
+                name=filename,
+                path=file_path if file_path else None,
+                url=license_url if license_url else None,
+                model_id=model_id,
+            )
             await ModelDataManager(self.session).insert_one(
                 ModelLicenses(**license_entry.model_dump(exclude_unset=True))
             )
