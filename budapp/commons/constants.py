@@ -523,3 +523,12 @@ class DropdownBackgroundColor(str, Enum):
         """Get a random color."""
         colors = list(cls)
         return random.choice(colors).value
+
+
+class BaseModelRelationEnum(StrEnum):
+    """Base model relation types."""
+
+    ADAPTER = "adapter"
+    MERGE = "merge"
+    QUANTIZED = "quantized"
+    FINETUNE = "finetune"
