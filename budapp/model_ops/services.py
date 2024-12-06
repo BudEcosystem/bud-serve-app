@@ -1276,7 +1276,7 @@ class ModelService(SessionMixin):
 
         # Remove old paper URLs
         if urls_to_remove:
-            # Delete all matching entries for the given URLs and model_id in one query
+            # Delete all matching entries for given URLs and model_id in one query
             await PaperPublishedDataManager(self.session).delete_paper_by_urls(
                 db_model=PaperPublished, fields={"model_id": model_id}, paper_urls={"url": urls_to_remove}
             )
