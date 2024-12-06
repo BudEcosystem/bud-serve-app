@@ -19,6 +19,7 @@
 import os
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
+from pydantic import AnyUrl
 
 import aiofiles
 import aiohttp
@@ -1172,7 +1173,7 @@ class ModelService(SessionMixin):
 
         return db_authors, count
 
-    async def edit_model(self, model_id: UUID, data: Dict[str, Any], file: UploadFile = None) -> None:
+    async def edit_model(self, model_id: UUID, data: Dict[str, Any]) -> None:
         """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
         # Retrieve existing model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
@@ -1185,6 +1186,7 @@ class ModelService(SessionMixin):
             data.pop("icon")
         # Handle file upload if provided
         # TODO: consider dapr local storage
+        file = data.pop("license_file")
         if file:
             # If a file is provided, save it locally and update the DB with the local path
             file_path = await self._save_uploaded_file(file)
@@ -1192,9 +1194,9 @@ class ModelService(SessionMixin):
 
         elif data.get("license_url"):
             # If a license URL is provided, store the URL in the DB instead of the file path
-            filename = data["license_url"].split("/")[-1]  # Extract filename from the URL
+            filename = str(data["license_url"]).split("/")[-1]  # Extract filename from the URL
             await self._create_or_update_license_entry(
-                model_id, filename if filename else "sample license", None, data["license_url"]
+                model_id, filename if filename else "sample license", None, str(data["license_url"])
             )  # TODO: modify filename arg when license service implemented
 
         # Add papers if provided
@@ -1202,11 +1204,15 @@ class ModelService(SessionMixin):
             await self._update_papers(model_id, data.pop("paper_urls"))
 
         updated_data = {
-            key: (None if data[key] == [] else data[key])
-            if key in data and (data[key] is not None or isinstance(data[key], list))
+            key: (
+                str(data[key]) if isinstance(data.get(key), AnyUrl) else (None if data.get(key) == [] else data[key])
+            )
+            if key in data
             else getattr(db_model, key)
             for key in db_model.__table__.columns.keys()
         }
+
+        logger.debug(f"updated_data: {updated_data}")
 
         # Update model with validated data
         await ModelDataManager(self.session).update_by_fields(db_model, updated_data)
@@ -1270,7 +1276,8 @@ class ModelService(SessionMixin):
         # Add new paper URLs
         if urls_to_add:
             urls_to_add = [
-                PaperPublished(id=uuid4(), title=None, url=paper_url, model_id=model_id) for paper_url in urls_to_add
+                PaperPublished(id=uuid4(), title=None, url=str(paper_url), model_id=model_id)
+                for paper_url in urls_to_add
             ]
             await PaperPublishedDataManager(self.session).insert_all(urls_to_add)
 

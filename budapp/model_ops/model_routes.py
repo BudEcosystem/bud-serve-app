@@ -22,12 +22,12 @@ from typing import List, Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Query, UploadFile, status
+from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError, HttpUrl
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
-from budapp.commons.async_utils import check_file_extension
 from budapp.commons.constants import ModalityEnum
 from budapp.commons.dependencies import (
     get_current_active_user,
@@ -54,6 +54,7 @@ from .schemas import (
     RecommendedTagsResponse,
     TagsListResponse,
     TasksListResponse,
+    EditModel,
 )
 from .services import (
     CloudModelService,
@@ -310,79 +311,65 @@ async def edit_model(
     model_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    name: Optional[str] = Form(None, min_length=1, max_length=100),
-    description: Optional[str] = Form(None, max_length=300),
-    tags: Optional[str] = Form(None),  # JSON string of tags
-    tasks: Optional[str] = Form(None),  # JSON string of tasks
+    name: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    tags: Optional[str] = Form(None),
+    tasks: Optional[str] = Form(None),
     icon: Optional[str] = Form(None),
     paper_urls: Optional[str] = Form(None),
-    github_url: Optional[HttpUrl] = Form(None),
-    huggingface_url: Optional[HttpUrl] = Form(None),
-    website_url: Optional[HttpUrl] = Form(None),
+    github_url: Optional[str] = Form(None),
+    huggingface_url: Optional[str] = Form(None),
+    website_url: Optional[str] = Form(None),
     license_file: UploadFile | None = None,
-    license_url: Optional[HttpUrl] = Form(None),
+    license_url: Optional[str] = Form(None),
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Edit cloud model with file upload"""
-    logger.info(
+
+    logger.debug(
         f"Received data: name={name}, description={description}, tags={tags}, tasks={tasks}, paper_urls={paper_urls}, github_url={github_url}, huggingface_url={huggingface_url}, website_url={website_url}, license_file={license_file}, license_url={license_url}"
     )
-    try:
-        # validate name
-        if name is not None:
-            name = name.strip()
-            if len(name) == 0:
-                raise ClientException("Cluster name cannot be empty or only whitespace.")
 
-        # Parse JSON strings for list fields
+    try:
         if type(tags) == str and len(tags) == 0:
             tags = []
         else:
             tags = json.loads(tags) if tags else None
-            tags = [Tag(**task).model_dump() for task in tags] if tags else None
+
         if type(tasks) == str and len(tasks) == 0:
             tasks = []
         else:
             tasks = json.loads(tasks) if tasks else None
-            tasks = [Task(**task).model_dump() for task in tasks] if tasks else None
 
         if type(paper_urls) == str and len(paper_urls) == 0:
             paper_urls = []
         elif isinstance(paper_urls, str) and len(paper_urls) > 0:
             # Split the first element into a list of URLs and validate each URL in loop
-            paper_urls = [str(HttpUrl(url.strip())) for url in paper_urls.split(",")]
-        if license_file and license_url:
-            raise ClientException("Please provide either a license file or a license URL, but not both.")
-        if license_file:
-            if not await check_file_extension(license_file.filename, ["pdf", "txt", "doc", "docx", "md"]):
-                logger.error("Invalid file extension for license file")
-                raise ClientException("Invalid file extension for license file")
-        # Convert to EditModel
-        edit_model = {
-            "name": name if name else None,
-            "description": description if description else None,
-            "tags": tags if type(tags) == list else None,
-            "tasks": tasks if type(tasks) == list else None,
-            "icon": icon if icon else None,
-            "paper_urls": paper_urls if type(paper_urls) == list else None,
-            "github_url": str(github_url) if github_url else None,
-            "huggingface_url": str(huggingface_url) if huggingface_url else None,
-            "website_url": str(website_url) if website_url else None,
-            "license_url": str(license_url) if license_url else None,
-        }
+            paper_urls = [url.strip() for url in paper_urls.split(",")]
+
+        edit_model = EditModel(
+            name=name if name else None,
+            description=description if description else None,
+            tags=tags if isinstance(tags, list) else None,
+            tasks=tasks if isinstance(tasks, list) else None,
+            icon=icon if icon else None,
+            paper_urls=paper_urls if isinstance(paper_urls, list) else None,
+            github_url=github_url if github_url else None,
+            huggingface_url=huggingface_url if huggingface_url else None,
+            website_url=website_url if website_url else None,
+            license_url=license_url if license_url else None,
+            license_file=license_file if license_file else None,
+        )
 
         # Pass file and edit_model data to your service
-        await ModelService(session).edit_model(model_id=model_id, data=edit_model, file=license_file)
+        await ModelService(session).edit_model(model_id=model_id, data=edit_model.model_dump())
 
         return SuccessResponse(message="Cloud model edited successfully", code=status.HTTP_200_OK).to_http_response()
     except ClientException as e:
         logger.exception(f"Failed to edit cloud model: {e}")
         return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
     except ValidationError as e:
-        logger.exception(f"Failed to edit cloud model: {str(e)}")
-        return ErrorResponse(
-            code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            message=str(e),
-        ).to_http_response()
+        logger.exception(f"ValidationErrors: {str(e)}")
+        raise RequestValidationError(e.errors())
     except JSONDecodeError as e:
         logger.exception(f"Failed to edit cloud model: {e}")
         return ErrorResponse(

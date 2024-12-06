@@ -20,6 +20,8 @@
 import re
 from datetime import datetime
 from typing import List, Literal, Optional, Tuple
+import json
+from fastapi import UploadFile
 
 from pydantic import (
     UUID4,
@@ -40,6 +42,7 @@ from budapp.commons.constants import (
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
 from budapp.user_ops.schemas import UserInfo
+from budapp.commons.async_utils import check_file_extension
 
 
 class ProviderFilter(BaseModel):
@@ -290,18 +293,49 @@ class CreateLocalModelWorkflowSteps(BaseModel):
 
 
 class EditModel(BaseModel):
-    """Schema for editing a model with optional fields and validations."""
-
-    name: Optional[str] = Field(None, min_length=1, max_length=100, description="Model name")
-    description: Optional[str] = Field(None, max_length=500, description="Brief model description")
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=300)
     tags: Optional[List[Tag]] = None
-    tasks: Optional[List[Tag]] = None
-    icon: Optional[str] = Field(None, description="Icon")
-    paper_urls: Optional[List[str]] = None
-    github_url: Optional[str] = Field(None, description="URL to the model's GitHub repository")
-    huggingface_url: Optional[str] = Field(None, description="URL to the model's Hugging Face page")
-    website_url: Optional[str] = Field(None, description="URL to the model's official website")
-    license_url: Optional[str] = Field(None, description="License url")
+    tasks: Optional[List[Task]] = None
+    icon: Optional[str] = None
+    paper_urls: Optional[List[HttpUrl]] = None
+    github_url: Optional[HttpUrl] = None
+    huggingface_url: Optional[HttpUrl] = None
+    website_url: Optional[HttpUrl] = None
+    license_file: Optional[UploadFile] = None
+    license_url: Optional[HttpUrl] = None
+
+    @field_validator("name", mode="before")
+    def validate_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            value = value.strip()
+            if len(value) == 0:
+                raise ValueError("Model name cannot be empty or only whitespace.")
+        return value
+
+    @model_validator(mode="before")
+    def validate_license(cls, values):
+        license_file = values.get("license_file")
+        license_url = values.get("license_url")
+
+        # Ensure only one of license_file or license_url is provided
+        if license_file and license_url:
+            raise ValueError("Please provide either a license file or a license URL, but not both.")
+
+        if license_file:
+            filename = license_file.filename
+            allowed_extensions = ["pdf", "txt", "doc", "docx", "md"]
+
+            if not filename or "." not in filename:
+                raise ValueError("File does not have a valid extension")
+
+            # Get the file extension from the filename
+            file_extension = filename.split(".")[-1].lower()
+
+            # Check if the file extension is in the allowed list
+            if file_extension not in allowed_extensions:
+                raise ValueError("Invalid file extension for license file")
+        return values
 
 
 class ModelResponse(BaseModel):
