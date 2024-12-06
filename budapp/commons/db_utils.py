@@ -411,56 +411,6 @@ class DataManagerUtils(SQLAlchemyMixin):
         """Delete a model instance from the database."""
         self.delete_model(model)
 
-    async def delete_all_by_fields(
-        self, model: Type[DeclarativeBase], fields: Dict[str, Any], multi_fields: Optional[Dict[str, List[Any]]] = None
-    ) -> None:
-        """
-        Delete multiple model instances based on the given fields and multi-field filters.
-
-        This method queries the database for the provided model class using the specified fields
-        as filters and deletes all matching records. Supports multi-field filtering with `IN` clauses.
-
-        Args:
-            model (Type[DeclarativeBase]): The SQLAlchemy model class to delete instances from.
-            fields (Dict): A dictionary of field names and their values to filter the records to delete.
-            multi_fields (Optional[Dict]): A dictionary of field names and their list of values for `IN` filtering.
-
-        Raises:
-            DatabaseException: If there's an error in field validation or database operation.
-        """
-        try:
-            # Validate the fields before querying
-            await self.validate_fields(model, fields)
-
-            # Build the query with filters
-            query = self.session.query(model).filter_by(**fields)
-
-            # Add multi-field filters (e.g., "field IN (values)")
-            if multi_fields:
-                for key, values in multi_fields.items():
-                    query = query.filter(getattr(model, key).in_(values))
-
-            # Check if any records exist to delete
-            if not query.count():
-                logger.info(
-                    f"No records found for deletion in {model.__name__} with filters: {fields} and multi-filters: {multi_fields}"
-                )
-                return
-
-            # Delete records
-            query.delete(synchronize_session=False)
-
-            # Commit the transaction
-            self.session.commit()
-            logger.info(
-                f"Successfully deleted records from {model.__name__} with filters: {fields} and multi-filters: {multi_fields}"
-            )
-        except (Exception, SQLAlchemyError) as e:
-            # Rollback the transaction on error
-            self.session.rollback()
-            logger.exception(f"Failed to delete records from {model.__name__}: {e}")
-            raise DatabaseException(f"Unable to delete records from {model.__name__}") from e
-
     async def get_all_by_fields(
         self, model: Type[DeclarativeBase], fields: Dict[str, Any]
     ) -> Optional[List[DeclarativeBase]]:
