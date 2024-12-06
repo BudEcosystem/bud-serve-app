@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import ARRAY, BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import JSONB
@@ -117,7 +117,7 @@ class PaperPublished(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     title: Mapped[str] = mapped_column(String, nullable=True)
-    authors: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
+    authors: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
     url: Mapped[str] = mapped_column(String, nullable=True)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
