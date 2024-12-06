@@ -1085,7 +1085,9 @@ class ModelService(SessionMixin):
     async def get_model_details(self, model_id: UUID) -> Model:
         """Retrieve model details by model ID."""
         model_details = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"id": model_id}, missing_ok=True
+            Model,
+            {"id": model_id, "is_active": True},
+            missing_ok=True,  # checks if "is_active": True
         )
 
         if not model_details:

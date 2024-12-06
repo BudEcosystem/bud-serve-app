@@ -414,7 +414,7 @@ class DataManagerUtils(SQLAlchemyMixin):
     async def get_all_by_fields(
         self, model: Type[DeclarativeBase], fields: Dict[str, Any]
     ) -> Optional[List[DeclarativeBase]]:
-        """Retrieve all model instances from the database based on the given fields.
+        """Retrieve all model instances from database based on the given fields.
 
         This method queries the database for all model instances matching the provided fields.
         If no instances are found and missing_ok is False, it raises an HTTPException.
