@@ -47,7 +47,7 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
-from .crud import CloudModelDataManager, ModelDataManager, ProviderDataManager
+from .crud import CloudModelDataManager, ModelDataManager, ProviderDataManager, PaperPublishedDataManager
 from .models import CloudModel, Model, ModelLicenses, PaperPublished
 from .models import Provider as ProviderModel
 from .schemas import (
@@ -1085,7 +1085,9 @@ class ModelService(SessionMixin):
     async def get_model_details(self, model_id: UUID) -> Model:
         """Retrieve model details by model ID."""
         model_details = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"id": model_id}, missing_ok=True
+            Model,
+            {"id": model_id, "is_active": True},
+            missing_ok=True,  # checks if "is_active": True
         )
 
         if not model_details:
@@ -1173,7 +1175,9 @@ class ModelService(SessionMixin):
     async def edit_model(self, model_id: UUID, data: Dict[str, Any], file: UploadFile = None) -> None:
         """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
         # Retrieve existing model
-        db_model = await ModelDataManager(self.session).retrieve_by_fields(model=Model, fields={"id": model_id})
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            model=Model, fields={"id": model_id, "is_active": True}
+        )
         if data.get("icon") and db_model.provider_type in [
             ModelProviderTypeEnum.CLOUD_MODEL,
             ModelProviderTypeEnum.HUGGING_FACE,
@@ -1223,9 +1227,9 @@ class ModelService(SessionMixin):
         """Create or update a license entry in the database."""
         # Check if a license entry with the given model_id exists
         existing_license = await ModelDataManager(self.session).retrieve_by_fields(
-            ModelLicenses, fields=dict(model_id=model_id), missing_ok=True
+            ModelLicenses, fields={"model_id": model_id}, missing_ok=True
         )
-        logger.info(f"existing license: {existing_license}")
+        logger.debug(f"existing license: {existing_license}")
         if existing_license:
             if existing_license.path and os.path.exists(existing_license.path):
                 os.remove(existing_license.path)
@@ -1235,7 +1239,6 @@ class ModelService(SessionMixin):
                 "path": file_path if file_path else None,
                 "url": license_url if license_url else None,
             }
-            logger.debug(f"existing_license: {existing_license}")
             await ModelDataManager(self.session).update_by_fields(existing_license, update_license_data)
         else:
             # Create a new license entry
@@ -1269,11 +1272,11 @@ class ModelService(SessionMixin):
             urls_to_add = [
                 PaperPublished(id=uuid4(), title=None, url=paper_url, model_id=model_id) for paper_url in urls_to_add
             ]
-            await ModelDataManager(self.session).insert_all(urls_to_add)
+            await PaperPublishedDataManager(self.session).insert_all(urls_to_add)
 
         # Remove old paper URLs
         if urls_to_remove:
             # Delete all matching entries for the given URLs and model_id in one query
-            await ModelDataManager(self.session).delete_all_by_fields(
-                model=PaperPublished, fields={"model_id": model_id}, multi_fields={"url": urls_to_remove}
+            await PaperPublishedDataManager(self.session).delete_paper_by_urls(
+                db_model=PaperPublished, fields={"model_id": model_id}, paper_urls={"url": urls_to_remove}
             )

@@ -16,10 +16,11 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the model ops."""
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 
 from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.exc import SQLAlchemyError
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
@@ -79,24 +80,44 @@ class ProviderDataManager(DataManagerUtils):
 class PaperPublishedDataManager(DataManagerUtils):
     """Data manager for the PaperPublished model."""
 
-    # async def get_paper_by_id(self, paper_id: UUID) -> Optional[PaperPublished]:
-    #     """Retrieve a cloud model by its ID."""
-    #     stmt = select(PaperPublished).where(PaperPublished.id == paper_id)
-    #     return self.scalar_one_or_none(stmt)
-
-    async def update_paper_by_id(self, paper_published: PaperPublished, update_data: Dict[str, Any]) -> PaperPublished:
-        """Update specific fields of a cloud model and save using update_one."""
-        # Update only the specified fields
-        for field, value in update_data.items():
-            if hasattr(paper_published, field):
-                setattr(paper_published, field, value)
-
-        # Use the update_one method to commit and refresh
+    async def delete_paper_by_urls(
+        self, db_model: Model, fields: Dict[str, Any], paper_urls: Optional[Dict[str, List[Any]]] = None
+    ) -> None:
+        """
+        Delete multiple model instances based on the given fields and multi-field filters.
+        """
         try:
-            return self.update_one(paper_published)
-        except DatabaseException as e:
-            logger.error(f"Failed to update paper by id: {e}")
-            raise
+            # Validate the fields before querying
+            await self.validate_fields(db_model, fields)
+
+            # Build the query with filters
+            query = self.session.query(db_model).filter_by(**fields)
+
+            # Add paper_urls
+            if paper_urls:
+                for key, values in paper_urls.items():
+                    query = query.filter(getattr(db_model, key).in_(values))
+
+            # Check if any records exist to delete
+            if not query.count():
+                logger.debug(
+                    f"No records found for deletion in {db_model.__name__} with filters: {fields} and multi-filters: {paper_urls}"
+                )
+                return
+
+            # Delete records
+            query.delete(synchronize_session=False)
+
+            # Commit the transaction
+            self.session.commit()
+            logger.debug(
+                f"Successfully deleted records from {db_model.__name__} with filters: {fields} and multi-filters: {paper_urls}"
+            )
+        except (Exception, SQLAlchemyError) as e:
+            # Rollback the transaction on error
+            self.session.rollback()
+            logger.exception(f"Failed to delete records from {db_model.__name__}: {e}")
+            raise DatabaseException(f"Unable to delete records from {db_model.__name__}") from e
 
 
 class ModelDataManager(DataManagerUtils):
