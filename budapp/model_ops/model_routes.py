@@ -331,21 +331,8 @@ async def edit_model(
         if name is not None:
             name = name.strip()
             if len(name) == 0:
-                # raise ValidationError("Cluster name cannot be empty or only whitespace.")
-                line_errors = [
-                    {
-                        "loc": ["body", "name"],
-                        "msg": "Cluster name cannot be empty or only whitespace.",
-                        "type": "string_too_short",
-                        "input": name,
-                        "ctx": {"min_length": 1},
-                    }
-                ]
-                raise ValidationError.from_exception_data(
-                    title="Validation Error",
-                    line_errors=line_errors,
-                    input_type="python",
-                )
+                raise ClientException("Cluster name cannot be empty or only whitespace.")
+
         # Parse JSON strings for list fields
         if type(tags) == str and len(tags) == 0:
             tags = []
@@ -361,11 +348,8 @@ async def edit_model(
         if type(paper_urls) == str and len(paper_urls) == 0:
             paper_urls = []
         elif isinstance(paper_urls, str) and len(paper_urls) > 0:
-            # Split the first element into a list of URLs and validate each URL in one loop
-            paper_urls = [
-                str(HttpUrl(url.strip()))  # Strip and validate each URL in one step
-                for url in paper_urls.split(",")
-            ]
+            # Split the first element into a list of URLs and validate each URL in loop
+            paper_urls = [str(HttpUrl(url.strip())) for url in paper_urls.split(",")]
         if license_file and license_url:
             raise ClientException("Please provide either a license file or a license URL, but not both.")
         if license_file:
