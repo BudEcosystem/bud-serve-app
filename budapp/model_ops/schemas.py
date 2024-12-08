@@ -32,6 +32,7 @@ from pydantic import (
 )
 
 from budapp.commons.constants import (
+    BaseModelRelationEnum,
     CredentialTypeEnum,
     ModalityEnum,
     ModelProviderTypeEnum,
@@ -154,6 +155,18 @@ class Model(ModelBase):
     provider: Provider | None = None
 
 
+class ModelArchitecture(BaseModel):
+    """Model architecture schema."""
+
+    intermediate_size: int | None = None
+    vocab_size: int | None = None
+    num_attention_heads: int | None = None
+    num_key_value_heads: int | None = None
+    rope_scaling: dict | None = None
+    model_weights_size: int | None = None
+    kv_cache_size: int | None = None
+
+
 class ModelCreate(ModelBase):
     """Schema for creating a new AI Model."""
 
@@ -166,6 +179,21 @@ class ModelCreate(ModelBase):
     author: Optional[str] = None
     provider_id: UUID4 | None = None
     local_path: str | None = None
+    strengths: list[str] | None = None
+    limitations: list[str] | None = None
+    languages: list[str] | None = None
+    use_cases: list[str] | None = None
+    minimum_requirements: dict | None = None
+    examples: list[dict] | None = None
+    base_model: str | None = None
+    base_model_relation: BaseModelRelationEnum | None = None
+    model_type: str | None = None
+    family: str | None = None
+    num_layers: int | None = None
+    hidden_size: int | None = None
+    context_length: int | None = None
+    torch_dtype: str | None = None
+    architecture: ModelArchitecture | None = None
 
 
 class ModelDetailResponse(SuccessResponse):
@@ -495,3 +523,28 @@ class ModelAuthorFilter(BaseModel):
     """Filter schema for model authors."""
 
     author: str | None = None
+
+
+# Schemas related to Paper Published
+
+
+class PaperPublishedCreate(BaseModel):
+    """Paper Published Create Schema."""
+
+    title: str | None = None
+    authors: list[str] | None = None
+    url: str | None = None
+    model_id: UUID4
+
+
+# Schemas related to Model Licenses
+
+
+class ModelLicensesCreate(BaseModel):
+    """Model Licenses Create Schema."""
+
+    name: str | None = None
+    url: str | None = None
+    path: str | None = None
+    faqs: list[dict] | None = None
+    model_id: UUID4

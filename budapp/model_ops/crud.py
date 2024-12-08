@@ -535,3 +535,9 @@ class CloudModelDataManager(DataManagerUtils):
         result = self.execute_all(stmt)
 
         return result, count
+
+
+class ModelLicensesDataManager(DataManagerUtils):
+    """Data manager for the ModelLicenses model."""
+
+    pass
