@@ -92,7 +92,8 @@ class PaperPublishedModel(BaseModel):
 
     id: UUID4
     title: str | None = None
-    url: str
+    authors: list[str] | None = None
+    url: str | None = None
     model_id: UUID4
 
     class Config:
@@ -109,11 +110,13 @@ class PaperPublishedModelEditRequest(BaseModel):
 
 
 class ModelLicensesModel(BaseModel):
-    """Paper Published Model Schema"""
+    """Model Licenses Model Schema"""
 
     id: UUID4
-    name: str
-    path: str
+    name: str | None = None
+    url: str | None = None
+    path: str | None = None
+    faqs: list[dict] | None = None
     model_id: UUID4
 
     class Config:
@@ -196,22 +199,55 @@ class ModelCreate(ModelBase):
     architecture: ModelArchitecture | None = None
 
 
-class ModelDetailResponse(SuccessResponse):
+class ModelDetailResponse(BaseModel):
     """Response schema for model details."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     id: UUID4
     name: str
-    description: Optional[str] = None
-    tags: Optional[List[Tag]] = None
-    tasks: Optional[List[Tag]] = None
+    description: str | None = None
+    tags: list[Tag] | None = None
+    tasks: list[Task] | None = None
+    author: str | None = None
+    model_size: int | None = None
     icon: str | None = None
-    github_url: Optional[str] = None
-    huggingface_url: Optional[str] = None
-    website_url: Optional[str] = None
-    paper_published: Optional[List[PaperPublishedModel]] = []
-    license: Optional[dict] = None
+    github_url: str | None = None
+    huggingface_url: str | None = None
+    website_url: str | None = None
+    bud_verified: bool = False
+    scan_verified: bool = False
+    eval_verified: bool = False
+    strengths: list[str] | None = None
+    limitations: list[str] | None = None
+    languages: list[str] | None = None
+    use_cases: list[str] | None = None
+    minimum_requirements: dict | None = None
+    examples: list[dict] | None = None
+    base_model: str | None = None
+    base_model_relation: BaseModelRelationEnum | None = None
+    model_type: str | None = None
+    family: str | None = None
+    num_layers: int | None = None
+    hidden_size: int | None = None
+    context_length: int | None = None
+    torch_dtype: str | None = None
+    architecture: ModelArchitecture | None = None
+    modality: ModalityEnum
+    source: str
     provider_type: ModelProviderTypeEnum
+    uri: str
+    paper_published: list[PaperPublishedModel] | None = None
+    model_licenses: ModelLicensesModel | None = None
     provider: Provider | None = None
+    scan_result: dict | None = None  # TODO: integrate actual scan result
+    eval_result: dict | None = None  # TODO: integrate actual eval result
+
+
+class ModelDetailSuccessResponse(SuccessResponse):
+    """Model detail success response schema."""
+
+    model: ModelDetailResponse
 
 
 class CreateCloudModelWorkflowRequest(BaseModel):
