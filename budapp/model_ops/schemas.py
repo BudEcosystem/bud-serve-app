@@ -225,7 +225,6 @@ class ModelDetailResponse(BaseModel):
     minimum_requirements: dict | None = None
     examples: list[dict] | None = None
     base_model: str | None = None
-    base_model_relation: BaseModelRelationEnum | None = None
     model_type: str | None = None
     family: str | None = None
     num_layers: int | None = None
@@ -240,14 +239,24 @@ class ModelDetailResponse(BaseModel):
     paper_published: list[PaperPublishedModel] | None = None
     model_licenses: ModelLicensesModel | None = None
     provider: Provider | None = None
-    scan_result: dict | None = None  # TODO: integrate actual scan result
-    eval_result: dict | None = None  # TODO: integrate actual eval result
+
+
+class ModelTree(BaseModel):
+    """Model tree schema."""
+
+    adapters_count: int = 0
+    finetunes_count: int = 0
+    merges_count: int = 0
+    quantizations_count: int = 0
 
 
 class ModelDetailSuccessResponse(SuccessResponse):
     """Model detail success response schema."""
 
     model: ModelDetailResponse
+    scan_result: dict | None = None  # TODO: integrate actual scan result
+    eval_result: dict | None = None  # TODO: integrate actual eval result
+    model_tree: ModelTree
 
 
 class CreateCloudModelWorkflowRequest(BaseModel):

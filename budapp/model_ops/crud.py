@@ -393,6 +393,16 @@ class ModelDataManager(DataManagerUtils):
 
         return result, count
 
+    async def get_model_tree_count(self, base_model: str) -> List[dict]:
+        """Get the model tree count."""
+        stmt = (
+            select(Model.base_model_relation, func.count(Model.id).label("count"))
+            .filter(Model.base_model == base_model, Model.is_active == True, Model.base_model_relation.is_not(None))
+            .group_by(Model.base_model_relation)
+        )
+
+        return self.execute_all(stmt)
+
 
 class CloudModelDataManager(DataManagerUtils):
     """Data manager for the CloudModel model."""

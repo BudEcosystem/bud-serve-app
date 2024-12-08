@@ -676,7 +676,7 @@ async def retrieve_model(
 ) -> Union[ModelDetailSuccessResponse, ErrorResponse]:
     """Retrieve details of a model by its ID."""
     try:
-        db_model = await ModelService(session).retrieve_model(model_id)
+        return await ModelService(session).retrieve_model(model_id)
     except ClientException as e:
         logger.exception(f"Failed to get model details: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
@@ -686,10 +686,3 @@ async def retrieve_model(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to retrieve model details",
         ).to_http_response()
-
-    return ModelDetailSuccessResponse(
-        model=db_model,
-        message="model retrieved successfully",
-        code=status.HTTP_200_OK,
-        object="model.get",
-    ).to_http_response()

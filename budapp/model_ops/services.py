@@ -66,10 +66,12 @@ from .schemas import (
     EditModel,
     ModelArchitecture,
     ModelCreate,
+    ModelDetailSuccessResponse,
     ModelLicensesCreate,
     ModelLicensesModel,
     ModelListResponse,
     ModelResponse,
+    ModelTree,
     PaperPublishedCreate,
     PaperPublishedModel,
 )
@@ -1311,10 +1313,32 @@ class CloudModelService(SessionMixin):
 class ModelService(SessionMixin):
     """Model service."""
 
-    async def retrieve_model(self, model_id: UUID) -> Model:
+    async def retrieve_model(self, model_id: UUID) -> ModelDetailSuccessResponse:
         """Retrieve model details by model ID."""
         db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": model_id, "is_active": True})
-        return db_model
+
+        # For base model there won't be any base model value
+        base_model = db_model.base_model
+        if not base_model:
+            base_model = db_model.uri
+
+        # Get base model relation count
+        model_tree_count = await ModelDataManager(self.session).get_model_tree_count(base_model)
+        base_model_relation_count = {row.base_model_relation.value: row.count for row in model_tree_count}
+        model_tree = ModelTree(
+            adapters_count=base_model_relation_count.get(BaseModelRelationEnum.ADAPTER.value, 0),
+            finetunes_count=base_model_relation_count.get(BaseModelRelationEnum.FINETUNE.value, 0),
+            merges_count=base_model_relation_count.get(BaseModelRelationEnum.MERGE.value, 0),
+            quantizations_count=base_model_relation_count.get(BaseModelRelationEnum.QUANTIZED.value, 0),
+        )
+
+        return ModelDetailSuccessResponse(
+            model=db_model,
+            model_tree=model_tree,
+            message="model retrieved successfully",
+            code=status.HTTP_200_OK,
+            object="model.get",
+        ).to_http_response()
 
     async def list_model_tags(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
         """Search model tags by name with pagination."""
