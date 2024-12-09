@@ -977,7 +977,7 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Sanitize base model
         base_model = model_info.get("model_tree", {}).get("base_model", [])
-        if len(base_model) > 0:
+        if base_model is not None and len(base_model) > 0:
             base_model = base_model[0]
         base_model = normalize_value(base_model)
 
