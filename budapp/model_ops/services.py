@@ -1250,7 +1250,7 @@ class ModelService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[str], int]:
         """Search author by name with pagination support."""
-        filters["is_active"] = True
+        filters["model_status"] = StatusEnum.ACTIVE
         db_models, count = await ModelDataManager(self.session).list_all_model_authors(
             offset, limit, filters, order_by, search
         )

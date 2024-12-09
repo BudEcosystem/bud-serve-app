@@ -1,8 +1,8 @@
-"""added model status in model table
+"""updated model table with model status
 
-Revision ID: bc228b8963b6
+Revision ID: 8d317585f402
 Revises: 64e788fd946c
-Create Date: 2024-12-03 10:09:59.042958
+Create Date: 2024-12-09 04:39:16.427069
 
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = "bc228b8963b6"
+revision: str = "8d317585f402"
 down_revision: Union[str, None] = "64e788fd946c"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
