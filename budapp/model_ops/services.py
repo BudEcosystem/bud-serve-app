@@ -1318,7 +1318,9 @@ class ModelService(SessionMixin):
 
     async def retrieve_model(self, model_id: UUID) -> ModelDetailSuccessResponse:
         """Retrieve model details by model ID."""
-        db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": model_id, "is_active": True})
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": model_id, "model_status": StatusEnum.ACTIVE}
+        )
 
         # For base model there won't be any base model value
         base_model = db_model.base_model

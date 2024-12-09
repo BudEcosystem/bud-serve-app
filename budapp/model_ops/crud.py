@@ -398,7 +398,11 @@ class ModelDataManager(DataManagerUtils):
         """Get the model tree count."""
         stmt = (
             select(Model.base_model_relation, func.count(Model.id).label("count"))
-            .filter(Model.base_model == base_model, Model.is_active == True, Model.base_model_relation.is_not(None))
+            .filter(
+                Model.base_model == base_model,
+                Model.model_status == StatusEnum.ACTIVE,
+                Model.base_model_relation.is_not(None),
+            )
             .group_by(Model.base_model_relation)
         )
 
