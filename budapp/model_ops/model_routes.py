@@ -46,7 +46,7 @@ from .schemas import (
     EditModel,
     ModelAuthorFilter,
     ModelAuthorResponse,
-    ModelDetailResponse,
+    ModelDetailSuccessResponse,
     ModelFilter,
     ModelPaginatedResponse,
     ProviderFilter,
@@ -658,38 +658,31 @@ async def list_all_model_authors(
             "model": ErrorResponse,
             "description": "Service is unavailable due to server error",
         },
-        status.HTTP_400_BAD_REQUEST: {
+        status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
-            "description": "Invalid request parameters",
+            "description": "Model not found",
         },
         status.HTTP_200_OK: {
-            "model": ModelDetailResponse,
+            "model": ModelDetailSuccessResponse,
             "description": "Successfully retrieved model details",
         },
     },
     description="Retrieve details of a model by ID",
 )
-async def get_model_details(
+async def retrieve_model(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     model_id: UUID,
-) -> Union[ModelDetailResponse, ErrorResponse]:
+) -> Union[ModelDetailSuccessResponse, ErrorResponse]:
     """Retrieve details of a model by its ID."""
     try:
-        model_details = await ModelService(session).get_model_details(model_id)
+        return await ModelService(session).retrieve_model(model_id)
     except ClientException as e:
         logger.exception(f"Failed to get model details: {e}")
-        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to get model details: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to retrieve model details",
         ).to_http_response()
-
-    return ModelDetailResponse(
-        **model_details,
-        message="model details fetched successfully",
-        code=status.HTTP_200_OK,
-        object="ModelDetailResponse",
-    )

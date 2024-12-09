@@ -16,9 +16,12 @@
 
 from datetime import datetime
 
-from pydantic import UUID4, BaseModel
+from pydantic import UUID4, BaseModel, ConfigDict
 
+from budapp.cluster_ops.schemas import ClusterResponse
 from budapp.commons.constants import EndpointStatusEnum
+from budapp.commons.schemas import PaginatedSuccessResponse
+from budapp.model_ops.schemas import ModelResponse
 
 
 # Endpoint schemas
@@ -39,3 +42,30 @@ class EndpointCreate(BaseModel):
     created_by: UUID4
     status_sync_at: datetime
     credential_id: UUID4 | None
+
+
+class EndpointFilter(BaseModel):
+    """Filter endpoint schema for filtering endpoints based on specific criteria."""
+
+    name: str | None = None
+    status: EndpointStatusEnum | None = None
+
+
+class EndpointListResponse(BaseModel):
+    """Endpoint list response schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    status: EndpointStatusEnum
+    model: ModelResponse
+    cluster: ClusterResponse
+    created_at: datetime
+    modified_at: datetime
+
+
+class EndpointPaginatedResponse(PaginatedSuccessResponse):
+    """Endpoint paginated response schema."""
+
+    endpoints: list[EndpointListResponse] = []
