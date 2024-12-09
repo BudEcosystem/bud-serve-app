@@ -518,10 +518,35 @@ class ModelTemplateTypeEnum(StrEnum):
 class DropdownBackgroundColor(str, Enum):
     """Background hex color for dropdown."""
 
-    COLOR_1 = "#D1B854"
+    COLOR_1 = "#EEEEEE"
+    COLOR_2 = "#965CDE"
+    COLOR_3 = "#EC7575"
+    COLOR_4 = "#479D5F"
+    COLOR_5 = "#D1B854"
+    COLOR_6 = "#ECAE75"
+    COLOR_7 = "#42CACF"
+    COLOR_8 = "#DE5CD1"
+    COLOR_9 = "#4077E6"
+    COLOR_10 = "#8DE640"
+    COLOR_11 = "#8E5EFF"
+    COLOR_12 = "#FF895E"
+    COLOR_13 = "#FF5E99"
+    COLOR_14 = "#F4FF5E"
+    COLOR_15 = "#FF5E5E"
+    COLOR_16 = "#5EA3FF"
+    COLOR_17 = "#5EFFBE"
 
     @classmethod
     def get_random_color(cls) -> str:
         """Get a random color."""
         colors = list(cls)
         return random.choice(colors).value
+
+
+class BaseModelRelationEnum(StrEnum):
+    """Base model relation types."""
+
+    ADAPTER = "adapter"
+    MERGE = "merge"
+    QUANTIZED = "quantized"
+    FINETUNE = "finetune"
