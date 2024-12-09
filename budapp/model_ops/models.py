@@ -20,12 +20,15 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, String, Uuid
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import false as sa_false
 
 from budapp.commons.constants import (
+    BaseModelRelationEnum,
     CredentialTypeEnum,
     ModalityEnum,
     ModelProviderTypeEnum,
@@ -48,6 +51,31 @@ class Model(Base):
     icon: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     github_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     huggingface_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    bud_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa_false())
+    scan_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa_false())
+    eval_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa_false())
+    strengths: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
+    limitations: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
+    languages: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
+    use_cases: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
+    minimum_requirements: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    examples: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
+    base_model: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    base_model_relation: Mapped[str] = mapped_column(
+        Enum(
+            BaseModelRelationEnum,
+            name="base_model_relation_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=True,
+    )
+    model_type: Mapped[str] = mapped_column(String, nullable=True)
+    family: Mapped[str] = mapped_column(String, nullable=True)
+    num_layers: Mapped[int] = mapped_column(Integer, nullable=True)
+    hidden_size: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    context_length: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    torch_dtype: Mapped[str] = mapped_column(String, nullable=True)
+    architecture: Mapped[dict] = mapped_column(JSONB, nullable=True)
     website_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     modality: Mapped[str] = mapped_column(
@@ -89,6 +117,7 @@ class PaperPublished(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     title: Mapped[str] = mapped_column(String, nullable=True)
+    authors: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
     url: Mapped[str] = mapped_column(String, nullable=True)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -104,7 +133,9 @@ class ModelLicenses(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String, nullable=True)
+    url: Mapped[str] = mapped_column(String, nullable=True)
     path: Mapped[str] = mapped_column(String, nullable=True)
+    faqs: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
