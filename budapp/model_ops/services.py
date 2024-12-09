@@ -57,6 +57,8 @@ from .schemas import (
     CreateLocalModelWorkflowRequest,
     CreateLocalModelWorkflowSteps,
     EditModel,
+    LocalModelScanRequest,
+    LocalModelScanWorkflowStepData,
     ModelCreate,
     ModelLicensesModel,
     ModelListResponse,
@@ -1126,6 +1128,188 @@ class LocalModelWorkflowService(SessionMixin):
                     return decrypted_token
                 except (KeyError, TypeError):
                     raise ClientException("Unable to get decrypted token")
+
+    async def scan_local_model_workflow(self, current_user_id: UUID, request: LocalModelScanRequest) -> WorkflowModel:
+        """Scan a local model."""
+        # Get request data
+        step_number = request.step_number
+        workflow_id = request.workflow_id
+        workflow_total_steps = request.workflow_total_steps
+        model_id = request.model_id
+        trigger_workflow = request.trigger_workflow
+
+        current_step_number = step_number
+
+        # Retrieve or create workflow
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id, workflow_total_steps, current_user_id
+        )
+
+        # Validate model id
+        if model_id:
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"id": model_id, "is_active": True}
+            )
+            if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+                raise ClientException("Security scan is only supported for local models")
+
+        # Prepare workflow step data
+        workflow_step_data = LocalModelScanWorkflowStepData(
+            model_id=model_id,
+        ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+
+        # Get workflow steps
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": db_workflow.id}
+        )
+
+        # For avoiding another db call for record retrieval, storing db object while iterating over db_workflow_steps
+        db_current_workflow_step = None
+
+        if db_workflow_steps:
+            for db_step in db_workflow_steps:
+                # Get current workflow step
+                if db_step.step_number == current_step_number:
+                    db_current_workflow_step = db_step
+
+        if db_current_workflow_step:
+            logger.info(f"Workflow {db_workflow.id} step {current_step_number} already exists")
+
+            # Update workflow step data in db
+            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                db_current_workflow_step,
+                {"data": workflow_step_data},
+            )
+            logger.info(f"Workflow {db_workflow.id} step {current_step_number} updated")
+        else:
+            logger.info(f"Creating workflow step {current_step_number} for workflow {db_workflow.id}")
+
+            # Insert step details in db
+            db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+                WorkflowStepModel(
+                    workflow_id=db_workflow.id,
+                    step_number=current_step_number,
+                    data=workflow_step_data,
+                )
+            )
+
+        # Update workflow current step as the highest step_number
+        db_max_workflow_step_number = max(step.step_number for step in db_workflow_steps) if db_workflow_steps else 0
+        workflow_current_step = max(current_step_number, db_max_workflow_step_number)
+        logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
+
+        if trigger_workflow:
+            # query workflow steps again to get latest data
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": db_workflow.id}
+            )
+
+            # Define the keys required for model security scan
+            keys_of_interest = [
+                "model_id",
+            ]
+
+            # from workflow steps extract necessary information
+            required_data = {}
+            for db_workflow_step in db_workflow_steps:
+                for key in keys_of_interest:
+                    if key in db_workflow_step.data:
+                        required_data[key] = db_workflow_step.data[key]
+
+            # Check if all required keys are present
+            required_keys = ["model_id"]
+            missing_keys = [key for key in required_keys if key not in required_data]
+            if missing_keys:
+                raise ClientException(f"Missing required data for model security scan: {', '.join(missing_keys)}")
+
+            try:
+                # Perform model security scan
+                await self._perform_model_security_scan(db_workflow.id, current_step_number, required_data)
+            except ClientException as e:
+                workflow_current_step = current_step_number
+                db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                    db_workflow,
+                    {"current_step": workflow_current_step},
+                )
+                logger.debug("Workflow updated with latest step")
+                raise e
+
+            # Create next workflow step to store model scan result
+            current_step_number = current_step_number + 1
+            workflow_current_step = current_step_number
+
+            # Update or create next workflow step
+            # NOTE: The when scanning is completed, the subscriber will create scan result and update scan result id to the step
+            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                db_workflow.id, current_step_number, {}
+            )
+
+        # This will ensure workflow step number is updated to the latest step number
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": workflow_current_step},
+        )
+
+        return db_workflow
+
+    async def _perform_model_security_scan(self, workflow_id: UUID, step_number: int, data: Dict) -> None:
+        """Perform model security scan."""
+        # Retrieve workflow step
+        db_workflow_step = await WorkflowDataManager(self.session).retrieve_by_fields(
+            WorkflowStepModel, {"workflow_id": workflow_id, "step_number": step_number}
+        )
+
+        # Add created_by to data for notification purpose in micro service
+        data["created_by"] = str(db_workflow_step.workflow.created_by)
+
+        # Perform model security scan request
+        model_security_scan_response = await self._perform_model_security_scan_request(workflow_id, data)
+
+        # Add payload dict to response
+        for step in model_security_scan_response["steps"]:
+            step["payload"] = {}
+
+        # Include model security scan response in current step data
+        data[BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value] = model_security_scan_response
+
+        # Update workflow step with response
+        await WorkflowStepDataManager(self.session).update_by_fields(db_workflow_step, {"data": data})
+
+    async def _perform_model_security_scan_request(self, workflow_id: UUID, data: Dict) -> None:
+        """Perform model security scan request."""
+        model_security_scan_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/model-info/scan"
+        )
+
+        # Retrieve model local path
+        model_id = data.get("model_id")
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": model_id, "is_active": True})
+        local_path = db_model.local_path
+
+        model_security_scan_request = {
+            "model_path": local_path,
+            "notification_metadata": {
+                "name": "bud-notification",
+                "subscriber_ids": data["created_by"],
+                "workflow_id": str(workflow_id),
+            },
+            "source_topic": f"{app_settings.source_topic}",
+        }
+        logger.debug(f"Model security scan payload: {model_security_scan_request}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(model_security_scan_endpoint, json=model_security_scan_request) as response:
+                    response_data = await response.json()
+                    if response.status >= 400:
+                        raise ClientException("unable to perform model security scan request")
+
+                    return response_data
+        except ClientException as e:
+            raise e
+        except Exception as e:
+            logger.error(f"Failed to perform model security scan request: {e}")
+            raise ClientException("unable to perform model security scan request") from e
 
 
 class CloudModelService(SessionMixin):

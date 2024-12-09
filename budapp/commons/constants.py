@@ -456,12 +456,14 @@ class BudServeWorkflowStepEventName(str, Enum):
         BUDSERVE_CLUSTER_EVENTS: Represents the Budserve cluster workflow step event name.
         CREATE_CLUSTER_EVENTS: Represents the create cluster workflow step event name.
         MODEL_EXTRACTION_EVENTS: Represents the model extraction workflow step event name.
+        MODEL_SECURITY_SCAN_EVENTS: Represents the model security scan workflow step event name.
     """
 
     BUD_SIMULATOR_EVENTS = "bud_simulator_events"
     BUDSERVE_CLUSTER_EVENTS = "budserve_cluster_events"
     CREATE_CLUSTER_EVENTS = "create_cluster_events"
     MODEL_EXTRACTION_EVENTS = "model_extraction_events"
+    MODEL_SECURITY_SCAN_EVENTS = "model_security_scan_events"
 
 
 class ClusterStatusEnum(StrEnum):

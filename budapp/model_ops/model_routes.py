@@ -44,6 +44,7 @@ from .schemas import (
     CreateCloudModelWorkflowResponse,
     CreateLocalModelWorkflowRequest,
     EditModel,
+    LocalModelScanRequest,
     ModelAuthorFilter,
     ModelAuthorResponse,
     ModelDetailResponse,
@@ -693,3 +694,44 @@ async def get_model_details(
         code=status.HTTP_200_OK,
         object="ModelDetailResponse",
     )
+
+
+@model_router.post(
+    "/security-scan",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RetrieveWorkflowDataResponse,
+            "description": "Successfully scan local model",
+        },
+    },
+    description="Scan local model",
+)
+async def scan_local_model_workflow(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: LocalModelScanRequest,
+) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
+    """Scan local model."""
+    try:
+        db_workflow = await LocalModelWorkflowService(session).scan_local_model_workflow(
+            current_user_id=current_user.id,
+            request=request,
+        )
+
+        return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
+    except ClientException as e:
+        logger.exception(f"Failed to scan local model: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to scan local model: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to scan local model"
+        ).to_http_response()

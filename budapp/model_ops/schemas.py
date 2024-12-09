@@ -495,3 +495,39 @@ class ModelAuthorFilter(BaseModel):
     """Filter schema for model authors."""
 
     author: str | None = None
+
+
+# Local model related schemas
+
+
+class LocalModelScanRequest(BaseModel):
+    """Local model scan request schema."""
+
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None
+    step_number: int = Field(..., gt=0)
+    trigger_workflow: bool = False
+    model_id: UUID4 | None = None
+
+    @model_validator(mode="after")
+    def validate_fields(self) -> "LocalModelScanRequest":
+        """Validate the fields of the request."""
+        if self.workflow_id is None and self.workflow_total_steps is None:
+            raise ValueError("workflow_total_steps is required when workflow_id is not provided")
+
+        if self.workflow_id is not None and self.workflow_total_steps is not None:
+            raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
+
+        # Check if at least one of the other fields is provided
+        other_fields = [self.model_id]
+        required_fields = ["model_id"]
+        if not any(other_fields):
+            raise ValueError(f"At least one of {', '.join(required_fields)} is required")
+
+        return self
+
+
+class LocalModelScanWorkflowStepData(BaseModel):
+    """Local model scan workflow step data schema."""
+
+    model_id: UUID4 | None
