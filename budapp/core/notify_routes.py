@@ -104,6 +104,15 @@ async def receive_notification(
                 object="notification",
                 message="Updated model extraction event in workflow step",
             ).to_http_response()
+        if (
+            payload.category == NotificationCategory.INTERNAL
+            and payload.type == PayloadType.PERFORM_MODEL_SECURITY_SCAN
+        ):
+            await NotificationService(session).update_model_security_scan_events(payload)
+            return NotificationResponse(
+                object="notification",
+                message="Updated model security scan event in workflow step",
+            ).to_http_response()
         else:
             return NotificationResponse(
                 object="notification",

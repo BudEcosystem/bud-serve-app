@@ -629,3 +629,30 @@ class LocalModelScanWorkflowStepData(BaseModel):
     """Local model scan workflow step data schema."""
 
     model_id: UUID4 | None
+
+
+# Schemas related to Model Security Scan Results
+
+
+class ModelIssue(BaseModel):
+    """Model issue schema."""
+
+    title: str
+    severity: str
+    description: str
+    source: str
+
+
+class ModelSecurityScanResultCreate(BaseModel):
+    """Model security scan result create schema."""
+
+    model_id: UUID4
+    total_issues: int
+    total_scanned_files: int
+    total_skipped_files: int
+    scanned_files: list[str]
+    low_severity_count: int
+    medium_severity_count: int
+    high_severity_count: int
+    critical_severity_count: int
+    model_issues: dict

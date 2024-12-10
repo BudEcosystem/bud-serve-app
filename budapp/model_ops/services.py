@@ -51,10 +51,12 @@ from .crud import (
     CloudModelDataManager,
     ModelDataManager,
     ModelLicensesDataManager,
+    ModelSecurityScanResultDataManager,
     PaperPublishedDataManager,
     ProviderDataManager,
 )
 from .models import CloudModel, Model, ModelLicenses, PaperPublished
+from .models import ModelSecurityScanResult as ModelSecurityScanResultModel
 from .models import Provider as ProviderModel
 from .schemas import (
     CreateCloudModelWorkflowRequest,
@@ -64,15 +66,17 @@ from .schemas import (
     CreateLocalModelWorkflowRequest,
     CreateLocalModelWorkflowSteps,
     EditModel,
-    ModelArchitecture,
     LocalModelScanRequest,
     LocalModelScanWorkflowStepData,
+    ModelArchitecture,
     ModelCreate,
     ModelDetailSuccessResponse,
+    ModelIssue,
     ModelLicensesCreate,
     ModelLicensesModel,
     ModelListResponse,
     ModelResponse,
+    ModelSecurityScanResultCreate,
     ModelTree,
     PaperPublishedCreate,
     PaperPublishedModel,
@@ -1459,6 +1463,152 @@ class LocalModelWorkflowService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to perform model security scan request: {e}")
             raise ClientException("unable to perform model security scan request") from e
+
+    async def create_scan_result_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Create a local model security scan result from notification event."""
+        logger.debug("Received event for creating local model security scan result")
+
+        # Get workflow steps
+        workflow_id = payload.workflow_id
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        logger.debug(f"Retrieved workflow: {db_workflow.id}")
+
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Get last step
+        db_latest_workflow_step = db_workflow_steps[-1]
+
+        # Define the keys required for endpoint creation
+        keys_of_interest = [
+            "model_id",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+        logger.debug("Collected required data from workflow steps")
+
+        # Get model
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": required_data["model_id"], "is_active": True}
+        )
+        local_path = db_model.local_path
+        logger.debug(f"Local path: {local_path}")
+
+        # Get model scan result
+        scan_result = payload.content.result["scan_result"]
+        logger.debug(f"Scan result: {scan_result}")
+
+        # Parse necessary data from scan result
+        total_issues_by_severity = scan_result.get("total_issues_by_severity", {})
+        low_severity_count = total_issues_by_severity.get("LOW", 0)
+        medium_severity_count = total_issues_by_severity.get("MEDIUM", 0)
+        high_severity_count = total_issues_by_severity.get("HIGH", 0)
+        critical_severity_count = total_issues_by_severity.get("CRITICAL", 0)
+
+        model_issues = scan_result.get("model_issues", [])
+        grouped_issues = await self._group_model_issues(model_issues, local_path)
+
+        # Create model security scan result
+        model_security_scan_result = ModelSecurityScanResultCreate(
+            model_id=db_model.id,
+            total_issues=scan_result.get("total_issues", 0),
+            total_scanned_files=scan_result.get("total_scanned", 0),
+            total_skipped_files=scan_result.get("total_skipped_files", 0),
+            scanned_files=scan_result.get("scanned_files", []),
+            low_severity_count=low_severity_count,
+            medium_severity_count=medium_severity_count,
+            high_severity_count=high_severity_count,
+            critical_severity_count=critical_severity_count,
+            model_issues=grouped_issues,
+        )
+        logger.debug("Parsed model security scan result")
+
+        # Check if model security scan result already exists
+        db_model_security_scan_result = await ModelSecurityScanResultDataManager(self.session).retrieve_by_fields(
+            ModelSecurityScanResultModel, {"model_id": db_model.id}, missing_ok=True
+        )
+
+        if db_model_security_scan_result:
+            logger.debug("Model security scan result already exists. Updating it.")
+            await ModelSecurityScanResultDataManager(self.session).update_by_fields(
+                db_model_security_scan_result,
+                model_security_scan_result.model_dump(),
+            )
+        else:
+            logger.debug("Model security scan result does not exist. Creating it.")
+            await ModelSecurityScanResultDataManager(self.session).insert_one(
+                ModelSecurityScanResultModel(**model_security_scan_result.model_dump())
+            )
+
+        # Mark scan_verified as True in model
+        await ModelDataManager(self.session).update_by_fields(
+            db_model,
+            {"scan_verified": True},
+        )
+
+        # Get dummy leaderboard data
+        leaderboard_data = await self.get_leaderboard()
+
+        # Create workflow step to store model scan result
+        end_step_number = db_latest_workflow_step.step_number + 1
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            workflow_id, end_step_number, {"leaderboard": leaderboard_data}
+        )
+
+        # Update workflow current step and status
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": end_step_number, "status": WorkflowStatusEnum.COMPLETED},
+        )
+
+    async def _group_model_issues(self, model_issues: list, local_path: str) -> list[ModelIssue]:
+        """Group model issues by severity."""
+        grouped_issues = {}
+
+        for model_issue in model_issues:
+            severity = model_issue["severity"].lower()
+
+            # Clean up the source path by removing local_path prefix
+            source = model_issue["source"]
+            if source.startswith(local_path):
+                source = source[len(local_path) :].lstrip("/")
+
+            # Group issues by severity
+            if severity not in grouped_issues:
+                grouped_issues[severity] = []
+            grouped_issues[severity].append(
+                ModelIssue(
+                    title=model_issue["title"],
+                    severity=severity,
+                    description=model_issue["description"],
+                    source=source,
+                ).model_dump()
+            )
+
+        return grouped_issues
+
+    async def get_leaderboard(self) -> dict:
+        """Get leaderboard for a model."""
+        return {
+            "headers": {
+                "evaluation_type": "Evaluation type",
+                "dataset": "Data Set",
+                "model_1": "Selected Model",
+                "model_2": "Model 2",
+            },
+            "rows": [
+                {"evaluation_type": "IFEval", "dataset": "Reasoning", "model_1": 65.1, "model_2": 65.1},
+                {"evaluation_type": "BBH", "dataset": "MMLU", "model_1": 46.9, "model_2": 46.9},
+                {"evaluation_type": "Model", "dataset": "Factuality", "model_1": 78.4, "model_2": 78.4},
+                {"evaluation_type": "Tags", "dataset": "Reasoning", "model_1": 60.8, "model_2": 60.8},
+            ],
+        }
 
 
 class CloudModelService(SessionMixin):

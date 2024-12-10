@@ -207,3 +207,23 @@ class CloudModel(Base):
     is_present_in_model: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     provider: Mapped[Optional["Provider"]] = relationship("Provider", back_populates="cloud_models")
+
+
+class ModelSecurityScanResult(Base):
+    """Model for a AI model security scan result."""
+
+    __tablename__ = "model_security_scan_result"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
+    total_issues: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_scanned_files: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_skipped_files: Mapped[int] = mapped_column(Integer, nullable=False)
+    scanned_files: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=False)
+    low_severity_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    medium_severity_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    high_severity_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    critical_severity_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    model_issues: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
