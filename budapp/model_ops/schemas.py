@@ -657,3 +657,13 @@ class ModelSecurityScanResultCreate(BaseModel):
     high_severity_count: int
     critical_severity_count: int
     model_issues: dict
+
+
+class ModelSecurityScanResult(ModelSecurityScanResultCreate):
+    """Model security scan result schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: UUID4
+    created_at: datetime
+    modified_at: datetime

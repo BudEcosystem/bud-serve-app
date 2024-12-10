@@ -1537,15 +1537,21 @@ class LocalModelWorkflowService(SessionMixin):
 
         if db_model_security_scan_result:
             logger.debug("Model security scan result already exists. Updating it.")
-            await ModelSecurityScanResultDataManager(self.session).update_by_fields(
+            db_model_security_scan_result = await ModelSecurityScanResultDataManager(self.session).update_by_fields(
                 db_model_security_scan_result,
                 model_security_scan_result.model_dump(),
             )
         else:
             logger.debug("Model security scan result does not exist. Creating it.")
-            await ModelSecurityScanResultDataManager(self.session).insert_one(
+            db_model_security_scan_result = await ModelSecurityScanResultDataManager(self.session).insert_one(
                 ModelSecurityScanResultModel(**model_security_scan_result.model_dump())
             )
+
+        # Update workflow step with model security scan result id
+        await WorkflowStepDataManager(self.session).update_by_fields(
+            db_latest_workflow_step,
+            {"data": {"security_scan_result_id": str(db_model_security_scan_result.id)}},
+        )
 
         # Mark scan_verified as True in model
         await ModelDataManager(self.session).update_by_fields(
