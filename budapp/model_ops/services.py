@@ -29,6 +29,7 @@ from pydantic import ValidationError
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import (
+    BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     CredentialTypeEnum,
     ModelProviderTypeEnum,
@@ -38,7 +39,7 @@ from budapp.commons.constants import (
 )
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
-from budapp.commons.helpers import assign_random_colors_to_names, get_normalized_string_or_none
+from budapp.commons.helpers import assign_random_colors_to_names, normalize_value
 from budapp.commons.schemas import Tag, Task
 from budapp.core.schemas import NotificationPayload
 from budapp.credential_ops.crud import ProprietaryCredentialDataManager
@@ -48,7 +49,13 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
-from .crud import CloudModelDataManager, ModelDataManager, ProviderDataManager, PaperPublishedDataManager
+from .crud import (
+    CloudModelDataManager,
+    ModelDataManager,
+    ModelLicensesDataManager,
+    PaperPublishedDataManager,
+    ProviderDataManager,
+)
 from .models import CloudModel, Model, ModelLicenses, PaperPublished
 from .models import Provider as ProviderModel
 from .schemas import (
@@ -59,10 +66,15 @@ from .schemas import (
     CreateLocalModelWorkflowRequest,
     CreateLocalModelWorkflowSteps,
     EditModel,
+    ModelArchitecture,
     ModelCreate,
+    ModelDetailSuccessResponse,
+    ModelLicensesCreate,
     ModelLicensesModel,
     ModelListResponse,
     ModelResponse,
+    ModelTree,
+    PaperPublishedCreate,
     PaperPublishedModel,
 )
 
@@ -849,13 +861,69 @@ class LocalModelWorkflowService(SessionMixin):
 
         extracted_author = required_data.get("author")
         if not extracted_author:
-            extracted_author = get_normalized_string_or_none(model_info.get("author", None))
+            extracted_author = normalize_value(model_info.get("author", None))
 
         # Finalize model details
-        model_description = get_normalized_string_or_none(model_info.get("description", None))
-        model_github_url = get_normalized_string_or_none(model_info.get("huggingface_url", None))
-        model_huggingface_url = get_normalized_string_or_none(model_info.get("huggingface_url", None))
-        model_website_url = get_normalized_string_or_none(model_info.get("website_url", None))
+        model_description = normalize_value(model_info.get("description", None))
+        model_github_url = normalize_value(model_info.get("huggingface_url", None))
+        model_huggingface_url = normalize_value(model_info.get("huggingface_url", None))
+        model_website_url = normalize_value(model_info.get("website_url", None))
+        languages = normalize_value(model_info.get("languages", None))
+        use_cases = normalize_value(model_info.get("use_cases", None))
+        model_size = normalize_value(model_info.get("architecture", {}).get("num_params", None))
+        model_type = normalize_value(model_info.get("architecture", {}).get("type", None))
+        family = normalize_value(model_info.get("architecture", {}).get("family", None))
+        num_layers = normalize_value(model_info.get("architecture", {}).get("num_layers", None))
+        hidden_size = normalize_value(model_info.get("architecture", {}).get("hidden_size", None))
+        context_length = normalize_value(model_info.get("architecture", {}).get("context_length", None))
+        torch_dtype = normalize_value(model_info.get("architecture", {}).get("torch_dtype", None))
+        model_architecture = ModelArchitecture(
+            intermediate_size=normalize_value(model_info.get("architecture", {}).get("intermediate_size", None)),
+            vocab_size=normalize_value(model_info.get("architecture", {}).get("vocab_size", None)),
+            num_attention_heads=normalize_value(model_info.get("architecture", {}).get("num_attention_heads", None)),
+            num_key_value_heads=normalize_value(model_info.get("architecture", {}).get("num_key_value_heads", None)),
+            rope_scaling=normalize_value(model_info.get("architecture", {}).get("rope_scaling", None)),
+            model_weights_size=normalize_value(model_info.get("architecture", {}).get("model_weights_size", None)),
+            kv_cache_size=normalize_value(model_info.get("architecture", {}).get("kv_cache_size", None)),
+        )
+
+        # Sanitize base model
+        base_model = model_info.get("model_tree", {}).get("base_model", [])
+        if base_model is not None and len(base_model) > 0:
+            base_model = base_model[0]
+        base_model = normalize_value(base_model)
+
+        # Dummy Values
+        # TODO: remove this after implementing actual service
+        strengths = [
+            "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+            "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+        ]
+        limitations = [
+            "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+            "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+        ]
+        examples = [
+            {
+                "prompt": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+                "prompt_type": "string",
+                "response": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+                "response_type": "string",
+            },
+            {
+                "prompt": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+                "prompt_type": "string",
+                "response": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+                "response_type": "string",
+            },
+        ]
+        minimum_requirements = {"device_name": "Dummy Device", "core": 3, "memory": "32 GB", "RAM": "32 GB"}
+        base_model_relation = BaseModelRelationEnum.ADAPTER
+
+        # Base model, Base model relation, fields will be none for base models
+        if required_data["uri"] == base_model:
+            base_model = None
+            base_model_relation = None
 
         # Set provider id and icon
         provider_id = None
@@ -886,11 +954,39 @@ class LocalModelWorkflowService(SessionMixin):
             provider_id=provider_id,
             local_path=local_path,
             icon=icon,
+            model_size=model_size,
+            strengths=strengths,
+            limitations=limitations,
+            languages=languages,
+            use_cases=use_cases,
+            minimum_requirements=minimum_requirements,
+            examples=examples,
+            base_model=base_model,
+            base_model_relation=base_model_relation,
+            model_type=model_type,
+            family=family,
+            num_layers=num_layers,
+            hidden_size=hidden_size,
+            context_length=context_length,
+            torch_dtype=torch_dtype,
+            architecture=model_architecture,
         )
 
         # Create model
-        db_model = await ModelDataManager(self.session).insert_one(Model(**model_data.model_dump()))
+        db_model = await ModelDataManager(self.session).insert_one(Model(**model_data.model_dump(exclude_none=True)))
         logger.debug(f"Model created with id {db_model.id}")
+
+        # Create papers
+        extracted_papers = model_info.get("papers", [])
+        if extracted_papers:
+            db_papers = await self._create_papers_from_model_info(extracted_papers, db_model.id)
+            logger.debug(f"Papers created for model {db_model.id}")
+
+        # Create model licenses
+        extracted_license = model_info.get("license", {})
+        if extracted_license:
+            db_model_licenses = await self._create_model_licenses_from_model_info(extracted_license, db_model.id)
+            logger.debug(f"Model licenses created for model {db_model.id}")
 
         # Update to workflow step
         workflow_update_data = {
@@ -1039,6 +1135,59 @@ class LocalModelWorkflowService(SessionMixin):
                 except (KeyError, TypeError):
                     raise ClientException("Unable to get decrypted token")
 
+    async def _create_papers_from_model_info(
+        self, extracted_papers: list[dict], model_id: UUID
+    ) -> List[PaperPublished]:
+        """Create papers from model info."""
+        # Store papers here for bulk insert
+        paper_models = []
+
+        for extracted_paper in extracted_papers:
+            paper_title = normalize_value(extracted_paper.get("title", None))
+            paper_authors = normalize_value(extracted_paper.get("authors", None))
+            paper_url = normalize_value(extracted_paper.get("url", None))
+
+            # Only add paper if it has title, authors or url
+            if any([paper_title, paper_authors, paper_url]):
+                paper_data = PaperPublishedCreate(
+                    title=paper_title,
+                    authors=paper_authors,
+                    url=paper_url,
+                    model_id=model_id,
+                )
+                paper_models.append(PaperPublished(**paper_data.model_dump(exclude_none=True)))
+
+        # Insert papers in db
+        return await PaperPublishedDataManager(self.session).insert_all(paper_models)
+
+    async def _create_model_licenses_from_model_info(
+        self, extracted_license: dict, model_id: UUID
+    ) -> List[ModelLicenses]:
+        """Create model licenses from model info."""
+        license_name = normalize_value(extracted_license.get("name"))
+        license_url = normalize_value(extracted_license.get("url"))
+        license_faqs = normalize_value(extracted_license.get("faqs"))
+        # TODO: Remove when faqs are implemented
+        license_faqs = [
+            {
+                "answer": True,
+                "question": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+            },
+            {
+                "answer": False,
+                "question": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+            },
+        ]
+        license_data = ModelLicensesCreate(
+            name=license_name,
+            url=license_url,
+            faqs=license_faqs,
+            model_id=model_id,
+        )
+        return await ModelLicensesDataManager(self.session).insert_one(
+            ModelLicenses(**license_data.model_dump(exclude_none=True))
+        )
+
 
 class CloudModelService(SessionMixin):
     """Cloud model service."""
@@ -1074,50 +1223,34 @@ class CloudModelService(SessionMixin):
 
 
 class ModelService(SessionMixin):
-    """Cloud model service."""
+    """Model service."""
 
-    async def get_faqs(self) -> List[Dict[str, Any]]:
-        """Dummy function to return FAQs for the license."""
-        return [
-            {"answer": True, "question": "Are the weights of models are opensource?"},
-            {"answer": False, "question": "Are the weights of models are opensource?"},
-        ]
-
-    async def get_model_details(self, model_id: UUID) -> Model:
+    async def retrieve_model(self, model_id: UUID) -> ModelDetailSuccessResponse:
         """Retrieve model details by model ID."""
-        model_details = await ModelDataManager(self.session).retrieve_by_fields(
-            Model,
-            {"id": model_id, "is_active": True},
-            missing_ok=True,  # checks if "is_active": True
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": model_id, "is_active": True})
+
+        # For base model there won't be any base model value
+        base_model = db_model.base_model
+        if not base_model:
+            base_model = db_model.uri
+
+        # Get base model relation count
+        model_tree_count = await ModelDataManager(self.session).get_model_tree_count(base_model)
+        base_model_relation_count = {row.base_model_relation.value: row.count for row in model_tree_count}
+        model_tree = ModelTree(
+            adapters_count=base_model_relation_count.get(BaseModelRelationEnum.ADAPTER.value, 0),
+            finetunes_count=base_model_relation_count.get(BaseModelRelationEnum.FINETUNE.value, 0),
+            merges_count=base_model_relation_count.get(BaseModelRelationEnum.MERGE.value, 0),
+            quantizations_count=base_model_relation_count.get(BaseModelRelationEnum.QUANTIZED.value, 0),
         )
 
-        if not model_details:
-            raise ClientException(message="Model not found", status_code=404)
-
-        paper_published_list = [PaperPublishedModel.from_orm(paper) for paper in model_details.paper_published]
-        if model_details.model_licenses:
-            license = ModelLicensesModel.from_orm(model_details.model_licenses)
-            license_data = license.dict()
-            license_data["faqs"] = await self.get_faqs()
-        else:
-            license_data = None
-
-        response_data = {
-            "id": model_details.id,
-            "name": model_details.name,
-            "description": model_details.description,
-            "icon": model_details.icon,
-            "tags": model_details.tags,
-            "tasks": model_details.tasks,
-            "github_url": model_details.github_url,
-            "huggingface_url": model_details.huggingface_url,
-            "website_url": model_details.website_url,
-            "paper_published": paper_published_list,
-            "license": license_data,
-            "provider_type": model_details.provider_type,
-            "provider": model_details.provider if model_details.provider else None,
-        }
-        return response_data
+        return ModelDetailSuccessResponse(
+            model=db_model,
+            model_tree=model_tree,
+            message="model retrieved successfully",
+            code=status.HTTP_200_OK,
+            object="model.get",
+        ).to_http_response()
 
     async def list_model_tags(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
         """Search model tags by name with pagination."""

@@ -17,7 +17,7 @@
 """Provides helper functions for the project."""
 
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 
 def create_dynamic_enum(enum_name: str, enum_values: List[str]) -> Enum:
@@ -71,17 +71,33 @@ def assign_random_colors_to_names(names: List[str]) -> List[Dict]:
     return result
 
 
-def get_normalized_string_or_none(value: Optional[str]) -> Optional[str]:
-    """Get a normalized string from a value, removing leading and trailing spaces.
+def normalize_value(value: Optional[Union[str, List, Dict]]) -> Optional[Union[str, List, Dict]]:
+    """Normalize a value by handling None, empty strings, empty lists, and empty dicts.
 
     Args:
         value: The value to normalize
 
     Returns:
-        The normalized string or None if the value is None
+        - None if the value is None, empty string, empty list, or empty dict
+        - Stripped string if the value is a non-empty string
+        - Original value for non-empty lists and dicts
+        - Original value for other types
     """
     if value is None:
         return None
 
-    stripped_value = value.strip()
-    return stripped_value if stripped_value else None
+    # Handle strings
+    if isinstance(value, str):
+        stripped_value = value.strip()
+        return stripped_value if stripped_value else None
+
+    # Handle lists
+    if isinstance(value, list):
+        return value if value else None
+
+    # Handle dicts
+    if isinstance(value, dict):
+        return value if value else None
+
+    # Return original value for other types
+    return value

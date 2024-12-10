@@ -3688,5 +3688,51 @@
                 "uri": "databricks/databricks-gte-large-en"
             }
         ]
+    },
+    "anthropic": {
+        "models": [
+            {
+                "name": "claude-3-5-sonnet-20240620",
+                "modality": "llm",
+                "source": "anthropic",
+                "uri": "claude-3-5-sonnet-20240620"
+            },
+            {
+                "name": "claude-3-haiku-20240307",
+                "modality": "llm",
+                "source": "anthropic",
+                "uri": "claude-3-haiku-20240307"
+            },
+            {
+                "name": "claude-3-opus-20240229",
+                "modality": "llm",
+                "source": "anthropic",
+                "uri": "claude-3-opus-20240229"
+            },
+            {
+                "name": "claude-3-5-sonnet-20240620",
+                "modality": "llm",
+                "source": "anthropic",
+                "uri": "claude-3-5-sonnet-20240620"
+            },
+            {
+                "name": "claude-3-sonnet-20240229",
+                "modality": "llm",
+                "source": "anthropic",
+                "uri": "claude-3-sonnet-20240229"
+            },
+            {
+                "name": "claude-2.1",
+                "modality": "llm",
+                "source": "anthropic",
+                "uri": "claude-2.1"
+            },
+            {
+                "name": "claude-2",
+                "modality": "llm",
+                "source": "anthropic",
+                "uri": "claude-2"
+            }
+        ]
     }
 }

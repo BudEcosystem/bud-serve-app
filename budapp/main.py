@@ -35,6 +35,7 @@ from .initializers.seeder import seeders
 from .model_ops import model_routes
 from .user_ops import user_routes
 from .workflow_ops import workflow_routes
+from .endpoint_ops import endpoint_routes
 
 
 logger = logging.get_logger(__name__)
@@ -120,6 +121,7 @@ internal_router = APIRouter()
 internal_router.include_router(auth_routes.auth_router)
 internal_router.include_router(cluster_routes.cluster_router)
 internal_router.include_router(common_routes.common_router)
+internal_router.include_router(endpoint_routes.endpoint_router)
 internal_router.include_router(meta_routes.meta_router)
 internal_router.include_router(model_routes.model_router)
 internal_router.include_router(notify_routes.notify_router)

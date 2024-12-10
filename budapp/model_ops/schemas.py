@@ -34,6 +34,7 @@ from pydantic import (
 )
 
 from budapp.commons.constants import (
+    BaseModelRelationEnum,
     CredentialTypeEnum,
     ModalityEnum,
     ModelProviderTypeEnum,
@@ -94,7 +95,8 @@ class PaperPublishedModel(BaseModel):
 
     id: UUID4
     title: str | None = None
-    url: str
+    authors: list[str] | None = None
+    url: str | None = None
     model_id: UUID4
 
     class Config:
@@ -111,11 +113,13 @@ class PaperPublishedModelEditRequest(BaseModel):
 
 
 class ModelLicensesModel(BaseModel):
-    """Paper Published Model Schema"""
+    """Model Licenses Model Schema"""
 
     id: UUID4
-    name: str
-    path: str
+    name: str | None = None
+    url: str | None = None
+    path: str | None = None
+    faqs: list[dict] | None = None
     model_id: UUID4
 
     class Config:
@@ -157,6 +161,18 @@ class Model(ModelBase):
     provider: Provider | None = None
 
 
+class ModelArchitecture(BaseModel):
+    """Model architecture schema."""
+
+    intermediate_size: int | None = None
+    vocab_size: int | None = None
+    num_attention_heads: int | None = None
+    num_key_value_heads: int | None = None
+    rope_scaling: dict | None = None
+    model_weights_size: int | None = None
+    kv_cache_size: int | None = None
+
+
 class ModelCreate(ModelBase):
     """Schema for creating a new AI Model."""
 
@@ -169,24 +185,81 @@ class ModelCreate(ModelBase):
     author: Optional[str] = None
     provider_id: UUID4 | None = None
     local_path: str | None = None
+    strengths: list[str] | None = None
+    limitations: list[str] | None = None
+    languages: list[str] | None = None
+    use_cases: list[str] | None = None
+    minimum_requirements: dict | None = None
+    examples: list[dict] | None = None
+    base_model: str | None = None
+    base_model_relation: BaseModelRelationEnum | None = None
+    model_type: str | None = None
+    family: str | None = None
+    num_layers: int | None = None
+    hidden_size: int | None = None
+    context_length: int | None = None
+    torch_dtype: str | None = None
+    architecture: ModelArchitecture | None = None
 
 
-class ModelDetailResponse(SuccessResponse):
+class ModelDetailResponse(BaseModel):
     """Response schema for model details."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     id: UUID4
     name: str
-    description: Optional[str] = None
-    tags: Optional[List[Tag]] = None
-    tasks: Optional[List[Tag]] = None
+    description: str | None = None
+    tags: list[Tag] | None = None
+    tasks: list[Task] | None = None
+    author: str | None = None
+    model_size: int | None = None
     icon: str | None = None
-    github_url: Optional[str] = None
-    huggingface_url: Optional[str] = None
-    website_url: Optional[str] = None
-    paper_published: Optional[List[PaperPublishedModel]] = []
-    license: Optional[dict] = None
+    github_url: str | None = None
+    huggingface_url: str | None = None
+    website_url: str | None = None
+    bud_verified: bool = False
+    scan_verified: bool = False
+    eval_verified: bool = False
+    strengths: list[str] | None = None
+    limitations: list[str] | None = None
+    languages: list[str] | None = None
+    use_cases: list[str] | None = None
+    minimum_requirements: dict | None = None
+    examples: list[dict] | None = None
+    base_model: str | None = None
+    model_type: str | None = None
+    family: str | None = None
+    num_layers: int | None = None
+    hidden_size: int | None = None
+    context_length: int | None = None
+    torch_dtype: str | None = None
+    architecture: ModelArchitecture | None = None
+    modality: ModalityEnum
+    source: str
     provider_type: ModelProviderTypeEnum
+    uri: str
+    paper_published: list[PaperPublishedModel] | None = None
+    model_licenses: ModelLicensesModel | None = None
     provider: Provider | None = None
+
+
+class ModelTree(BaseModel):
+    """Model tree schema."""
+
+    adapters_count: int = 0
+    finetunes_count: int = 0
+    merges_count: int = 0
+    quantizations_count: int = 0
+
+
+class ModelDetailSuccessResponse(SuccessResponse):
+    """Model detail success response schema."""
+
+    model: ModelDetailResponse
+    scan_result: dict | None = None  # TODO: integrate actual scan result
+    eval_result: dict | None = None  # TODO: integrate actual eval result
+    model_tree: ModelTree
 
 
 class CreateCloudModelWorkflowRequest(BaseModel):
@@ -518,3 +591,28 @@ class ModelAuthorFilter(BaseModel):
     """Filter schema for model authors."""
 
     author: str | None = None
+
+
+# Schemas related to Paper Published
+
+
+class PaperPublishedCreate(BaseModel):
+    """Paper Published Create Schema."""
+
+    title: str | None = None
+    authors: list[str] | None = None
+    url: str | None = None
+    model_id: UUID4
+
+
+# Schemas related to Model Licenses
+
+
+class ModelLicensesCreate(BaseModel):
+    """Model Licenses Create Schema."""
+
+    name: str | None = None
+    url: str | None = None
+    path: str | None = None
+    faqs: list[dict] | None = None
+    model_id: UUID4
