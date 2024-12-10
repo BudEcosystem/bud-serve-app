@@ -52,7 +52,7 @@ class Model(Base):
     github_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     huggingface_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     bud_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa_false())
-    scan_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa_false())
+    scan_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     eval_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa_false())
     strengths: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
     limitations: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)

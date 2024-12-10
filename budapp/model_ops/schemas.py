@@ -197,6 +197,7 @@ class ModelCreate(ModelBase):
     context_length: int | None = None
     torch_dtype: str | None = None
     architecture: ModelArchitecture | None = None
+    scan_verified: bool | None = None
 
 
 class ModelDetailResponse(BaseModel):
@@ -216,7 +217,7 @@ class ModelDetailResponse(BaseModel):
     huggingface_url: str | None = None
     website_url: str | None = None
     bud_verified: bool = False
-    scan_verified: bool = False
+    scan_verified: bool | None = None
     eval_verified: bool = False
     strengths: list[str] | None = None
     limitations: list[str] | None = None

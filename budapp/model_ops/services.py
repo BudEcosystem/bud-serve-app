@@ -1064,6 +1064,7 @@ class LocalModelWorkflowService(SessionMixin):
             context_length=context_length,
             torch_dtype=torch_dtype,
             architecture=model_architecture,
+            scan_verified=False,
         )
 
         # Create model
