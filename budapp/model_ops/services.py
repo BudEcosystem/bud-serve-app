@@ -965,21 +965,77 @@ class LocalModelWorkflowService(SessionMixin):
         model_website_url = normalize_value(model_info.get("website_url", None))
         languages = normalize_value(model_info.get("languages", None))
         use_cases = normalize_value(model_info.get("use_cases", None))
-        model_size = normalize_value(model_info.get("architecture", {}).get("num_params", None))
-        model_type = normalize_value(model_info.get("architecture", {}).get("type", None))
-        family = normalize_value(model_info.get("architecture", {}).get("family", None))
-        num_layers = normalize_value(model_info.get("architecture", {}).get("num_layers", None))
-        hidden_size = normalize_value(model_info.get("architecture", {}).get("hidden_size", None))
-        context_length = normalize_value(model_info.get("architecture", {}).get("context_length", None))
-        torch_dtype = normalize_value(model_info.get("architecture", {}).get("torch_dtype", None))
+        model_size = normalize_value(
+            model_info.get("architecture", {}).get("num_params", None)
+            if model_info.get("architecture") is not None
+            else None
+        )
+        model_type = normalize_value(
+            model_info.get("architecture", {}).get("type", None)
+            if model_info.get("architecture") is not None
+            else None
+        )
+        family = normalize_value(
+            model_info.get("architecture", {}).get("family", None)
+            if model_info.get("architecture") is not None
+            else None
+        )
+        num_layers = normalize_value(
+            model_info.get("architecture", {}).get("num_layers", None)
+            if model_info.get("architecture") is not None
+            else None
+        )
+        hidden_size = normalize_value(
+            model_info.get("architecture", {}).get("hidden_size", None)
+            if model_info.get("architecture") is not None
+            else None
+        )
+        context_length = normalize_value(
+            model_info.get("architecture", {}).get("context_length", None)
+            if model_info.get("architecture") is not None
+            else None
+        )
+        torch_dtype = normalize_value(
+            model_info.get("architecture", {}).get("torch_dtype", None)
+            if model_info.get("architecture") is not None
+            else None
+        )
         model_architecture = ModelArchitecture(
-            intermediate_size=normalize_value(model_info.get("architecture", {}).get("intermediate_size", None)),
-            vocab_size=normalize_value(model_info.get("architecture", {}).get("vocab_size", None)),
-            num_attention_heads=normalize_value(model_info.get("architecture", {}).get("num_attention_heads", None)),
-            num_key_value_heads=normalize_value(model_info.get("architecture", {}).get("num_key_value_heads", None)),
-            rope_scaling=normalize_value(model_info.get("architecture", {}).get("rope_scaling", None)),
-            model_weights_size=normalize_value(model_info.get("architecture", {}).get("model_weights_size", None)),
-            kv_cache_size=normalize_value(model_info.get("architecture", {}).get("kv_cache_size", None)),
+            intermediate_size=normalize_value(
+                model_info.get("architecture", {}).get("intermediate_size", None)
+                if model_info.get("architecture") is not None
+                else None
+            ),
+            vocab_size=normalize_value(
+                model_info.get("architecture", {}).get("vocab_size", None)
+                if model_info.get("architecture") is not None
+                else None
+            ),
+            num_attention_heads=normalize_value(
+                model_info.get("architecture", {}).get("num_attention_heads", None)
+                if model_info.get("architecture") is not None
+                else None
+            ),
+            num_key_value_heads=normalize_value(
+                model_info.get("architecture", {}).get("num_key_value_heads", None)
+                if model_info.get("architecture") is not None
+                else None
+            ),
+            rope_scaling=normalize_value(
+                model_info.get("architecture", {}).get("rope_scaling", None)
+                if model_info.get("architecture") is not None
+                else None
+            ),
+            model_weights_size=normalize_value(
+                model_info.get("architecture", {}).get("model_weights_size", None)
+                if model_info.get("architecture") is not None
+                else None
+            ),
+            kv_cache_size=normalize_value(
+                model_info.get("architecture", {}).get("kv_cache_size", None)
+                if model_info.get("architecture") is not None
+                else None
+            ),
         )
 
         # Sanitize base model
