@@ -551,3 +551,12 @@ class BaseModelRelationEnum(StrEnum):
     MERGE = "merge"
     QUANTIZED = "quantized"
     FINETUNE = "finetune"
+
+
+class ModelSecurityScanStatusEnum(StrEnum):
+    """Model security scan status types."""
+
+    LOW = auto()
+    MEDIUM = auto()
+    HIGH = auto()
+    CRITICAL = auto()

@@ -32,6 +32,7 @@ from budapp.commons.constants import (
     BudServeWorkflowStepEventName,
     CredentialTypeEnum,
     ModelProviderTypeEnum,
+    ModelSecurityScanStatusEnum,
     ModelSourceEnum,
     WorkflowStatusEnum,
 )
@@ -1515,9 +1516,15 @@ class LocalModelWorkflowService(SessionMixin):
         model_issues = scan_result.get("model_issues", [])
         grouped_issues = await self._group_model_issues(model_issues, local_path)
 
+        # Determine overall scan status
+        overall_scan_status = await self.determine_overall_scan_status(
+            low_severity_count, medium_severity_count, high_severity_count, critical_severity_count
+        )
+
         # Create model security scan result
         model_security_scan_result = ModelSecurityScanResultCreate(
             model_id=db_model.id,
+            status=overall_scan_status,
             total_issues=scan_result.get("total_issues", 0),
             total_scanned_files=scan_result.get("total_scanned", 0),
             total_skipped_files=scan_result.get("total_skipped_files", 0),
@@ -1616,6 +1623,32 @@ class LocalModelWorkflowService(SessionMixin):
                 {"evaluation_type": "Tags", "dataset": "Reasoning", "model_1": 60.8, "model_2": 60.8},
             ],
         }
+
+    @staticmethod
+    async def determine_overall_scan_status(
+        low_count: int, medium_count: int, high_count: int, critical_count: int
+    ) -> ModelSecurityScanStatusEnum:
+        """Determine the overall security scan status based on issue counts.
+
+        Args:
+            low_count: Number of low severity issues
+            medium_count: Number of medium severity issues
+            high_count: Number of high severity issues
+            critical_count: Number of critical severity issues
+
+        Returns:
+            ModelSecurityScanStatusEnum: The overall status based on the highest severity with issues
+        """
+        if critical_count > 0:
+            return ModelSecurityScanStatusEnum.CRITICAL
+        elif high_count > 0:
+            return ModelSecurityScanStatusEnum.HIGH
+        elif medium_count > 0:
+            return ModelSecurityScanStatusEnum.MEDIUM
+        elif low_count > 0:
+            return ModelSecurityScanStatusEnum.LOW
+        else:
+            return ModelSecurityScanStatusEnum.LOW  # Default to LOW if no issues are found
 
 
 class CloudModelService(SessionMixin):

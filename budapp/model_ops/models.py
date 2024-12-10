@@ -32,6 +32,7 @@ from budapp.commons.constants import (
     CredentialTypeEnum,
     ModalityEnum,
     ModelProviderTypeEnum,
+    ModelSecurityScanStatusEnum,
 )
 from budapp.commons.database import Base
 
@@ -108,6 +109,9 @@ class Model(Base):
     paper_published: Mapped[List["PaperPublished"]] = relationship("PaperPublished", back_populates="model")
     model_licenses: Mapped["ModelLicenses"] = relationship("ModelLicenses", back_populates="model")
     provider: Mapped[Optional["Provider"]] = relationship("Provider", back_populates="models")
+    model_security_scan_result: Mapped["ModelSecurityScanResult"] = relationship(
+        "ModelSecurityScanResult", back_populates="model"
+    )
 
 
 class PaperPublished(Base):
@@ -216,6 +220,15 @@ class ModelSecurityScanResult(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
+    status: Mapped[str] = mapped_column(
+        PG_ENUM(
+            ModelSecurityScanStatusEnum,
+            name="model_security_scan_status_enum",
+            values_callable=lambda x: [e.value for e in x],
+            create_type=False,
+        ),
+        nullable=False,
+    )
     total_issues: Mapped[int] = mapped_column(Integer, nullable=False)
     total_scanned_files: Mapped[int] = mapped_column(Integer, nullable=False)
     total_skipped_files: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -227,3 +240,5 @@ class ModelSecurityScanResult(Base):
     model_issues: Mapped[dict] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    model: Mapped["Model"] = relationship("Model", back_populates="model_security_scan_result")

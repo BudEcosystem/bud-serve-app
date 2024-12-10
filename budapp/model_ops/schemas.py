@@ -36,6 +36,7 @@ from budapp.commons.constants import (
     CredentialTypeEnum,
     ModalityEnum,
     ModelProviderTypeEnum,
+    ModelSecurityScanStatusEnum,
     ModelSourceEnum,
     WorkflowStatusEnum,
 )
@@ -648,6 +649,7 @@ class ModelSecurityScanResultCreate(BaseModel):
     """Model security scan result create schema."""
 
     model_id: UUID4
+    status: ModelSecurityScanStatusEnum
     total_issues: int
     total_scanned_files: int
     total_skipped_files: int
@@ -667,3 +669,18 @@ class ModelSecurityScanResult(ModelSecurityScanResultCreate):
     id: UUID4
     created_at: datetime
     modified_at: datetime
+
+
+class ModelSecurityScanResultResponse(BaseModel):
+    """Model security scan result response schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    status: ModelSecurityScanStatusEnum
+    total_issues: int
+    total_scanned_files: int
+    total_skipped_files: int
+    low_severity_count: int
+    medium_severity_count: int
+    high_severity_count: int
+    critical_severity_count: int
