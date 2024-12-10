@@ -28,9 +28,11 @@ from budapp.commons.exceptions import ClientException
 from budapp.model_ops.crud import (
     CloudModelDataManager,
     ModelDataManager,
+    ModelSecurityScanResultDataManager,
     ProviderDataManager,
 )
 from budapp.model_ops.models import CloudModel, Model
+from budapp.model_ops.models import ModelSecurityScanResult as ModelSecurityScanResultModel
 from budapp.model_ops.models import Provider as ProviderModel
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
@@ -106,6 +108,10 @@ class WorkflowService(SessionMixin):
             ingress_url = required_data.get("ingress_url")
             create_cluster_events = required_data.get(BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value)
             model_extraction_events = required_data.get(BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value)
+            model_security_scan_events = required_data.get(
+                BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value
+            )
+            security_scan_result_id = required_data.get("security_scan_result_id")
             icon = required_data.get("icon")
             uri = required_data.get("uri")
             author = required_data.get("author")
@@ -136,6 +142,14 @@ class WorkflowService(SessionMixin):
                 else None
             )
 
+            db_model_security_scan_result = (
+                await ModelSecurityScanResultDataManager(self.session).retrieve_by_fields(
+                    ModelSecurityScanResultModel, {"id": UUID(security_scan_result_id)}, missing_ok=True
+                )
+                if "security_scan_result_id" in required_data
+                else None
+            )
+
             workflow_steps = RetrieveWorkflowStepData(
                 provider_type=provider_type if provider_type else None,
                 provider=db_provider if db_provider else None,
@@ -155,6 +169,9 @@ class WorkflowService(SessionMixin):
                 tags=tags if tags else None,
                 model_extraction_events=model_extraction_events if model_extraction_events else None,
                 description=description if description else None,
+                security_scan_result_id=security_scan_result_id if security_scan_result_id else None,
+                model_security_scan_events=model_security_scan_events if model_security_scan_events else None,
+                security_scan_result=db_model_security_scan_result if db_model_security_scan_result else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -207,6 +224,12 @@ class WorkflowService(SessionMixin):
                 BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value,
                 "model_id",
                 "description",
+            ],
+            "scan_local_model": [
+                "model_id",
+                "security_scan_result_id",
+                "leaderboard",
+                BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value,
             ],
         }
 

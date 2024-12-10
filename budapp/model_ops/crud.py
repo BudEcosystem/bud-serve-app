@@ -551,3 +551,9 @@ class ModelLicensesDataManager(DataManagerUtils):
     """Data manager for the ModelLicenses model."""
 
     pass
+
+
+class ModelSecurityScanResultDataManager(DataManagerUtils):
+    """Data manager for the ModelSecurityScanResult model."""
+
+    pass

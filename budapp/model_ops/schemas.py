@@ -36,6 +36,7 @@ from budapp.commons.constants import (
     CredentialTypeEnum,
     ModalityEnum,
     ModelProviderTypeEnum,
+    ModelSecurityScanStatusEnum,
     ModelSourceEnum,
     WorkflowStatusEnum,
 )
@@ -197,6 +198,7 @@ class ModelCreate(ModelBase):
     context_length: int | None = None
     torch_dtype: str | None = None
     architecture: ModelArchitecture | None = None
+    scan_verified: bool | None = None
 
 
 class ModelDetailResponse(BaseModel):
@@ -216,7 +218,7 @@ class ModelDetailResponse(BaseModel):
     huggingface_url: str | None = None
     website_url: str | None = None
     bud_verified: bool = False
-    scan_verified: bool = False
+    scan_verified: bool | None = None
     eval_verified: bool = False
     strengths: list[str] | None = None
     limitations: list[str] | None = None
@@ -250,11 +252,26 @@ class ModelTree(BaseModel):
     quantizations_count: int = 0
 
 
+class ModelSecurityScanResultResponse(BaseModel):
+    """Model security scan result response schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    status: ModelSecurityScanStatusEnum
+    total_issues: int
+    total_scanned_files: int
+    total_skipped_files: int
+    low_severity_count: int
+    medium_severity_count: int
+    high_severity_count: int
+    critical_severity_count: int
+
+
 class ModelDetailSuccessResponse(SuccessResponse):
     """Model detail success response schema."""
 
     model: ModelDetailResponse
-    scan_result: dict | None = None  # TODO: integrate actual scan result
+    scan_result: ModelSecurityScanResultResponse | None = None
     eval_result: dict | None = None  # TODO: integrate actual eval result
     model_tree: ModelTree
 
@@ -593,3 +610,77 @@ class ModelLicensesCreate(BaseModel):
     path: str | None = None
     faqs: list[dict] | None = None
     model_id: UUID4
+
+
+# Local model related schemas
+
+
+class LocalModelScanRequest(BaseModel):
+    """Local model scan request schema."""
+
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None
+    step_number: int = Field(..., gt=0)
+    trigger_workflow: bool = False
+    model_id: UUID4 | None = None
+
+    @model_validator(mode="after")
+    def validate_fields(self) -> "LocalModelScanRequest":
+        """Validate the fields of the request."""
+        if self.workflow_id is None and self.workflow_total_steps is None:
+            raise ValueError("workflow_total_steps is required when workflow_id is not provided")
+
+        if self.workflow_id is not None and self.workflow_total_steps is not None:
+            raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
+
+        # Check if at least one of the other fields is provided
+        other_fields = [self.model_id]
+        required_fields = ["model_id"]
+        if not any(other_fields):
+            raise ValueError(f"At least one of {', '.join(required_fields)} is required")
+
+        return self
+
+
+class LocalModelScanWorkflowStepData(BaseModel):
+    """Local model scan workflow step data schema."""
+
+    model_id: UUID4 | None
+
+
+# Schemas related to Model Security Scan Results
+
+
+class ModelIssue(BaseModel):
+    """Model issue schema."""
+
+    title: str
+    severity: str
+    description: str
+    source: str
+
+
+class ModelSecurityScanResultCreate(BaseModel):
+    """Model security scan result create schema."""
+
+    model_id: UUID4
+    status: ModelSecurityScanStatusEnum
+    total_issues: int
+    total_scanned_files: int
+    total_skipped_files: int
+    scanned_files: list[str]
+    low_severity_count: int
+    medium_severity_count: int
+    high_severity_count: int
+    critical_severity_count: int
+    model_issues: dict
+
+
+class ModelSecurityScanResult(ModelSecurityScanResultCreate):
+    """Model security scan result schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: UUID4
+    created_at: datetime
+    modified_at: datetime

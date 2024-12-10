@@ -446,6 +446,7 @@ class PayloadType(str, Enum):
     DEPLOY_MODEL = "deploy_model"
     REGISTER_CLUSTER = "register_cluster"
     PERFORM_MODEL_EXTRACTION = "perform_model_extraction"
+    PERFORM_MODEL_SECURITY_SCAN = "perform_model_security_scan"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -456,12 +457,14 @@ class BudServeWorkflowStepEventName(str, Enum):
         BUDSERVE_CLUSTER_EVENTS: Represents the Budserve cluster workflow step event name.
         CREATE_CLUSTER_EVENTS: Represents the create cluster workflow step event name.
         MODEL_EXTRACTION_EVENTS: Represents the model extraction workflow step event name.
+        MODEL_SECURITY_SCAN_EVENTS: Represents the model security scan workflow step event name.
     """
 
     BUD_SIMULATOR_EVENTS = "bud_simulator_events"
     BUDSERVE_CLUSTER_EVENTS = "budserve_cluster_events"
     CREATE_CLUSTER_EVENTS = "create_cluster_events"
     MODEL_EXTRACTION_EVENTS = "model_extraction_events"
+    MODEL_SECURITY_SCAN_EVENTS = "model_security_scan_events"
 
 
 class ClusterStatusEnum(StrEnum):
@@ -548,3 +551,12 @@ class BaseModelRelationEnum(StrEnum):
     MERGE = "merge"
     QUANTIZED = "quantized"
     FINETUNE = "finetune"
+
+
+class ModelSecurityScanStatusEnum(StrEnum):
+    """Model security scan status types."""
+
+    LOW = auto()
+    MEDIUM = auto()
+    HIGH = auto()
+    CRITICAL = auto()
