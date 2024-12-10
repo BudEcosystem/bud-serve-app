@@ -252,11 +252,26 @@ class ModelTree(BaseModel):
     quantizations_count: int = 0
 
 
+class ModelSecurityScanResultResponse(BaseModel):
+    """Model security scan result response schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    status: ModelSecurityScanStatusEnum
+    total_issues: int
+    total_scanned_files: int
+    total_skipped_files: int
+    low_severity_count: int
+    medium_severity_count: int
+    high_severity_count: int
+    critical_severity_count: int
+
+
 class ModelDetailSuccessResponse(SuccessResponse):
     """Model detail success response schema."""
 
     model: ModelDetailResponse
-    scan_result: dict | None = None  # TODO: integrate actual scan result
+    scan_result: ModelSecurityScanResultResponse | None = None
     eval_result: dict | None = None  # TODO: integrate actual eval result
     model_tree: ModelTree
 
@@ -669,18 +684,3 @@ class ModelSecurityScanResult(ModelSecurityScanResultCreate):
     id: UUID4
     created_at: datetime
     modified_at: datetime
-
-
-class ModelSecurityScanResultResponse(BaseModel):
-    """Model security scan result response schema."""
-
-    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
-
-    status: ModelSecurityScanStatusEnum
-    total_issues: int
-    total_scanned_files: int
-    total_skipped_files: int
-    low_severity_count: int
-    medium_severity_count: int
-    high_severity_count: int
-    critical_severity_count: int

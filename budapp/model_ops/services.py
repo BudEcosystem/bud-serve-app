@@ -1709,6 +1709,7 @@ class ModelService(SessionMixin):
         return ModelDetailSuccessResponse(
             model=db_model,
             model_tree=model_tree,
+            scan_result=db_model.model_security_scan_result,
             message="model retrieved successfully",
             code=status.HTTP_200_OK,
             object="model.get",
