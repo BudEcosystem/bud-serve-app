@@ -105,7 +105,6 @@ class ModelLicenses(Base):
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String, nullable=True)
     path: Mapped[str] = mapped_column(String, nullable=True)
-    url: Mapped[str] = mapped_column(String, nullable=True)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
