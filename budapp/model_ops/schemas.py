@@ -20,6 +20,8 @@
 import re
 from datetime import datetime
 from typing import List, Literal, Optional, Tuple
+import json
+from fastapi import UploadFile
 
 from pydantic import (
     UUID4,
@@ -29,6 +31,7 @@ from pydantic import (
     HttpUrl,
     field_validator,
     model_validator,
+    field_serializer,
 )
 
 from budapp.commons.constants import (
@@ -42,6 +45,7 @@ from budapp.commons.constants import (
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
 from budapp.user_ops.schemas import UserInfo
+from budapp.commons.async_utils import check_file_extension
 
 
 class ProviderFilter(BaseModel):
@@ -380,29 +384,57 @@ class CreateLocalModelWorkflowSteps(BaseModel):
 
 
 class EditModel(BaseModel):
-    """Schema for editing a model with optional fields and validations."""
+    name: str | None = Field(None, min_length=1, max_length=100)
+    description: str | None = Field(None, max_length=300)
+    tags: List[Tag] | None = None
+    tasks: List[Task] | None = None
+    icon: str | None = None
+    paper_urls: List[HttpUrl] | None = None
+    github_url: HttpUrl | None = None
+    huggingface_url: HttpUrl | None = None
+    website_url: HttpUrl | None = None
+    license_file: UploadFile | None = None
+    license_url: HttpUrl | None = None
 
-    name: Optional[str] = Field(None, min_length=1, max_length=100, description="Model name")
-    description: Optional[str] = Field(None, max_length=500, description="Brief model description")
-    tags: Optional[List[Tag]] = None
-    tasks: Optional[List[Tag]] = None
-    paper_urls: Optional[List[HttpUrl]] = None
-    github_url: Optional[HttpUrl] = Field(None, description="URL to the model's GitHub repository")
-    huggingface_url: Optional[HttpUrl] = Field(None, description="URL to the model's Hugging Face page")
-    website_url: Optional[HttpUrl] = Field(None, description="URL to the model's official website")
-    license_url: Optional[HttpUrl] = Field(None, description="License url")
+    @field_validator("name", mode="before")
+    def validate_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            value = value.strip()
+            if len(value) == 0:
+                raise ValueError("Model name cannot be empty or only whitespace.")
+        return value
 
-    def dict(self, **kwargs):
-        # Use the parent `dict()` method to get the original dictionary
-        data = super().dict(**kwargs)
-        # Convert all HttpUrl fields to strings for compatibility with SQLAlchemy
-        for key in ["github_url", "huggingface_url", "website_url", "license_url"]:
-            if data.get(key) is not None:
-                data[key] = str(data[key])
-        # Handle `paper_urls` as a list of URLs
-        if data.get("paper_urls") is not None:
-            data["paper_urls"] = [str(url) for url in data["paper_urls"]]
-        return data
+    @model_validator(mode="before")
+    def validate_license(cls, values):
+        license_file = values.get("license_file")
+        license_url = values.get("license_url")
+
+        # Ensure only one of license_file or license_url is provided
+        if license_file and license_url:
+            raise ValueError("Please provide either a license file or a license URL, but not both.")
+
+        if license_file:
+            filename = license_file.filename
+            allowed_extensions = ["pdf", "txt", "doc", "docx", "md"]
+
+            if not filename or "." not in filename:
+                raise ValueError("File does not have a valid extension")
+
+            # Get the file extension from the filename
+            file_extension = filename.split(".")[-1].lower()
+
+            # Check if the file extension is in the allowed list
+            if file_extension not in allowed_extensions:
+                raise ValueError("Invalid file extension for license file")
+        return values
+
+    @field_serializer("github_url", "huggingface_url", "website_url", "license_url")
+    def str_url(self, url: HttpUrl | None) -> str:
+        return str(url) if url else None
+
+    @field_serializer("paper_urls")
+    def str_paper_urls(self, urls: List[HttpUrl] | None) -> List[str]:
+        return [str(url) for url in urls] if urls else urls
 
 
 class ModelResponse(BaseModel):
