@@ -1794,8 +1794,16 @@ class ModelService(SessionMixin):
         )
         if existing_license:
             logger.debug(f"existing license: {existing_license}")
-            if existing_license.path and os.path.exists(existing_license.path):
-                os.remove(existing_license.path)
+            existing_license_path = (
+                os.path.join(app_settings.static_dir, existing_license.path) if existing_license.path else ""
+            )
+            if existing_license_path and os.path.exists(existing_license_path):
+                try:
+                    os.remove(existing_license_path)
+                except PermissionError as e:
+                    raise ClientException(
+                        status_code=403, message=f"Permission denied while accessing the file: {existing_license.name}"
+                    )
 
             update_license_data = {
                 "name": filename,
