@@ -20,18 +20,17 @@
 import re
 from datetime import datetime
 from typing import List, Literal, Optional, Tuple
-import json
-from fastapi import UploadFile
 
+from fastapi import UploadFile
 from pydantic import (
     UUID4,
     BaseModel,
     ConfigDict,
     Field,
     HttpUrl,
+    field_serializer,
     field_validator,
     model_validator,
-    field_serializer,
 )
 
 from budapp.commons.constants import (
@@ -45,7 +44,6 @@ from budapp.commons.constants import (
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
 from budapp.user_ops.schemas import UserInfo
-from budapp.commons.async_utils import check_file_extension
 
 
 class ProviderFilter(BaseModel):
@@ -278,6 +276,7 @@ class ModelDetailSuccessResponse(SuccessResponse):
     scan_result: ModelSecurityScanResultResponse | None = None
     eval_result: dict | None = None  # TODO: integrate actual eval result
     model_tree: ModelTree
+    endpoints_count: int
 
 
 class CreateCloudModelWorkflowRequest(BaseModel):

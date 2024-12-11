@@ -48,6 +48,7 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
+from ..endpoint_ops.models import Endpoint as EndpointModel
 from .crud import (
     CloudModelDataManager,
     ModelDataManager,
@@ -1671,10 +1672,15 @@ class ModelService(SessionMixin):
             quantizations_count=base_model_relation_count.get(BaseModelRelationEnum.QUANTIZED.value, 0),
         )
 
+        db_endpoint_count = await ModelDataManager(self.session).get_count_by_fields(
+            EndpointModel, {"model_id": model_id, "is_active": True}
+        )
+
         return ModelDetailSuccessResponse(
             model=db_model,
             model_tree=model_tree,
             scan_result=db_model.model_security_scan_result,
+            endpoints_count=db_endpoint_count,
             message="model retrieved successfully",
             code=status.HTTP_200_OK,
             object="model.get",
