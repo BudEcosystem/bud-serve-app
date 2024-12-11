@@ -31,6 +31,7 @@ from pydantic import (
     HttpUrl,
     field_validator,
     model_validator,
+    field_serializer,
 )
 
 from budapp.commons.constants import (
@@ -366,17 +367,17 @@ class CreateLocalModelWorkflowSteps(BaseModel):
 
 
 class EditModel(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=300)
-    tags: Optional[List[Tag]] = None
-    tasks: Optional[List[Task]] = None
-    icon: Optional[str] = None
-    paper_urls: Optional[List[HttpUrl]] = None
-    github_url: Optional[HttpUrl] = None
-    huggingface_url: Optional[HttpUrl] = None
-    website_url: Optional[HttpUrl] = None
-    license_file: Optional[UploadFile] = None
-    license_url: Optional[HttpUrl] = None
+    name: str | None = Field(None, min_length=1, max_length=100)
+    description: str | None = Field(None, max_length=300)
+    tags: List[Tag] | None = None
+    tasks: List[Task] | None = None
+    icon: str | None = None
+    paper_urls: List[HttpUrl] | None = None
+    github_url: HttpUrl | None = None
+    huggingface_url: HttpUrl | None = None
+    website_url: HttpUrl | None = None
+    license_file: UploadFile | None = None
+    license_url: HttpUrl | None = None
 
     @field_validator("name", mode="before")
     def validate_name(cls, value: Optional[str]) -> Optional[str]:
@@ -409,6 +410,14 @@ class EditModel(BaseModel):
             if file_extension not in allowed_extensions:
                 raise ValueError("Invalid file extension for license file")
         return values
+
+    @field_serializer("github_url", "huggingface_url", "website_url", "license_url")
+    def str_url(self, url: HttpUrl | None) -> str:
+        return str(url) if url else None
+
+    @field_serializer("paper_urls")
+    def str_paper_urls(self, urls: List[HttpUrl] | None) -> List[str]:
+        return [str(url) for url in urls] if urls else urls
 
 
 class ModelResponse(BaseModel):

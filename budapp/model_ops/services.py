@@ -20,6 +20,7 @@ import os
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
 from pydantic import AnyUrl
+from pathlib import Path
 
 import aiofiles
 import aiohttp
@@ -1308,6 +1309,7 @@ class ModelService(SessionMixin):
 
     async def edit_model(self, model_id: UUID, data: Dict[str, Any]) -> None:
         """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
+        logger.debug(f"edit recieved data: {data}")
         # Retrieve existing model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
             model=Model, fields={"id": model_id, "is_active": True}
@@ -1317,48 +1319,39 @@ class ModelService(SessionMixin):
             ModelProviderTypeEnum.HUGGING_FACE,
         ]:
             data.pop("icon")
+
         # Handle file upload if provided
         # TODO: consider dapr local storage
-        file = data.pop("license_file")
-        if file:
+        if data.get("license_file"):
             # If a file is provided, save it locally and update the DB with the local path
+            file = data.pop("license_file")
             file_path = await self._save_uploaded_file(file)
             await self._create_or_update_license_entry(model_id, file.filename, file_path, None)
 
         elif data.get("license_url"):
             # If a license URL is provided, store the URL in the DB instead of the file path
-            filename = str(data["license_url"]).split("/")[-1]  # Extract filename from the URL
+            license_url = data.pop("license_url")
+            filename = license_url.split("/")[-1]  # Extract filename from the URL
             await self._create_or_update_license_entry(
-                model_id, filename if filename else "sample license", None, str(data["license_url"])
+                model_id, filename if filename else "sample license", None, str(license_url)
             )  # TODO: modify filename arg when license service implemented
 
         # Add papers if provided
-        if data.get("paper_urls") or data["paper_urls"] == []:
-            await self._update_papers(model_id, data.pop("paper_urls"))
-
-        updated_data = {
-            key: (
-                str(data[key]) if isinstance(data.get(key), AnyUrl) else (None if data.get(key) == [] else data[key])
-            )
-            if key in data
-            else getattr(db_model, key)
-            for key in db_model.__table__.columns.keys()
-        }
-
-        logger.debug(f"updated_data: {updated_data}")
+        if isinstance(data.get("paper_urls"), list):
+            paper_urls = data.pop("paper_urls")
+            await self._update_papers(model_id, paper_urls)
 
         # Update model with validated data
-        await ModelDataManager(self.session).update_by_fields(db_model, updated_data)
+        await ModelDataManager(self.session).update_by_fields(db_model, data)
 
     async def _save_uploaded_file(self, file: UploadFile) -> str:
         """Save uploaded file and return file path."""
-        file_directory = "static/licenses"
-        os.makedirs(file_directory, exist_ok=True)
-        file_path = os.path.join(file_directory, file.filename)
-        async with aiofiles.open(file_path, "wb") as f:
-            content = await file.read()
-            await f.write(content)
-        return file_path
+        file_path = os.path.join(app_settings.static_dir, "licenses", file.filename)
+        with Path(file_path).open("wb") as f:
+            # while chunk := await file.read(1024):  # Read in chunks
+            #     f.write(chunk)
+            f.write(await file.read())  # TODO: decide which one to follow
+        return os.path.join("licenses", file.filename)
 
     async def _create_or_update_license_entry(
         self, model_id: UUID, filename: str, file_path: str, license_url: str
@@ -1378,7 +1371,7 @@ class ModelService(SessionMixin):
                 "path": file_path if file_path else None,
                 "url": license_url if license_url else None,
             }
-            await ModelDataManager(self.session).update_by_fields(existing_license, update_license_data)
+            await ModelLicensesDataManager(self.session).update_by_fields(existing_license, update_license_data)
         else:
             # Create a new license entry
             license_entry = ModelLicensesModel(
@@ -1388,7 +1381,7 @@ class ModelService(SessionMixin):
                 url=license_url if license_url else None,
                 model_id=model_id,
             )
-            await ModelDataManager(self.session).insert_one(
+            await ModelLicensesDataManager(self.session).insert_one(
                 ModelLicenses(**license_entry.model_dump(exclude_unset=True))
             )
 
@@ -1404,7 +1397,9 @@ class ModelService(SessionMixin):
         input_urls = set(paper_urls)
         urls_to_add = input_urls - existing_urls
         urls_to_remove = existing_urls - input_urls
-        logger.debug(f"paper info: {input_urls}, urls_to_add: {urls_to_add}, urls_to_remove: {urls_to_remove}")
+        logger.debug(
+            f"paper info: {input_urls}, existing urls: {existing_urls}, urls_to_add: {urls_to_add}, urls_to_remove: {urls_to_remove}"
+        )
 
         # Add new paper URLs
         if urls_to_add:
@@ -1418,5 +1413,5 @@ class ModelService(SessionMixin):
         if urls_to_remove:
             # Delete all matching entries for given URLs and model_id in one query
             await PaperPublishedDataManager(self.session).delete_paper_by_urls(
-                db_model=PaperPublished, fields={"model_id": model_id}, paper_urls={"url": urls_to_remove}
+                model_id=model_id, paper_urls={"url": urls_to_remove}
             )

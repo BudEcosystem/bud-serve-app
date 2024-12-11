@@ -311,17 +311,17 @@ async def edit_model(
     model_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    name: Optional[str] = Form(None),
-    description: Optional[str] = Form(None),
-    tags: Optional[str] = Form(None),
-    tasks: Optional[str] = Form(None),
-    icon: Optional[str] = Form(None),
-    paper_urls: Optional[str] = Form(None),
-    github_url: Optional[str] = Form(None),
-    huggingface_url: Optional[str] = Form(None),
-    website_url: Optional[str] = Form(None),
+    name: str | None = Form(None),
+    description: str | None = Form(None),
+    tags: str | None = Form(None),
+    tasks: str | None = Form(None),
+    icon: str | None = Form(None),
+    paper_urls: str | None = Form(None),
+    github_url: str | None = Form(None),
+    huggingface_url: str | None = Form(None),
+    website_url: str | None = Form(None),
     license_file: UploadFile | None = None,
-    license_url: Optional[str] = Form(None),
+    license_url: str | None = Form(None),
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Edit cloud model with file upload"""
 
@@ -330,17 +330,17 @@ async def edit_model(
     )
 
     try:
-        if type(tags) == str and len(tags) == 0:
+        if isinstance(tags, str) and len(tags) == 0:
             tags = []
         else:
             tags = json.loads(tags) if tags else None
 
-        if type(tasks) == str and len(tasks) == 0:
+        if isinstance(tasks, str) and len(tasks) == 0:
             tasks = []
         else:
             tasks = json.loads(tasks) if tasks else None
 
-        if type(paper_urls) == str and len(paper_urls) == 0:
+        if isinstance(tags, str) and len(paper_urls) == 0:
             paper_urls = []
         elif isinstance(paper_urls, str) and len(paper_urls) > 0:
             # Split the first element into a list of URLs and validate each URL in loop
@@ -361,7 +361,9 @@ async def edit_model(
         )
 
         # Pass file and edit_model data to your service
-        await ModelService(session).edit_model(model_id=model_id, data=edit_model.model_dump())
+        await ModelService(session).edit_model(
+            model_id=model_id, data=edit_model.model_dump(exclude_none=True, exclude_unset=True)
+        )
 
         return SuccessResponse(message="Cloud model edited successfully", code=status.HTTP_200_OK).to_http_response()
     except ClientException as e:

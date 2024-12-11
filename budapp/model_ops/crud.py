@@ -17,6 +17,7 @@
 """The crud package, containing essential business logic, services, and routing configurations for the model ops."""
 
 from typing import Any, Dict, List, Tuple, Optional
+from uuid import UUID
 
 from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
@@ -80,44 +81,30 @@ class ProviderDataManager(DataManagerUtils):
 class PaperPublishedDataManager(DataManagerUtils):
     """Data manager for the PaperPublished model."""
 
-    async def delete_paper_by_urls(
-        self, db_model: Model, fields: Dict[str, Any], paper_urls: Optional[Dict[str, List[Any]]] = None
-    ) -> None:
+    async def delete_paper_by_urls(self, model_id: UUID, paper_urls: Optional[Dict[str, List[Any]]] = None) -> None:
         """
-        Delete multiple model instances based on the given fields and multi-field filters.
+        Delete multiple model instances based on the model id and paper urls.
         """
         try:
-            # Validate the fields before querying
-            await self.validate_fields(db_model, fields)
-
             # Build the query with filters
-            query = self.session.query(db_model).filter_by(**fields)
+            query = self.session.query(PaperPublished).filter_by(**{"model_id": model_id})
 
             # Add paper_urls
             if paper_urls:
                 for key, values in paper_urls.items():
-                    query = query.filter(getattr(db_model, key).in_(values))
-
-            # Check if any records exist to delete
-            if not query.count():
-                logger.debug(
-                    f"No records found for deletion in {db_model.__name__} with filters: {fields} and multi-filters: {paper_urls}"
-                )
-                return
+                    query = query.filter(getattr(PaperPublished, key).in_(values))
 
             # Delete records
             query.delete(synchronize_session=False)
 
             # Commit the transaction
             self.session.commit()
-            logger.debug(
-                f"Successfully deleted records from {db_model.__name__} with filters: {fields} and multi-filters: {paper_urls}"
-            )
+            logger.debug(f"Successfully deleted records from {PaperPublished.__name__} with paper_urls: {paper_urls}")
         except (Exception, SQLAlchemyError) as e:
             # Rollback the transaction on error
             self.session.rollback()
-            logger.exception(f"Failed to delete records from {db_model.__name__}: {e}")
-            raise DatabaseException(f"Unable to delete records from {db_model.__name__}") from e
+            logger.exception(f"Failed to delete records from {PaperPublished.__name__}: {e}")
+            raise DatabaseException(f"Unable to delete records from {PaperPublished.__name__}") from e
 
 
 class ModelDataManager(DataManagerUtils):
