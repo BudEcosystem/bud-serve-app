@@ -2,7 +2,7 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field
 
 from budapp.commons.constants import ModelProviderTypeEnum, WorkflowStatusEnum
 from budapp.commons.schemas import SuccessResponse, Tag
-from budapp.model_ops.schemas import CloudModel, Model, Provider
+from budapp.model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider
 
 
 class RetrieveWorkflowStepData(BaseModel):
@@ -18,16 +18,19 @@ class RetrieveWorkflowStepData(BaseModel):
     model_id: UUID4 | None = None
     model: Model | None = None
     workflow_execution_status: dict | None = None
-    leaderboard: list | None = None
+    leaderboard: list | dict | None = None
     name: str | None = None
     ingress_url: str | None = None
     create_cluster_events: dict | None = None
+    model_security_scan_events: dict | None = None
     icon: str | None = None
     uri: str | None = None
     author: str | None = None
     tags: list[Tag] | None = None
     model_extraction_events: dict | None = None
     description: str | None = None
+    security_scan_result_id: UUID4 | None = None
+    security_scan_result: ModelSecurityScanResult | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
