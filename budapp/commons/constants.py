@@ -560,6 +560,7 @@ class ModelSecurityScanStatusEnum(StrEnum):
     MEDIUM = auto()
     HIGH = auto()
     CRITICAL = auto()
+    SAFE = auto()
 
 
 LICENSE_DIR = "licenses"

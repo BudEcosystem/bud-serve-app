@@ -17,19 +17,17 @@
 """The model ops services. Contains business logic for model ops."""
 
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
-from pydantic import AnyUrl
-from pathlib import Path
 
-import aiofiles
 import aiohttp
 from fastapi import UploadFile, status
-from pydantic import ValidationError
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import (
+    LICENSE_DIR,
     BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     CredentialTypeEnum,
@@ -37,8 +35,6 @@ from budapp.commons.constants import (
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
     WorkflowStatusEnum,
-    ModelProviderTypeEnum,
-    LICENSE_DIR,
 )
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
@@ -70,7 +66,6 @@ from .schemas import (
     CreateCloudModelWorkflowSteps,
     CreateLocalModelWorkflowRequest,
     CreateLocalModelWorkflowSteps,
-    EditModel,
     LocalModelScanRequest,
     LocalModelScanWorkflowStepData,
     ModelArchitecture,
@@ -84,7 +79,6 @@ from .schemas import (
     ModelSecurityScanResultCreate,
     ModelTree,
     PaperPublishedCreate,
-    PaperPublishedModel,
 )
 
 
@@ -1035,7 +1029,6 @@ class LocalModelWorkflowService(SessionMixin):
             context_length=context_length,
             torch_dtype=torch_dtype,
             architecture=model_architecture,
-            scan_verified=False,
         )
 
         # Create model
@@ -1530,10 +1523,12 @@ class LocalModelWorkflowService(SessionMixin):
             {"data": {"security_scan_result_id": str(db_model_security_scan_result.id)}},
         )
 
-        # Mark scan_verified as True in model
-        await ModelDataManager(self.session).update_by_fields(
+        # Mark scan_verified according to overall scan status
+        scan_verified = True if overall_scan_status == ModelSecurityScanStatusEnum.SAFE else False
+
+        db_model = await ModelDataManager(self.session).update_by_fields(
             db_model,
-            {"scan_verified": True},
+            {"scan_verified": scan_verified},
         )
 
         # Get dummy leaderboard data
@@ -1618,7 +1613,7 @@ class LocalModelWorkflowService(SessionMixin):
         elif low_count > 0:
             return ModelSecurityScanStatusEnum.LOW
         else:
-            return ModelSecurityScanStatusEnum.LOW  # Default to LOW if no issues are found
+            return ModelSecurityScanStatusEnum.SAFE  # Default to SAFE if no issues are found
 
 
 class CloudModelService(SessionMixin):
@@ -1801,7 +1796,7 @@ class ModelService(SessionMixin):
             if existing_license_path and os.path.exists(existing_license_path):
                 try:
                     os.remove(existing_license_path)
-                except PermissionError as e:
+                except PermissionError:
                     raise ClientException(
                         status_code=status.HTTP_403_FORBIDDEN,
                         message=f"Permission denied while accessing the file: {existing_license.name}",
