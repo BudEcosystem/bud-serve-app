@@ -1779,9 +1779,7 @@ class ModelService(SessionMixin):
         """Save uploaded file and return file path."""
         file_path = os.path.join(app_settings.static_dir, "licenses", file.filename)
         with Path(file_path).open("wb") as f:
-            # while chunk := await file.read(1024):  # Read in chunks
-            #     f.write(chunk)
-            f.write(await file.read())  # TODO: decide which one to follow
+            f.write(await file.read())
         return os.path.join("licenses", file.filename)
 
     async def _create_or_update_license_entry(
