@@ -38,6 +38,7 @@ from budapp.commons.constants import (
     ModelSourceEnum,
     WorkflowStatusEnum,
     ModelProviderTypeEnum,
+    LICENSE_DIR,
 )
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
@@ -1777,10 +1778,10 @@ class ModelService(SessionMixin):
 
     async def _save_uploaded_file(self, file: UploadFile) -> str:
         """Save uploaded file and return file path."""
-        file_path = os.path.join(app_settings.static_dir, "licenses", file.filename)
+        file_path = os.path.join(app_settings.static_dir, LICENSE_DIR, file.filename)
         with Path(file_path).open("wb") as f:
             f.write(await file.read())
-        return os.path.join("licenses", file.filename)
+        return os.path.join(LICENSE_DIR, file.filename)
 
     async def _create_or_update_license_entry(
         self, model_id: UUID, filename: str, file_path: str, license_url: str
@@ -1800,7 +1801,8 @@ class ModelService(SessionMixin):
                     os.remove(existing_license_path)
                 except PermissionError as e:
                     raise ClientException(
-                        status_code=403, message=f"Permission denied while accessing the file: {existing_license.name}"
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message=f"Permission denied while accessing the file: {existing_license.name}",
                     )
 
             update_license_data = {

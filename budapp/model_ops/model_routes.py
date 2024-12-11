@@ -370,7 +370,7 @@ async def edit_model(
         return SuccessResponse(message="Cloud model edited successfully", code=status.HTTP_200_OK).to_http_response()
     except ClientException as e:
         logger.exception(f"Failed to edit cloud model: {e}")
-        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except ValidationError as e:
         logger.exception(f"ValidationErrors: {str(e)}")
         raise RequestValidationError(e.errors())
