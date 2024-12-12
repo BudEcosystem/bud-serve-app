@@ -189,7 +189,16 @@ class CloudModel(Base):
     github_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     huggingface_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     website_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    model_status: Mapped[str] = mapped_column(
+        Enum(
+            StatusEnum,
+            name="status_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=StatusEnum.ACTIVE,
+    )
     modality: Mapped[str] = mapped_column(
         PG_ENUM(
             ModalityEnum,
