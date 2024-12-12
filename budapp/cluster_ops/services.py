@@ -186,10 +186,6 @@ class ClusterService(SessionMixin):
         else:
             logger.debug(f"Creating workflow step {current_step_number} for workflow {db_workflow.id}")
 
-            # Default values are inserted in first step of a workflow
-            if not db_workflow_steps:
-                workflow_step_data["created_by"] = str(current_user_id)
-
             # Insert step details in db
             db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
                 WorkflowStepModel(
@@ -236,7 +232,6 @@ class ClusterService(SessionMixin):
                 "icon",
                 "ingress_url",
                 "configuration_yaml",
-                "created_by",
             ]
 
             # from workflow steps extract necessary information
@@ -247,7 +242,7 @@ class ClusterService(SessionMixin):
                         required_data[key] = db_workflow_step.data[key]
 
             # Check if all required keys are present
-            required_keys = ["name", "icon", "ingress_url", "configuration_yaml", "created_by"]
+            required_keys = ["name", "icon", "ingress_url", "configuration_yaml"]
             missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
@@ -260,7 +255,7 @@ class ClusterService(SessionMixin):
                 raise ClientException("Cluster name already exists")
 
             # Trigger create cluster workflow by step
-            await self._execute_create_cluster_workflow(required_data, db_workflow.id)
+            await self._execute_create_cluster_workflow(required_data, db_workflow.id, current_user_id)
             logger.debug("Successfully executed create cluster workflow")
 
             # Increment step number of workflow and workflow step
@@ -280,7 +275,9 @@ class ClusterService(SessionMixin):
 
         return db_workflow
 
-    async def _execute_create_cluster_workflow(self, data: Dict[str, Any], workflow_id: UUID) -> None:
+    async def _execute_create_cluster_workflow(
+        self, data: Dict[str, Any], workflow_id: UUID, current_user_id: UUID
+    ) -> None:
         """Execute create cluster workflow."""
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
             {"workflow_id": workflow_id}
@@ -299,7 +296,7 @@ class ClusterService(SessionMixin):
             raise ClientException(f"Cluster {data['name']} already exists")
 
         # Create cluster in bud_cluster app
-        bud_cluster_response = await self._perform_create_cluster_request(data, workflow_id)
+        bud_cluster_response = await self._perform_create_cluster_request(data, workflow_id, current_user_id)
 
         # Add payload dict to response
         for step in bud_cluster_response["steps"]:
@@ -312,7 +309,9 @@ class ClusterService(SessionMixin):
             db_latest_workflow_step, {"data": create_cluster_events}
         )
 
-    async def _perform_create_cluster_request(self, data: Dict[str, str], workflow_id: UUID) -> dict:
+    async def _perform_create_cluster_request(
+        self, data: Dict[str, str], workflow_id: UUID, current_user_id: UUID
+    ) -> dict:
         """Make async POST request to create cluster to budcluster app.
 
         Args:
@@ -333,7 +332,7 @@ class ClusterService(SessionMixin):
             "ingress_url": data["ingress_url"],
             "notification_metadata": {
                 "name": "bud-notification",
-                "subscriber_ids": data["created_by"],
+                "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
             "source_topic": f"{app_settings.source_topic}",
@@ -345,6 +344,7 @@ class ClusterService(SessionMixin):
                 # Write configuration yaml to temporary yaml file
                 yaml.safe_dump(data["configuration_yaml"], temp_file)
 
+                logger.debug(f"cluster_create_request: {cluster_create_request}")
                 # Perform the request as a form data
                 async with aiohttp.ClientSession() as session:
                     form = aiohttp.FormData()
@@ -355,20 +355,11 @@ class ClusterService(SessionMixin):
                         form.add_field("configuration", config_file, filename=temp_file.name)
                         try:
                             async with session.post(create_cluster_endpoint, data=form) as response:
-                                if response.status != 200:
-                                    error_text = await response.text()
-                                    logger.error(
-                                        f"Cluster service error: Status={response.status}, Response={error_text}"
-                                    )
-                                    raise ClientException(
-                                        f"External cluster service error (HTTP {response.status}): {error_text[:200]}"
-                                    )
-
                                 response_data = await response.json()
                                 logger.debug(f"Response from budcluster service: {response_data}")
 
-                                if response.status >= 400:
-                                    error_message = response_data.get("detail", "Failed to create cluster")
+                                if response.status != 200:
+                                    error_message = response_data.get("message", "Failed to create cluster")
                                     logger.error(f"Failed to create cluster with external service: {error_message}")
                                     raise ClientException(error_message)
 
@@ -412,8 +403,9 @@ class ClusterService(SessionMixin):
         """
         logger.debug("Received event for creating cluster")
 
-        # Get workflow steps
+        # Get workflow and steps
         workflow_id = payload.workflow_id
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
             {"workflow_id": workflow_id}
         )
@@ -426,7 +418,6 @@ class ClusterService(SessionMixin):
             "name",
             "icon",
             "ingress_url",
-            "created_by",
         ]
 
         # from workflow steps extract necessary information
@@ -458,7 +449,7 @@ class ClusterService(SessionMixin):
             name=required_data["name"],
             icon=required_data["icon"],
             ingress_url=required_data["ingress_url"],
-            created_by=UUID(required_data["created_by"]),
+            created_by=db_workflow.created_by,
             cluster_id=UUID(bud_cluster_id),
             **cluster_resources.model_dump(exclude_unset=True, exclude_none=True),
             status=ClusterStatusEnum.AVAILABLE,
@@ -467,7 +458,6 @@ class ClusterService(SessionMixin):
 
         # Mark workflow as completed
         logger.debug(f"Updating workflow status: {workflow_id}")
-        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
 
         # Update status for last step
         execution_status = {"status": "success", "message": "Cluster successfully created"}
