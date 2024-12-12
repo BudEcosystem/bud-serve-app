@@ -22,7 +22,8 @@ from typing import List, Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Query, UploadFile, status
-from pydantic import ValidationError
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError, HttpUrl
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -34,7 +35,7 @@ from budapp.commons.dependencies import (
     parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
-from budapp.commons.schemas import ErrorResponse, SuccessResponse
+from budapp.commons.schemas import ErrorResponse, SuccessResponse, Tag, Task
 from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
@@ -44,6 +45,7 @@ from .schemas import (
     CreateCloudModelWorkflowResponse,
     CreateLocalModelWorkflowRequest,
     EditModel,
+    LocalModelScanRequest,
     ModelAuthorFilter,
     ModelAuthorResponse,
     ModelDetailSuccessResponse,
@@ -54,6 +56,7 @@ from .schemas import (
     RecommendedTagsResponse,
     TagsListResponse,
     TasksListResponse,
+    EditModel,
 )
 from .services import (
     CloudModelService,
@@ -310,58 +313,67 @@ async def edit_model(
     model_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    name: Optional[str] = Form(None, min_length=1, max_length=100),
-    description: Optional[str] = Form(None, max_length=500),
-    tags: Optional[str] = Form(None),  # JSON string of tags
-    tasks: Optional[str] = Form(None),  # JSON string of tasks
-    paper_urls: Optional[list[str]] = Form(None),
-    github_url: Optional[str] = Form(None),
-    huggingface_url: Optional[str] = Form(None),
-    website_url: Optional[str] = Form(None),
+    name: str | None = Form(None),
+    description: str | None = Form(None),
+    tags: str | None = Form(None),
+    tasks: str | None = Form(None),
+    icon: str | None = Form(None),
+    paper_urls: str | None = Form(None),
+    github_url: str | None = Form(None),
+    huggingface_url: str | None = Form(None),
+    website_url: str | None = Form(None),
     license_file: UploadFile | None = None,
-    license_url: Optional[str] = Form(None),
+    license_url: str | None = Form(None),
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Edit cloud model with file upload"""
-    logger.info(
+
+    logger.debug(
         f"Received data: name={name}, description={description}, tags={tags}, tasks={tasks}, paper_urls={paper_urls}, github_url={github_url}, huggingface_url={huggingface_url}, website_url={website_url}, license_file={license_file}, license_url={license_url}"
     )
+
     try:
-        # Parse JSON strings for list fields
-        tags = json.loads(tags) if tags else None
-        tasks = json.loads(tasks) if tasks else None
+        if isinstance(tags, str) and len(tags) == 0:
+            tags = []
+        else:
+            tags = json.loads(tags) if tags else None
 
-        # Convert to list of multiple strings from a list of single string with comma separated values
-        if paper_urls and isinstance(paper_urls, list) and len(paper_urls) > 0:
-            paper_urls = [url.strip() for url in paper_urls[0].split(",")]
+        if isinstance(tasks, str) and len(tasks) == 0:
+            tasks = []
+        else:
+            tasks = json.loads(tasks) if tasks else None
 
-        try:
-            # Convert to EditModel
-            edit_model = EditModel(
-                name=name if name else None,
-                description=description if description else None,
-                tags=tags if tags else None,
-                tasks=tasks if tasks else None,
-                paper_urls=paper_urls if paper_urls else None,
-                github_url=github_url if github_url else None,
-                huggingface_url=huggingface_url if huggingface_url else None,
-                website_url=website_url if website_url else None,
-                license_url=license_url if license_url else None,
-            )
-        except ValidationError as e:
-            logger.exception(f"Failed to edit cloud model: {e}")
-            return ErrorResponse(
-                code=status.HTTP_422_UNPROCESSABLE_ENTITY, message="Validation error"
-            ).to_http_response()
+        if isinstance(tags, str) and len(paper_urls) == 0:
+            paper_urls = []
+        elif isinstance(paper_urls, str) and len(paper_urls) > 0:
+            # Split the first element into a list of URLs and validate each URL in loop
+            paper_urls = [url.strip() for url in paper_urls.split(",")]
+
+        edit_model = EditModel(
+            name=name if name else None,
+            description=description if description else None,
+            tags=tags if isinstance(tags, list) else None,
+            tasks=tasks if isinstance(tasks, list) else None,
+            icon=icon if icon else None,
+            paper_urls=paper_urls if isinstance(paper_urls, list) else None,
+            github_url=github_url if github_url else None,
+            huggingface_url=huggingface_url if huggingface_url else None,
+            website_url=website_url if website_url else None,
+            license_url=license_url if license_url else None,
+            license_file=license_file if license_file else None,
+        )
 
         # Pass file and edit_model data to your service
-        await CloudModelWorkflowService(session).edit_cloud_model(
-            model_id=model_id, data=edit_model.dict(exclude_unset=True, exclude_none=True), file=license_file
+        await ModelService(session).edit_model(
+            model_id=model_id, data=edit_model.model_dump(exclude_none=True, exclude_unset=True)
         )
 
         return SuccessResponse(message="Cloud model edited successfully", code=status.HTTP_200_OK).to_http_response()
     except ClientException as e:
         logger.exception(f"Failed to edit cloud model: {e}")
-        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except ValidationError as e:
+        logger.exception(f"ValidationErrors: {str(e)}")
+        raise RequestValidationError(e.errors())
     except JSONDecodeError as e:
         logger.exception(f"Failed to edit cloud model: {e}")
         return ErrorResponse(
@@ -685,4 +697,45 @@ async def retrieve_model(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to retrieve model details",
+        ).to_http_response()
+
+
+@model_router.post(
+    "/security-scan",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RetrieveWorkflowDataResponse,
+            "description": "Successfully scan local model",
+        },
+    },
+    description="Scan local model",
+)
+async def scan_local_model_workflow(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: LocalModelScanRequest,
+) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
+    """Scan local model."""
+    try:
+        db_workflow = await LocalModelWorkflowService(session).scan_local_model_workflow(
+            current_user_id=current_user.id,
+            request=request,
+        )
+
+        return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
+    except ClientException as e:
+        logger.exception(f"Failed to scan local model: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to scan local model: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to scan local model"
         ).to_http_response()

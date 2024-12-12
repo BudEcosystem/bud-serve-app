@@ -33,6 +33,8 @@ from budapp.commons.constants import BudServeWorkflowStepEventName, ClusterStatu
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.core.schemas import NotificationPayload
+from budapp.endpoint_ops.crud import EndpointDataManager
+from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
@@ -559,3 +561,49 @@ class ClusterService(SessionMixin):
         cluster_details = ClusterResponse.model_validate(cluster_details)
 
         return cluster_details
+
+    async def delete_cluster(self, cluster_id: UUID) -> None:
+        """Delete a cluster by its ID.
+
+        Args:
+            cluster_id: The ID of the cluster to delete.
+        """
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            ClusterModel, {"id": cluster_id, "is_active": True}
+        )
+
+        # Check for active endpoints
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel, {"cluster_id": cluster_id, "is_active": True}, missing_ok=True
+        )
+
+        # Raise error if cluster has active endpoints
+        if db_endpoint:
+            raise ClientException("Cannot delete cluster with active endpoints")
+
+        # Perform delete cluster request to bud_cluster app
+        await self._perform_bud_cluster_delete_request(db_cluster.cluster_id)
+
+        # Update cluster status in db
+        await ClusterDataManager(self.session).update_by_fields(db_cluster, {"is_active": False})
+
+    async def _perform_bud_cluster_delete_request(self, bud_cluster_id: UUID) -> None:
+        """Perform delete cluster request to bud_cluster app.
+
+        Args:
+            bud_cluster_id: The ID of the cluster to delete.
+        """
+        delete_cluster_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/{bud_cluster_id}"
+
+        logger.debug("Performing delete cluster request to budcluster")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.delete(delete_cluster_endpoint) as response:
+                    if response.status != 200:
+                        logger.error(f"Failed to delete cluster: {response.status} {await response.json()}")
+                        raise ClientException("Failed to delete cluster")
+
+            logger.debug("Successfully deleted cluster from budcluster")
+        except Exception as e:
+            logger.exception(f"Failed to delete cluster: {e}")
+            raise ClientException("Failed to delete cluster") from e

@@ -17,21 +17,22 @@
 """The model ops services. Contains business logic for model ops."""
 
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
 
-import aiofiles
 import aiohttp
 from fastapi import UploadFile, status
-from pydantic import ValidationError
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import (
+    LICENSE_DIR,
     BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     CredentialTypeEnum,
     ModelProviderTypeEnum,
+    ModelSecurityScanStatusEnum,
     ModelSourceEnum,
     WorkflowStatusEnum,
     StatusEnum,
@@ -48,14 +49,17 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
+from ..endpoint_ops.models import Endpoint as EndpointModel
 from .crud import (
     CloudModelDataManager,
     ModelDataManager,
     ModelLicensesDataManager,
+    ModelSecurityScanResultDataManager,
     PaperPublishedDataManager,
     ProviderDataManager,
 )
 from .models import CloudModel, Model, ModelLicenses, PaperPublished
+from .models import ModelSecurityScanResult as ModelSecurityScanResultModel
 from .models import Provider as ProviderModel
 from .schemas import (
     CreateCloudModelWorkflowRequest,
@@ -64,17 +68,19 @@ from .schemas import (
     CreateCloudModelWorkflowSteps,
     CreateLocalModelWorkflowRequest,
     CreateLocalModelWorkflowSteps,
-    EditModel,
+    LocalModelScanRequest,
+    LocalModelScanWorkflowStepData,
     ModelArchitecture,
     ModelCreate,
     ModelDetailSuccessResponse,
+    ModelIssue,
     ModelLicensesCreate,
     ModelLicensesModel,
     ModelListResponse,
     ModelResponse,
+    ModelSecurityScanResultCreate,
     ModelTree,
     PaperPublishedCreate,
-    PaperPublishedModel,
 )
 
 
@@ -263,96 +269,6 @@ class CloudModelWorkflowService(SessionMixin):
             logger.debug(f"Successfully created model {db_model.id}")
 
         return db_workflow
-
-    async def edit_cloud_model(self, model_id: UUID, data: Dict[str, Any], file: UploadFile = None) -> None:
-        """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
-        # Retrieve existing model
-        model = await ModelDataManager(self.session).retrieve_by_fields(model=Model, fields={"id": model_id})
-        if not model:
-            raise ValueError(f"Model with ID {model_id} not found")
-
-        # Handle file upload if provided
-        if file:
-            file_path = await self._save_uploaded_file(file)
-            await self._create_or_update_license_entry(model_id, file.filename, file_path)
-
-        # Handle license URL if provided
-        elif data.get("license_url"):
-            file_path, filename = await self._download_license_file(data.pop("license_url"))
-            await self._create_or_update_license_entry(model_id, filename, file_path)
-
-        # Add papers if provided
-        if data.get("paper_urls"):
-            await self._add_papers(model_id, data.pop("paper_urls"))
-
-        # Validate and update fields
-        validated_data = await self._validate_update_data(model, data)
-
-        # Update model with validated data
-        await ModelDataManager(self.session).update_by_fields(model, validated_data)
-
-    async def _save_uploaded_file(self, file: UploadFile) -> str:
-        """Save uploaded file and return file path."""
-        file_directory = "static/licenses"
-        os.makedirs(file_directory, exist_ok=True)
-        file_path = os.path.join(file_directory, file.filename)
-        async with aiofiles.open(file_path, "wb") as f:
-            content = await file.read()
-            await f.write(content)
-        return file_path
-
-    async def _download_license_file(self, license_url: str) -> tuple[str, str]:
-        """Download file from URL and save locally, returning file path and name."""
-        file_directory = "static/licenses"
-        os.makedirs(file_directory, exist_ok=True)
-        filename = license_url.split("/")[-1]
-        file_path = os.path.join(file_directory, filename)
-        async with aiohttp.ClientSession() as session:
-            async with session.get(license_url) as response:
-                if response.status == 200:
-                    content = await response.read()
-                    async with aiofiles.open(file_path, "wb") as f:
-                        await f.write(content)
-                else:
-                    raise ClientException("Failed to download the file from the provided URL")
-        return file_path, filename
-
-    async def _create_or_update_license_entry(self, model_id: UUID, filename: str, file_path: str) -> None:
-        """Create or update a license entry in the database."""
-        # Check if a license entry with the given model_id exists
-        existing_license = await ModelDataManager(self.session).retrieve_by_fields(
-            ModelLicenses, fields=dict(model_id=model_id), missing_ok=True
-        )
-
-        if existing_license:
-            # Update the existing license entry
-            existing_license.name = filename
-            existing_license.path = file_path
-            print(existing_license)
-            ModelDataManager(self.session).update_one(existing_license)
-        else:
-            # Create a new license entry
-            license_entry = ModelLicensesModel(id=uuid4(), name=filename, path=file_path, model_id=model_id)
-            await ModelDataManager(self.session).insert_one(
-                ModelLicenses(**license_entry.model_dump(exclude_unset=True))
-            )
-
-    async def _validate_update_data(self, model: Model, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate and prepare update data using EditModel schema."""
-        model_data = {key: getattr(model, key) for key in model.__table__.columns.keys()}
-        updated_data = {**model_data, **data}
-        try:
-            return EditModel(**updated_data).dict(exclude_unset=True, exclude_none=True)
-        except ValidationError as e:
-            raise ValueError(f"Validation error: {e}")
-
-    async def _add_papers(self, model_id: UUID, paper_urls: list[str]) -> None:
-        """Add paper entries if paper URLs are provided."""
-        for paper_url in paper_urls:
-            paper_entry = PaperPublishedModel(id=uuid4(), title=None, url=paper_url, model_id=model_id)
-            await ModelDataManager(self.session).insert_one(
-                PaperPublished(**paper_entry.model_dump(exclude_unset=True))
-            )
 
     async def _execute_add_cloud_model_workflow(self, data: Dict[str, Any], workflow_id: UUID) -> None:
         """Execute add cloud model workflow."""
@@ -959,26 +875,82 @@ class LocalModelWorkflowService(SessionMixin):
         model_website_url = normalize_value(model_info.get("website_url", None))
         languages = normalize_value(model_info.get("languages", None))
         use_cases = normalize_value(model_info.get("use_cases", None))
-        model_size = normalize_value(model_info.get("architecture", {}).get("num_params", None))
-        model_type = normalize_value(model_info.get("architecture", {}).get("type", None))
-        family = normalize_value(model_info.get("architecture", {}).get("family", None))
-        num_layers = normalize_value(model_info.get("architecture", {}).get("num_layers", None))
-        hidden_size = normalize_value(model_info.get("architecture", {}).get("hidden_size", None))
-        context_length = normalize_value(model_info.get("architecture", {}).get("context_length", None))
-        torch_dtype = normalize_value(model_info.get("architecture", {}).get("torch_dtype", None))
+        model_size = normalize_value(
+            model_info.get("architecture", {}).get("num_params", None)
+            if model_info.get("architecture") is not None
+            else None
+        )
+        model_type = normalize_value(
+            model_info.get("architecture", {}).get("type", None)
+            if model_info.get("architecture") is not None
+            else None
+        )
+        family = normalize_value(
+            model_info.get("architecture", {}).get("family", None)
+            if model_info.get("architecture") is not None
+            else None
+        )
+        num_layers = normalize_value(
+            model_info.get("architecture", {}).get("num_layers", None)
+            if model_info.get("architecture") is not None
+            else None
+        )
+        hidden_size = normalize_value(
+            model_info.get("architecture", {}).get("hidden_size", None)
+            if model_info.get("architecture") is not None
+            else None
+        )
+        context_length = normalize_value(
+            model_info.get("architecture", {}).get("context_length", None)
+            if model_info.get("architecture") is not None
+            else None
+        )
+        torch_dtype = normalize_value(
+            model_info.get("architecture", {}).get("torch_dtype", None)
+            if model_info.get("architecture") is not None
+            else None
+        )
         model_architecture = ModelArchitecture(
-            intermediate_size=normalize_value(model_info.get("architecture", {}).get("intermediate_size", None)),
-            vocab_size=normalize_value(model_info.get("architecture", {}).get("vocab_size", None)),
-            num_attention_heads=normalize_value(model_info.get("architecture", {}).get("num_attention_heads", None)),
-            num_key_value_heads=normalize_value(model_info.get("architecture", {}).get("num_key_value_heads", None)),
-            rope_scaling=normalize_value(model_info.get("architecture", {}).get("rope_scaling", None)),
-            model_weights_size=normalize_value(model_info.get("architecture", {}).get("model_weights_size", None)),
-            kv_cache_size=normalize_value(model_info.get("architecture", {}).get("kv_cache_size", None)),
+            intermediate_size=normalize_value(
+                model_info.get("architecture", {}).get("intermediate_size", None)
+                if model_info.get("architecture") is not None
+                else None
+            ),
+            vocab_size=normalize_value(
+                model_info.get("architecture", {}).get("vocab_size", None)
+                if model_info.get("architecture") is not None
+                else None
+            ),
+            num_attention_heads=normalize_value(
+                model_info.get("architecture", {}).get("num_attention_heads", None)
+                if model_info.get("architecture") is not None
+                else None
+            ),
+            num_key_value_heads=normalize_value(
+                model_info.get("architecture", {}).get("num_key_value_heads", None)
+                if model_info.get("architecture") is not None
+                else None
+            ),
+            rope_scaling=normalize_value(
+                model_info.get("architecture", {}).get("rope_scaling", None)
+                if model_info.get("architecture") is not None
+                else None
+            ),
+            model_weights_size=normalize_value(
+                model_info.get("architecture", {}).get("model_weights_size", None)
+                if model_info.get("architecture") is not None
+                else None
+            ),
+            kv_cache_size=normalize_value(
+                model_info.get("architecture", {}).get("kv_cache_size", None)
+                if model_info.get("architecture") is not None
+                else None
+            ),
         )
 
         # Sanitize base model
         base_model = model_info.get("model_tree", {}).get("base_model", [])
-        if len(base_model) > 0:
+        if base_model is not None and len(base_model) > 0:
             base_model = base_model[0]
         base_model = normalize_value(base_model)
 
@@ -1279,6 +1251,374 @@ class LocalModelWorkflowService(SessionMixin):
             ModelLicenses(**license_data.model_dump(exclude_none=True))
         )
 
+    async def scan_local_model_workflow(self, current_user_id: UUID, request: LocalModelScanRequest) -> WorkflowModel:
+        """Scan a local model."""
+        # Get request data
+        step_number = request.step_number
+        workflow_id = request.workflow_id
+        workflow_total_steps = request.workflow_total_steps
+        model_id = request.model_id
+        trigger_workflow = request.trigger_workflow
+
+        current_step_number = step_number
+
+        # Retrieve or create workflow
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id, workflow_total_steps, current_user_id
+        )
+
+        # Validate model id
+        if model_id:
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"id": model_id, "is_active": True}
+            )
+            if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+                raise ClientException("Security scan is only supported for local models")
+
+        # Prepare workflow step data
+        workflow_step_data = LocalModelScanWorkflowStepData(
+            model_id=model_id,
+        ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+
+        # Get workflow steps
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": db_workflow.id}
+        )
+
+        # For avoiding another db call for record retrieval, storing db object while iterating over db_workflow_steps
+        db_current_workflow_step = None
+
+        if db_workflow_steps:
+            for db_step in db_workflow_steps:
+                # Get current workflow step
+                if db_step.step_number == current_step_number:
+                    db_current_workflow_step = db_step
+
+        if db_current_workflow_step:
+            logger.info(f"Workflow {db_workflow.id} step {current_step_number} already exists")
+
+            # Update workflow step data in db
+            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                db_current_workflow_step,
+                {"data": workflow_step_data},
+            )
+            logger.info(f"Workflow {db_workflow.id} step {current_step_number} updated")
+        else:
+            logger.info(f"Creating workflow step {current_step_number} for workflow {db_workflow.id}")
+
+            # Insert step details in db
+            db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+                WorkflowStepModel(
+                    workflow_id=db_workflow.id,
+                    step_number=current_step_number,
+                    data=workflow_step_data,
+                )
+            )
+
+        # Update workflow current step as the highest step_number
+        db_max_workflow_step_number = max(step.step_number for step in db_workflow_steps) if db_workflow_steps else 0
+        workflow_current_step = max(current_step_number, db_max_workflow_step_number)
+        logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
+
+        if trigger_workflow:
+            # query workflow steps again to get latest data
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": db_workflow.id}
+            )
+
+            # Define the keys required for model security scan
+            keys_of_interest = [
+                "model_id",
+            ]
+
+            # from workflow steps extract necessary information
+            required_data = {}
+            for db_workflow_step in db_workflow_steps:
+                for key in keys_of_interest:
+                    if key in db_workflow_step.data:
+                        required_data[key] = db_workflow_step.data[key]
+
+            # Check if all required keys are present
+            required_keys = ["model_id"]
+            missing_keys = [key for key in required_keys if key not in required_data]
+            if missing_keys:
+                raise ClientException(f"Missing required data for model security scan: {', '.join(missing_keys)}")
+
+            try:
+                # Perform model security scan
+                await self._perform_model_security_scan(db_workflow.id, current_step_number, required_data)
+            except ClientException as e:
+                workflow_current_step = current_step_number
+                db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                    db_workflow,
+                    {"current_step": workflow_current_step},
+                )
+                logger.debug("Workflow updated with latest step")
+                raise e
+
+            # Create next workflow step to store model scan result
+            current_step_number = current_step_number + 1
+            workflow_current_step = current_step_number
+
+            # Update or create next workflow step
+            # NOTE: The when scanning is completed, the subscriber will create scan result and update scan result id to the step
+            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                db_workflow.id, current_step_number, {}
+            )
+
+        # This will ensure workflow step number is updated to the latest step number
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": workflow_current_step},
+        )
+
+        return db_workflow
+
+    async def _perform_model_security_scan(self, workflow_id: UUID, step_number: int, data: Dict) -> None:
+        """Perform model security scan."""
+        # Retrieve workflow step
+        db_workflow_step = await WorkflowDataManager(self.session).retrieve_by_fields(
+            WorkflowStepModel, {"workflow_id": workflow_id, "step_number": step_number}
+        )
+
+        # Add created_by to data for notification purpose in micro service
+        data["created_by"] = str(db_workflow_step.workflow.created_by)
+
+        # Perform model security scan request
+        model_security_scan_response = await self._perform_model_security_scan_request(workflow_id, data)
+
+        # Add payload dict to response
+        for step in model_security_scan_response["steps"]:
+            step["payload"] = {}
+
+        # Include model security scan response in current step data
+        data[BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value] = model_security_scan_response
+
+        # Update workflow step with response
+        await WorkflowStepDataManager(self.session).update_by_fields(db_workflow_step, {"data": data})
+
+    async def _perform_model_security_scan_request(self, workflow_id: UUID, data: Dict) -> None:
+        """Perform model security scan request."""
+        model_security_scan_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/model-info/scan"
+        )
+
+        # Retrieve model local path
+        model_id = data.get("model_id")
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": model_id, "is_active": True})
+        local_path = db_model.local_path
+
+        model_security_scan_request = {
+            "model_path": local_path,
+            "notification_metadata": {
+                "name": "bud-notification",
+                "subscriber_ids": data["created_by"],
+                "workflow_id": str(workflow_id),
+            },
+            "source_topic": f"{app_settings.source_topic}",
+        }
+        logger.debug(f"Model security scan payload: {model_security_scan_request}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(model_security_scan_endpoint, json=model_security_scan_request) as response:
+                    response_data = await response.json()
+                    if response.status >= 400:
+                        raise ClientException("unable to perform model security scan request")
+
+                    return response_data
+        except ClientException as e:
+            raise e
+        except Exception as e:
+            logger.error(f"Failed to perform model security scan request: {e}")
+            raise ClientException("unable to perform model security scan request") from e
+
+    async def create_scan_result_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Create a local model security scan result from notification event."""
+        logger.debug("Received event for creating local model security scan result")
+
+        # Get workflow steps
+        workflow_id = payload.workflow_id
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        logger.debug(f"Retrieved workflow: {db_workflow.id}")
+
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Get last step
+        db_latest_workflow_step = db_workflow_steps[-1]
+
+        # Define the keys required for endpoint creation
+        keys_of_interest = [
+            "model_id",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+        logger.debug("Collected required data from workflow steps")
+
+        # Get model
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": required_data["model_id"], "is_active": True}
+        )
+        local_path = db_model.local_path
+        logger.debug(f"Local path: {local_path}")
+
+        # Get model scan result
+        scan_result = payload.content.result["scan_result"]
+        logger.debug(f"Scan result: {scan_result}")
+
+        # Parse necessary data from scan result
+        total_issues_by_severity = scan_result.get("total_issues_by_severity", {})
+        low_severity_count = total_issues_by_severity.get("LOW", 0)
+        medium_severity_count = total_issues_by_severity.get("MEDIUM", 0)
+        high_severity_count = total_issues_by_severity.get("HIGH", 0)
+        critical_severity_count = total_issues_by_severity.get("CRITICAL", 0)
+
+        model_issues = scan_result.get("model_issues", [])
+        grouped_issues = await self._group_model_issues(model_issues, local_path)
+
+        # Determine overall scan status
+        overall_scan_status = await self.determine_overall_scan_status(
+            low_severity_count, medium_severity_count, high_severity_count, critical_severity_count
+        )
+
+        # Create model security scan result
+        model_security_scan_result = ModelSecurityScanResultCreate(
+            model_id=db_model.id,
+            status=overall_scan_status,
+            total_issues=scan_result.get("total_issues", 0),
+            total_scanned_files=scan_result.get("total_scanned", 0),
+            total_skipped_files=scan_result.get("total_skipped_files", 0),
+            scanned_files=scan_result.get("scanned_files", []),
+            low_severity_count=low_severity_count,
+            medium_severity_count=medium_severity_count,
+            high_severity_count=high_severity_count,
+            critical_severity_count=critical_severity_count,
+            model_issues=grouped_issues,
+        )
+        logger.debug("Parsed model security scan result")
+
+        # Check if model security scan result already exists
+        db_model_security_scan_result = await ModelSecurityScanResultDataManager(self.session).retrieve_by_fields(
+            ModelSecurityScanResultModel, {"model_id": db_model.id}, missing_ok=True
+        )
+
+        if db_model_security_scan_result:
+            logger.debug("Model security scan result already exists. Updating it.")
+            db_model_security_scan_result = await ModelSecurityScanResultDataManager(self.session).update_by_fields(
+                db_model_security_scan_result,
+                model_security_scan_result.model_dump(),
+            )
+        else:
+            logger.debug("Model security scan result does not exist. Creating it.")
+            db_model_security_scan_result = await ModelSecurityScanResultDataManager(self.session).insert_one(
+                ModelSecurityScanResultModel(**model_security_scan_result.model_dump())
+            )
+
+        # Update workflow step with model security scan result id
+        await WorkflowStepDataManager(self.session).update_by_fields(
+            db_latest_workflow_step,
+            {"data": {"security_scan_result_id": str(db_model_security_scan_result.id)}},
+        )
+
+        # Mark scan_verified according to overall scan status
+        scan_verified = True if overall_scan_status == ModelSecurityScanStatusEnum.SAFE else False
+
+        db_model = await ModelDataManager(self.session).update_by_fields(
+            db_model,
+            {"scan_verified": scan_verified},
+        )
+
+        # Get dummy leaderboard data
+        leaderboard_data = await self.get_leaderboard()
+
+        # Create workflow step to store model scan result
+        end_step_number = db_latest_workflow_step.step_number + 1
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            workflow_id, end_step_number, {"leaderboard": leaderboard_data}
+        )
+
+        # Update workflow current step and status
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": end_step_number, "status": WorkflowStatusEnum.COMPLETED},
+        )
+
+    async def _group_model_issues(self, model_issues: list, local_path: str) -> list[ModelIssue]:
+        """Group model issues by severity."""
+        grouped_issues = {}
+
+        for model_issue in model_issues:
+            severity = model_issue["severity"].lower()
+
+            # Clean up the source path by removing local_path prefix
+            source = model_issue["source"]
+            if source.startswith(local_path):
+                source = source[len(local_path) :].lstrip("/")
+
+            # Group issues by severity
+            if severity not in grouped_issues:
+                grouped_issues[severity] = []
+            grouped_issues[severity].append(
+                ModelIssue(
+                    title=model_issue["title"],
+                    severity=severity,
+                    description=model_issue["description"],
+                    source=source,
+                ).model_dump()
+            )
+
+        return grouped_issues
+
+    async def get_leaderboard(self) -> dict:
+        """Get leaderboard for a model."""
+        return {
+            "headers": {
+                "evaluation_type": "Evaluation type",
+                "dataset": "Data Set",
+                "model_1": "Selected Model",
+                "model_2": "Model 2",
+            },
+            "rows": [
+                {"evaluation_type": "IFEval", "dataset": "Reasoning", "model_1": 65.1, "model_2": 65.1},
+                {"evaluation_type": "BBH", "dataset": "MMLU", "model_1": 46.9, "model_2": 46.9},
+                {"evaluation_type": "Model", "dataset": "Factuality", "model_1": 78.4, "model_2": 78.4},
+                {"evaluation_type": "Tags", "dataset": "Reasoning", "model_1": 60.8, "model_2": 60.8},
+            ],
+        }
+
+    @staticmethod
+    async def determine_overall_scan_status(
+        low_count: int, medium_count: int, high_count: int, critical_count: int
+    ) -> ModelSecurityScanStatusEnum:
+        """Determine the overall security scan status based on issue counts.
+
+        Args:
+            low_count: Number of low severity issues
+            medium_count: Number of medium severity issues
+            high_count: Number of high severity issues
+            critical_count: Number of critical severity issues
+
+        Returns:
+            ModelSecurityScanStatusEnum: The overall status based on the highest severity with issues
+        """
+        if critical_count > 0:
+            return ModelSecurityScanStatusEnum.CRITICAL
+        elif high_count > 0:
+            return ModelSecurityScanStatusEnum.HIGH
+        elif medium_count > 0:
+            return ModelSecurityScanStatusEnum.MEDIUM
+        elif low_count > 0:
+            return ModelSecurityScanStatusEnum.LOW
+        else:
+            return ModelSecurityScanStatusEnum.SAFE  # Default to SAFE if no issues are found
+
 
 class CloudModelService(SessionMixin):
     """Cloud model service."""
@@ -1337,9 +1677,15 @@ class ModelService(SessionMixin):
             quantizations_count=base_model_relation_count.get(BaseModelRelationEnum.QUANTIZED.value, 0),
         )
 
+        db_endpoint_count = await ModelDataManager(self.session).get_count_by_fields(
+            EndpointModel, {"model_id": model_id, "is_active": True}
+        )
+
         return ModelDetailSuccessResponse(
             model=db_model,
             model_tree=model_tree,
+            scan_result=db_model.model_security_scan_result,
+            endpoints_count=db_endpoint_count,
             message="model retrieved successfully",
             code=status.HTTP_200_OK,
             object="model.get",
@@ -1398,3 +1744,121 @@ class ModelService(SessionMixin):
         db_authors = [model.author for model in db_models]
 
         return db_authors, count
+
+    async def edit_model(self, model_id: UUID, data: Dict[str, Any]) -> None:
+        """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
+        logger.debug(f"edit recieved data: {data}")
+        # Retrieve existing model
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            model=Model, fields={"id": model_id, "is_active": True}
+        )
+        if data.get("icon") and db_model.provider_type in [
+            ModelProviderTypeEnum.CLOUD_MODEL,
+            ModelProviderTypeEnum.HUGGING_FACE,
+        ]:
+            data.pop("icon")
+
+        # Handle file upload if provided
+        # TODO: consider dapr local storage
+        if data.get("license_file"):
+            # If a file is provided, save it locally and update the DB with the local path
+            file = data.pop("license_file")
+            file_path = await self._save_uploaded_file(file)
+            await self._create_or_update_license_entry(model_id, file.filename, file_path, None)
+
+        elif data.get("license_url"):
+            # If a license URL is provided, store the URL in the DB instead of the file path
+            license_url = data.pop("license_url")
+            filename = license_url.split("/")[-1]  # Extract filename from the URL
+            await self._create_or_update_license_entry(
+                model_id, filename if filename else "sample license", None, str(license_url)
+            )  # TODO: modify filename arg when license service implemented
+
+        # Add papers if provided
+        if isinstance(data.get("paper_urls"), list):
+            paper_urls = data.pop("paper_urls")
+            await self._update_papers(model_id, paper_urls)
+
+        # Update model with validated data
+        await ModelDataManager(self.session).update_by_fields(db_model, data)
+
+    async def _save_uploaded_file(self, file: UploadFile) -> str:
+        """Save uploaded file and return file path."""
+        # create the license directory if not present already
+        os.makedirs(os.path.join(app_settings.static_dir, LICENSE_DIR), exist_ok=True)
+        file_path = os.path.join(app_settings.static_dir, LICENSE_DIR, file.filename)
+        with Path(file_path).open("wb") as f:
+            f.write(await file.read())
+        return os.path.join(LICENSE_DIR, file.filename)
+
+    async def _create_or_update_license_entry(
+        self, model_id: UUID, filename: str, file_path: str, license_url: str
+    ) -> None:
+        """Create or update a license entry in the database."""
+        # Check if a license entry with the given model_id exists
+        existing_license = await ModelDataManager(self.session).retrieve_by_fields(
+            ModelLicenses, fields={"model_id": model_id}, missing_ok=True
+        )
+        if existing_license:
+            logger.debug(f"existing license: {existing_license}")
+            existing_license_path = (
+                os.path.join(app_settings.static_dir, existing_license.path) if existing_license.path else ""
+            )
+            if existing_license_path and os.path.exists(existing_license_path):
+                try:
+                    os.remove(existing_license_path)
+                except PermissionError:
+                    raise ClientException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message=f"Permission denied while accessing the file: {existing_license.name}",
+                    )
+
+            update_license_data = {
+                "name": filename,
+                "path": file_path if file_path else None,
+                "url": license_url if license_url else None,
+            }
+            await ModelLicensesDataManager(self.session).update_by_fields(existing_license, update_license_data)
+        else:
+            # Create a new license entry
+            license_entry = ModelLicensesModel(
+                id=uuid4(),
+                name=filename,
+                path=file_path if file_path else None,
+                url=license_url if license_url else None,
+                model_id=model_id,
+            )
+            await ModelLicensesDataManager(self.session).insert_one(
+                ModelLicenses(**license_entry.model_dump(exclude_unset=True))
+            )
+
+    async def _update_papers(self, model_id: UUID, paper_urls: list[str]) -> None:
+        """Update paper entries for the given model by adding new URLs and removing old ones."""
+        # Fetch existing paper URLs for the model
+        existing_papers = await ModelDataManager(self.session).get_all_by_fields(
+            model=PaperPublished, fields={"model_id": model_id}
+        )
+        existing_urls = {paper.url for paper in existing_papers}
+
+        # Determine URLs to add and remove
+        input_urls = set(paper_urls)
+        urls_to_add = input_urls - existing_urls
+        urls_to_remove = existing_urls - input_urls
+        logger.debug(
+            f"paper info: {input_urls}, existing urls: {existing_urls}, urls_to_add: {urls_to_add}, urls_to_remove: {urls_to_remove}"
+        )
+
+        # Add new paper URLs
+        if urls_to_add:
+            urls_to_add = [
+                PaperPublished(id=uuid4(), title=None, url=str(paper_url), model_id=model_id)
+                for paper_url in urls_to_add
+            ]
+            await PaperPublishedDataManager(self.session).insert_all(urls_to_add)
+
+        # Remove old paper URLs
+        if urls_to_remove:
+            # Delete all matching entries for given URLs and model_id in one query
+            await PaperPublishedDataManager(self.session).delete_paper_by_urls(
+                model_id=model_id, paper_urls={"url": urls_to_remove}
+            )

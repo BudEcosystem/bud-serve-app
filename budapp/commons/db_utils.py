@@ -410,3 +410,45 @@ class DataManagerUtils(SQLAlchemyMixin):
     async def delete_one(self, model: Type[DeclarativeBase]) -> None:
         """Delete a model instance from the database."""
         self.delete_model(model)
+
+    async def get_all_by_fields(
+        self, model: Type[DeclarativeBase], fields: Dict[str, Any]
+    ) -> Optional[List[DeclarativeBase]]:
+        """Retrieve all model instances from database based on the given fields.
+
+        This method queries the database for all model instances matching the provided fields.
+        If no instances are found and missing_ok is False, it raises an HTTPException.
+
+        Args:
+            model (Type[DeclarativeBase]): The SQLAlchemy model class to query.
+            fields (Dict): A dictionary of field names and their values to filter by.
+            missing_ok (bool, optional): If True, return an empty list when no instances are found
+                                        instead of raising an exception. Defaults to False.
+
+        Returns:
+            Optional[List[DeclarativeBase]]: A list of found model instances, or an empty list if not found
+                                            and missing_ok is True.
+
+        Raises:
+            HTTPException: If no model instances are found and missing_ok is False.
+            DatabaseException: If there's an error in field validation or database operation.
+        """
+        await self.validate_fields(model, fields)
+
+        stmt = select(model).filter_by(**fields)
+        return self.scalars_all(stmt)
+
+    async def get_count_by_fields(self, model: Type[DeclarativeBase], fields: Dict[str, Any]) -> int:
+        """Get the count of model instances from database based on the given fields.
+
+        Args:
+            model (Type[DeclarativeBase]): The SQLAlchemy model class to query.
+            fields (Dict): A dictionary of field names and their values to filter by.
+
+        Returns:
+            int: The count of model instances matching the provided fields.
+        """
+        await self.validate_fields(model, fields)
+
+        stmt = select(func.count()).select_from(model).filter_by(**fields)
+        return self.execute_scalar(stmt)

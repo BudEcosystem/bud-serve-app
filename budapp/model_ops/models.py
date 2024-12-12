@@ -32,6 +32,7 @@ from budapp.commons.constants import (
     CredentialTypeEnum,
     ModalityEnum,
     ModelProviderTypeEnum,
+    ModelSecurityScanStatusEnum,
     StatusEnum,
 )
 from budapp.commons.database import Base
@@ -53,7 +54,7 @@ class Model(Base):
     github_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     huggingface_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     bud_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa_false())
-    scan_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa_false())
+    scan_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     eval_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa_false())
     strengths: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
     limitations: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
@@ -117,6 +118,9 @@ class Model(Base):
     paper_published: Mapped[List["PaperPublished"]] = relationship("PaperPublished", back_populates="model")
     model_licenses: Mapped["ModelLicenses"] = relationship("ModelLicenses", back_populates="model")
     provider: Mapped[Optional["Provider"]] = relationship("Provider", back_populates="models")
+    model_security_scan_result: Mapped["ModelSecurityScanResult"] = relationship(
+        "ModelSecurityScanResult", back_populates="model"
+    )
 
 
 class PaperPublished(Base):
@@ -225,3 +229,34 @@ class CloudModel(Base):
     is_present_in_model: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     provider: Mapped[Optional["Provider"]] = relationship("Provider", back_populates="cloud_models")
+
+
+class ModelSecurityScanResult(Base):
+    """Model for a AI model security scan result."""
+
+    __tablename__ = "model_security_scan_result"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
+    status: Mapped[str] = mapped_column(
+        PG_ENUM(
+            ModelSecurityScanStatusEnum,
+            name="model_security_scan_status_enum",
+            values_callable=lambda x: [e.value for e in x],
+            create_type=False,
+        ),
+        nullable=False,
+    )
+    total_issues: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_scanned_files: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_skipped_files: Mapped[int] = mapped_column(Integer, nullable=False)
+    scanned_files: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=False)
+    low_severity_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    medium_severity_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    high_severity_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    critical_severity_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    model_issues: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    model: Mapped["Model"] = relationship("Model", back_populates="model_security_scan_result")

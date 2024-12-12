@@ -21,12 +21,14 @@ import re
 from datetime import datetime
 from typing import List, Literal, Optional, Tuple
 
+from fastapi import UploadFile
 from pydantic import (
     UUID4,
     BaseModel,
     ConfigDict,
     Field,
     HttpUrl,
+    field_serializer,
     field_validator,
     model_validator,
 )
@@ -36,6 +38,7 @@ from budapp.commons.constants import (
     CredentialTypeEnum,
     ModalityEnum,
     ModelProviderTypeEnum,
+    ModelSecurityScanStatusEnum,
     ModelSourceEnum,
     WorkflowStatusEnum,
 )
@@ -197,6 +200,7 @@ class ModelCreate(ModelBase):
     context_length: int | None = None
     torch_dtype: str | None = None
     architecture: ModelArchitecture | None = None
+    scan_verified: bool | None = None
 
 
 class ModelDetailResponse(BaseModel):
@@ -216,7 +220,7 @@ class ModelDetailResponse(BaseModel):
     huggingface_url: str | None = None
     website_url: str | None = None
     bud_verified: bool = False
-    scan_verified: bool = False
+    scan_verified: bool | None = None
     eval_verified: bool = False
     strengths: list[str] | None = None
     limitations: list[str] | None = None
@@ -250,13 +254,29 @@ class ModelTree(BaseModel):
     quantizations_count: int = 0
 
 
+class ModelSecurityScanResultResponse(BaseModel):
+    """Model security scan result response schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    status: ModelSecurityScanStatusEnum
+    total_issues: int
+    total_scanned_files: int
+    total_skipped_files: int
+    low_severity_count: int
+    medium_severity_count: int
+    high_severity_count: int
+    critical_severity_count: int
+
+
 class ModelDetailSuccessResponse(SuccessResponse):
     """Model detail success response schema."""
 
     model: ModelDetailResponse
-    scan_result: dict | None = None  # TODO: integrate actual scan result
+    scan_result: ModelSecurityScanResultResponse | None = None
     eval_result: dict | None = None  # TODO: integrate actual eval result
     model_tree: ModelTree
+    endpoints_count: int
 
 
 class CreateCloudModelWorkflowRequest(BaseModel):
@@ -363,29 +383,57 @@ class CreateLocalModelWorkflowSteps(BaseModel):
 
 
 class EditModel(BaseModel):
-    """Schema for editing a model with optional fields and validations."""
+    name: str | None = Field(None, min_length=1, max_length=100)
+    description: str | None = Field(None, max_length=300)
+    tags: List[Tag] | None = None
+    tasks: List[Task] | None = None
+    icon: str | None = None
+    paper_urls: List[HttpUrl] | None = None
+    github_url: HttpUrl | None = None
+    huggingface_url: HttpUrl | None = None
+    website_url: HttpUrl | None = None
+    license_file: UploadFile | None = None
+    license_url: HttpUrl | None = None
 
-    name: Optional[str] = Field(None, min_length=1, max_length=100, description="Model name")
-    description: Optional[str] = Field(None, max_length=500, description="Brief model description")
-    tags: Optional[List[Tag]] = None
-    tasks: Optional[List[Tag]] = None
-    paper_urls: Optional[List[HttpUrl]] = None
-    github_url: Optional[HttpUrl] = Field(None, description="URL to the model's GitHub repository")
-    huggingface_url: Optional[HttpUrl] = Field(None, description="URL to the model's Hugging Face page")
-    website_url: Optional[HttpUrl] = Field(None, description="URL to the model's official website")
-    license_url: Optional[HttpUrl] = Field(None, description="License url")
+    @field_validator("name", mode="before")
+    def validate_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            value = value.strip()
+            if len(value) == 0:
+                raise ValueError("Model name cannot be empty or only whitespace.")
+        return value
 
-    def dict(self, **kwargs):
-        # Use the parent `dict()` method to get the original dictionary
-        data = super().dict(**kwargs)
-        # Convert all HttpUrl fields to strings for compatibility with SQLAlchemy
-        for key in ["github_url", "huggingface_url", "website_url", "license_url"]:
-            if data.get(key) is not None:
-                data[key] = str(data[key])
-        # Handle `paper_urls` as a list of URLs
-        if data.get("paper_urls") is not None:
-            data["paper_urls"] = [str(url) for url in data["paper_urls"]]
-        return data
+    @model_validator(mode="before")
+    def validate_license(cls, values):
+        license_file = values.get("license_file")
+        license_url = values.get("license_url")
+
+        # Ensure only one of license_file or license_url is provided
+        if license_file and license_url:
+            raise ValueError("Please provide either a license file or a license URL, but not both.")
+
+        if license_file:
+            filename = license_file.filename
+            allowed_extensions = ["pdf", "txt", "doc", "docx", "md"]
+
+            if not filename or "." not in filename:
+                raise ValueError("File does not have a valid extension")
+
+            # Get the file extension from the filename
+            file_extension = filename.split(".")[-1].lower()
+
+            # Check if the file extension is in the allowed list
+            if file_extension not in allowed_extensions:
+                raise ValueError("Invalid file extension for license file")
+        return values
+
+    @field_serializer("github_url", "huggingface_url", "website_url", "license_url")
+    def str_url(self, url: HttpUrl | None) -> str:
+        return str(url) if url else None
+
+    @field_serializer("paper_urls")
+    def str_paper_urls(self, urls: List[HttpUrl] | None) -> List[str]:
+        return [str(url) for url in urls] if urls else urls
 
 
 class ModelResponse(BaseModel):
@@ -593,3 +641,77 @@ class ModelLicensesCreate(BaseModel):
     path: str | None = None
     faqs: list[dict] | None = None
     model_id: UUID4
+
+
+# Local model related schemas
+
+
+class LocalModelScanRequest(BaseModel):
+    """Local model scan request schema."""
+
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None
+    step_number: int = Field(..., gt=0)
+    trigger_workflow: bool = False
+    model_id: UUID4 | None = None
+
+    @model_validator(mode="after")
+    def validate_fields(self) -> "LocalModelScanRequest":
+        """Validate the fields of the request."""
+        if self.workflow_id is None and self.workflow_total_steps is None:
+            raise ValueError("workflow_total_steps is required when workflow_id is not provided")
+
+        if self.workflow_id is not None and self.workflow_total_steps is not None:
+            raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
+
+        # Check if at least one of the other fields is provided
+        other_fields = [self.model_id]
+        required_fields = ["model_id"]
+        if not any(other_fields):
+            raise ValueError(f"At least one of {', '.join(required_fields)} is required")
+
+        return self
+
+
+class LocalModelScanWorkflowStepData(BaseModel):
+    """Local model scan workflow step data schema."""
+
+    model_id: UUID4 | None
+
+
+# Schemas related to Model Security Scan Results
+
+
+class ModelIssue(BaseModel):
+    """Model issue schema."""
+
+    title: str
+    severity: str
+    description: str
+    source: str
+
+
+class ModelSecurityScanResultCreate(BaseModel):
+    """Model security scan result create schema."""
+
+    model_id: UUID4
+    status: ModelSecurityScanStatusEnum
+    total_issues: int
+    total_scanned_files: int
+    total_skipped_files: int
+    scanned_files: list[str]
+    low_severity_count: int
+    medium_severity_count: int
+    high_severity_count: int
+    critical_severity_count: int
+    model_issues: dict
+
+
+class ModelSecurityScanResult(ModelSecurityScanResultCreate):
+    """Model security scan result schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: UUID4
+    created_at: datetime
+    modified_at: datetime
