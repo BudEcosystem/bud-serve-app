@@ -1780,7 +1780,7 @@ class ModelService(SessionMixin):
     async def _save_uploaded_file(self, file: UploadFile) -> str:
         """Save uploaded file and return file path."""
         # create the license directory if not present already
-        os.makedirs(app_settings.static_dir, LICENSE_DIR, exist_ok=True)
+        os.makedirs(os.path.join(app_settings.static_dir, LICENSE_DIR), exist_ok=True)
         file_path = os.path.join(app_settings.static_dir, LICENSE_DIR, file.filename)
         with Path(file_path).open("wb") as f:
             f.write(await file.read())
