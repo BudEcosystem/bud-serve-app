@@ -264,7 +264,7 @@ class NotificationService(SessionMixin):
             url=deployment_url,
             namespace=namespace,
             replicas=required_data["replicas"],
-            status=EndpointStatusEnum.DEPLOYING,
+            status=EndpointStatusEnum.RUNNING,
             created_by=required_data["created_by"],
             status_sync_at=datetime.now(tz=timezone.utc),
             credential_id=credential_id,
