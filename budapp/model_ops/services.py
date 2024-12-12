@@ -23,6 +23,7 @@ from uuid import UUID, uuid4
 
 import aiohttp
 from fastapi import UploadFile, status
+from pydantic import HttpUrl
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
@@ -187,10 +188,6 @@ class CloudModelWorkflowService(SessionMixin):
         else:
             logger.info(f"Creating workflow step {current_step_number} for workflow {db_workflow.id}")
 
-            # Default values are inserted in first step of a workflow
-            if not db_workflow_steps:
-                workflow_step_data["created_by"] = str(current_user_id)
-
             # Insert step details in db
             db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
                 WorkflowStepModel(
@@ -240,7 +237,6 @@ class CloudModelWorkflowService(SessionMixin):
                 "provider_type",
                 "provider_id",
                 "cloud_model_id",
-                "created_by",
             ]
 
             # from workflow steps extract necessary information
@@ -264,12 +260,14 @@ class CloudModelWorkflowService(SessionMixin):
                 raise ClientException("Model name already exists")
 
             # Trigger deploy model by step
-            db_model = await self._execute_add_cloud_model_workflow(required_data, db_workflow.id)
+            db_model = await self._execute_add_cloud_model_workflow(required_data, db_workflow.id, current_user_id)
             logger.debug(f"Successfully created model {db_model.id}")
 
         return db_workflow
 
-    async def _execute_add_cloud_model_workflow(self, data: Dict[str, Any], workflow_id: UUID) -> None:
+    async def _execute_add_cloud_model_workflow(
+        self, data: Dict[str, Any], workflow_id: UUID, current_user_id: UUID
+    ) -> None:
         """Execute add cloud model workflow."""
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
             {"workflow_id": workflow_id}
@@ -287,7 +285,7 @@ class CloudModelWorkflowService(SessionMixin):
             )
 
         # Prepare model creation data from input
-        model_data = await self._prepare_model_data(data, db_cloud_model)
+        model_data = await self._prepare_model_data(data, current_user_id, db_cloud_model)
 
         # Check for duplicate model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
@@ -494,7 +492,9 @@ class CloudModelWorkflowService(SessionMixin):
             },
         ]
 
-    async def _prepare_model_data(self, data: Dict[str, Any], db_cloud_model: Optional[CloudModel] = None) -> None:
+    async def _prepare_model_data(
+        self, data: Dict[str, Any], current_user_id: UUID, db_cloud_model: Optional[CloudModel] = None
+    ) -> None:
         """Prepare model data."""
         source = data.get("source")
         name = data.get("name")
@@ -503,7 +503,6 @@ class CloudModelWorkflowService(SessionMixin):
         tags = data.get("tags")
         provider_type = data.get("provider_type")
         provider_id = data.get("provider_id")
-        created_by = data.get("created_by")
 
         if db_cloud_model:
             model_data = ModelCreate(
@@ -520,7 +519,7 @@ class CloudModelWorkflowService(SessionMixin):
                 source=db_cloud_model.source,
                 provider_type=provider_type,
                 uri=db_cloud_model.uri,
-                created_by=UUID(created_by),
+                created_by=current_user_id,
                 provider_id=provider_id,
             )
         else:
@@ -531,7 +530,7 @@ class CloudModelWorkflowService(SessionMixin):
                 uri=uri,
                 tags=tags,
                 provider_type=provider_type,
-                created_by=UUID(created_by),
+                created_by=current_user_id,
                 provider_id=provider_id,
             )
 
@@ -724,10 +723,6 @@ class LocalModelWorkflowService(SessionMixin):
         else:
             logger.info(f"Creating workflow step {current_step_number} for workflow {db_workflow.id}")
 
-            # Default values are inserted in first step of a workflow
-            if not db_workflow_steps:
-                workflow_step_data["created_by"] = str(current_user_id)
-
             # Insert step details in db
             db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
                 WorkflowStepModel(
@@ -754,7 +749,6 @@ class LocalModelWorkflowService(SessionMixin):
                 "proprietary_credential_id",  # Only required for HuggingFace (Optional)
                 "name",
                 "uri",
-                "created_by",
             ]
 
             # from workflow steps extract necessary information
@@ -765,7 +759,7 @@ class LocalModelWorkflowService(SessionMixin):
                         required_data[key] = db_workflow_step.data[key]
 
             # Check if all required keys are present
-            required_keys = ["provider_type", "name", "uri", "created_by"]
+            required_keys = ["provider_type", "name", "uri"]
             missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data for model extraction: {', '.join(missing_keys)}")
@@ -775,7 +769,9 @@ class LocalModelWorkflowService(SessionMixin):
 
             try:
                 # Perform model extraction
-                await self._perform_model_extraction(db_workflow.id, current_step_number, required_data)
+                await self._perform_model_extraction(
+                    db_workflow.id, current_step_number, required_data, current_user_id
+                )
             except ClientException as e:
                 workflow_current_step = current_step_number
                 db_workflow = await WorkflowDataManager(self.session).update_by_fields(
@@ -807,8 +803,9 @@ class LocalModelWorkflowService(SessionMixin):
         """Create a local model from notification event."""
         logger.debug("Received event for creating local model")
 
-        # Get workflow steps
+        # Get workflow and steps
         workflow_id = payload.workflow_id
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
             {"workflow_id": workflow_id}
         )
@@ -824,7 +821,6 @@ class LocalModelWorkflowService(SessionMixin):
             "author",
             "tags",
             "icon",
-            "created_by",
         ]
 
         # from workflow steps extract necessary information
@@ -1009,7 +1005,7 @@ class LocalModelWorkflowService(SessionMixin):
             source=ModelSourceEnum.LOCAL,
             provider_type=required_data["provider_type"],
             uri=required_data["uri"],
-            created_by=UUID(required_data["created_by"]),
+            created_by=db_workflow.created_by,
             author=extracted_author,
             provider_id=provider_id,
             local_path=local_path,
@@ -1061,7 +1057,6 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Mark workflow as completed
         logger.debug(f"Updating workflow status: {workflow_id}")
-        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
 
     async def _verify_hugging_face_uri_duplication(
@@ -1110,7 +1105,16 @@ class LocalModelWorkflowService(SessionMixin):
             if db_model:
                 raise ClientException("Duplicate hugging face uri found")
 
-    async def _perform_model_extraction(self, workflow_id: UUID, step_number: int, data: Dict) -> None:
+        if query_uri and query_provider_type and query_provider_type == ModelProviderTypeEnum.URL.value:
+            # Check for valid url
+            try:
+                HttpUrl(query_uri)
+            except ValueError:
+                raise ClientException("Invalid url found")
+
+    async def _perform_model_extraction(
+        self, workflow_id: UUID, step_number: int, data: Dict, current_user_id: UUID
+    ) -> None:
         """Perform model extraction."""
         # Update or create next workflow step
         db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
@@ -1118,7 +1122,7 @@ class LocalModelWorkflowService(SessionMixin):
         )
 
         # Perform model extraction request
-        model_extraction_response = await self._perform_model_extraction_request(workflow_id, data)
+        model_extraction_response = await self._perform_model_extraction_request(workflow_id, data, current_user_id)
 
         # Add payload dict to response
         for step in model_extraction_response["steps"]:
@@ -1133,7 +1137,7 @@ class LocalModelWorkflowService(SessionMixin):
             db_workflow_step, {"data": model_extraction_events}
         )
 
-    async def _perform_model_extraction_request(self, workflow_id: UUID, data: Dict) -> None:
+    async def _perform_model_extraction_request(self, workflow_id: UUID, data: Dict, current_user_id: UUID) -> None:
         """Perform model extraction request."""
         model_extraction_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/model-info/extract"
@@ -1160,7 +1164,7 @@ class LocalModelWorkflowService(SessionMixin):
             "hf_token": hf_token,
             "notification_metadata": {
                 "name": "bud-notification",
-                "subscriber_ids": data["created_by"],
+                "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
             "source_topic": f"{app_settings.source_topic}",

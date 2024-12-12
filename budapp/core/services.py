@@ -232,7 +232,6 @@ class NotificationService(SessionMixin):
             "project_id",
             "cluster_id",  # bud_cluster_id
             "endpoint_name",
-            "created_by",
             "replicas",
         ]
 
@@ -254,6 +253,8 @@ class NotificationService(SessionMixin):
             logger.error(f"Cluster with id {required_data['cluster_id']} not found")
             return
 
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+
         # Create endpoint in database
         endpoint_data = EndpointCreate(
             model_id=required_data["model_id"],
@@ -264,8 +265,8 @@ class NotificationService(SessionMixin):
             url=deployment_url,
             namespace=namespace,
             replicas=required_data["replicas"],
-            status=EndpointStatusEnum.DEPLOYING,
-            created_by=required_data["created_by"],
+            status=EndpointStatusEnum.RUNNING,
+            created_by=db_workflow.created_by,
             status_sync_at=datetime.now(tz=timezone.utc),
             credential_id=credential_id,
         )
@@ -277,7 +278,6 @@ class NotificationService(SessionMixin):
 
         # Mark workflow as completed
         logger.debug(f"Marking workflow as completed: {workflow_id}")
-        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
 
         return db_endpoint

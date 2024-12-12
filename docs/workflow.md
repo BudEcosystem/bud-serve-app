@@ -230,3 +230,16 @@ curl --location 'https://<base_url>/clusters/clusters' \
 --form 'workflow_total_steps="3"' \
 --form 'trigger_workflow="true"'
 ```
+
+## Model Security Scan
+
+### Perform model security scan
+
+```json
+{
+  "workflow_total_steps": 3,
+  "step_number": 1,
+  "trigger_workflow": true,
+  "model_id": "d023bba4-9367-4b74-a096-c0045ee581fa"
+}
+```
