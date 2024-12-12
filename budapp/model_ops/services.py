@@ -1270,7 +1270,7 @@ class LocalModelWorkflowService(SessionMixin):
         # Validate model id
         if model_id:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"id": model_id, "is_active": True}
+                Model, {"id": model_id, "model_status": StatusEnum.ACTIVE}
             )
             if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
                 raise ClientException("Security scan is only supported for local models")
@@ -1405,7 +1405,9 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Retrieve model local path
         model_id = data.get("model_id")
-        db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": model_id, "is_active": True})
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": model_id, "model_status": StatusEnum.ACTIVE}
+        )
         local_path = db_model.local_path
 
         model_security_scan_request = {
@@ -1464,7 +1466,7 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Get model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"id": required_data["model_id"], "is_active": True}
+            Model, {"id": required_data["model_id"], "model_status": StatusEnum.ACTIVE}
         )
         local_path = db_model.local_path
         logger.debug(f"Local path: {local_path}")
@@ -1750,7 +1752,7 @@ class ModelService(SessionMixin):
         logger.debug(f"edit recieved data: {data}")
         # Retrieve existing model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            model=Model, fields={"id": model_id, "is_active": True}
+            model=Model, fields={"id": model_id, "model_status": StatusEnum.ACTIVE}
         )
         if data.get("icon") and db_model.provider_type in [
             ModelProviderTypeEnum.CLOUD_MODEL,
