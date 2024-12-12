@@ -187,10 +187,6 @@ class CloudModelWorkflowService(SessionMixin):
         else:
             logger.info(f"Creating workflow step {current_step_number} for workflow {db_workflow.id}")
 
-            # Default values are inserted in first step of a workflow
-            if not db_workflow_steps:
-                workflow_step_data["created_by"] = str(current_user_id)
-
             # Insert step details in db
             db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
                 WorkflowStepModel(
@@ -240,7 +236,6 @@ class CloudModelWorkflowService(SessionMixin):
                 "provider_type",
                 "provider_id",
                 "cloud_model_id",
-                "created_by",
             ]
 
             # from workflow steps extract necessary information
@@ -264,12 +259,14 @@ class CloudModelWorkflowService(SessionMixin):
                 raise ClientException("Model name already exists")
 
             # Trigger deploy model by step
-            db_model = await self._execute_add_cloud_model_workflow(required_data, db_workflow.id)
+            db_model = await self._execute_add_cloud_model_workflow(required_data, db_workflow.id, current_user_id)
             logger.debug(f"Successfully created model {db_model.id}")
 
         return db_workflow
 
-    async def _execute_add_cloud_model_workflow(self, data: Dict[str, Any], workflow_id: UUID) -> None:
+    async def _execute_add_cloud_model_workflow(
+        self, data: Dict[str, Any], workflow_id: UUID, current_user_id: UUID
+    ) -> None:
         """Execute add cloud model workflow."""
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
             {"workflow_id": workflow_id}
@@ -287,7 +284,7 @@ class CloudModelWorkflowService(SessionMixin):
             )
 
         # Prepare model creation data from input
-        model_data = await self._prepare_model_data(data, db_cloud_model)
+        model_data = await self._prepare_model_data(data, current_user_id, db_cloud_model)
 
         # Check for duplicate model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
@@ -494,7 +491,9 @@ class CloudModelWorkflowService(SessionMixin):
             },
         ]
 
-    async def _prepare_model_data(self, data: Dict[str, Any], db_cloud_model: Optional[CloudModel] = None) -> None:
+    async def _prepare_model_data(
+        self, data: Dict[str, Any], current_user_id: UUID, db_cloud_model: Optional[CloudModel] = None
+    ) -> None:
         """Prepare model data."""
         source = data.get("source")
         name = data.get("name")
@@ -503,7 +502,6 @@ class CloudModelWorkflowService(SessionMixin):
         tags = data.get("tags")
         provider_type = data.get("provider_type")
         provider_id = data.get("provider_id")
-        created_by = data.get("created_by")
 
         if db_cloud_model:
             model_data = ModelCreate(
@@ -520,7 +518,7 @@ class CloudModelWorkflowService(SessionMixin):
                 source=db_cloud_model.source,
                 provider_type=provider_type,
                 uri=db_cloud_model.uri,
-                created_by=UUID(created_by),
+                created_by=current_user_id,
                 provider_id=provider_id,
             )
         else:
@@ -531,7 +529,7 @@ class CloudModelWorkflowService(SessionMixin):
                 uri=uri,
                 tags=tags,
                 provider_type=provider_type,
-                created_by=UUID(created_by),
+                created_by=current_user_id,
                 provider_id=provider_id,
             )
 
