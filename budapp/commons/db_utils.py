@@ -437,3 +437,18 @@ class DataManagerUtils(SQLAlchemyMixin):
 
         stmt = select(model).filter_by(**fields)
         return self.scalars_all(stmt)
+
+    async def get_count_by_fields(self, model: Type[DeclarativeBase], fields: Dict[str, Any]) -> int:
+        """Get the count of model instances from database based on the given fields.
+
+        Args:
+            model (Type[DeclarativeBase]): The SQLAlchemy model class to query.
+            fields (Dict): A dictionary of field names and their values to filter by.
+
+        Returns:
+            int: The count of model instances matching the provided fields.
+        """
+        await self.validate_fields(model, fields)
+
+        stmt = select(func.count()).select_from(model).filter_by(**fields)
+        return self.execute_scalar(stmt)

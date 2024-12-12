@@ -38,12 +38,13 @@ from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
+from ..commons.schemas import SuccessResponse
 from .schemas import (
     ClusterFilter,
     ClusterListResponse,
     CreateClusterWorkflowRequest,
-    SingleClusterResponse,
     EditCluster,
+    SingleClusterResponse,
 )
 from .services import ClusterService
 
@@ -218,7 +219,6 @@ async def edit_cluster(
     edit_cluster: EditCluster,
 ) -> Union[SingleClusterResponse, ErrorResponse]:
     """Edit cluster."""
-
     data = edit_cluster.dict(exclude_unset=True, exclude_none=True)
 
     try:
@@ -280,4 +280,47 @@ async def get_cluster_details(
         message="Cluster details fetched successfully",
         code=status.HTTP_200_OK,
         object="cluster.get",
+    )
+
+
+@cluster_router.delete(
+    "/{cluster_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request parameters",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully deleted cluster",
+        },
+    },
+    description="Delete a cluster by ID",
+)
+async def delete_cluster(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    cluster_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a cluster by its ID."""
+    try:
+        await ClusterService(session).delete_cluster(cluster_id)
+    except ClientException as e:
+        logger.exception(f"Failed to delete cluster: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete cluster: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to delete cluster",
+        ).to_http_response()
+
+    return SuccessResponse(
+        message="Cluster deleted successfully",
+        code=status.HTTP_200_OK,
+        object="cluster.delete",
     )
