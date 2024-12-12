@@ -844,7 +844,7 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Extract and finalize tags, tasks and author
         given_tags = required_data.get("tags", [])
-        extracted_tags = model_info.get("tags", [])
+        extracted_tags = model_info.get("tags", []) or []
         if extracted_tags:
             # assign random colors to extracted tags
             extracted_tags = assign_random_colors_to_names(extracted_tags)
