@@ -43,7 +43,7 @@ from .schemas import (
     ClusterFilter,
     ClusterListResponse,
     CreateClusterWorkflowRequest,
-    EditCluster,
+    EditClusterRequest,
     SingleClusterResponse,
 )
 from .services import ClusterService
@@ -216,18 +216,18 @@ async def edit_cluster(
     cluster_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    edit_cluster: EditCluster,
+    edit_cluster: EditClusterRequest,
 ) -> Union[SingleClusterResponse, ErrorResponse]:
     """Edit cluster."""
-    data = edit_cluster.dict(exclude_unset=True, exclude_none=True)
-
     try:
-        updated_cluster_info = await ClusterService(session).edit_cluster(cluster_id=cluster_id, data=data)
+        db_cluster = await ClusterService(session).edit_cluster(
+            cluster_id=cluster_id, data=edit_cluster.model_dump(exclude_unset=True, exclude_none=True)
+        )
         return SingleClusterResponse(
-            cluster=updated_cluster_info,
+            cluster=db_cluster,
             message="Cluster details updated successfully",
             code=status.HTTP_200_OK,
-            object="SingleClusterResponse",
+            object="cluster.edit",
         )
     except ClientException as e:
         logger.exception(f"Failed to edit cluster: {e}")

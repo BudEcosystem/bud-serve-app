@@ -529,19 +529,23 @@ class ClusterService(SessionMixin):
     async def edit_cluster(self, cluster_id: UUID, data: Dict[str, Any]) -> ClusterResponse:
         """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
         # Retrieve existing model
-        cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
             model=ClusterModel, fields={"id": cluster_id}
         )
-        if not cluster:
-            raise ValueError(f"Model with ID {cluster_id} not found")
 
-        if data.get("ingress_url"):
-            data["ingress_url"] = str(data["ingress_url"])
+        if "name" in data:
+            duplicate_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+                model=ClusterModel,
+                fields={"name": data["name"], "is_active": True},
+                exclude_fields={"id": cluster_id},
+                missing_ok=True,
+            )
+            if duplicate_cluster:
+                raise ClientException("Cluster name already exists")
 
-        updated_cluster = await ClusterDataManager(self.session).update_by_fields(cluster, data)
-        updated_cluster = ClusterResponse.model_validate(updated_cluster)
+        db_cluster = await ClusterDataManager(self.session).update_by_fields(db_cluster, data)
 
-        return updated_cluster
+        return db_cluster
 
     async def get_cluster_details(self, cluster_id: UUID) -> ClusterModel:
         """Retrieve model details by model ID."""

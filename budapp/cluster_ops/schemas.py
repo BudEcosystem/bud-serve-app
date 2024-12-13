@@ -21,7 +21,7 @@ from datetime import datetime
 from typing import List
 from uuid import UUID
 
-from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, computed_field, Field, validator
+from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from budapp.commons.constants import ClusterStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
@@ -142,7 +142,7 @@ class CreateClusterWorkflowSteps(BaseModel):
     configuration_yaml: dict | None = None
 
 
-class EditCluster(BaseModel):
+class EditClusterRequest(BaseModel):
     name: str | None = Field(
         None,
         min_length=1,
@@ -152,12 +152,19 @@ class EditCluster(BaseModel):
     icon: str | None = Field(None, description="URL or path of the cluster icon.")
     ingress_url: AnyHttpUrl | None = Field(None, description="ingress_url.")
 
-    @validator("name", pre=True, always=True)
+    @field_validator("name", mode="before")
+    @classmethod
     def validate_name(cls, value: str | None) -> str | None:
         """Ensure the name is not empty or only whitespace."""
         if value is not None and not value.strip():
             raise ValueError("Cluster name cannot be empty or only whitespace.")
         return value
+
+    @field_validator("ingress_url", mode="after")
+    @classmethod
+    def convert_url_to_string(cls, value: AnyHttpUrl | None) -> str | None:
+        """Convert AnyHttpUrl to string."""
+        return str(value) if value is not None else None
 
 
 class SingleClusterResponse(SuccessResponse):

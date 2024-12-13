@@ -353,7 +353,11 @@ class DataManagerUtils(SQLAlchemyMixin):
         return self.add_all(models)
 
     async def retrieve_by_fields(
-        self, model: Type[DeclarativeBase], fields: Dict[str, Any], missing_ok: bool = False
+        self,
+        model: Type[DeclarativeBase],
+        fields: Dict[str, Any],
+        exclude_fields: Optional[Dict[str, Any]] = None,
+        missing_ok: bool = False,
     ) -> Optional[DeclarativeBase]:
         """Retrieve a model instance from the database based on given fields.
 
@@ -376,6 +380,12 @@ class DataManagerUtils(SQLAlchemyMixin):
         await self.validate_fields(model, fields)
 
         stmt = select(model).filter_by(**fields)
+
+        if exclude_fields is not None:
+            await self.validate_fields(model, exclude_fields)
+            exclude_conditions = [getattr(model, field) != value for field, value in exclude_fields.items()]
+            stmt = stmt.filter(*exclude_conditions)
+
         db_model = self.scalar_one_or_none(stmt)
 
         if not missing_ok and db_model is None:
