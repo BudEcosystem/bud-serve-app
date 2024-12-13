@@ -1751,6 +1751,17 @@ class ModelService(SessionMixin):
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
             model=Model, fields={"id": model_id, "is_active": True}
         )
+
+        if data.get("name"):
+            duplicate_model = await ModelDataManager(self.session).retrieve_by_fields(
+                model=Model,
+                fields={"name": data["name"], "is_active": True},
+                exclude_fields={"id": model_id},
+                missing_ok=True,
+            )
+            if duplicate_model:
+                raise ClientException("Model name already exists")
+
         if data.get("icon") and db_model.provider_type in [
             ModelProviderTypeEnum.CLOUD_MODEL,
             ModelProviderTypeEnum.HUGGING_FACE,
