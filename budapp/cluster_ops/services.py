@@ -14,7 +14,7 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""The cluster ops services. Contains business logic for model ops."""
+"""The cluster ops services. Contains business logic for cluster ops."""
 
 import json
 import tempfile
