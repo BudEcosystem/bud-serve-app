@@ -36,6 +36,7 @@ from .model_ops import model_routes
 from .user_ops import user_routes
 from .workflow_ops import workflow_routes
 from .endpoint_ops import endpoint_routes
+from .project_ops import project_routes
 
 
 logger = logging.get_logger(__name__)
@@ -127,6 +128,7 @@ internal_router.include_router(model_routes.model_router)
 internal_router.include_router(notify_routes.notify_router)
 internal_router.include_router(user_routes.user_router)
 internal_router.include_router(workflow_routes.workflow_router)
+internal_router.include_router(project_routes.project_router)
 
 app.include_router(internal_router)
 
