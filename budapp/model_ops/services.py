@@ -49,6 +49,7 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
+from ..commons.helpers import validate_huggingface_repo_format
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from .crud import (
     CloudModelDataManager,
@@ -703,7 +704,7 @@ class LocalModelWorkflowService(SessionMixin):
         db_current_workflow_step = None
 
         # Verify hugging face uri duplication
-        await self._verify_hugging_face_uri_duplication(provider_type, uri, db_workflow_steps)
+        await self._verify_provider_type_uri_duplication(provider_type, uri, db_workflow_steps)
 
         if db_workflow_steps:
             for db_step in db_workflow_steps:
@@ -1059,7 +1060,7 @@ class LocalModelWorkflowService(SessionMixin):
         logger.debug(f"Updating workflow status: {workflow_id}")
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
 
-    async def _verify_hugging_face_uri_duplication(
+    async def _verify_provider_type_uri_duplication(
         self,
         provider_type: ModelProviderTypeEnum,
         uri: str,
@@ -1098,12 +1099,10 @@ class LocalModelWorkflowService(SessionMixin):
             query_provider_type = db_step_provider_type
 
         if query_uri and query_provider_type and query_provider_type == ModelProviderTypeEnum.HUGGING_FACE.value:
-            # Check duplicate hugging face uri
-            db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"uri": query_uri, "provider_type": query_provider_type, "is_active": True}, missing_ok=True
-            )
-            if db_model:
-                raise ClientException("Duplicate hugging face uri found")
+            # Check uri in huggingface uri format
+            is_valid_huggingface_uri = validate_huggingface_repo_format(query_uri)
+            if not is_valid_huggingface_uri:
+                raise ClientException("Invalid huggingface uri format")
 
         if query_uri and query_provider_type and query_provider_type == ModelProviderTypeEnum.URL.value:
             # Check for valid url
@@ -1111,6 +1110,18 @@ class LocalModelWorkflowService(SessionMixin):
                 HttpUrl(query_uri)
             except ValueError:
                 raise ClientException("Invalid url found")
+
+        if query_uri and query_provider_type and query_provider_type == ModelProviderTypeEnum.DISK.value:
+            # Check for valid local path
+            if not os.path.exists(query_uri):
+                raise ClientException("Given local path does not exist")
+
+        # Check duplicate hugging face uri
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"uri": query_uri, "provider_type": query_provider_type, "is_active": True}, missing_ok=True
+        )
+        if db_model:
+            raise ClientException(f"Duplicate {query_provider_type} uri found")
 
     async def _perform_model_extraction(
         self, workflow_id: UUID, step_number: int, data: Dict, current_user_id: UUID
