@@ -21,7 +21,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Uuid
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -47,7 +47,6 @@ class Endpoint(Base):
     bud_cluster_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     url: Mapped[str] = mapped_column(String, nullable=False)
     namespace: Mapped[str] = mapped_column(String, nullable=False)
-    replicas: Mapped[int] = mapped_column(Integer, nullable=False)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
