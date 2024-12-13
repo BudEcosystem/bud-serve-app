@@ -37,7 +37,8 @@ class ProjectService(SessionMixin):
         """Edit project by validating and updating specific fields."""
         # Retrieve existing model
         db_project = await ProjectDataManager(self.session).retrieve_by_fields(
-            model=ProjectModel, fields={"id": project_id}
+            model=ProjectModel,
+            fields={"id": project_id, "is_active": True},
         )
 
         if "name" in data:
