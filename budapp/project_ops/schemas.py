@@ -1,22 +1,20 @@
-from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
-from typing import List, Literal, Optional, Tuple
+from budapp.commons.schemas import SuccessResponse, Tag
+from typing import List
 from pydantic import (
     UUID4,
     BaseModel,
     ConfigDict,
-    EmailStr,
     Field,
-    conlist,
     field_validator,
-    model_validator,
-    validator
 )
+
 
 class ProjectBase(BaseModel):
     name: str
     description: str | None = None
     tags: List[Tag] | None = None
     icon: str | None = None
+
 
 class EditProjectRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
@@ -32,12 +30,14 @@ class EditProjectRequest(BaseModel):
             raise ValueError("Project name cannot be empty or only whitespace.")
         return value
 
+
 class ProjectResponse(ProjectBase):
     """Project response to client schema"""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID4
+
 
 class SingleProjectResponse(SuccessResponse):
     project: ProjectResponse
