@@ -23,13 +23,12 @@ from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.api_utils import pubsub_api_endpoint
-from budapp.commons.constants import NotificationCategory, PayloadType
 from budapp.commons.dependencies import get_session
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
 
 from .schemas import NotificationRequest, NotificationResponse
-from .services import NotificationService
+from .services import SubscriberHandler
 
 
 logger = logging.get_logger(__name__)
@@ -78,46 +77,7 @@ async def receive_notification(
     try:
         logger.info("Subscribed to bud-serve-app notifications successfully")
         payload = notification.payload
-
-        # Check if the notification is internal
-        if payload.category == NotificationCategory.INTERNAL and payload.type == PayloadType.DEPLOYMENT_RECOMMENDATION:
-            await NotificationService(session).update_recommended_cluster_events(payload)
-            return NotificationResponse(
-                object="notification",
-                message="Updated recommended cluster event in workflow step",
-            ).to_http_response()
-        if payload.category == NotificationCategory.INTERNAL and payload.type == PayloadType.DEPLOY_MODEL:
-            await NotificationService(session).update_model_deployment_events(payload)
-            return NotificationResponse(
-                object="notification",
-                message="Updated model deployment event in workflow step",
-            ).to_http_response()
-        if payload.category == NotificationCategory.INTERNAL and payload.type == PayloadType.REGISTER_CLUSTER:
-            await NotificationService(session).update_cluster_creation_events(payload)
-            return NotificationResponse(
-                object="notification",
-                message="Updated cluster creation event in workflow step",
-            ).to_http_response()
-        if payload.category == NotificationCategory.INTERNAL and payload.type == PayloadType.PERFORM_MODEL_EXTRACTION:
-            await NotificationService(session).update_model_extraction_events(payload)
-            return NotificationResponse(
-                object="notification",
-                message="Updated model extraction event in workflow step",
-            ).to_http_response()
-        if (
-            payload.category == NotificationCategory.INTERNAL
-            and payload.type == PayloadType.PERFORM_MODEL_SECURITY_SCAN
-        ):
-            await NotificationService(session).update_model_security_scan_events(payload)
-            return NotificationResponse(
-                object="notification",
-                message="Updated model security scan event in workflow step",
-            ).to_http_response()
-        else:
-            return NotificationResponse(
-                object="notification",
-                message="Pubsub notification received",
-            ).to_http_response()
+        return await SubscriberHandler(session).handle_subscriber_event(payload)
     except ClientException as e:
         logger.exception(f"Failed to execute notification: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()

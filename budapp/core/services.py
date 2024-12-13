@@ -20,11 +20,19 @@
 from datetime import datetime, timezone
 from typing import Dict, List, Tuple
 
+from sqlalchemy.orm import Session
+
 from budapp.cluster_ops.crud import ClusterDataManager
 from budapp.cluster_ops.models import Cluster as ClusterModel
 from budapp.cluster_ops.services import ClusterService
 from budapp.commons import logging
-from budapp.commons.constants import BudServeWorkflowStepEventName, EndpointStatusEnum, WorkflowStatusEnum
+from budapp.commons.constants import (
+    BudServeWorkflowStepEventName,
+    EndpointStatusEnum,
+    NotificationCategory,
+    PayloadType,
+    WorkflowStatusEnum,
+)
 from budapp.commons.db_utils import SessionMixin
 from budapp.endpoint_ops.crud import EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
@@ -36,7 +44,7 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
 from .crud import IconDataManager
 from .models import Icon as IconModel
-from .schemas import NotificationPayload
+from .schemas import NotificationPayload, NotificationResponse
 
 
 logger = logging.get_logger(__name__)
@@ -281,6 +289,82 @@ class NotificationService(SessionMixin):
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
 
         return db_endpoint
+
+
+class SubscriberHandler:
+    """Service for handling subscriber events."""
+
+    def __init__(self, session: Session):
+        """Initialize the SubscriberHandler with a database session."""
+        self.session = session
+
+    async def handle_subscriber_event(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the subscriber event."""
+        logger.debug(f"Received subscriber event: {payload}")
+
+        if payload.category != NotificationCategory.INTERNAL:
+            logger.warning("Skipping non-internal notification")
+            return NotificationResponse(
+                object="notification",
+                message="Pubsub notification received",
+            ).to_http_response()
+
+        handlers = {
+            PayloadType.DEPLOYMENT_RECOMMENDATION: self._handle_deployment_recommendation,
+            PayloadType.DEPLOY_MODEL: self._handle_deploy_model,
+            PayloadType.REGISTER_CLUSTER: self._handle_register_cluster,
+            PayloadType.PERFORM_MODEL_EXTRACTION: self._handle_perform_model_extraction,
+            PayloadType.PERFORM_MODEL_SECURITY_SCAN: self._handle_perform_model_security_scan,
+        }
+
+        handler = handlers.get(payload.type)
+        if not handler:
+            logger.warning(f"No handler found for payload type: {payload.type}")
+            return NotificationResponse(
+                object="notification", message="Pubsub notification received"
+            ).to_http_response()
+
+        return await handler(payload)
+
+    async def _handle_deployment_recommendation(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the deployment recommendation event."""
+        await NotificationService(self.session).update_recommended_cluster_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated recommended cluster event in workflow step",
+        ).to_http_response()
+
+    async def _handle_deploy_model(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the deploy model event."""
+        await NotificationService(self.session).update_model_deployment_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated model deployment event in workflow step",
+        ).to_http_response()
+
+    async def _handle_register_cluster(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the register cluster event."""
+        await NotificationService(self.session).update_cluster_creation_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated cluster creation event in workflow step",
+        ).to_http_response()
+
+    async def _handle_perform_model_extraction(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the perform model extraction event."""
+        await NotificationService(self.session).update_model_extraction_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated model extraction event in workflow step",
+        ).to_http_response()
+
+    async def _handle_perform_model_security_scan(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the perform model security scan event."""
+        await NotificationService(self.session).update_model_security_scan_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated model security scan event in workflow step",
+        ).to_http_response()
 
 
 class IconService(SessionMixin):
