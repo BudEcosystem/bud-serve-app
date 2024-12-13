@@ -19,6 +19,9 @@
 from enum import Enum
 from typing import Dict, List, Optional, Union
 
+from huggingface_hub.utils import validate_repo_id
+from huggingface_hub.utils._validators import HFValidationError
+
 
 def create_dynamic_enum(enum_name: str, enum_values: List[str]) -> Enum:
     """Create a dynamic Enum class from a list of values.
@@ -101,3 +104,32 @@ def normalize_value(value: Optional[Union[str, List, Dict]]) -> Optional[Union[s
 
     # Return original value for other types
     return value
+
+
+def validate_huggingface_repo_format(repo_id: str) -> bool:
+    """Validate a huggingface repo id.
+
+    Args:
+        repo_id: The huggingface repo id to validate
+
+    Returns:
+        True if the repo id is valid, False otherwise
+    """
+    if not isinstance(repo_id, str):
+        return False
+
+    repo_id = repo_id.strip()
+    if not repo_id:
+        return False
+
+    parts = repo_id.split("/")
+
+    if len(parts) != 2:
+        return False
+
+    try:
+        validate_repo_id(repo_id)
+    except HFValidationError:
+        return False
+
+    return True
