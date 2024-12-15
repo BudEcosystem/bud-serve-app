@@ -240,7 +240,6 @@ class NotificationService(SessionMixin):
             "project_id",
             "cluster_id",  # bud_cluster_id
             "endpoint_name",
-            "replicas",
         ]
 
         # from workflow steps extract necessary information
@@ -272,7 +271,6 @@ class NotificationService(SessionMixin):
             name=required_data["endpoint_name"],
             url=deployment_url,
             namespace=namespace,
-            replicas=required_data["replicas"],
             status=EndpointStatusEnum.RUNNING,
             created_by=db_workflow.created_by,
             status_sync_at=datetime.now(tz=timezone.utc),
