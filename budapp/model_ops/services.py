@@ -1119,7 +1119,9 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Check duplicate hugging face uri
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"uri": query_uri, "provider_type": query_provider_type, "is_active": True}, missing_ok=True
+            Model,
+            {"uri": query_uri, "provider_type": query_provider_type, "model_status": StatusEnum.ACTIVE},
+            missing_ok=True,
         )
         if db_model:
             raise ClientException(f"Duplicate {query_provider_type} uri found")
