@@ -38,7 +38,6 @@ from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
-from ..commons.schemas import SuccessResponse
 from .schemas import (
     ClusterFilter,
     ClusterListResponse,
@@ -283,8 +282,8 @@ async def get_cluster_details(
     )
 
 
-@cluster_router.delete(
-    "/{cluster_id}",
+@cluster_router.post(
+    "/{cluster_id}/delete-workflow",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
@@ -295,8 +294,8 @@ async def get_cluster_details(
             "description": "Invalid request parameters",
         },
         status.HTTP_200_OK: {
-            "model": SuccessResponse,
-            "description": "Successfully deleted cluster",
+            "model": RetrieveWorkflowDataResponse,
+            "description": "Successfully executed delete cluster workflow",
         },
     },
     description="Delete a cluster by ID",
@@ -305,10 +304,11 @@ async def delete_cluster(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     cluster_id: UUID,
-) -> Union[SuccessResponse, ErrorResponse]:
+) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Delete a cluster by its ID."""
     try:
-        await ClusterService(session).delete_cluster(cluster_id)
+        db_workflow = await ClusterService(session).delete_cluster(cluster_id, current_user.id)
+        return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
     except ClientException as e:
         logger.exception(f"Failed to delete cluster: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
@@ -318,9 +318,3 @@ async def delete_cluster(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to delete cluster",
         ).to_http_response()
-
-    return SuccessResponse(
-        message="Cluster deleted successfully",
-        code=status.HTTP_200_OK,
-        object="cluster.delete",
-    )
