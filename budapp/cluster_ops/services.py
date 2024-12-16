@@ -556,7 +556,7 @@ class ClusterService(SessionMixin):
 
         return cluster_details
 
-    async def delete_cluster(self, cluster_id: UUID) -> None:
+    async def delete_cluster(self, cluster_id: UUID, current_user_id: UUID) -> None:
         """Delete a cluster by its ID.
 
         Args:
@@ -575,29 +575,78 @@ class ClusterService(SessionMixin):
         if db_endpoint:
             raise ClientException("Cannot delete cluster with active endpoints")
 
+        current_step_number = 1
+
+        # Retrieve or create workflow
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id=None, workflow_total_steps=current_step_number, current_user_id=current_user_id
+        )
+        logger.debug(f"Delete cluster workflow {db_workflow.id} created")
+
         # Perform delete cluster request to bud_cluster app
-        await self._perform_bud_cluster_delete_request(db_cluster.cluster_id)
+        bud_cluster_response = await self._perform_bud_cluster_delete_request(
+            db_cluster.cluster_id, current_user_id, db_workflow.id
+        )
 
-        # Update cluster status in db
-        await ClusterDataManager(self.session).update_by_fields(db_cluster, {"is_active": False})
+        # Add payload dict to response
+        for step in bud_cluster_response["steps"]:
+            step["payload"] = {}
 
-    async def _perform_bud_cluster_delete_request(self, bud_cluster_id: UUID) -> None:
+        delete_cluster_workflow_id = bud_cluster_response.get("workflow_id")
+        delete_cluster_events = {
+            BudServeWorkflowStepEventName.DELETE_CLUSTER_EVENTS.value: bud_cluster_response,
+            "delete_cluster_workflow_id": delete_cluster_workflow_id,
+        }
+
+        # Insert step details in db
+        db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+            WorkflowStepModel(
+                workflow_id=db_workflow.id,
+                step_number=current_step_number,
+                data=delete_cluster_events,
+            )
+        )
+        logger.debug(f"Created workflow step {current_step_number} for workflow {db_workflow.id}")
+
+        # Update cluster status to deleting
+        await ClusterDataManager(self.session).update_by_fields(db_cluster, {"status": ClusterStatusEnum.DELETING})
+        logger.debug(f"Cluster {db_cluster.id} status updated to {ClusterStatusEnum.DELETING.value}")
+
+        return db_workflow
+
+    async def _perform_bud_cluster_delete_request(
+        self, bud_cluster_id: UUID, current_user_id: UUID, workflow_id: UUID
+    ) -> Dict:
         """Perform delete cluster request to bud_cluster app.
 
         Args:
             bud_cluster_id: The ID of the cluster to delete.
         """
-        delete_cluster_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/{bud_cluster_id}"
+        delete_cluster_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/delete"
+        )
+
+        payload = {
+            "cluster_id": str(bud_cluster_id),
+            "notification_metadata": {
+                "name": "bud-notification",
+                "subscriber_ids": str(current_user_id),
+                "workflow_id": str(workflow_id),
+            },
+            "source_topic": "appMessages",
+        }
 
         logger.debug("Performing delete cluster request to budcluster")
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.delete(delete_cluster_endpoint) as response:
+                async with session.post(delete_cluster_endpoint, json=payload) as response:
+                    response_data = await response.json()
                     if response.status != 200:
-                        logger.error(f"Failed to delete cluster: {response.status} {await response.json()}")
+                        logger.error(f"Failed to delete cluster: {response.status} {response_data}")
                         raise ClientException("Failed to delete cluster")
 
-            logger.debug("Successfully deleted cluster from budcluster")
+                    logger.debug("Successfully deleted cluster from budcluster")
+                    return response_data
         except Exception as e:
-            logger.exception(f"Failed to delete cluster: {e}")
+            logger.exception(f"Failed to send delete cluster request: {e}")
             raise ClientException("Failed to delete cluster") from e
