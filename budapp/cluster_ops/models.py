@@ -24,7 +24,7 @@ from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Uui
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from budapp.commons.constants import ClusterStatusEnum
+from budapp.commons.constants import ClusterStatusEnum, StatusEnum
 from budapp.commons.database import Base
 
 
@@ -34,7 +34,15 @@ class Cluster(Base):
     __tablename__ = "cluster"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    cluster_status: Mapped[str] = mapped_column(
+        Enum(
+            StatusEnum,
+            name="status_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=StatusEnum.ACTIVE,
+    )
     ingress_url: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(
         Enum(

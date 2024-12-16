@@ -564,3 +564,14 @@ class ModelSecurityScanStatusEnum(StrEnum):
 
 
 LICENSE_DIR = "licenses"
+
+
+class StatusEnum(StrEnum):
+    """Enumeration of entity statuses in the system.
+    Attributes:
+        ACTIVE: Represents an active entity.
+        DELETED: Represents an deleted entity.
+    """
+
+    ACTIVE = auto()
+    DELETED = auto()
