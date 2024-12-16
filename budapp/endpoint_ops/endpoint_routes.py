@@ -126,7 +126,7 @@ async def delete_endpoint(
     session: Annotated[Session, Depends(get_session)],
     endpoint_id: UUID,
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
-    """Delete a cluster by its ID."""
+    """Delete a endpoint by its ID."""
     try:
         db_workflow = await EndpointService(session).delete_endpoint(endpoint_id, current_user.id)
         return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
@@ -134,8 +134,8 @@ async def delete_endpoint(
         logger.exception(f"Failed to delete endpoint: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
-        logger.exception(f"Failed to delete cluster: {e}")
+        logger.exception(f"Failed to delete endpoint: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message="Failed to delete cluster",
+            message="Failed to delete endpoint",
         ).to_http_response()

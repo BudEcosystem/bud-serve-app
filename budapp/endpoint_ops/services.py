@@ -78,7 +78,7 @@ class EndpointService(SessionMixin):
         )
         logger.debug(f"Delete endpoint workflow {db_workflow.id} created")
 
-        # Perform delete cluster request to bud_cluster app
+        # Perform delete endpoint request to bud_cluster app
         bud_cluster_response = await self._perform_bud_cluster_delete_endpoint_request(
             db_endpoint.cluster.cluster_id, db_endpoint.namespace, current_user_id, db_workflow.id
         )
@@ -104,7 +104,7 @@ class EndpointService(SessionMixin):
         )
         logger.debug(f"Created workflow step {current_step_number} for workflow {db_workflow.id}")
 
-        # Update cluster status to deleting
+        # Update endpoint status to deleting
         await EndpointDataManager(self.session).update_by_fields(db_endpoint, {"status": EndpointStatusEnum.DELETING})
         logger.debug(f"Endpoint {db_endpoint.id} status updated to {EndpointStatusEnum.DELETING.value}")
 
@@ -113,7 +113,7 @@ class EndpointService(SessionMixin):
     async def _perform_bud_cluster_delete_endpoint_request(
         self, bud_cluster_id: UUID, namespace: str, current_user_id: UUID, workflow_id: UUID
     ) -> Dict:
-        """Perform delete cluster request to bud_cluster app.
+        """Perform delete endpoint request to bud_cluster app.
 
         Args:
             bud_cluster_id: The ID of the cluster being served by the endpoint to delete.
