@@ -23,6 +23,7 @@ class RetrieveWorkflowStepData(BaseModel):
     ingress_url: str | None = None
     create_cluster_events: dict | None = None
     delete_cluster_events: dict | None = None
+    delete_endpoint_events: dict | None = None
     model_security_scan_events: dict | None = None
     icon: str | None = None
     uri: str | None = None

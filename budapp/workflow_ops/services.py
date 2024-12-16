@@ -108,6 +108,7 @@ class WorkflowService(SessionMixin):
             ingress_url = required_data.get("ingress_url")
             create_cluster_events = required_data.get(BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value)
             delete_cluster_events = required_data.get(BudServeWorkflowStepEventName.DELETE_CLUSTER_EVENTS.value)
+            delete_endpoint_events = required_data.get(BudServeWorkflowStepEventName.DELETE_ENDPOINT_EVENTS.value)
             model_extraction_events = required_data.get(BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value)
             model_security_scan_events = required_data.get(
                 BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value
@@ -174,6 +175,7 @@ class WorkflowService(SessionMixin):
                 model_security_scan_events=model_security_scan_events if model_security_scan_events else None,
                 security_scan_result=db_model_security_scan_result if db_model_security_scan_result else None,
                 delete_cluster_events=delete_cluster_events if delete_cluster_events else None,
+                delete_endpoint_events=delete_endpoint_events if delete_endpoint_events else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -235,6 +237,9 @@ class WorkflowService(SessionMixin):
             ],
             "delete_cluster": [
                 BudServeWorkflowStepEventName.DELETE_CLUSTER_EVENTS.value,
+            ],
+            "delete_endpoint": [
+                BudServeWorkflowStepEventName.DELETE_ENDPOINT_EVENTS.value,
             ],
         }
 

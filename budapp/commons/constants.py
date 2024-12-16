@@ -467,6 +467,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     MODEL_EXTRACTION_EVENTS = "model_extraction_events"
     MODEL_SECURITY_SCAN_EVENTS = "model_security_scan_events"
     DELETE_CLUSTER_EVENTS = "delete_cluster_events"
+    DELETE_ENDPOINT_EVENTS = "delete_endpoint_events"
 
 
 class ClusterStatusEnum(StrEnum):
@@ -503,6 +504,7 @@ class EndpointStatusEnum(StrEnum):
     DEPLOYING = auto()
     UNHEALTHY = auto()
     DELETING = auto()
+    DELETED = auto()
 
 
 class ModelTemplateTypeEnum(StrEnum):
