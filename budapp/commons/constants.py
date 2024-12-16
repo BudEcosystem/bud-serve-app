@@ -566,7 +566,7 @@ class ModelSecurityScanStatusEnum(StrEnum):
 LICENSE_DIR = "licenses"
 
 
-class StatusEnum(StrEnum):
+class ModelStatusEnum(StrEnum):
     """Enumeration of entity statuses in the system.
 
     Attributes:

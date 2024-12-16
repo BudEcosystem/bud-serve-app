@@ -36,7 +36,7 @@ from budapp.commons.constants import (
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
     WorkflowStatusEnum,
-    StatusEnum,
+    ModelStatusEnum,
 )
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
@@ -145,7 +145,7 @@ class CloudModelWorkflowService(SessionMixin):
 
         if name:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"name": name, "model_status": StatusEnum.ACTIVE}, missing_ok=True
+                Model, {"name": name, "status": ModelStatusEnum.ACTIVE}, missing_ok=True
             )
             if db_model:
                 raise ClientException("Model name already exists")
@@ -256,7 +256,7 @@ class CloudModelWorkflowService(SessionMixin):
 
             # Check duplicate name exist in model
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"name": required_data["name"], "model_status": StatusEnum.ACTIVE}, missing_ok=True
+                Model, {"name": required_data["name"], "status": ModelStatusEnum.ACTIVE}, missing_ok=True
             )
             if db_model:
                 raise ClientException("Model name already exists")
@@ -421,7 +421,7 @@ class CloudModelWorkflowService(SessionMixin):
                 {
                     "uri": query_uri,
                     "source": query_source,
-                    "model_status": StatusEnum.ACTIVE,
+                    "status": ModelStatusEnum.ACTIVE,
                 },
                 missing_ok=True,
             )
@@ -671,7 +671,7 @@ class LocalModelWorkflowService(SessionMixin):
         # Validate model name to be unique
         if name:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"name": name, "model_status": StatusEnum.ACTIVE}, missing_ok=True
+                Model, {"name": name, "status": ModelStatusEnum.ACTIVE}, missing_ok=True
             )
             if db_model:
                 raise ClientException("Model name should be unique")
@@ -835,7 +835,7 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Check for model with duplicate name
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"name": required_data["name"], "model_status": StatusEnum.ACTIVE}, missing_ok=True
+            Model, {"name": required_data["name"], "status": ModelStatusEnum.ACTIVE}, missing_ok=True
         )
         if db_model:
             logger.error(f"Unable to create model with name {required_data['name']} as it already exists")
@@ -1120,7 +1120,7 @@ class LocalModelWorkflowService(SessionMixin):
         # Check duplicate hugging face uri
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
             Model,
-            {"uri": query_uri, "provider_type": query_provider_type, "model_status": StatusEnum.ACTIVE},
+            {"uri": query_uri, "provider_type": query_provider_type, "status": ModelStatusEnum.ACTIVE},
             missing_ok=True,
         )
         if db_model:
@@ -1285,7 +1285,7 @@ class LocalModelWorkflowService(SessionMixin):
         # Validate model id
         if model_id:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"id": model_id, "model_status": StatusEnum.ACTIVE}
+                Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
             )
             if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
                 raise ClientException("Security scan is only supported for local models")
@@ -1421,7 +1421,7 @@ class LocalModelWorkflowService(SessionMixin):
         # Retrieve model local path
         model_id = data.get("model_id")
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"id": model_id, "model_status": StatusEnum.ACTIVE}
+            Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
         )
         local_path = db_model.local_path
 
@@ -1481,7 +1481,7 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Get model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"id": required_data["model_id"], "model_status": StatusEnum.ACTIVE}
+            Model, {"id": required_data["model_id"], "status": ModelStatusEnum.ACTIVE}
         )
         local_path = db_model.local_path
         logger.debug(f"Local path: {local_path}")
@@ -1676,7 +1676,7 @@ class ModelService(SessionMixin):
     async def retrieve_model(self, model_id: UUID) -> ModelDetailSuccessResponse:
         """Retrieve model details by model ID."""
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"id": model_id, "model_status": StatusEnum.ACTIVE}
+            Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
         )
 
         # For base model there won't be any base model value
@@ -1754,7 +1754,7 @@ class ModelService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[str], int]:
         """Search author by name with pagination support."""
-        filters["model_status"] = StatusEnum.ACTIVE
+        filters["status"] = ModelStatusEnum.ACTIVE
         db_models, count = await ModelDataManager(self.session).list_all_model_authors(
             offset, limit, filters, order_by, search
         )
@@ -1767,7 +1767,7 @@ class ModelService(SessionMixin):
         logger.debug(f"edit recieved data: {data}")
         # Retrieve existing model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            model=Model, fields={"id": model_id, "model_status": StatusEnum.ACTIVE}
+            model=Model, fields={"id": model_id, "status": ModelStatusEnum.ACTIVE}
         )
 
         if data.get("name"):
