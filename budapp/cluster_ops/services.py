@@ -479,6 +479,54 @@ class ClusterService(SessionMixin):
             )
             await WorkflowDataManager(self.session).update_by_fields(db_workflow, workflow_data)
 
+    async def delete_cluster_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Delete a cluster in database.
+
+        Args:
+            payload: The payload to delete the cluster with.
+
+        Raises:
+            ClientException: If the cluster already exists.
+        """
+        logger.debug("Received event for deleting cluster")
+
+        # Get workflow and steps
+        workflow_id = payload.workflow_id
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for endpoint creation
+        keys_of_interest = [
+            "cluster_id",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        logger.debug("Collected required data from workflow steps")
+
+        # Retrieve cluster from db
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            ClusterModel, {"id": required_data["cluster_id"], "is_active": True}, missing_ok=True
+        )
+        logger.debug(f"Cluster retrieved successfully: {db_cluster.id}")
+
+        # Mark cluster as deleted
+        db_cluster = await ClusterDataManager(self.session).update_by_fields(
+            db_cluster, {"status": ClusterStatusEnum.DELETED, "is_active": False}
+        )
+        logger.debug(f"Cluster {db_cluster.id} marked as deleted")
+
+        # Mark workflow as completed
+        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
+        logger.debug(f"Workflow {db_workflow.id} marked as completed")
+
     async def _calculate_cluster_resources(self, data: Dict[str, Any]) -> ClusterResourcesInfo:
         """Calculate the cluster resources.
 
@@ -596,6 +644,7 @@ class ClusterService(SessionMixin):
         delete_cluster_events = {
             BudServeWorkflowStepEventName.DELETE_CLUSTER_EVENTS.value: bud_cluster_response,
             "delete_cluster_workflow_id": delete_cluster_workflow_id,
+            "cluster_id": str(db_cluster.id),
         }
 
         # Insert step details in db
