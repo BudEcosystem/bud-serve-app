@@ -446,6 +446,7 @@ class PayloadType(str, Enum):
     DEPLOY_MODEL = "deploy_model"
     REGISTER_CLUSTER = "register_cluster"
     DELETE_CLUSTER = "delete_cluster"
+    DELETE_DEPLOYMENT = "delete_deployment"
     PERFORM_MODEL_EXTRACTION = "perform_model_extraction"
     PERFORM_MODEL_SECURITY_SCAN = "perform_model_security_scan"
 

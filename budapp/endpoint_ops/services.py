@@ -27,9 +27,11 @@ from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.models import Project as ProjectModel
 
 from ..commons.config import app_settings
-from ..commons.constants import BudServeWorkflowStepEventName, EndpointStatusEnum
+from ..commons.constants import BudServeWorkflowStepEventName, EndpointStatusEnum, WorkflowStatusEnum
 from ..commons.exceptions import ClientException
-from ..workflow_ops.crud import WorkflowStepDataManager
+from ..core.schemas import NotificationPayload
+from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
+from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.services import WorkflowService
 from .crud import EndpointDataManager
@@ -148,3 +150,51 @@ class EndpointService(SessionMixin):
         except Exception as e:
             logger.exception(f"Failed to send delete endpoint request: {e}")
             raise ClientException("Failed to delete endpoint") from e
+
+    async def delete_endpoint_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Delete a endpoint in database.
+
+        Args:
+            payload: The payload to delete the endpoint with.
+
+        Raises:
+            ClientException: If the endpoint already exists.
+        """
+        logger.debug("Received event for deleting endpoint")
+
+        # Get workflow and steps
+        workflow_id = payload.workflow_id
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for endpoint deletion
+        keys_of_interest = [
+            "endpoint_id",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        logger.debug("Collected required data from workflow steps")
+
+        # Retrieve endpoint from db
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel, {"id": required_data["endpoint_id"], "is_active": True}
+        )
+        logger.debug(f"Endpoint retrieved successfully: {db_endpoint.id}")
+
+        # Mark endpoint as deleted
+        db_endpoint = await EndpointDataManager(self.session).update_by_fields(
+            db_endpoint, {"status": EndpointStatusEnum.DELETED, "is_active": False}
+        )
+        logger.debug(f"Endpoint {db_endpoint.id} marked as deleted")
+
+        # Mark workflow as completed
+        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
+        logger.debug(f"Workflow {db_workflow.id} marked as completed")
