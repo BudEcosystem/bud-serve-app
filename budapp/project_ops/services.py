@@ -22,6 +22,7 @@ from uuid import UUID
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
+from budapp.commons.constants import ProjectStatusEnum
 
 from .crud import ProjectDataManager
 from .models import Project as ProjectModel
@@ -38,13 +39,13 @@ class ProjectService(SessionMixin):
         # Retrieve existing model
         db_project = await ProjectDataManager(self.session).retrieve_by_fields(
             model=ProjectModel,
-            fields={"id": project_id, "is_active": True},
+            fields={"id": project_id, "status": ProjectStatusEnum.ACTIVE},
         )
 
         if "name" in data:
             duplicate_project = await ProjectDataManager(self.session).retrieve_by_fields(
                 model=ProjectModel,
-                fields={"name": data["name"], "is_active": True},
+                fields={"name": data["name"], "status": ProjectStatusEnum.ACTIVE},
                 exclude_fields={"id": project_id},
                 missing_ok=True,
             )
