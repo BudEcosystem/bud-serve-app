@@ -33,6 +33,8 @@ from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
 
+from ..workflow_ops.schemas import RetrieveWorkflowDataResponse
+from ..workflow_ops.services import WorkflowService
 from .schemas import EndpointFilter, EndpointPaginatedResponse
 from .services import EndpointService
 
@@ -99,3 +101,41 @@ async def list_all_endpoints(
         code=status.HTTP_200_OK,
         message="Successfully list all endpoints",
     ).to_http_response()
+
+
+@endpoint_router.post(
+    "/{endpoint_id}/delete-workflow",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request parameters",
+        },
+        status.HTTP_200_OK: {
+            "model": RetrieveWorkflowDataResponse,
+            "description": "Successfully executed delete endpoint workflow",
+        },
+    },
+    description="Delete an endpoint by ID",
+)
+async def delete_endpoint(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    endpoint_id: UUID,
+) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
+    """Delete a cluster by its ID."""
+    try:
+        db_workflow = await EndpointService(session).delete_endpoint(endpoint_id, current_user.id)
+        return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
+    except ClientException as e:
+        logger.exception(f"Failed to delete endpoint: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete cluster: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to delete cluster",
+        ).to_http_response()
