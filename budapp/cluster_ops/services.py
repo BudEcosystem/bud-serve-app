@@ -29,7 +29,12 @@ from fastapi import UploadFile
 from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension
 from budapp.commons.config import app_settings
-from budapp.commons.constants import BudServeWorkflowStepEventName, ClusterStatusEnum, WorkflowStatusEnum
+from budapp.commons.constants import (
+    BudServeWorkflowStepEventName,
+    ClusterStatusEnum,
+    WorkflowStatusEnum,
+    EndpointStatusEnum,
+)
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.core.schemas import NotificationPayload
@@ -616,7 +621,10 @@ class ClusterService(SessionMixin):
 
         # Check for active endpoints
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-            EndpointModel, {"cluster_id": cluster_id, "is_active": True}, missing_ok=True
+            EndpointModel,
+            fields={"cluster_id": cluster_id},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+            missing_ok=True,
         )
 
         # Raise error if cluster has active endpoints

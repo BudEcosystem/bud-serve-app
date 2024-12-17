@@ -503,6 +503,7 @@ class EndpointStatusEnum(StrEnum):
     DEPLOYING = auto()
     UNHEALTHY = auto()
     DELETING = auto()
+    DELETED = auto()
 
 
 class ModelTemplateTypeEnum(StrEnum):

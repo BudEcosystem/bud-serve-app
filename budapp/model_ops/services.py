@@ -36,6 +36,7 @@ from budapp.commons.constants import (
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
     WorkflowStatusEnum,
+    EndpointStatusEnum,
 )
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
@@ -1688,7 +1689,7 @@ class ModelService(SessionMixin):
         )
 
         db_endpoint_count = await ModelDataManager(self.session).get_count_by_fields(
-            EndpointModel, {"model_id": model_id, "is_active": True}
+            EndpointModel, fields={"model_id": model_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
         )
 
         return ModelDetailSuccessResponse(
