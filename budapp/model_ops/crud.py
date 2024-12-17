@@ -25,7 +25,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
-from budapp.commons.constants import ModelStatusEnum
+from budapp.commons.constants import ModelStatusEnum, CloudModelStatusEnum
 from budapp.commons.exceptions import DatabaseException
 from budapp.endpoint_ops.models import Endpoint
 from budapp.model_ops.models import CloudModel, Model, PaperPublished
@@ -374,17 +374,29 @@ class ModelDataManager(DataManagerUtils):
         # Generate statements according to search or filters
         if search:
             search_conditions = await self.generate_search_stmt(Model, filters)
-            stmt = select(Model).distinct(Model.author).filter(and_(*search_conditions, Model.author.is_not(None)))
+            stmt = (
+                select(Model)
+                .distinct(Model.author)
+                .filter(and_(*search_conditions, Model.author.is_not(None), Model.status == ModelStatusEnum.ACTIVE))
+            )
             count_stmt = select(func.count().label("count")).select_from(
                 select(Model.author)
                 .distinct()
-                .filter(and_(*search_conditions, Model.author.is_not(None)))
+                .filter(and_(*search_conditions, Model.author.is_not(None), Model.status == ModelStatusEnum.ACTIVE))
                 .alias("distinct_authors")
             )
         else:
-            stmt = select(Model).distinct(Model.author).filter_by(**filters).filter(Model.author.is_not(None))
+            stmt = (
+                select(Model)
+                .distinct(Model.author)
+                .filter_by(**filters)
+                .filter(Model.author.is_not(None), Model.status == ModelStatusEnum.ACTIVE)
+            )
             count_stmt = select(func.count().label("count")).select_from(
-                select(Model.author).distinct().filter(Model.author.is_not(None)).alias("distinct_authors")
+                select(Model.author)
+                .distinct()
+                .filter(Model.author.is_not(None), Model.status == ModelStatusEnum.ACTIVE)
+                .alias("distinct_authors")
             )
 
         # Calculate count before applying limit and offset
@@ -485,17 +497,30 @@ class CloudModelDataManager(DataManagerUtils):
         # Generate statements according to search or filters
         if search:
             search_conditions = await self.generate_search_stmt(CloudModel, filters)
-            stmt = select(CloudModel).filter(or_(*search_conditions)).where(or_(*explicit_conditions))
+            stmt = (
+                select(CloudModel)
+                .filter(and_(or_(*search_conditions), CloudModel.status == CloudModelStatusEnum.ACTIVE))
+                .where(or_(*explicit_conditions))
+            )
             count_stmt = (
                 select(func.count())
                 .select_from(CloudModel)
-                .filter(or_(*search_conditions))
+                .filter(and_(or_(*search_conditions), CloudModel.status == CloudModelStatusEnum.ACTIVE))
                 .where(or_(*explicit_conditions))
             )
         else:
-            stmt = select(CloudModel).filter_by(**filters).where(and_(*explicit_conditions))
+            stmt = (
+                select(CloudModel)
+                .filter_by(**filters)
+                .where(and_(*explicit_conditions))
+                .filter(CloudModel.status == CloudModelStatusEnum.ACTIVE)
+            )
             count_stmt = (
-                select(func.count()).select_from(CloudModel).filter_by(**filters).where(and_(*explicit_conditions))
+                select(func.count())
+                .select_from(CloudModel)
+                .filter_by(**filters)
+                .where(and_(*explicit_conditions))
+                .filter(CloudModel.status == CloudModelStatusEnum.ACTIVE)
             )
 
         # Calculate count before applying limit and offset
@@ -527,7 +552,7 @@ class CloudModelDataManager(DataManagerUtils):
                     func.count().label("count"),
                 )
                 .select_from(CloudModel)
-                .where(CloudModel.tags.is_not(None))
+                .where(CloudModel.tags.is_not(None), CloudModel.status == CloudModelStatusEnum.ACTIVE)
                 .group_by(
                     func.jsonb_array_elements(CloudModel.tags).op("->>")("name"),
                     func.jsonb_array_elements(CloudModel.tags).op("->>")("color"),

@@ -34,6 +34,7 @@ from budapp.commons.constants import (
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelStatusEnum,
+    CloudModelStatusEnum,
 )
 from budapp.commons.database import Base
 
@@ -82,7 +83,7 @@ class Model(Base):
     status: Mapped[str] = mapped_column(
         Enum(
             ModelStatusEnum,
-            name="status_enum",
+            name="model_status_enum",
             values_callable=lambda x: [e.value for e in x],
         ),
         nullable=False,
@@ -195,12 +196,12 @@ class CloudModel(Base):
     website_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(
         Enum(
-            ModelStatusEnum,
-            name="status_enum",
+            CloudModelStatusEnum,
+            name="cloud_model_status_enum",
             values_callable=lambda x: [e.value for e in x],
         ),
         nullable=False,
-        default=ModelStatusEnum.ACTIVE,
+        default=CloudModelStatusEnum.ACTIVE,
     )
     modality: Mapped[str] = mapped_column(
         PG_ENUM(

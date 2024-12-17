@@ -37,6 +37,7 @@ from budapp.commons.constants import (
     ModelSourceEnum,
     WorkflowStatusEnum,
     ModelStatusEnum,
+    CloudModelStatusEnum,
 )
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
@@ -137,7 +138,7 @@ class CloudModelWorkflowService(SessionMixin):
 
         if cloud_model_id:
             db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
-                CloudModel, {"id": cloud_model_id}
+                CloudModel, {"id": cloud_model_id, "status": CloudModelStatusEnum.ACTIVE}
             )
 
             if db_cloud_model.is_present_in_model:
@@ -283,7 +284,7 @@ class CloudModelWorkflowService(SessionMixin):
         db_cloud_model = None
         if cloud_model_id:
             db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
-                CloudModel, {"id": cloud_model_id}, missing_ok=True
+                CloudModel, {"id": cloud_model_id, "status": CloudModelStatusEnum.ACTIVE}, missing_ok=True
             )
 
         # Prepare model creation data from input
@@ -291,7 +292,9 @@ class CloudModelWorkflowService(SessionMixin):
 
         # Check for duplicate model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"uri": model_data.uri, "source": model_data.source}, missing_ok=True
+            Model,
+            {"uri": model_data.uri, "source": model_data.source, "status": ModelStatusEnum.ACTIVE},
+            missing_ok=True,
         )
         if db_model:
             logger.info(f"Model {model_data.uri} with {model_data.source} already exists")
@@ -600,7 +603,9 @@ class CloudModelWorkflowService(SessionMixin):
 
         db_cloud_model = (
             await CloudModelDataManager(self.session).retrieve_by_fields(
-                CloudModel, {"id": required_data["cloud_model_id"]}, missing_ok=True
+                CloudModel,
+                {"id": required_data["cloud_model_id"], "status": CloudModelStatusEnum.ACTIVE},
+                missing_ok=True,
             )
             if "cloud_model_id" in required_data
             else None
@@ -608,7 +613,7 @@ class CloudModelWorkflowService(SessionMixin):
 
         db_model = (
             await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"id": UUID(required_data["model_id"])}, missing_ok=True
+                Model, {"id": UUID(required_data["model_id"]), "status": ModelStatusEnum.ACTIVE}, missing_ok=True
             )
             if "model_id" in required_data
             else None
@@ -1773,7 +1778,7 @@ class ModelService(SessionMixin):
         if data.get("name"):
             duplicate_model = await ModelDataManager(self.session).retrieve_by_fields(
                 model=Model,
-                fields={"name": data["name"], "is_active": True},
+                fields={"name": data["name"], "status": ModelStatusEnum.ACTIVE},
                 exclude_fields={"id": model_id},
                 missing_ok=True,
             )
@@ -1824,7 +1829,7 @@ class ModelService(SessionMixin):
     ) -> None:
         """Create or update a license entry in the database."""
         # Check if a license entry with the given model_id exists
-        existing_license = await ModelDataManager(self.session).retrieve_by_fields(
+        existing_license = await ModelLicensesDataManager(self.session).retrieve_by_fields(
             ModelLicenses, fields={"model_id": model_id}, missing_ok=True
         )
         if existing_license:
