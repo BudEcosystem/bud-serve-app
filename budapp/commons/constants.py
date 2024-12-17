@@ -446,6 +446,7 @@ class PayloadType(str, Enum):
     DEPLOY_MODEL = "deploy_model"
     REGISTER_CLUSTER = "register_cluster"
     DELETE_CLUSTER = "delete_cluster"
+    DELETE_DEPLOYMENT = "delete_deployment"
     PERFORM_MODEL_EXTRACTION = "perform_model_extraction"
     PERFORM_MODEL_SECURITY_SCAN = "perform_model_security_scan"
 
@@ -467,6 +468,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     MODEL_EXTRACTION_EVENTS = "model_extraction_events"
     MODEL_SECURITY_SCAN_EVENTS = "model_security_scan_events"
     DELETE_CLUSTER_EVENTS = "delete_cluster_events"
+    DELETE_ENDPOINT_EVENTS = "delete_endpoint_events"
 
 
 class ClusterStatusEnum(StrEnum):
@@ -503,6 +505,7 @@ class EndpointStatusEnum(StrEnum):
     DEPLOYING = auto()
     UNHEALTHY = auto()
     DELETING = auto()
+    DELETED = auto()
 
 
 class ModelTemplateTypeEnum(StrEnum):
