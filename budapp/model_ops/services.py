@@ -953,28 +953,29 @@ class LocalModelWorkflowService(SessionMixin):
         # Dummy Values
         # TODO: remove this after implementing actual service
         strengths = [
-            "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-            "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+            "Efficient processing of large-scale data with optimized memory usage",
+            "Fast inference time with efficient model architecture.",
+            "Scalable architecture suitable for various deployment scenarios",
         ]
         limitations = [
-            "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-            "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+            "Limited performance on out-of-distribution data",
+            "May produce inconsistent outputs for complex queries",
         ]
         examples = [
             {
-                "prompt": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+                "prompt": "Explain the concept of machine learning in simple terms.",
                 "prompt_type": "string",
-                "response": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+                "response": "Machine learning is like teaching a computer by showing it examples. Just as you learn to recognize cats by seeing many cat pictures, a computer can learn patterns from data to make predictions or decisions.",
                 "response_type": "string",
             },
             {
-                "prompt": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+                "prompt": "What are the key differences between AI and human intelligence?",
                 "prompt_type": "string",
-                "response": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+                "response": "AI excels at processing large amounts of data and finding patterns, while human intelligence shines in creativity, emotional understanding, and adaptability. AI learns from specific data, whereas humans can learn from few examples and apply knowledge across different contexts. Humans have consciousness and self-awareness, which AI currently lacks.",
                 "response_type": "string",
             },
         ]
-        minimum_requirements = {"device_name": "Dummy Device", "core": 3, "memory": "32 GB", "RAM": "32 GB"}
+        minimum_requirements = {"device_name": "Xenon Dev", "core": 3, "memory": "32 GB", "RAM": "32 GB"}
         base_model_relation = BaseModelRelationEnum.ADAPTER
 
         # Base model, Base model relation, fields will be none for base models
