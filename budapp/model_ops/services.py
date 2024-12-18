@@ -1885,7 +1885,7 @@ class ModelService(SessionMixin):
         # Add new paper URLs
         if urls_to_add:
             urls_to_add = [
-                PaperPublished(id=uuid4(), title=None, url=str(paper_url), model_id=model_id)
+                PaperPublished(id=uuid4(), title="Untitled Research Paper", url=str(paper_url), model_id=model_id)
                 for paper_url in urls_to_add
             ]
             await PaperPublishedDataManager(self.session).insert_all(urls_to_add)
