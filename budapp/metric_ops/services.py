@@ -61,13 +61,14 @@ class MetricService(SessionMixin):
     ) -> PerformanceAnalyticsResponse:
         """Get request performance analytics."""
         bud_metric_response = await self._perform_request_performance_analytics(request)
-        logger.debug(f"Bud metric response: {bud_metric_response}")
 
         return PerformanceAnalyticsResponse(
             code=status.HTTP_200_OK,
             object="request.performance.analytics",
             message="Successfully fetched request performance analytics",
-            data="Dummy data",
+            ttft_metrics=bud_metric_response["ttft_metrics"],
+            latency_metrics=bud_metric_response["latency_metrics"],
+            throughput_metrics=bud_metric_response["throughput_metrics"],
         )
 
     @staticmethod
