@@ -1,8 +1,8 @@
 """added status to project table
 
-Revision ID: 27a44af3fdfe
-Revises: b15331009e3f
-Create Date: 2024-12-16 09:55:02.458803
+Revision ID: 04ef4a274216
+Revises: cbbdd257bedd
+Create Date: 2024-12-18 10:16:17.791188
 
 """
 
@@ -13,8 +13,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = "27a44af3fdfe"
-down_revision: Union[str, None] = "4d5cd5449049"
+revision: str = "04ef4a274216"
+down_revision: Union[str, None] = "cbbdd257bedd"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
