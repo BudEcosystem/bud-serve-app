@@ -407,7 +407,7 @@ class CreateLocalModelWorkflowSteps(BaseModel):
 
 class EditModel(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
-    description: str | None = Field(None, max_length=300)
+    description: str | None = Field(None, max_length=400)
     tags: List[Tag] | None = None
     tasks: List[Task] | None = None
     icon: str | None = None
