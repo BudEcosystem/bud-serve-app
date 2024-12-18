@@ -1537,46 +1537,6 @@
             }
         ]
     },
-    "palm": {
-        "models": [
-            {
-                "name": "palm/chat-bison",
-                "modality": "llm",
-                "source": "palm",
-                "uri": "palm/chat-bison"
-            },
-            {
-                "name": "palm/chat-bison-001",
-                "modality": "llm",
-                "source": "palm",
-                "uri": "palm/chat-bison-001"
-            },
-            {
-                "name": "palm/text-bison",
-                "modality": "llm",
-                "source": "palm",
-                "uri": "palm/text-bison"
-            },
-            {
-                "name": "palm/text-bison-001",
-                "modality": "llm",
-                "source": "palm",
-                "uri": "palm/text-bison-001"
-            },
-            {
-                "name": "palm/text-bison-safety-off",
-                "modality": "llm",
-                "source": "palm",
-                "uri": "palm/text-bison-safety-off"
-            },
-            {
-                "name": "palm/text-bison-safety-recitation-off",
-                "modality": "llm",
-                "source": "palm",
-                "uri": "palm/text-bison-safety-recitation-off"
-            }
-        ]
-    },
     "gemini": {
         "models": [
             {

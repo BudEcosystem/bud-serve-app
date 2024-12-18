@@ -159,7 +159,6 @@ ModelSourceEnum = create_dynamic_enum(
         "perplexity",
         "vertex_ai-code-text-models",
         "vertex_ai-text-models",
-        "palm",
         "cohere_chat",
         "vertex_ai-embedding-models",
         "text-completion-openai",
@@ -445,6 +444,8 @@ class PayloadType(str, Enum):
     DEPLOYMENT_RECOMMENDATION = "deployment_recommendation"
     DEPLOY_MODEL = "deploy_model"
     REGISTER_CLUSTER = "register_cluster"
+    DELETE_CLUSTER = "delete_cluster"
+    DELETE_DEPLOYMENT = "delete_deployment"
     PERFORM_MODEL_EXTRACTION = "perform_model_extraction"
     PERFORM_MODEL_SECURITY_SCAN = "perform_model_security_scan"
 
@@ -465,6 +466,8 @@ class BudServeWorkflowStepEventName(str, Enum):
     CREATE_CLUSTER_EVENTS = "create_cluster_events"
     MODEL_EXTRACTION_EVENTS = "model_extraction_events"
     MODEL_SECURITY_SCAN_EVENTS = "model_security_scan_events"
+    DELETE_CLUSTER_EVENTS = "delete_cluster_events"
+    DELETE_ENDPOINT_EVENTS = "delete_endpoint_events"
 
 
 class ClusterStatusEnum(StrEnum):
@@ -481,6 +484,8 @@ class ClusterStatusEnum(StrEnum):
     NOT_AVAILABLE = auto()
     REGISTERING = auto()
     ERROR = auto()
+    DELETING = auto()
+    DELETED = auto()
 
 
 class EndpointStatusEnum(StrEnum):
@@ -499,6 +504,7 @@ class EndpointStatusEnum(StrEnum):
     DEPLOYING = auto()
     UNHEALTHY = auto()
     DELETING = auto()
+    DELETED = auto()
 
 
 class ModelTemplateTypeEnum(StrEnum):
@@ -564,6 +570,30 @@ class ModelSecurityScanStatusEnum(StrEnum):
 
 
 LICENSE_DIR = "licenses"
+
+
+class ModelStatusEnum(StrEnum):
+    """Enumeration of entity statuses in the system.
+
+    Attributes:
+        ACTIVE: Represents an active entity.
+        DELETED: Represents an deleted entity.
+    """
+
+    ACTIVE = auto()
+    DELETED = auto()
+
+
+class CloudModelStatusEnum(StrEnum):
+    """Enumeration of entity statuses in the system.
+
+    Attributes:
+        ACTIVE: Represents an active entity.
+        DELETED: Represents an deleted entity.
+    """
+
+    ACTIVE = auto()
+    DELETED = auto()
 
 
 class StatusEnum(StrEnum):

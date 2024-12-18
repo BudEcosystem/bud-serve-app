@@ -31,12 +31,13 @@ from .commons import logging
 from .commons.config import app_settings
 from .commons.constants import Environment
 from .core import common_routes, meta_routes, notify_routes
+from .endpoint_ops import endpoint_routes
 from .initializers.seeder import seeders
+from .metric_ops import metric_routes
 from .model_ops import model_routes
+from .project_ops import project_routes
 from .user_ops import user_routes
 from .workflow_ops import workflow_routes
-from .endpoint_ops import endpoint_routes
-from .project_ops import project_routes
 
 
 logger = logging.get_logger(__name__)
@@ -124,6 +125,7 @@ internal_router.include_router(cluster_routes.cluster_router)
 internal_router.include_router(common_routes.common_router)
 internal_router.include_router(endpoint_routes.endpoint_router)
 internal_router.include_router(meta_routes.meta_router)
+internal_router.include_router(metric_routes.metric_router)
 internal_router.include_router(model_routes.model_router)
 internal_router.include_router(notify_routes.notify_router)
 internal_router.include_router(user_routes.user_router)

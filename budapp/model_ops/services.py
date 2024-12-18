@@ -36,6 +36,8 @@ from budapp.commons.constants import (
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
     WorkflowStatusEnum,
+    ModelStatusEnum,
+    CloudModelStatusEnum,
 )
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
@@ -136,7 +138,7 @@ class CloudModelWorkflowService(SessionMixin):
 
         if cloud_model_id:
             db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
-                CloudModel, {"id": cloud_model_id}
+                CloudModel, {"id": cloud_model_id, "status": CloudModelStatusEnum.ACTIVE}
             )
 
             if db_cloud_model.is_present_in_model:
@@ -144,7 +146,7 @@ class CloudModelWorkflowService(SessionMixin):
 
         if name:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"name": name, "is_active": True}, missing_ok=True
+                Model, {"name": name, "status": ModelStatusEnum.ACTIVE}, missing_ok=True
             )
             if db_model:
                 raise ClientException("Model name already exists")
@@ -255,7 +257,7 @@ class CloudModelWorkflowService(SessionMixin):
 
             # Check duplicate name exist in model
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"name": required_data["name"], "is_active": True}, missing_ok=True
+                Model, {"name": required_data["name"], "status": ModelStatusEnum.ACTIVE}, missing_ok=True
             )
             if db_model:
                 raise ClientException("Model name already exists")
@@ -282,7 +284,7 @@ class CloudModelWorkflowService(SessionMixin):
         db_cloud_model = None
         if cloud_model_id:
             db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
-                CloudModel, {"id": cloud_model_id}, missing_ok=True
+                CloudModel, {"id": cloud_model_id, "status": CloudModelStatusEnum.ACTIVE}, missing_ok=True
             )
 
         # Prepare model creation data from input
@@ -290,7 +292,9 @@ class CloudModelWorkflowService(SessionMixin):
 
         # Check for duplicate model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"uri": model_data.uri, "source": model_data.source}, missing_ok=True
+            Model,
+            {"uri": model_data.uri, "source": model_data.source, "status": ModelStatusEnum.ACTIVE},
+            missing_ok=True,
         )
         if db_model:
             logger.info(f"Model {model_data.uri} with {model_data.source} already exists")
@@ -420,7 +424,7 @@ class CloudModelWorkflowService(SessionMixin):
                 {
                     "uri": query_uri,
                     "source": query_source,
-                    "is_active": True,
+                    "status": ModelStatusEnum.ACTIVE,
                 },
                 missing_ok=True,
             )
@@ -599,7 +603,9 @@ class CloudModelWorkflowService(SessionMixin):
 
         db_cloud_model = (
             await CloudModelDataManager(self.session).retrieve_by_fields(
-                CloudModel, {"id": required_data["cloud_model_id"]}, missing_ok=True
+                CloudModel,
+                {"id": required_data["cloud_model_id"], "status": CloudModelStatusEnum.ACTIVE},
+                missing_ok=True,
             )
             if "cloud_model_id" in required_data
             else None
@@ -607,7 +613,7 @@ class CloudModelWorkflowService(SessionMixin):
 
         db_model = (
             await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"id": UUID(required_data["model_id"])}, missing_ok=True
+                Model, {"id": UUID(required_data["model_id"]), "status": ModelStatusEnum.ACTIVE}, missing_ok=True
             )
             if "model_id" in required_data
             else None
@@ -670,7 +676,7 @@ class LocalModelWorkflowService(SessionMixin):
         # Validate model name to be unique
         if name:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"name": name, "is_active": True}, missing_ok=True
+                Model, {"name": name, "status": ModelStatusEnum.ACTIVE}, missing_ok=True
             )
             if db_model:
                 raise ClientException("Model name should be unique")
@@ -834,7 +840,7 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Check for model with duplicate name
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"name": required_data["name"], "is_active": True}, missing_ok=True
+            Model, {"name": required_data["name"], "status": ModelStatusEnum.ACTIVE}, missing_ok=True
         )
         if db_model:
             logger.error(f"Unable to create model with name {required_data['name']} as it already exists")
@@ -953,28 +959,29 @@ class LocalModelWorkflowService(SessionMixin):
         # Dummy Values
         # TODO: remove this after implementing actual service
         strengths = [
-            "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-            "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+            "Efficient processing of large-scale data with optimized memory usage",
+            "Fast inference time with efficient model architecture.",
+            "Scalable architecture suitable for various deployment scenarios",
         ]
         limitations = [
-            "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-            "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+            "Limited performance on out-of-distribution data",
+            "May produce inconsistent outputs for complex queries",
         ]
         examples = [
             {
-                "prompt": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+                "prompt": "Explain the concept of machine learning in simple terms.",
                 "prompt_type": "string",
-                "response": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+                "response": "Machine learning is like teaching a computer by showing it examples. Just as you learn to recognize cats by seeing many cat pictures, a computer can learn patterns from data to make predictions or decisions.",
                 "response_type": "string",
             },
             {
-                "prompt": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+                "prompt": "What are the key differences between AI and human intelligence?",
                 "prompt_type": "string",
-                "response": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+                "response": "AI excels at processing large amounts of data and finding patterns, while human intelligence shines in creativity, emotional understanding, and adaptability. AI learns from specific data, whereas humans can learn from few examples and apply knowledge across different contexts. Humans have consciousness and self-awareness, which AI currently lacks.",
                 "response_type": "string",
             },
         ]
-        minimum_requirements = {"device_name": "Dummy Device", "core": 3, "memory": "32 GB", "RAM": "32 GB"}
+        minimum_requirements = {"device_name": "Xenon Dev", "core": 3, "memory": "32 GB", "RAM": "32 GB"}
         base_model_relation = BaseModelRelationEnum.ADAPTER
 
         # Base model, Base model relation, fields will be none for base models
@@ -1118,7 +1125,9 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Check duplicate hugging face uri
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"uri": query_uri, "provider_type": query_provider_type, "is_active": True}, missing_ok=True
+            Model,
+            {"uri": query_uri, "provider_type": query_provider_type, "status": ModelStatusEnum.ACTIVE},
+            missing_ok=True,
         )
         if db_model:
             raise ClientException(f"Duplicate {query_provider_type} uri found")
@@ -1282,7 +1291,7 @@ class LocalModelWorkflowService(SessionMixin):
         # Validate model id
         if model_id:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"id": model_id, "is_active": True}
+                Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
             )
             if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
                 raise ClientException("Security scan is only supported for local models")
@@ -1417,7 +1426,9 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Retrieve model local path
         model_id = data.get("model_id")
-        db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": model_id, "is_active": True})
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
+        )
         local_path = db_model.local_path
 
         model_security_scan_request = {
@@ -1476,7 +1487,7 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Get model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"id": required_data["model_id"], "is_active": True}
+            Model, {"id": required_data["model_id"], "status": ModelStatusEnum.ACTIVE}
         )
         local_path = db_model.local_path
         logger.debug(f"Local path: {local_path}")
@@ -1670,7 +1681,9 @@ class ModelService(SessionMixin):
 
     async def retrieve_model(self, model_id: UUID) -> ModelDetailSuccessResponse:
         """Retrieve model details by model ID."""
-        db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": model_id, "is_active": True})
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
+        )
 
         # For base model there won't be any base model value
         base_model = db_model.base_model
@@ -1747,7 +1760,7 @@ class ModelService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[str], int]:
         """Search author by name with pagination support."""
-        filters["is_active"] = True
+        filters["status"] = ModelStatusEnum.ACTIVE
         db_models, count = await ModelDataManager(self.session).list_all_model_authors(
             offset, limit, filters, order_by, search
         )
@@ -1760,13 +1773,13 @@ class ModelService(SessionMixin):
         logger.debug(f"edit recieved data: {data}")
         # Retrieve existing model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            model=Model, fields={"id": model_id, "is_active": True}
+            model=Model, fields={"id": model_id, "status": ModelStatusEnum.ACTIVE}
         )
 
         if data.get("name"):
             duplicate_model = await ModelDataManager(self.session).retrieve_by_fields(
                 model=Model,
-                fields={"name": data["name"], "is_active": True},
+                fields={"name": data["name"], "status": ModelStatusEnum.ACTIVE},
                 exclude_fields={"id": model_id},
                 missing_ok=True,
             )
@@ -1817,7 +1830,7 @@ class ModelService(SessionMixin):
     ) -> None:
         """Create or update a license entry in the database."""
         # Check if a license entry with the given model_id exists
-        existing_license = await ModelDataManager(self.session).retrieve_by_fields(
+        existing_license = await ModelLicensesDataManager(self.session).retrieve_by_fields(
             ModelLicenses, fields={"model_id": model_id}, missing_ok=True
         )
         if existing_license:
@@ -1872,7 +1885,7 @@ class ModelService(SessionMixin):
         # Add new paper URLs
         if urls_to_add:
             urls_to_add = [
-                PaperPublished(id=uuid4(), title=None, url=str(paper_url), model_id=model_id)
+                PaperPublished(id=uuid4(), title="Untitled Research Paper", url=str(paper_url), model_id=model_id)
                 for paper_url in urls_to_add
             ]
             await PaperPublishedDataManager(self.session).insert_all(urls_to_add)
