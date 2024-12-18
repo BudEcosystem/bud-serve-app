@@ -36,26 +36,26 @@ class BaseAnalyticsRequest(BaseModel):
     top_k: int | None = None
 
 
-class RequestCountAnalyticsRequest(BaseAnalyticsRequest):
+class CountAnalyticsRequest(BaseAnalyticsRequest):
     """Request count analytics request schema."""
 
     metrics: Literal["overall", "concurrency"] = "overall"
 
 
-class RequestCountAnalyticsResponse(SuccessResponse):
+class CountAnalyticsResponse(SuccessResponse):
     """Request count analytics response schema."""
 
     overall_metrics: dict
     concurrency_metrics: dict | None = None
 
 
-class RequestPerformanceAnalyticsRequest(BaseAnalyticsRequest):
+class PerformanceAnalyticsRequest(BaseAnalyticsRequest):
     """Request performance analytics request schema."""
 
     metrics: Literal["ttft", "latency", "throughput"] = "ttft"
 
 
-class RequestPerformanceAnalyticsResponse(SuccessResponse):
+class PerformanceAnalyticsResponse(SuccessResponse):
     """Request performance analytics response schema."""
 
     data: str  # TODO: Remove this once we have the actual data

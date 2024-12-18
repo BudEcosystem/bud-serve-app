@@ -32,10 +32,10 @@ from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
 
 from .schemas import (
-    RequestCountAnalyticsRequest,
-    RequestCountAnalyticsResponse,
-    RequestPerformanceAnalyticsRequest,
-    RequestPerformanceAnalyticsResponse,
+    CountAnalyticsRequest,
+    CountAnalyticsResponse,
+    PerformanceAnalyticsRequest,
+    PerformanceAnalyticsResponse,
 )
 from .services import MetricService
 
@@ -57,7 +57,7 @@ metric_router = APIRouter(prefix="/metrics", tags=["metric"])
             "description": "Service is unavailable due to client error",
         },
         status.HTTP_200_OK: {
-            "model": RequestCountAnalyticsResponse,
+            "model": CountAnalyticsResponse,
             "description": "Successfully get request count analytics",
         },
     },
@@ -66,8 +66,8 @@ metric_router = APIRouter(prefix="/metrics", tags=["metric"])
 async def get_request_count_analytics(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    metric_request: RequestCountAnalyticsRequest,
-) -> Union[RequestCountAnalyticsResponse, ErrorResponse]:
+    metric_request: CountAnalyticsRequest,
+) -> Union[CountAnalyticsResponse, ErrorResponse]:
     """Get request count analytics."""
     try:
         return await MetricService(session).get_request_count_analytics(metric_request)
@@ -93,7 +93,7 @@ async def get_request_count_analytics(
             "description": "Service is unavailable due to client error",
         },
         status.HTTP_200_OK: {
-            "model": RequestPerformanceAnalyticsResponse,
+            "model": PerformanceAnalyticsResponse,
             "description": "Successfully get request performance analytics",
         },
     },
@@ -102,8 +102,8 @@ async def get_request_count_analytics(
 async def get_request_performance_analytics(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    metric_request: RequestPerformanceAnalyticsRequest,
-) -> Union[RequestPerformanceAnalyticsResponse, ErrorResponse]:
+    metric_request: PerformanceAnalyticsRequest,
+) -> Union[PerformanceAnalyticsResponse, ErrorResponse]:
     """Get request performance analytics."""
     try:
         return await MetricService(session).get_request_performance_analytics(metric_request)

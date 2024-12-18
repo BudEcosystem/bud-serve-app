@@ -27,10 +27,10 @@ from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 
 from .schemas import (
-    RequestCountAnalyticsRequest,
-    RequestCountAnalyticsResponse,
-    RequestPerformanceAnalyticsRequest,
-    RequestPerformanceAnalyticsResponse,
+    CountAnalyticsRequest,
+    CountAnalyticsResponse,
+    PerformanceAnalyticsRequest,
+    PerformanceAnalyticsResponse,
 )
 
 
@@ -42,12 +42,12 @@ class MetricService(SessionMixin):
 
     async def get_request_count_analytics(
         self,
-        request: RequestCountAnalyticsRequest,
-    ) -> RequestCountAnalyticsResponse:
+        request: CountAnalyticsRequest,
+    ) -> CountAnalyticsResponse:
         """Get request count analytics."""
         bud_metric_response = await self._perform_request_count_analytics(request)
 
-        return RequestCountAnalyticsResponse(
+        return CountAnalyticsResponse(
             code=status.HTTP_200_OK,
             object="request.count.analytics",
             message="Successfully fetched request count analytics",
@@ -57,13 +57,13 @@ class MetricService(SessionMixin):
 
     async def get_request_performance_analytics(
         self,
-        request: RequestPerformanceAnalyticsRequest,
-    ) -> RequestPerformanceAnalyticsResponse:
+        request: PerformanceAnalyticsRequest,
+    ) -> PerformanceAnalyticsResponse:
         """Get request performance analytics."""
         bud_metric_response = await self._perform_request_performance_analytics(request)
         logger.debug(f"Bud metric response: {bud_metric_response}")
 
-        return RequestPerformanceAnalyticsResponse(
+        return PerformanceAnalyticsResponse(
             code=status.HTTP_200_OK,
             object="request.performance.analytics",
             message="Successfully fetched request performance analytics",
@@ -72,7 +72,7 @@ class MetricService(SessionMixin):
 
     @staticmethod
     async def _perform_request_count_analytics(
-        metric_request: RequestCountAnalyticsRequest,
+        metric_request: CountAnalyticsRequest,
     ) -> Dict:
         """Get request count analytics."""
         request_count_analytics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/analytics/request-counts"
@@ -103,7 +103,7 @@ class MetricService(SessionMixin):
 
     @staticmethod
     async def _perform_request_performance_analytics(
-        metric_request: RequestPerformanceAnalyticsRequest,
+        metric_request: PerformanceAnalyticsRequest,
     ) -> Dict:
         """Get request performance analytics."""
         request_performance_analytics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/analytics/request-performance"
