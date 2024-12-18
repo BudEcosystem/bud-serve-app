@@ -159,7 +159,6 @@ ModelSourceEnum = create_dynamic_enum(
         "perplexity",
         "vertex_ai-code-text-models",
         "vertex_ai-text-models",
-        "palm",
         "cohere_chat",
         "vertex_ai-embedding-models",
         "text-completion-openai",
