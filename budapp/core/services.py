@@ -42,6 +42,7 @@ from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManage
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
+from ..endpoint_ops.services import EndpointService
 from .crud import IconDataManager
 from .models import Icon as IconModel
 from .schemas import NotificationPayload, NotificationResponse
@@ -139,6 +140,21 @@ class NotificationService(SessionMixin):
         # Create cluster in database if node info fetched successfully
         if payload.content.status == "COMPLETED" and payload.content.title == "Cluster deleted successfully":
             await ClusterService(self.session).delete_cluster_from_notification_event(payload)
+
+    async def update_delete_endpoint_events(self, payload: NotificationPayload) -> None:
+        """Update the delete endpoint events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.DELETE_ENDPOINT_EVENTS.value, payload)
+
+        # Create cluster in database if node info fetched successfully
+        if payload.content.status == "COMPLETED" and payload.content.title == "Deployment deleted successfully":
+            await EndpointService(self.session).delete_endpoint_from_notification_event(payload)
 
     async def update_model_security_scan_events(self, payload: NotificationPayload) -> None:
         """Update the model security scan events for a workflow step.
@@ -329,6 +345,7 @@ class SubscriberHandler:
             PayloadType.PERFORM_MODEL_EXTRACTION: self._handle_perform_model_extraction,
             PayloadType.PERFORM_MODEL_SECURITY_SCAN: self._handle_perform_model_security_scan,
             PayloadType.DELETE_CLUSTER: self._handle_delete_cluster,
+            PayloadType.DELETE_DEPLOYMENT: self._handle_delete_endpoint,
         }
 
         handler = handlers.get(payload.type)
@@ -386,6 +403,14 @@ class SubscriberHandler:
         return NotificationResponse(
             object="notification",
             message="Updated delete cluster event in workflow step",
+        ).to_http_response()
+
+    async def _handle_delete_endpoint(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the delete endpoint event."""
+        await NotificationService(self.session).update_delete_endpoint_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated delete endpoint event in workflow step",
         ).to_http_response()
 
 
