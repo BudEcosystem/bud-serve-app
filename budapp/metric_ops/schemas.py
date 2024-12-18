@@ -25,8 +25,8 @@ from pydantic import UUID4, BaseModel
 from ..commons.schemas import SuccessResponse
 
 
-class RequestCountAnalyticsRequest(BaseModel):
-    """Request count analytics request schema."""
+class BaseAnalyticsRequest(BaseModel):
+    """Base analytics request schema."""
 
     frequency: Literal["hourly", "daily", "weekly", "monthly", "quarterly", "yearly"]
     filter_by: Literal["project", "model", "endpoint"]
@@ -34,7 +34,12 @@ class RequestCountAnalyticsRequest(BaseModel):
     from_date: datetime
     to_date: datetime | None = None
     top_k: int | None = None
-    metrics: Literal["overall", "concurrency"] | None = None
+
+
+class RequestCountAnalyticsRequest(BaseAnalyticsRequest):
+    """Request count analytics request schema."""
+
+    metrics: Literal["overall", "concurrency"] = "overall"
 
 
 class RequestCountAnalyticsResponse(SuccessResponse):
@@ -42,3 +47,15 @@ class RequestCountAnalyticsResponse(SuccessResponse):
 
     overall_metrics: dict
     concurrency_metrics: dict | None = None
+
+
+class RequestPerformanceAnalyticsRequest(BaseAnalyticsRequest):
+    """Request performance analytics request schema."""
+
+    metrics: Literal["ttft", "latency", "throughput"] = "ttft"
+
+
+class RequestPerformanceAnalyticsResponse(SuccessResponse):
+    """Request performance analytics response schema."""
+
+    data: str  # TODO: Remove this once we have the actual data

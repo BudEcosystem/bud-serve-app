@@ -29,6 +29,8 @@ from budapp.commons.exceptions import ClientException
 from .schemas import (
     RequestCountAnalyticsRequest,
     RequestCountAnalyticsResponse,
+    RequestPerformanceAnalyticsRequest,
+    RequestPerformanceAnalyticsResponse,
 )
 
 
@@ -51,6 +53,21 @@ class MetricService(SessionMixin):
             message="Successfully fetched request count analytics",
             overall_metrics=bud_metric_response["overall_metrics"],
             concurrency_metrics=bud_metric_response["concurrency_metrics"],
+        )
+
+    async def get_request_performance_analytics(
+        self,
+        request: RequestPerformanceAnalyticsRequest,
+    ) -> RequestPerformanceAnalyticsResponse:
+        """Get request performance analytics."""
+        bud_metric_response = await self._perform_request_performance_analytics(request)
+        logger.debug(f"Bud metric response: {bud_metric_response}")
+
+        return RequestPerformanceAnalyticsResponse(
+            code=status.HTTP_200_OK,
+            object="request.performance.analytics",
+            message="Successfully fetched request performance analytics",
+            data="Dummy data",
         )
 
     @staticmethod
@@ -82,4 +99,36 @@ class MetricService(SessionMixin):
             logger.exception(f"Failed to send request count analytics request: {e}")
             raise ClientException(
                 "Failed to get request count analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    @staticmethod
+    async def _perform_request_performance_analytics(
+        metric_request: RequestPerformanceAnalyticsRequest,
+    ) -> Dict:
+        """Get request performance analytics."""
+        request_performance_analytics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/analytics/request-performance"
+
+        logger.debug(
+            f"Performing request performance analytics request to bud_metric {metric_request.model_dump(exclude_none=True, exclude_unset=True, mode='json')}"
+        )
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    request_performance_analytics_endpoint,
+                    json=metric_request.model_dump(exclude_none=True, exclude_unset=True, mode="json"),
+                ) as response:
+                    response_data = await response.json()
+                    if response.status != status.HTTP_200_OK:
+                        logger.error(f"Failed to get request performance analytics: {response.status} {response_data}")
+                        raise ClientException(
+                            "Failed to get request performance analytics",
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        )
+
+                    logger.debug("Successfully get request performance analytics from budmetric")
+                    return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send request performance analytics request: {e}")
+            raise ClientException(
+                "Failed to get request performance analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e

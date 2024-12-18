@@ -31,7 +31,12 @@ from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
 
-from .schemas import RequestCountAnalyticsRequest, RequestCountAnalyticsResponse
+from .schemas import (
+    RequestCountAnalyticsRequest,
+    RequestCountAnalyticsResponse,
+    RequestPerformanceAnalyticsRequest,
+    RequestPerformanceAnalyticsResponse,
+)
 from .services import MetricService
 
 
@@ -73,4 +78,40 @@ async def get_request_count_analytics(
         logger.exception(f"Failed to get request count analytics: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get request count analytics"
+        ).to_http_response()
+
+
+@metric_router.post(
+    "/analytics/request-performance",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RequestPerformanceAnalyticsResponse,
+            "description": "Successfully get request performance analytics",
+        },
+    },
+    description="Get request performance analytics",
+)
+async def get_request_performance_analytics(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    metric_request: RequestPerformanceAnalyticsRequest,
+) -> Union[RequestPerformanceAnalyticsResponse, ErrorResponse]:
+    """Get request performance analytics."""
+    try:
+        return await MetricService(session).get_request_performance_analytics(metric_request)
+    except ClientException as e:
+        logger.exception(f"Failed to get request performance analytics: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get request performance analytics: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get request performance analytics"
         ).to_http_response()
