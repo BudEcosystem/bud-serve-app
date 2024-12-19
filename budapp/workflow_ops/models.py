@@ -17,14 +17,16 @@
 """The workflow ops package, containing essential business logic, services, and routing configurations for the workflow ops."""
 
 from datetime import datetime
+from typing import Any, Dict, List, Union
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from budapp.commons.constants import WorkflowStatusEnum
 from budapp.commons.database import Base
+
+from ..commons.constants import WorkflowStatusEnum, WorkflowTypeEnum
 
 
 class Workflow(Base):
@@ -42,6 +44,17 @@ class Workflow(Base):
         ),
         default=WorkflowStatusEnum.IN_PROGRESS.value,
     )
+    workflow_type: Mapped[str] = mapped_column(
+        Enum(
+            WorkflowTypeEnum,
+            name="workflow_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String, nullable=True)
+    icon: Mapped[str] = mapped_column(String, nullable=False)
+    progress: Mapped[Union[Dict[str, Any], List[Any]]] = mapped_column(JSONB, nullable=True)
     current_step: Mapped[int] = mapped_column(Integer, default=0)
     total_steps: Mapped[int] = mapped_column(Integer, nullable=False)
     reason: Mapped[str] = mapped_column(String, nullable=True)
