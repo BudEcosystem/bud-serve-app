@@ -407,6 +407,18 @@ class WorkflowStatusEnum(StrEnum):
     # Cancelled status not required since workflow delete api delete record
 
 
+class WorkflowTypeEnum(StrEnum):
+    """Enumeration of workflow types."""
+
+    MODEL_DEPLOYMENT = auto()
+    MODEL_SECURITY_SCAN = auto()
+    CLUSTER_ONBOARDING = auto()
+    CLUSTER_DELETION = auto()
+    ENDPOINT_DELETION = auto()
+    CLOUD_MODEL_ONBOARDING = auto()
+    LOCAL_MODEL_ONBOARDING = auto()
+
+
 class NotificationType(Enum):
     """Represents the type of a notification.
 
