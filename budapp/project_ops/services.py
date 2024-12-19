@@ -22,7 +22,7 @@ from uuid import UUID
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
-from budapp.commons.constants import ProjectStatusEnum
+from ..commons.constants import ProjectStatusEnum
 
 from .crud import ProjectDataManager
 from .models import Project as ProjectModel

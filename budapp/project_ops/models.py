@@ -24,7 +24,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.database import Base
-from budapp.commons.constants import ProjectStatusEnum
+from ..commons.constants import ProjectStatusEnum
 
 project_user_association = Table(
     "project_user_association",
