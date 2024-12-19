@@ -17,7 +17,7 @@
 """The workflow ops package, containing essential business logic, services, and routing configurations for the workflow ops."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Uuid
@@ -53,7 +53,7 @@ class Workflow(Base):
         nullable=False,
     )
     title: Mapped[str] = mapped_column(String, nullable=True)
-    icon: Mapped[str] = mapped_column(String, nullable=False)
+    icon: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     progress: Mapped[Union[Dict[str, Any], List[Any]]] = mapped_column(JSONB, nullable=True)
     current_step: Mapped[int] = mapped_column(Integer, default=0)
     total_steps: Mapped[int] = mapped_column(Integer, nullable=False)
