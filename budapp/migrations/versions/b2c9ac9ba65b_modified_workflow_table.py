@@ -1,8 +1,8 @@
 """Modified Workflow Table
 
-Revision ID: d22d7a37e7a9
+Revision ID: b2c9ac9ba65b
 Revises: d92d92c1c90c
-Create Date: 2024-12-19 10:46:35.317902
+Create Date: 2024-12-19 13:30:12.338808
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'd22d7a37e7a9'
+revision: str = 'b2c9ac9ba65b'
 down_revision: Union[str, None] = 'd92d92c1c90c'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -23,7 +23,7 @@ def upgrade() -> None:
     sa.Enum('model_deployment', 'model_security_scan', 'cluster_onboarding', 'cluster_deletion', 'endpoint_deletion', 'cloud_model_onboarding', 'local_model_onboarding', name='workflow_type_enum').create(op.get_bind())
     op.add_column('workflow', sa.Column('workflow_type', postgresql.ENUM('model_deployment', 'model_security_scan', 'cluster_onboarding', 'cluster_deletion', 'endpoint_deletion', 'cloud_model_onboarding', 'local_model_onboarding', name='workflow_type_enum', create_type=False), nullable=False))
     op.add_column('workflow', sa.Column('title', sa.String(), nullable=True))
-    op.add_column('workflow', sa.Column('icon', sa.String(), nullable=False))
+    op.add_column('workflow', sa.Column('icon', sa.String(), nullable=True))
     op.add_column('workflow', sa.Column('progress', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
     # ### end Alembic commands ###
 
