@@ -29,7 +29,7 @@ from fastapi import UploadFile
 from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension
 from budapp.commons.config import app_settings
-from budapp.commons.constants import BudServeWorkflowStepEventName, ClusterStatusEnum, WorkflowStatusEnum, StatusEnum
+from budapp.commons.constants import BudServeWorkflowStepEventName, ClusterStatusEnum, WorkflowStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.core.schemas import NotificationPayload
@@ -67,11 +67,9 @@ class ClusterService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[ClusterPaginatedResponse], int]:
         """Get all active clusters."""
-        filters_dict = filters
-        filters_dict["cluster_status"] = StatusEnum.ACTIVE
 
         clusters, count = await ClusterDataManager(self.session).get_all_clusters(
-            offset, limit, filters_dict, order_by, search
+            offset, limit, filters, order_by, search
         )
         # Add dummy data and additional fields
         updated_clusters = []
@@ -147,7 +145,10 @@ class ClusterService(SessionMixin):
         if cluster_name:
             # Check duplicate cluster name
             db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-                ClusterModel, {"name": cluster_name, "cluster_status": StatusEnum.ACTIVE}, missing_ok=True
+                ClusterModel,
+                fields={"name": cluster_name},
+                exclude_fields={"status": ClusterStatusEnum.DELETED},
+                missing_ok=True,
             )
             if db_cluster:
                 raise ClientException("Cluster name already exists")
@@ -249,7 +250,10 @@ class ClusterService(SessionMixin):
 
             # Check duplicate cluster name
             db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-                ClusterModel, {"name": required_data["name"], "cluster_status": StatusEnum.ACTIVE}, missing_ok=True
+                ClusterModel,
+                {"name": required_data["name"]},
+                exclude_fields={"status": ClusterStatusEnum.DELETED},
+                missing_ok=True,
             )
             if db_cluster:
                 raise ClientException("Cluster name already exists")
@@ -288,7 +292,7 @@ class ClusterService(SessionMixin):
 
         # Check for duplicate cluster name
         db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel, {"name": data["name"], "cluster_status": StatusEnum.ACTIVE}, missing_ok=True
+            ClusterModel, {"name": data["name"]}, exclude_fields={"status": ClusterStatusEnum.DELETED}, missing_ok=True
         )
 
         if db_cluster:
@@ -431,7 +435,10 @@ class ClusterService(SessionMixin):
 
         # Check duplicate cluster name
         db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel, {"name": required_data["name"], "cluster_status": StatusEnum.ACTIVE}, missing_ok=True
+            ClusterModel,
+            {"name": required_data["name"]},
+            exclude_fields={"status": ClusterStatusEnum.DELETED},
+            missing_ok=True,
         )
 
         if db_cluster:
@@ -513,13 +520,16 @@ class ClusterService(SessionMixin):
 
         # Retrieve cluster from db
         db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel, {"id": required_data["cluster_id"], "is_active": True}, missing_ok=True
+            ClusterModel,
+            {"id": required_data["cluster_id"]},
+            exclude_fields={"status": ClusterStatusEnum.DELETED},
+            missing_ok=True,
         )
         logger.debug(f"Cluster retrieved successfully: {db_cluster.id}")
 
         # Mark cluster as deleted
         db_cluster = await ClusterDataManager(self.session).update_by_fields(
-            db_cluster, {"status": ClusterStatusEnum.DELETED, "is_active": False}
+            db_cluster, {"status": ClusterStatusEnum.DELETED}
         )
         logger.debug(f"Cluster {db_cluster.id} marked as deleted")
 
@@ -584,8 +594,8 @@ class ClusterService(SessionMixin):
         if "name" in data:
             duplicate_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
                 model=ClusterModel,
-                fields={"name": data["name"], "cluster_status": StatusEnum.ACTIVE},
-                exclude_fields={"id": cluster_id},
+                fields={"name": data["name"]},
+                exclude_fields={"id": cluster_id, "status": ClusterStatusEnum.DELETED},
                 missing_ok=True,
             )
             if duplicate_cluster:
@@ -611,7 +621,7 @@ class ClusterService(SessionMixin):
             cluster_id: The ID of the cluster to delete.
         """
         db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel, {"id": cluster_id, "cluster_status": StatusEnum.ACTIVE}
+            ClusterModel, fields={"id": cluster_id}, exclude_fields={"status": ClusterStatusEnum.DELETED}
         )
 
         # Check for active endpoints
