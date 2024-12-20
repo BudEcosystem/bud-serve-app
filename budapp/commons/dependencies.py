@@ -124,7 +124,7 @@ async def get_current_active_user(current_user: Annotated[User, Depends(get_curr
     Returns:
         User: The current active user.
     """
-    if not current_user.is_active or current_user.status != UserStatusEnum.ACTIVE:
+    if current_user.status != UserStatusEnum.ACTIVE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
     return current_user
 

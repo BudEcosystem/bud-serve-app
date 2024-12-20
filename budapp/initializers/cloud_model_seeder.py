@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import ModelProviderTypeEnum, ModelSourceEnum
+from budapp.commons.constants import ModelProviderTypeEnum, ModelSourceEnum, UserStatusEnum
 from budapp.commons.database import engine
 from budapp.model_ops.crud import CloudModelDataManager, ProviderDataManager
 from budapp.model_ops.models import CloudModel
@@ -28,6 +28,7 @@ CLOUD_MODEL_SEEDER_FILE_PATH = os.path.join(CURRENT_FILE_PATH, "data", "cloud_mo
 
 MODEL_SOURCES = [member.value for member in ModelSourceEnum]
 
+
 class CloudModelSeeder(BaseSeeder):
     """Cloud model seeder."""
 
@@ -44,7 +45,7 @@ class CloudModelSeeder(BaseSeeder):
         """Seed the cloud models."""
         db_user = await UserDataManager(session).retrieve_by_fields(
             UserModel,
-            {"email": app_settings.superuser_email, "is_active": True, "is_superuser": True},
+            {"email": app_settings.superuser_email, "status": UserStatusEnum.ACTIVE, "is_superuser": True},
             missing_ok=True,
         )
 

@@ -55,7 +55,6 @@ class User(Base):
         default=UserStatusEnum.INVITED.value,
     )
     password: Mapped[str] = mapped_column(String, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
     is_reset_password: Mapped[bool] = mapped_column(Boolean, default=True)
     color: Mapped[str] = mapped_column(String, nullable=False)
