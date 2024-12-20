@@ -128,7 +128,15 @@ class CloudModelWorkflowService(SessionMixin):
         current_step_number = step_number
 
         # Retrieve or create workflow
-        db_workflow = await self._retrieve_or_create_workflow(workflow_id, workflow_total_steps, current_user_id)
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING,
+            title="Cloud Model Onboarding",
+            total_steps=workflow_total_steps,
+            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+        )
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id, workflow_create, current_user_id
+        )
 
         # Model source is provider type
         source = None
@@ -138,6 +146,12 @@ class CloudModelWorkflowService(SessionMixin):
             )
             source = db_provider.type.value
 
+            # Update icon on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"icon": db_provider.icon},
+            )
+
         if cloud_model_id:
             db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
                 CloudModel, {"id": cloud_model_id, "status": CloudModelStatusEnum.ACTIVE}
@@ -146,12 +160,24 @@ class CloudModelWorkflowService(SessionMixin):
             if db_cloud_model.is_present_in_model:
                 raise ClientException("Cloud model is already present in model")
 
+            # Update title on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": db_cloud_model.name},
+            )
+
         if name:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
                 Model, {"name": name, "status": ModelStatusEnum.ACTIVE}, missing_ok=True
             )
             if db_model:
                 raise ClientException("Model name already exists")
+
+            # Update title on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": name},
+            )
 
         # Prepare workflow step data
         workflow_step_data = CreateCloudModelWorkflowSteps(
@@ -356,31 +382,6 @@ class CloudModelWorkflowService(SessionMixin):
                 {"current_step": end_step_number, "status": WorkflowStatusEnum.COMPLETED},
             )
         return db_model
-
-    async def _retrieve_or_create_workflow(
-        self, workflow_id: Optional[UUID], workflow_total_steps: Optional[int], current_user_id: UUID
-    ) -> None:
-        """Retrieve or create workflow."""
-        if workflow_id:
-            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
-                WorkflowModel, {"id": workflow_id}
-            )
-
-            if db_workflow.status != WorkflowStatusEnum.IN_PROGRESS:
-                logger.error(f"Workflow {workflow_id} is not in progress")
-                raise ClientException("Workflow is not in progress")
-
-            if db_workflow.created_by != current_user_id:
-                logger.error(f"User {current_user_id} is not the creator of workflow {workflow_id}")
-                raise ClientException("User is not authorized to perform this action")
-        elif workflow_total_steps:
-            db_workflow = await WorkflowDataManager(self.session).insert_one(
-                WorkflowModel(total_steps=workflow_total_steps, created_by=current_user_id),
-            )
-        else:
-            raise ClientException("Either workflow_id or workflow_total_steps should be provided")
-
-        return db_workflow
 
     async def _validate_duplicate_source_uri_model(
         self, source: str, uri: str, db_workflow_steps: List[WorkflowStepModel], current_step_number: int
