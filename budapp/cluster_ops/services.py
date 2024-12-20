@@ -615,12 +615,12 @@ class ClusterService(SessionMixin):
         )
 
         # Check for active endpoints
-        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-            EndpointModel, {"cluster_id": cluster_id, "is_active": True}, missing_ok=True
+        db_endpoints = await EndpointDataManager(self.session).get_all_by_fields(
+            EndpointModel, {"cluster_id": cluster_id, "is_active": True}
         )
 
         # Raise error if cluster has active endpoints
-        if db_endpoint:
+        if db_endpoints:
             raise ClientException("Cannot delete cluster with active endpoints")
 
         current_step_number = 1
