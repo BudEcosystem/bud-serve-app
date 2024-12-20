@@ -651,8 +651,14 @@ class ClusterService(SessionMixin):
         current_step_number = 1
 
         # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.CLUSTER_DELETION,
+            title=db_cluster.name,
+            total_steps=current_step_number,
+            icon=db_cluster.icon,
+        )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
-            workflow_id=None, workflow_total_steps=current_step_number, current_user_id=current_user_id
+            workflow_id=None, workflow_data=workflow_create, current_user_id=current_user_id
         )
         logger.debug(f"Delete cluster workflow {db_workflow.id} created")
 
@@ -681,6 +687,12 @@ class ClusterService(SessionMixin):
             )
         )
         logger.debug(f"Created workflow step {current_step_number} for workflow {db_workflow.id}")
+
+        # Update progress in workflow
+        bud_cluster_response["progress_type"] = BudServeWorkflowStepEventName.DELETE_CLUSTER_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": bud_cluster_response, "current_step": current_step_number}
+        )
 
         # Update cluster status to deleting
         await ClusterDataManager(self.session).update_by_fields(db_cluster, {"status": ClusterStatusEnum.DELETING})
