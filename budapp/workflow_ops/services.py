@@ -38,7 +38,7 @@ from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManage
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
-from .schemas import RetrieveWorkflowDataResponse, RetrieveWorkflowStepData
+from .schemas import RetrieveWorkflowDataResponse, RetrieveWorkflowStepData, WorkflowUtilCreate
 
 
 logger = logging.get_logger(__name__)
@@ -249,9 +249,11 @@ class WorkflowService(SessionMixin):
         return list(all_keys)
 
     async def retrieve_or_create_workflow(
-        self, workflow_id: Optional[UUID], workflow_total_steps: Optional[int], current_user_id: UUID
+        self, workflow_id: Optional[UUID], workflow_data: WorkflowUtilCreate, current_user_id: UUID
     ) -> None:
         """Retrieve or create workflow."""
+        workflow_data = workflow_data.model_dump(exclude_none=True, exclude_unset=True)
+
         if workflow_id:
             db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
                 WorkflowModel, {"id": workflow_id}
@@ -264,12 +266,12 @@ class WorkflowService(SessionMixin):
             if db_workflow.created_by != current_user_id:
                 logger.error(f"User {current_user_id} is not the creator of workflow {workflow_id}")
                 raise ClientException("User is not authorized to perform this action")
-        elif workflow_total_steps:
+        elif "total_steps" in workflow_data:
             db_workflow = await WorkflowDataManager(self.session).insert_one(
-                WorkflowModel(total_steps=workflow_total_steps, created_by=current_user_id),
+                WorkflowModel(**workflow_data, created_by=current_user_id),
             )
         else:
-            raise ClientException("Either workflow_id or workflow_total_steps should be provided")
+            raise ClientException("Either workflow_id or total_steps should be provided")
 
         return db_workflow
 

@@ -1,8 +1,9 @@
 from pydantic import UUID4, BaseModel, ConfigDict, Field
 
-from budapp.commons.constants import ModelProviderTypeEnum, WorkflowStatusEnum
 from budapp.commons.schemas import SuccessResponse, Tag
 from budapp.model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider
+
+from ..commons.constants import ModelProviderTypeEnum, WorkflowStatusEnum, WorkflowTypeEnum
 
 
 class RetrieveWorkflowStepData(BaseModel):
@@ -58,3 +59,12 @@ class WorkflowResponse(SuccessResponse):
     status: WorkflowStatusEnum
     current_step: int
     reason: str | None = None
+
+
+class WorkflowUtilCreate(BaseModel):
+    """Workflow create schema."""
+
+    workflow_type: WorkflowTypeEnum
+    title: str
+    icon: str | None = None
+    total_steps: int | None = None
