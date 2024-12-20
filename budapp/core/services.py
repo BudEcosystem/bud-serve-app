@@ -162,7 +162,11 @@ class NotificationService(SessionMixin):
         Returns:
             None
         """
+        # Update workflow step data event
         await self._update_workflow_step_events(BudServeWorkflowStepEventName.DELETE_ENDPOINT_EVENTS.value, payload)
+
+        # Update progress in workflow
+        await self._update_workflow_progress(BudServeWorkflowStepEventName.DELETE_ENDPOINT_EVENTS.value, payload)
 
         # Create cluster in database if node info fetched successfully
         if payload.content.status == "COMPLETED" and payload.content.title == "Deployment deleted successfully":

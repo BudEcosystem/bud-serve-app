@@ -646,7 +646,7 @@ class ClusterService(SessionMixin):
 
         # Raise error if cluster has active endpoints
         if db_endpoints:
-            raise ClientException("Cannot delete cluster with active endpoints")
+            raise ClientException("Cannot delete cluster with active deployments")
 
         current_step_number = 1
 

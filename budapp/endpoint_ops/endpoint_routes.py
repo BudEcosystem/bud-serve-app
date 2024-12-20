@@ -129,7 +129,7 @@ async def delete_endpoint(
         db_workflow = await EndpointService(session).delete_endpoint(endpoint_id, current_user.id)
         logger.debug(f"Endpoint deleting initiated with workflow id: {db_workflow.id}")
         return SuccessResponse(
-            message="Endpoint deleting initiated successfully",
+            message="Deployment deleting initiated successfully",
             code=status.HTTP_200_OK,
             object="endpoint.delete",
         )
