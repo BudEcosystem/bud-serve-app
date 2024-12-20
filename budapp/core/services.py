@@ -18,7 +18,7 @@
 """Implements core services and business logic that power the microservices, including key functionality and integrations."""
 
 from datetime import datetime, timezone
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -116,7 +116,11 @@ class NotificationService(SessionMixin):
         Returns:
             None
         """
+        # Update workflow step data event
         await self._update_workflow_step_events(BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value, payload)
+
+        # Update progress in workflow
+        await self._update_workflow_progress(BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value, payload)
 
         # Create cluster in database if node info fetched successfully
         if (
@@ -241,6 +245,69 @@ class NotificationService(SessionMixin):
                 break
 
         return data if updated else None
+
+    async def _update_workflow_progress(self, event_name: str, payload: NotificationPayload) -> None:
+        """Update the workflow progress for a workflow step.
+
+        Args:
+            event_name: The name of event to update.
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        # Fetch workflow with progress
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+            WorkflowModel, {"id": payload.workflow_id}
+        )
+
+        if not isinstance(db_workflow.progress, dict):
+            logger.warning(f"Workflow {payload.workflow_id} progress is not in expected format")
+            return
+
+        progress_type = db_workflow.progress.get("progress_type")
+        if progress_type != event_name:
+            logger.warning(f"Progress type {progress_type} does not match event name {event_name}")
+            return
+
+        updated_progress = await self._update_progress_data(db_workflow.progress, payload)
+        if not updated_progress:
+            logger.warning(f"No matching event found for {payload.event}")
+            return
+
+        # Update progress in workflow
+        self.session.refresh(db_workflow)
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": updated_progress}
+        )
+        logger.info(f"Updated workflow progress: {db_workflow.id}")
+
+    async def _update_progress_data(
+        self, progress: Dict[str, Any], payload: NotificationPayload
+    ) -> Optional[Dict[str, Any]]:
+        """Update the progress data for a workflow.
+
+        Args:
+            payload: The payload to update the step.
+            progress: The progress data to update.
+
+        Returns:
+            The updated progress data or None if the update failed.
+        """
+        steps = progress.get("steps", [])
+
+        if not isinstance(steps, list):
+            logger.warning("Steps data is not in expected format")
+            return
+
+        updated = False
+        for step_data in steps:
+            if isinstance(step_data, dict) and step_data.get("id") == payload.event:
+                step_data["payload"] = payload.model_dump(exclude_unset=True, mode="json")
+                updated = True
+                break
+
+        return progress if updated else None
 
     async def _create_endpoint(self, payload: NotificationPayload) -> None:
         """Create an endpoint when deployment is completed.
