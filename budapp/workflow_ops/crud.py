@@ -16,13 +16,14 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the workflow ops."""
 
-from typing import List
+from typing import Dict, List, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 
+from .models import Workflow as WorkflowModel
 from .models import WorkflowStep as WorkflowStepModel
 
 
@@ -32,7 +33,40 @@ logger = logging.get_logger(__name__)
 class WorkflowDataManager(DataManagerUtils):
     """Data manager for the Workflow model."""
 
-    pass
+    async def get_all_workflows(
+        self,
+        offset: int,
+        limit: int,
+        filters: Dict = {},  # endpoint count need to consider in future
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[WorkflowModel], int]:
+        """List all workflows from the database."""
+        await self.validate_fields(WorkflowModel, filters)
+
+        # Generate statements based on search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(WorkflowModel, filters)
+            stmt = select(WorkflowModel).filter(and_(*search_conditions))
+            count_stmt = select(func.count()).select_from(WorkflowModel).filter(and_(*search_conditions))
+        else:
+            stmt = select(WorkflowModel).filter_by(**filters)
+            count_stmt = select(func.count()).select_from(WorkflowModel).filter_by(**filters)
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(WorkflowModel, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.scalars_all(stmt)
+
+        return result, count
 
 
 class WorkflowStepDataManager(DataManagerUtils):

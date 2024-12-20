@@ -1,6 +1,6 @@
 from pydantic import UUID4, BaseModel, ConfigDict, Field
 
-from budapp.commons.schemas import SuccessResponse, Tag
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 from budapp.model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider
 
 from ..commons.constants import ModelProviderTypeEnum, WorkflowStatusEnum, WorkflowTypeEnum
@@ -59,6 +59,36 @@ class WorkflowResponse(SuccessResponse):
     status: WorkflowStatusEnum
     current_step: int
     reason: str | None = None
+
+
+class Workflow(BaseModel):
+    """Workflow schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: UUID4
+    title: str | None = None
+    icon: str | None = None
+    progress: dict | None = None
+    workflow_type: WorkflowTypeEnum
+    total_steps: int = Field(..., gt=0)
+    status: WorkflowStatusEnum
+    current_step: int
+    reason: str | None = None
+
+
+class WorkflowListResponse(PaginatedSuccessResponse):
+    """Workflow list response schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    workflows: list[Workflow]
+
+
+class WorkflowFilter(BaseModel):
+    """Workflow filter schema."""
+
+    type: WorkflowTypeEnum | None = None
 
 
 class WorkflowUtilCreate(BaseModel):

@@ -16,7 +16,7 @@
 
 """The workflow ops services. Contains business logic for workflow ops."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import status
@@ -34,10 +34,10 @@ from budapp.model_ops.crud import (
 from budapp.model_ops.models import CloudModel, Model
 from budapp.model_ops.models import ModelSecurityScanResult as ModelSecurityScanResultModel
 from budapp.model_ops.models import Provider as ProviderModel
-from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
+from .crud import WorkflowDataManager, WorkflowStepDataManager
 from .schemas import RetrieveWorkflowDataResponse, RetrieveWorkflowStepData, WorkflowUtilCreate
 
 
@@ -302,6 +302,22 @@ class WorkflowService(SessionMixin):
             raise ClientException("Workflow is not in progress state")
 
         await WorkflowDataManager(self.session).delete_one(db_workflow)
+
+    async def get_all_active_workflows(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[WorkflowModel], int]:
+        """Get all active worflows."""
+        filters_dict = filters
+
+        # Filter by in progress status
+        filters_dict["status"] = WorkflowStatusEnum.IN_PROGRESS
+
+        return await WorkflowDataManager(self.session).get_all_workflows(offset, limit, filters_dict, order_by, search)
 
 
 class WorkflowStepService(SessionMixin):
