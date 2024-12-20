@@ -66,7 +66,11 @@ class NotificationService(SessionMixin):
         Returns:
             None
         """
+        # Update workflow step data event
         await self._update_workflow_step_events(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
+
+        # Update progress in workflow
+        await self._update_workflow_progress(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
 
     async def update_model_deployment_events(self, payload: NotificationPayload) -> None:
         """Update the model deployment events for a workflow step.
@@ -77,7 +81,11 @@ class NotificationService(SessionMixin):
         Returns:
             None
         """
+        # Update workflow step data event
         await self._update_workflow_step_events(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value, payload)
+
+        # Update progress in workflow
+        await self._update_workflow_progress(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value, payload)
 
         # Create endpoint when deployment is completed
         if (
