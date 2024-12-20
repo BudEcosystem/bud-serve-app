@@ -308,9 +308,9 @@ async def delete_cluster(
     """Delete a cluster by its ID."""
     try:
         db_workflow = await ClusterService(session).delete_cluster(cluster_id, current_user.id)
-        logger.debug(f"Cluster deleted with workflow id: {db_workflow.id}")
+        logger.debug(f"Cluster deleting initiated with workflow id: {db_workflow.id}")
         return SuccessResponse(
-            message="Cluster deleted successfully",
+            message="Cluster deleting initiated successfully",
             code=status.HTTP_200_OK,
             object="cluster.delete",
         )
