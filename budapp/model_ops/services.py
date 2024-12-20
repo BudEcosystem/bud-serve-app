@@ -27,18 +27,6 @@ from pydantic import HttpUrl
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import (
-    LICENSE_DIR,
-    BaseModelRelationEnum,
-    BudServeWorkflowStepEventName,
-    CredentialTypeEnum,
-    ModelProviderTypeEnum,
-    ModelSecurityScanStatusEnum,
-    ModelSourceEnum,
-    WorkflowStatusEnum,
-    ModelStatusEnum,
-    CloudModelStatusEnum,
-)
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.helpers import assign_random_colors_to_names, normalize_value
@@ -51,8 +39,22 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
+from ..commons.constants import (
+    LICENSE_DIR,
+    BaseModelRelationEnum,
+    BudServeWorkflowStepEventName,
+    CloudModelStatusEnum,
+    CredentialTypeEnum,
+    ModelProviderTypeEnum,
+    ModelSecurityScanStatusEnum,
+    ModelSourceEnum,
+    ModelStatusEnum,
+    WorkflowStatusEnum,
+    WorkflowTypeEnum,
+)
 from ..commons.helpers import validate_huggingface_repo_format
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import (
     CloudModelDataManager,
     ModelDataManager,
@@ -663,8 +665,14 @@ class LocalModelWorkflowService(SessionMixin):
         current_step_number = step_number
 
         # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.LOCAL_MODEL_ONBOARDING,
+            title="Local Model Onboarding",
+            total_steps=workflow_total_steps,
+            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+        )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
-            workflow_id, workflow_total_steps, current_user_id
+            workflow_id, workflow_create, current_user_id
         )
 
         # Validate proprietary credential id
@@ -681,6 +689,12 @@ class LocalModelWorkflowService(SessionMixin):
             if db_model:
                 raise ClientException("Model name should be unique")
 
+            # Update title on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": name},
+            )
+
         # Add provider_id for HuggingFace provider type
         provider_id = None
         if provider_type == ModelProviderTypeEnum.HUGGING_FACE:
@@ -688,6 +702,12 @@ class LocalModelWorkflowService(SessionMixin):
                 ProviderModel, {"type": CredentialTypeEnum.HUGGINGFACE}
             )
             provider_id = db_provider.id
+
+            # Update icon on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"icon": db_provider.icon},
+            )
 
         # Prepare workflow step data
         workflow_step_data = CreateLocalModelWorkflowSteps(
@@ -777,7 +797,7 @@ class LocalModelWorkflowService(SessionMixin):
             try:
                 # Perform model extraction
                 await self._perform_model_extraction(
-                    db_workflow.id, current_step_number, required_data, current_user_id
+                    db_workflow.id, current_step_number, required_data, current_user_id, db_workflow
                 )
             except ClientException as e:
                 workflow_current_step = current_step_number
@@ -1133,7 +1153,7 @@ class LocalModelWorkflowService(SessionMixin):
             raise ClientException(f"Duplicate {query_provider_type} uri found")
 
     async def _perform_model_extraction(
-        self, workflow_id: UUID, step_number: int, data: Dict, current_user_id: UUID
+        self, workflow_id: UUID, step_number: int, data: Dict, current_user_id: UUID, db_workflow: WorkflowModel
     ) -> None:
         """Perform model extraction."""
         # Update or create next workflow step
@@ -1156,6 +1176,12 @@ class LocalModelWorkflowService(SessionMixin):
         await WorkflowStepDataManager(self.session).update_by_fields(
             db_workflow_step, {"data": model_extraction_events}
         )
+
+        # Update progress in workflow
+        if isinstance(model_extraction_response, dict):
+            model_extraction_response["progress_type"] = BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value
+
+        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"progress": model_extraction_response})
 
     async def _perform_model_extraction_request(self, workflow_id: UUID, data: Dict, current_user_id: UUID) -> None:
         """Perform model extraction request."""
