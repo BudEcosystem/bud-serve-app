@@ -1311,8 +1311,14 @@ class LocalModelWorkflowService(SessionMixin):
         current_step_number = step_number
 
         # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.MODEL_SECURITY_SCAN,
+            title="Model Security Scan",
+            total_steps=workflow_total_steps,
+            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+        )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
-            workflow_id, workflow_total_steps, current_user_id
+            workflow_id, workflow_create, current_user_id
         )
 
         # Validate model id
@@ -1322,6 +1328,21 @@ class LocalModelWorkflowService(SessionMixin):
             )
             if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
                 raise ClientException("Security scan is only supported for local models")
+
+            # Update icon on workflow
+            if db_model.provider_type == ModelProviderTypeEnum.HUGGING_FACE:
+                db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                    ProviderModel, {"id": db_model.provider_id}
+                )
+                model_icon = db_provider.icon
+            else:
+                model_icon = db_model.icon
+
+            # Update title, icon on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": db_model.name, "icon": model_icon},
+            )
 
         # Prepare workflow step data
         workflow_step_data = LocalModelScanWorkflowStepData(
@@ -1394,7 +1415,9 @@ class LocalModelWorkflowService(SessionMixin):
 
             try:
                 # Perform model security scan
-                await self._perform_model_security_scan(db_workflow.id, current_step_number, required_data)
+                await self._perform_model_security_scan(
+                    db_workflow.id, current_step_number, required_data, db_workflow
+                )
             except ClientException as e:
                 workflow_current_step = current_step_number
                 db_workflow = await WorkflowDataManager(self.session).update_by_fields(
@@ -1422,7 +1445,9 @@ class LocalModelWorkflowService(SessionMixin):
 
         return db_workflow
 
-    async def _perform_model_security_scan(self, workflow_id: UUID, step_number: int, data: Dict) -> None:
+    async def _perform_model_security_scan(
+        self, workflow_id: UUID, step_number: int, data: Dict, db_workflow: WorkflowModel
+    ) -> None:
         """Perform model security scan."""
         # Retrieve workflow step
         db_workflow_step = await WorkflowDataManager(self.session).retrieve_by_fields(
@@ -1444,6 +1469,13 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Update workflow step with response
         await WorkflowStepDataManager(self.session).update_by_fields(db_workflow_step, {"data": data})
+
+        # Update progress in workflow
+        model_security_scan_response["progress_type"] = BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value
+
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": model_security_scan_response}
+        )
 
     async def _perform_model_security_scan_request(self, workflow_id: UUID, data: Dict) -> None:
         """Perform model security scan request."""
