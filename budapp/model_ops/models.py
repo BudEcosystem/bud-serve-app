@@ -33,6 +33,8 @@ from budapp.commons.constants import (
     ModalityEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
+    ModelStatusEnum,
+    CloudModelStatusEnum,
 )
 from budapp.commons.database import Base
 
@@ -78,7 +80,15 @@ class Model(Base):
     torch_dtype: Mapped[str] = mapped_column(String, nullable=True)
     architecture: Mapped[dict] = mapped_column(JSONB, nullable=True)
     website_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str] = mapped_column(
+        Enum(
+            ModelStatusEnum,
+            name="model_status_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=ModelStatusEnum.ACTIVE,
+    )
     modality: Mapped[str] = mapped_column(
         Enum(
             ModalityEnum,
@@ -184,7 +194,15 @@ class CloudModel(Base):
     github_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     huggingface_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     website_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str] = mapped_column(
+        Enum(
+            CloudModelStatusEnum,
+            name="cloud_model_status_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=CloudModelStatusEnum.ACTIVE,
+    )
     modality: Mapped[str] = mapped_column(
         PG_ENUM(
             ModalityEnum,

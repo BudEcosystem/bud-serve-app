@@ -609,7 +609,7 @@ class ClusterService(SessionMixin):
 
         return cluster_details
 
-    async def delete_cluster(self, cluster_id: UUID, current_user_id: UUID) -> None:
+    async def delete_cluster(self, cluster_id: UUID, current_user_id: UUID) -> WorkflowModel:
         """Delete a cluster by its ID.
 
         Args:
@@ -690,10 +690,10 @@ class ClusterService(SessionMixin):
                 "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
-            "source_topic": "appMessages",
+            "source_topic": f"{app_settings.source_topic}",
         }
 
-        logger.debug("Performing delete cluster request to budcluster")
+        logger.debug(f"Performing delete cluster request to budcluster {payload}")
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(delete_cluster_endpoint, json=payload) as response:

@@ -19,12 +19,12 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Table, Uuid
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Table, Uuid, Enum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.database import Base
-
+from ..commons.constants import ProjectStatusEnum
 
 project_user_association = Table(
     "project_user_association",
@@ -44,7 +44,15 @@ class Project(Base):
     description: Mapped[str] = mapped_column(String)
     tags: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
     icon: Mapped[str] = mapped_column(String, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str] = mapped_column(
+        Enum(
+            ProjectStatusEnum,
+            name="project_status_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=ProjectStatusEnum.ACTIVE,
+    )
     benchmark: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

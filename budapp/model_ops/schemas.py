@@ -254,26 +254,49 @@ class ModelTree(BaseModel):
     quantizations_count: int = 0
 
 
-class ModelSecurityScanResultResponse(BaseModel):
-    """Model security scan result response schema."""
+# Schemas related to Model Security Scan Results
 
-    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
+class ModelIssue(BaseModel):
+    """Model issue schema."""
+
+    title: str
+    severity: str
+    description: str
+    source: str
+
+
+class ModelSecurityScanResultCreate(BaseModel):
+    """Model security scan result create schema."""
+
+    model_id: UUID4
     status: ModelSecurityScanStatusEnum
     total_issues: int
     total_scanned_files: int
     total_skipped_files: int
+    scanned_files: list[str]
     low_severity_count: int
     medium_severity_count: int
     high_severity_count: int
     critical_severity_count: int
+    model_issues: dict
+
+
+class ModelSecurityScanResult(ModelSecurityScanResultCreate):
+    """Model security scan result schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: UUID4
+    created_at: datetime
+    modified_at: datetime
 
 
 class ModelDetailSuccessResponse(SuccessResponse):
     """Model detail success response schema."""
 
     model: ModelDetailResponse
-    scan_result: ModelSecurityScanResultResponse | None = None
+    scan_result: ModelSecurityScanResult | None = None
     eval_result: dict | None = None  # TODO: integrate actual eval result
     model_tree: ModelTree
     endpoints_count: int
@@ -384,7 +407,7 @@ class CreateLocalModelWorkflowSteps(BaseModel):
 
 class EditModel(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
-    description: str | None = Field(None, max_length=300)
+    description: str | None = Field(None, max_length=400)
     tags: List[Tag] | None = None
     tasks: List[Task] | None = None
     icon: str | None = None
@@ -677,41 +700,3 @@ class LocalModelScanWorkflowStepData(BaseModel):
     """Local model scan workflow step data schema."""
 
     model_id: UUID4 | None
-
-
-# Schemas related to Model Security Scan Results
-
-
-class ModelIssue(BaseModel):
-    """Model issue schema."""
-
-    title: str
-    severity: str
-    description: str
-    source: str
-
-
-class ModelSecurityScanResultCreate(BaseModel):
-    """Model security scan result create schema."""
-
-    model_id: UUID4
-    status: ModelSecurityScanStatusEnum
-    total_issues: int
-    total_scanned_files: int
-    total_skipped_files: int
-    scanned_files: list[str]
-    low_severity_count: int
-    medium_severity_count: int
-    high_severity_count: int
-    critical_severity_count: int
-    model_issues: dict
-
-
-class ModelSecurityScanResult(ModelSecurityScanResultCreate):
-    """Model security scan result schema."""
-
-    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
-
-    id: UUID4
-    created_at: datetime
-    modified_at: datetime
