@@ -66,7 +66,7 @@ class EndpointService(SessionMixin):
             project_id, offset, limit, filters, order_by, search
         )
 
-    async def delete_endpoint(self, endpoint_id: UUID, current_user_id: UUID) -> None:
+    async def delete_endpoint(self, endpoint_id: UUID, current_user_id: UUID) -> WorkflowModel:
         """Delete an endpoint by its ID."""
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
             EndpointModel, {"id": endpoint_id, "is_active": True}
