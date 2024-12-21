@@ -230,6 +230,9 @@ class AppConfig(BaseConfig):
     bud_metrics_app_id: str = Field(alias="BUD_METRICS_APP_ID")
     source_topic: str = Field(alias="SOURCE_TOPIC", default="budAppMessages")
 
+    # Budserve host
+    budserve_host: str = Field(alias="BUD_SERVE_HOST", default="https://api-dev.bud.studio")
+
     @computed_field
     def static_dir(self) -> str:
         """Get the static directory."""

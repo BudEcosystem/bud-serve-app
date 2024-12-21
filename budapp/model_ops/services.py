@@ -1235,7 +1235,7 @@ class LocalModelWorkflowService(SessionMixin):
     async def _get_decrypted_token(credential_id: UUID) -> str:
         """Get decrypted token."""
         # TODO: remove this function after implementing dapr decryption
-        url = f"https://api-dev.bud.studio/proprietary/credentials/{credential_id}/details"
+        url = f"{app_settings.budserve_host}/proprietary/credentials/{credential_id}/details"
 
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
