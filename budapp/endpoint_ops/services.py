@@ -27,12 +27,21 @@ from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.models import Project as ProjectModel
 
 from ..commons.config import app_settings
-from ..commons.constants import BudServeWorkflowStepEventName, EndpointStatusEnum, WorkflowStatusEnum
+from ..commons.constants import (
+    BudServeWorkflowStepEventName,
+    EndpointStatusEnum,
+    ModelProviderTypeEnum,
+    WorkflowStatusEnum,
+    WorkflowTypeEnum,
+)
 from ..commons.exceptions import ClientException
 from ..core.schemas import NotificationPayload
+from ..model_ops.crud import ProviderDataManager
+from ..model_ops.models import Provider as ProviderModel
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
+from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService
 from .crud import EndpointDataManager
 from .models import Endpoint as EndpointModel
@@ -72,11 +81,25 @@ class EndpointService(SessionMixin):
             EndpointModel, {"id": endpoint_id, "is_active": True}
         )
 
+        if db_endpoint.model.provider_type in [ModelProviderTypeEnum.HUGGING_FACE, ModelProviderTypeEnum.CLOUD_MODEL]:
+            db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                ProviderModel, {"id": db_endpoint.model.provider_id}
+            )
+            model_icon = db_provider.icon
+        else:
+            model_icon = db_endpoint.model.icon
+
         current_step_number = 1
 
         # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.ENDPOINT_DELETION,
+            title=db_endpoint.name,
+            total_steps=current_step_number,
+            icon=model_icon,
+        )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
-            workflow_id=None, workflow_total_steps=current_step_number, current_user_id=current_user_id
+            workflow_id=None, workflow_data=workflow_create, current_user_id=current_user_id
         )
         logger.debug(f"Delete endpoint workflow {db_workflow.id} created")
 
@@ -105,6 +128,12 @@ class EndpointService(SessionMixin):
             )
         )
         logger.debug(f"Created workflow step {current_step_number} for workflow {db_workflow.id}")
+
+        # Update progress in workflow
+        bud_cluster_response["progress_type"] = BudServeWorkflowStepEventName.DELETE_ENDPOINT_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": bud_cluster_response, "current_step": current_step_number}
+        )
 
         # Update endpoint status to deleting
         await EndpointDataManager(self.session).update_by_fields(db_endpoint, {"status": EndpointStatusEnum.DELETING})

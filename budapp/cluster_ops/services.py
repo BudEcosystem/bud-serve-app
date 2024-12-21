@@ -29,7 +29,6 @@ from fastapi import UploadFile
 from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension
 from budapp.commons.config import app_settings
-from budapp.commons.constants import BudServeWorkflowStepEventName, ClusterStatusEnum, WorkflowStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.core.schemas import NotificationPayload
@@ -40,6 +39,8 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
+from ..commons.constants import BudServeWorkflowStepEventName, ClusterStatusEnum, WorkflowStatusEnum, WorkflowTypeEnum
+from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import ClusterDataManager
 from .models import Cluster as ClusterModel
 from .schemas import (
@@ -128,8 +129,14 @@ class ClusterService(SessionMixin):
         current_step_number = step_number
 
         # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.CLUSTER_ONBOARDING,
+            title="Cluster Onboarding",
+            total_steps=workflow_total_steps,
+            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+        )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
-            workflow_id, workflow_total_steps, current_user_id
+            workflow_id, workflow_create, current_user_id
         )
 
         # Validate the configuration file
@@ -151,6 +158,20 @@ class ClusterService(SessionMixin):
             )
             if db_cluster:
                 raise ClientException("Cluster name already exists")
+
+            # Update title on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": cluster_name},
+            )
+
+        if cluster_icon:
+            # Update icon on workflow
+            # NOTE: Multiple queries because of considering future orchestration upgrade
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"icon": cluster_icon},
+            )
 
         # Prepare workflow step data
         workflow_step_data = CreateClusterWorkflowSteps(
@@ -255,7 +276,7 @@ class ClusterService(SessionMixin):
                 raise ClientException("Cluster name already exists")
 
             # Trigger create cluster workflow by step
-            await self._execute_create_cluster_workflow(required_data, db_workflow.id, current_user_id)
+            await self._execute_create_cluster_workflow(required_data, db_workflow.id, current_user_id, db_workflow)
             logger.debug("Successfully executed create cluster workflow")
 
             # Increment step number of workflow and workflow step
@@ -276,7 +297,7 @@ class ClusterService(SessionMixin):
         return db_workflow
 
     async def _execute_create_cluster_workflow(
-        self, data: Dict[str, Any], workflow_id: UUID, current_user_id: UUID
+        self, data: Dict[str, Any], workflow_id: UUID, current_user_id: UUID, db_workflow: WorkflowModel
     ) -> None:
         """Execute create cluster workflow."""
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -308,6 +329,10 @@ class ClusterService(SessionMixin):
         await WorkflowStepDataManager(self.session).update_by_fields(
             db_latest_workflow_step, {"data": create_cluster_events}
         )
+
+        # Update progress in workflow
+        bud_cluster_response["progress_type"] = BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"progress": bud_cluster_response})
 
     async def _perform_create_cluster_request(
         self, data: Dict[str, str], workflow_id: UUID, current_user_id: UUID
@@ -621,13 +646,19 @@ class ClusterService(SessionMixin):
 
         # Raise error if cluster has active endpoints
         if db_endpoints:
-            raise ClientException("Cannot delete cluster with active endpoints")
+            raise ClientException("Cannot delete cluster with active deployments")
 
         current_step_number = 1
 
         # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.CLUSTER_DELETION,
+            title=db_cluster.name,
+            total_steps=current_step_number,
+            icon=db_cluster.icon,
+        )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
-            workflow_id=None, workflow_total_steps=current_step_number, current_user_id=current_user_id
+            workflow_id=None, workflow_data=workflow_create, current_user_id=current_user_id
         )
         logger.debug(f"Delete cluster workflow {db_workflow.id} created")
 
@@ -656,6 +687,12 @@ class ClusterService(SessionMixin):
             )
         )
         logger.debug(f"Created workflow step {current_step_number} for workflow {db_workflow.id}")
+
+        # Update progress in workflow
+        bud_cluster_response["progress_type"] = BudServeWorkflowStepEventName.DELETE_CLUSTER_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": bud_cluster_response, "current_step": current_step_number}
+        )
 
         # Update cluster status to deleting
         await ClusterDataManager(self.session).update_by_fields(db_cluster, {"status": ClusterStatusEnum.DELETING})
