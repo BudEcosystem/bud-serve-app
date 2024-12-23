@@ -30,11 +30,9 @@ from budapp.commons.dependencies import (
     parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
-from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
 
-from ..workflow_ops.schemas import RetrieveWorkflowDataResponse
-from ..workflow_ops.services import WorkflowService
+from ..commons.schemas import ErrorResponse, SuccessResponse
 from .schemas import EndpointFilter, EndpointPaginatedResponse
 from .services import EndpointService
 
@@ -115,7 +113,7 @@ async def list_all_endpoints(
             "description": "Invalid request parameters",
         },
         status.HTTP_200_OK: {
-            "model": RetrieveWorkflowDataResponse,
+            "model": SuccessResponse,
             "description": "Successfully executed delete endpoint workflow",
         },
     },
@@ -125,11 +123,16 @@ async def delete_endpoint(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     endpoint_id: UUID,
-) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
+) -> Union[SuccessResponse, ErrorResponse]:
     """Delete a endpoint by its ID."""
     try:
         db_workflow = await EndpointService(session).delete_endpoint(endpoint_id, current_user.id)
-        return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
+        logger.debug(f"Endpoint deleting initiated with workflow id: {db_workflow.id}")
+        return SuccessResponse(
+            message="Deployment deleting initiated successfully",
+            code=status.HTTP_200_OK,
+            object="endpoint.delete",
+        )
     except ClientException as e:
         logger.exception(f"Failed to delete endpoint: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
