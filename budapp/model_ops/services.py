@@ -1389,6 +1389,12 @@ class LocalModelWorkflowService(SessionMixin):
         workflow_current_step = max(current_step_number, db_max_workflow_step_number)
         logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
 
+        # This will ensure workflow step number is updated to the latest step number
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": workflow_current_step},
+        )
+
         if trigger_workflow:
             # query workflow steps again to get latest data
             db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -1415,50 +1421,36 @@ class LocalModelWorkflowService(SessionMixin):
 
             try:
                 # Perform model security scan
-                await self._perform_model_security_scan(
-                    db_workflow.id, current_step_number, required_data, db_workflow
-                )
+                await self._perform_model_security_scan(current_step_number, required_data, db_workflow)
             except ClientException as e:
-                workflow_current_step = current_step_number
+                # NOTE: Update workflow status to failed only for model security scan workflow. if micro-service fails,
+                # For remaining workflows, if microservice fails, the workflow steps won't be created from backend
+                # According to ui model_id and trigger workflow required in request body
+                # But Orchestration perspective, the workflow steps can also provided separately in request body
+                # So, we need to update the workflow status to failed only for model security scan workflow
                 db_workflow = await WorkflowDataManager(self.session).update_by_fields(
                     db_workflow,
-                    {"current_step": workflow_current_step},
+                    {"status": WorkflowStatusEnum.FAILED},
                 )
                 logger.debug("Workflow updated with latest step")
                 raise e
 
-            # Create next workflow step to store model scan result
-            current_step_number = current_step_number + 1
-            workflow_current_step = current_step_number
-
-            # Update or create next workflow step
-            # NOTE: The when scanning is completed, the subscriber will create scan result and update scan result id to the step
-            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                db_workflow.id, current_step_number, {}
-            )
-
-        # This will ensure workflow step number is updated to the latest step number
-        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-            db_workflow,
-            {"current_step": workflow_current_step},
-        )
-
         return db_workflow
 
     async def _perform_model_security_scan(
-        self, workflow_id: UUID, step_number: int, data: Dict, db_workflow: WorkflowModel
+        self, current_step_number: int, data: Dict, db_workflow: WorkflowModel
     ) -> None:
         """Perform model security scan."""
         # Retrieve workflow step
         db_workflow_step = await WorkflowDataManager(self.session).retrieve_by_fields(
-            WorkflowStepModel, {"workflow_id": workflow_id, "step_number": step_number}
+            WorkflowStepModel, {"workflow_id": db_workflow.id, "step_number": current_step_number}
         )
 
-        # Add created_by to data for notification purpose in micro service
-        data["created_by"] = str(db_workflow_step.workflow.created_by)
-
         # Perform model security scan request
-        model_security_scan_response = await self._perform_model_security_scan_request(workflow_id, data)
+        current_user_id = db_workflow_step.workflow.created_by
+        model_security_scan_response = await self._perform_model_security_scan_request(
+            db_workflow.id, data, current_user_id
+        )
 
         # Add payload dict to response
         for step in model_security_scan_response["steps"]:
@@ -1477,7 +1469,7 @@ class LocalModelWorkflowService(SessionMixin):
             db_workflow, {"progress": model_security_scan_response}
         )
 
-    async def _perform_model_security_scan_request(self, workflow_id: UUID, data: Dict) -> None:
+    async def _perform_model_security_scan_request(self, workflow_id: UUID, data: Dict, current_user_id: UUID) -> None:
         """Perform model security scan request."""
         model_security_scan_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/model-info/scan"
@@ -1494,7 +1486,7 @@ class LocalModelWorkflowService(SessionMixin):
             "model_path": local_path,
             "notification_metadata": {
                 "name": "bud-notification",
-                "subscriber_ids": data["created_by"],
+                "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
             "source_topic": f"{app_settings.source_topic}",
@@ -1527,9 +1519,6 @@ class LocalModelWorkflowService(SessionMixin):
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
             {"workflow_id": workflow_id}
         )
-
-        # Get last step
-        db_latest_workflow_step = db_workflow_steps[-1]
 
         # Define the keys required for endpoint creation
         keys_of_interest = [
@@ -1603,10 +1592,19 @@ class LocalModelWorkflowService(SessionMixin):
                 ModelSecurityScanResultModel(**model_security_scan_result.model_dump())
             )
 
+        # Update workflow current step
+        current_step_number = db_workflow.current_step + 1
+        workflow_current_step = current_step_number
+
         # Update workflow step with model security scan result id
-        await WorkflowStepDataManager(self.session).update_by_fields(
-            db_latest_workflow_step,
-            {"data": {"security_scan_result_id": str(db_model_security_scan_result.id)}},
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, {"security_scan_result_id": str(db_model_security_scan_result.id)}
+        )
+
+        # Update workflow current step
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": workflow_current_step},
         )
 
         # Mark scan_verified according to overall scan status
@@ -1620,16 +1618,19 @@ class LocalModelWorkflowService(SessionMixin):
         # Get dummy leaderboard data
         leaderboard_data = await self.get_leaderboard()
 
+        # Update workflow current step
+        current_step_number = db_workflow.current_step + 1
+        workflow_current_step = current_step_number
+
         # Create workflow step to store model scan result
-        end_step_number = db_latest_workflow_step.step_number + 1
         db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-            workflow_id, end_step_number, {"leaderboard": leaderboard_data}
+            workflow_id, current_step_number, {"leaderboard": leaderboard_data}
         )
 
         # Update workflow current step and status
         await WorkflowDataManager(self.session).update_by_fields(
             db_workflow,
-            {"current_step": end_step_number, "status": WorkflowStatusEnum.COMPLETED},
+            {"current_step": workflow_current_step, "status": WorkflowStatusEnum.COMPLETED},
         )
 
     async def _group_model_issues(self, model_issues: list, local_path: str) -> list[ModelIssue]:
