@@ -251,12 +251,12 @@ class UserStatusEnum(StrEnum):
 
     Attributes:
         ACTIVE: Represents an active user account.
-        INACTIVE: Represents an inactive or disabled user account.
+        DELETED: Represents an deleted or disabled user account.
         INVITED: Represents a user who has been invited but hasn't yet activated their account.
     """
 
     ACTIVE = auto()
-    INACTIVE = auto()
+    DELETED = auto()
     INVITED = auto()
 
 
