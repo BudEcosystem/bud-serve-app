@@ -24,6 +24,7 @@ from budapp.commons.db_utils import DataManagerUtils
 from sqlalchemy import and_, desc, func, or_, select
 
 from budapp.cluster_ops.models import Cluster
+from ..commons.constants import ClusterStatusEnum
 
 logger = logging.get_logger(__name__)
 
@@ -51,6 +52,10 @@ class ClusterDataManager(DataManagerUtils):
         else:
             stmt = select(Cluster).filter_by(**filters)
             count_stmt = select(func.count()).select_from(Cluster).filter_by(**filters)
+
+        # Exclude deleted clusters
+        stmt = stmt.filter(Cluster.status != ClusterStatusEnum.DELETED)
+        count_stmt = count_stmt.filter(Cluster.status != ClusterStatusEnum.DELETED)
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)
