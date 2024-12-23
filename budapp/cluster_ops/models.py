@@ -34,7 +34,6 @@ class Cluster(Base):
     __tablename__ = "cluster"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     ingress_url: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(
         Enum(

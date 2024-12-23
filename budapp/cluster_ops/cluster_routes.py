@@ -33,7 +33,7 @@ from budapp.commons.dependencies import (
     parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
-from budapp.commons.schemas import ErrorResponse
+from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
@@ -294,7 +294,7 @@ async def get_cluster_details(
             "description": "Invalid request parameters",
         },
         status.HTTP_200_OK: {
-            "model": RetrieveWorkflowDataResponse,
+            "model": SuccessResponse,
             "description": "Successfully executed delete cluster workflow",
         },
     },
@@ -304,11 +304,16 @@ async def delete_cluster(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     cluster_id: UUID,
-) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
+) -> Union[SuccessResponse, ErrorResponse]:
     """Delete a cluster by its ID."""
     try:
         db_workflow = await ClusterService(session).delete_cluster(cluster_id, current_user.id)
-        return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
+        logger.debug(f"Cluster deleting initiated with workflow id: {db_workflow.id}")
+        return SuccessResponse(
+            message="Cluster deleting initiated successfully",
+            code=status.HTTP_200_OK,
+            object="cluster.delete",
+        )
     except ClientException as e:
         logger.exception(f"Failed to delete cluster: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
