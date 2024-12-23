@@ -765,6 +765,12 @@ class LocalModelWorkflowService(SessionMixin):
         workflow_current_step = max(current_step_number, db_max_workflow_step_number)
         logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
 
+        # This will ensure workflow step number is updated to the latest step number
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": workflow_current_step},
+        )
+
         if trigger_workflow:
             # query workflow steps again to get latest data
             db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -792,38 +798,11 @@ class LocalModelWorkflowService(SessionMixin):
             if missing_keys:
                 raise ClientException(f"Missing required data for model extraction: {', '.join(missing_keys)}")
 
-            # Create or update new workflow step for model extraction
-            current_step_number = current_step_number + 1
-
             try:
                 # Perform model extraction
-                await self._perform_model_extraction(
-                    db_workflow.id, current_step_number, required_data, current_user_id, db_workflow
-                )
+                await self._perform_model_extraction(current_step_number, required_data, current_user_id, db_workflow)
             except ClientException as e:
-                workflow_current_step = current_step_number
-                db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-                    db_workflow,
-                    {"current_step": workflow_current_step},
-                )
-                logger.debug("Workflow updated with latest step")
                 raise e
-
-            # Create next workflow step to store model extraction response
-            current_step_number = current_step_number + 1
-            workflow_current_step = current_step_number
-
-            # Update or create next workflow step
-            # NOTE: The when extraction is done, the subscriber will create model and update model_id to the step
-            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                workflow_id, current_step_number, {}
-            )
-
-        # This will ensure workflow step number is updated to the latest step number
-        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-            db_workflow,
-            {"current_step": workflow_current_step},
-        )
 
         return db_workflow
 
@@ -837,9 +816,6 @@ class LocalModelWorkflowService(SessionMixin):
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
             {"workflow_id": workflow_id}
         )
-
-        # Get last step
-        db_latest_workflow_step = db_workflow_steps[-1]
 
         # Define the keys required for endpoint creation
         keys_of_interest = [
@@ -1079,14 +1055,21 @@ class LocalModelWorkflowService(SessionMixin):
             "tags": extracted_tags,
             "description": model_description,
         }
-        await WorkflowStepDataManager(self.session).update_by_fields(
-            db_latest_workflow_step, {"data": workflow_update_data}
+
+        current_step_number = db_workflow.current_step + 1
+        workflow_current_step = current_step_number
+
+        # Update or create next workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            workflow_id, current_step_number, workflow_update_data
         )
-        logger.debug(f"Workflow step updated with model id {db_model.id}")
+        logger.debug(f"Workflow step updated {db_workflow_step.id}")
 
         # Mark workflow as completed
         logger.debug(f"Updating workflow status: {workflow_id}")
-        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
+        )
 
     async def _verify_provider_type_uri_duplication(
         self,
@@ -1154,16 +1137,11 @@ class LocalModelWorkflowService(SessionMixin):
             raise ClientException(f"Duplicate {query_provider_type} uri found")
 
     async def _perform_model_extraction(
-        self, workflow_id: UUID, step_number: int, data: Dict, current_user_id: UUID, db_workflow: WorkflowModel
+        self, current_step_number: int, data: Dict, current_user_id: UUID, db_workflow: WorkflowModel
     ) -> None:
         """Perform model extraction."""
-        # Update or create next workflow step
-        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-            workflow_id, step_number, {}
-        )
-
         # Perform model extraction request
-        model_extraction_response = await self._perform_model_extraction_request(workflow_id, data, current_user_id)
+        model_extraction_response = await self._perform_model_extraction_request(db_workflow.id, data, current_user_id)
 
         # Add payload dict to response
         for step in model_extraction_response["steps"]:
@@ -1173,16 +1151,20 @@ class LocalModelWorkflowService(SessionMixin):
             BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value: model_extraction_response
         }
 
-        # Update workflow step with response
-        await WorkflowStepDataManager(self.session).update_by_fields(
-            db_workflow_step, {"data": model_extraction_events}
+        current_step_number = current_step_number + 1
+        workflow_current_step = current_step_number
+
+        # Update or create next workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, model_extraction_events
         )
+        logger.debug(f"Workflow step created with id {db_workflow_step.id}")
 
         # Update progress in workflow
-        if isinstance(model_extraction_response, dict):
-            model_extraction_response["progress_type"] = BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value
-
-        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"progress": model_extraction_response})
+        model_extraction_response["progress_type"] = BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": model_extraction_response, "current_step": workflow_current_step}
+        )
 
     async def _perform_model_extraction_request(self, workflow_id: UUID, data: Dict, current_user_id: UUID) -> None:
         """Perform model extraction request."""
@@ -1222,14 +1204,14 @@ class LocalModelWorkflowService(SessionMixin):
                 async with session.post(model_extraction_endpoint, json=model_extraction_request) as response:
                     response_data = await response.json()
                     if response.status >= 400:
-                        raise ClientException("unable to perform model extraction request")
+                        raise ClientException("Unable to perform model extraction")
 
                     return response_data
         except ClientException as e:
             raise e
         except Exception as e:
             logger.error(f"Failed to perform model extraction request: {e}")
-            raise ClientException("unable to perform model extraction request") from e
+            raise ClientException("Unable to perform model extraction") from e
 
     @staticmethod
     async def _get_decrypted_token(credential_id: UUID) -> str:
