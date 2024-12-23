@@ -68,7 +68,6 @@ class ClusterService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[ClusterPaginatedResponse], int]:
         """Get all active clusters."""
-
         clusters, count = await ClusterDataManager(self.session).get_all_clusters(
             offset, limit, filters, order_by, search
         )
@@ -297,7 +296,7 @@ class ClusterService(SessionMixin):
 
         # Update or create next workflow step
         db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-            db_workflow.id, current_step_number, {"data": create_cluster_events}
+            db_workflow.id, current_step_number, create_cluster_events
         )
         logger.debug(f"Created workflow step {db_workflow_step.id} for storing create cluster events")
 
@@ -480,7 +479,7 @@ class ClusterService(SessionMixin):
 
             # Update or create next workflow step
             db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                db_workflow.id, current_step_number, {"data": execution_status_data}
+                db_workflow.id, current_step_number, execution_status_data
             )
             logger.debug(f"Upsert workflow step {db_workflow_step.id} for storing create cluster status")
 
