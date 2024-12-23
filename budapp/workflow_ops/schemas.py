@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import UUID4, BaseModel, ConfigDict, Field
 
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
@@ -75,6 +77,8 @@ class Workflow(BaseModel):
     status: WorkflowStatusEnum
     current_step: int
     reason: str | None = None
+    created_at: datetime
+    modified_at: datetime
 
 
 class WorkflowListResponse(PaginatedSuccessResponse):
