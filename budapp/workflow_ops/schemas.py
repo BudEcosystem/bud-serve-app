@@ -92,7 +92,7 @@ class WorkflowListResponse(PaginatedSuccessResponse):
 class WorkflowFilter(BaseModel):
     """Workflow filter schema."""
 
-    type: WorkflowTypeEnum | None = None
+    workflow_type: WorkflowTypeEnum | None = None
 
 
 class WorkflowUtilCreate(BaseModel):
