@@ -422,7 +422,7 @@ class DataManagerUtils(SQLAlchemyMixin):
         self.delete_model(model)
 
     async def get_all_by_fields(
-        self, model: Type[DeclarativeBase], fields: Dict[str, Any]
+        self, model: Type[DeclarativeBase], fields: Dict[str, Any], exclude_fields: Optional[Dict[str, Any]] = None
     ) -> Optional[List[DeclarativeBase]]:
         """Retrieve all model instances from database based on the given fields.
 
@@ -432,8 +432,7 @@ class DataManagerUtils(SQLAlchemyMixin):
         Args:
             model (Type[DeclarativeBase]): The SQLAlchemy model class to query.
             fields (Dict): A dictionary of field names and their values to filter by.
-            missing_ok (bool, optional): If True, return an empty list when no instances are found
-                                        instead of raising an exception. Defaults to False.
+            exclude_fields (Optional[Dict[str, Any]]): A dictionary of field names and values to exclude from the results.
 
         Returns:
             Optional[List[DeclarativeBase]]: A list of found model instances, or an empty list if not found
@@ -446,6 +445,12 @@ class DataManagerUtils(SQLAlchemyMixin):
         await self.validate_fields(model, fields)
 
         stmt = select(model).filter_by(**fields)
+
+        if exclude_fields is not None:
+            await self.validate_fields(model, exclude_fields)
+            exclude_conditions = [getattr(model, field) != value for field, value in exclude_fields.items()]
+            stmt = stmt.filter(*exclude_conditions)
+
         return self.scalars_all(stmt)
 
     async def get_count_by_fields(
@@ -456,6 +461,7 @@ class DataManagerUtils(SQLAlchemyMixin):
         Args:
             model (Type[DeclarativeBase]): The SQLAlchemy model class to query.
             fields (Dict): A dictionary of field names and their values to filter by.
+            exclude_fields (Optional[Dict[str, Any]]): A dictionary of field names and values to exclude from the results.
 
         Returns:
             int: The count of model instances matching the provided fields.

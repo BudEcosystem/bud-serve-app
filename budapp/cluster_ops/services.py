@@ -632,7 +632,7 @@ class ClusterService(SessionMixin):
         )
 
         # Check for active endpoints
-        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+        db_endpoints = await EndpointDataManager(self.session).get_all_by_fields(
             EndpointModel,
             fields={"cluster_id": cluster_id},
             exclude_fields={"status": EndpointStatusEnum.DELETED},

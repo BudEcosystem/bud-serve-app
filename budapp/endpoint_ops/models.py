@@ -24,6 +24,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Uuid
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import JSONB
 
 from budapp.cluster_ops.models import Cluster
 from budapp.commons.constants import EndpointStatusEnum
@@ -59,6 +60,7 @@ class Endpoint(Base):
     )
     credential_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("proprietary_credential.id"), nullable=True)
     status_sync_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    model_configuration: Mapped[dict] = mapped_column(JSONB, nullable=True)
 
     model: Mapped[Model] = relationship("Model", back_populates="endpoints", foreign_keys=[model_id])
     # worker: Mapped[Worker] = relationship(
