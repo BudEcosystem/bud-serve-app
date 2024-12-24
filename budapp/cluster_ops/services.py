@@ -24,7 +24,7 @@ from uuid import UUID
 
 import aiohttp
 import yaml
-from fastapi import UploadFile
+from fastapi import UploadFile, status
 
 from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension
@@ -649,9 +649,15 @@ class ClusterService(SessionMixin):
         logger.debug(f"Delete cluster workflow {db_workflow.id} created")
 
         # Perform delete cluster request to bud_cluster app
-        bud_cluster_response = await self._perform_bud_cluster_delete_request(
-            db_cluster.cluster_id, current_user_id, db_workflow.id
-        )
+        try:
+            bud_cluster_response = await self._perform_bud_cluster_delete_request(
+                db_cluster.cluster_id, current_user_id, db_workflow.id
+            )
+        except ClientException as e:
+            await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"status": WorkflowStatusEnum.FAILED}
+            )
+            raise e
 
         # Add payload dict to response
         for step in bud_cluster_response["steps"]:
@@ -715,10 +721,12 @@ class ClusterService(SessionMixin):
                     response_data = await response.json()
                     if response.status != 200:
                         logger.error(f"Failed to delete cluster: {response.status} {response_data}")
-                        raise ClientException("Failed to delete cluster")
+                        raise ClientException(
+                            "Failed to delete cluster", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
 
                     logger.debug("Successfully deleted cluster from budcluster")
                     return response_data
         except Exception as e:
             logger.exception(f"Failed to send delete cluster request: {e}")
-            raise ClientException("Failed to delete cluster") from e
+            raise ClientException("Failed to delete cluster", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR) from e
