@@ -27,18 +27,6 @@ from pydantic import HttpUrl
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import (
-    LICENSE_DIR,
-    BaseModelRelationEnum,
-    BudServeWorkflowStepEventName,
-    CredentialTypeEnum,
-    ModelProviderTypeEnum,
-    ModelSecurityScanStatusEnum,
-    ModelSourceEnum,
-    WorkflowStatusEnum,
-    ModelStatusEnum,
-    CloudModelStatusEnum,
-)
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.helpers import assign_random_colors_to_names, normalize_value
@@ -51,8 +39,22 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
+from ..commons.constants import (
+    LICENSE_DIR,
+    BaseModelRelationEnum,
+    BudServeWorkflowStepEventName,
+    CloudModelStatusEnum,
+    CredentialTypeEnum,
+    ModelProviderTypeEnum,
+    ModelSecurityScanStatusEnum,
+    ModelSourceEnum,
+    ModelStatusEnum,
+    WorkflowStatusEnum,
+    WorkflowTypeEnum,
+)
 from ..commons.helpers import validate_huggingface_repo_format
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import (
     CloudModelDataManager,
     ModelDataManager,
@@ -126,7 +128,15 @@ class CloudModelWorkflowService(SessionMixin):
         current_step_number = step_number
 
         # Retrieve or create workflow
-        db_workflow = await self._retrieve_or_create_workflow(workflow_id, workflow_total_steps, current_user_id)
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING,
+            title="Cloud Model Onboarding",
+            total_steps=workflow_total_steps,
+            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+        )
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id, workflow_create, current_user_id
+        )
 
         # Model source is provider type
         source = None
@@ -136,6 +146,12 @@ class CloudModelWorkflowService(SessionMixin):
             )
             source = db_provider.type.value
 
+            # Update icon on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"icon": db_provider.icon},
+            )
+
         if cloud_model_id:
             db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
                 CloudModel, {"id": cloud_model_id, "status": CloudModelStatusEnum.ACTIVE}
@@ -144,12 +160,24 @@ class CloudModelWorkflowService(SessionMixin):
             if db_cloud_model.is_present_in_model:
                 raise ClientException("Cloud model is already present in model")
 
+            # Update title on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": db_cloud_model.name},
+            )
+
         if name:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
                 Model, {"name": name, "status": ModelStatusEnum.ACTIVE}, missing_ok=True
             )
             if db_model:
                 raise ClientException("Model name already exists")
+
+            # Update title on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": name},
+            )
 
         # Prepare workflow step data
         workflow_step_data = CreateCloudModelWorkflowSteps(
@@ -354,31 +382,6 @@ class CloudModelWorkflowService(SessionMixin):
                 {"current_step": end_step_number, "status": WorkflowStatusEnum.COMPLETED},
             )
         return db_model
-
-    async def _retrieve_or_create_workflow(
-        self, workflow_id: Optional[UUID], workflow_total_steps: Optional[int], current_user_id: UUID
-    ) -> None:
-        """Retrieve or create workflow."""
-        if workflow_id:
-            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
-                WorkflowModel, {"id": workflow_id}
-            )
-
-            if db_workflow.status != WorkflowStatusEnum.IN_PROGRESS:
-                logger.error(f"Workflow {workflow_id} is not in progress")
-                raise ClientException("Workflow is not in progress")
-
-            if db_workflow.created_by != current_user_id:
-                logger.error(f"User {current_user_id} is not the creator of workflow {workflow_id}")
-                raise ClientException("User is not authorized to perform this action")
-        elif workflow_total_steps:
-            db_workflow = await WorkflowDataManager(self.session).insert_one(
-                WorkflowModel(total_steps=workflow_total_steps, created_by=current_user_id),
-            )
-        else:
-            raise ClientException("Either workflow_id or workflow_total_steps should be provided")
-
-        return db_workflow
 
     async def _validate_duplicate_source_uri_model(
         self, source: str, uri: str, db_workflow_steps: List[WorkflowStepModel], current_step_number: int
@@ -663,8 +666,14 @@ class LocalModelWorkflowService(SessionMixin):
         current_step_number = step_number
 
         # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.LOCAL_MODEL_ONBOARDING,
+            title="Local Model Onboarding",
+            total_steps=workflow_total_steps,
+            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+        )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
-            workflow_id, workflow_total_steps, current_user_id
+            workflow_id, workflow_create, current_user_id
         )
 
         # Validate proprietary credential id
@@ -681,6 +690,12 @@ class LocalModelWorkflowService(SessionMixin):
             if db_model:
                 raise ClientException("Model name should be unique")
 
+            # Update title on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": name},
+            )
+
         # Add provider_id for HuggingFace provider type
         provider_id = None
         if provider_type == ModelProviderTypeEnum.HUGGING_FACE:
@@ -688,6 +703,12 @@ class LocalModelWorkflowService(SessionMixin):
                 ProviderModel, {"type": CredentialTypeEnum.HUGGINGFACE}
             )
             provider_id = db_provider.id
+
+            # Update icon on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"icon": db_provider.icon},
+            )
 
         # Prepare workflow step data
         workflow_step_data = CreateLocalModelWorkflowSteps(
@@ -744,6 +765,12 @@ class LocalModelWorkflowService(SessionMixin):
         workflow_current_step = max(current_step_number, db_max_workflow_step_number)
         logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
 
+        # This will ensure workflow step number is updated to the latest step number
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": workflow_current_step},
+        )
+
         if trigger_workflow:
             # query workflow steps again to get latest data
             db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -771,38 +798,11 @@ class LocalModelWorkflowService(SessionMixin):
             if missing_keys:
                 raise ClientException(f"Missing required data for model extraction: {', '.join(missing_keys)}")
 
-            # Create or update new workflow step for model extraction
-            current_step_number = current_step_number + 1
-
             try:
                 # Perform model extraction
-                await self._perform_model_extraction(
-                    db_workflow.id, current_step_number, required_data, current_user_id
-                )
+                await self._perform_model_extraction(current_step_number, required_data, current_user_id, db_workflow)
             except ClientException as e:
-                workflow_current_step = current_step_number
-                db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-                    db_workflow,
-                    {"current_step": workflow_current_step},
-                )
-                logger.debug("Workflow updated with latest step")
                 raise e
-
-            # Create next workflow step to store model extraction response
-            current_step_number = current_step_number + 1
-            workflow_current_step = current_step_number
-
-            # Update or create next workflow step
-            # NOTE: The when extraction is done, the subscriber will create model and update model_id to the step
-            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                workflow_id, current_step_number, {}
-            )
-
-        # This will ensure workflow step number is updated to the latest step number
-        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-            db_workflow,
-            {"current_step": workflow_current_step},
-        )
 
         return db_workflow
 
@@ -816,9 +816,6 @@ class LocalModelWorkflowService(SessionMixin):
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
             {"workflow_id": workflow_id}
         )
-
-        # Get last step
-        db_latest_workflow_step = db_workflow_steps[-1]
 
         # Define the keys required for endpoint creation
         keys_of_interest = [
@@ -1058,14 +1055,21 @@ class LocalModelWorkflowService(SessionMixin):
             "tags": extracted_tags,
             "description": model_description,
         }
-        await WorkflowStepDataManager(self.session).update_by_fields(
-            db_latest_workflow_step, {"data": workflow_update_data}
+
+        current_step_number = db_workflow.current_step + 1
+        workflow_current_step = current_step_number
+
+        # Update or create next workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            workflow_id, current_step_number, workflow_update_data
         )
-        logger.debug(f"Workflow step updated with model id {db_model.id}")
+        logger.debug(f"Workflow step updated {db_workflow_step.id}")
 
         # Mark workflow as completed
         logger.debug(f"Updating workflow status: {workflow_id}")
-        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
+        )
 
     async def _verify_provider_type_uri_duplication(
         self,
@@ -1133,16 +1137,11 @@ class LocalModelWorkflowService(SessionMixin):
             raise ClientException(f"Duplicate {query_provider_type} uri found")
 
     async def _perform_model_extraction(
-        self, workflow_id: UUID, step_number: int, data: Dict, current_user_id: UUID
+        self, current_step_number: int, data: Dict, current_user_id: UUID, db_workflow: WorkflowModel
     ) -> None:
         """Perform model extraction."""
-        # Update or create next workflow step
-        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-            workflow_id, step_number, {}
-        )
-
         # Perform model extraction request
-        model_extraction_response = await self._perform_model_extraction_request(workflow_id, data, current_user_id)
+        model_extraction_response = await self._perform_model_extraction_request(db_workflow.id, data, current_user_id)
 
         # Add payload dict to response
         for step in model_extraction_response["steps"]:
@@ -1152,9 +1151,19 @@ class LocalModelWorkflowService(SessionMixin):
             BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value: model_extraction_response
         }
 
-        # Update workflow step with response
-        await WorkflowStepDataManager(self.session).update_by_fields(
-            db_workflow_step, {"data": model_extraction_events}
+        current_step_number = current_step_number + 1
+        workflow_current_step = current_step_number
+
+        # Update or create next workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, model_extraction_events
+        )
+        logger.debug(f"Workflow step created with id {db_workflow_step.id}")
+
+        # Update progress in workflow
+        model_extraction_response["progress_type"] = BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": model_extraction_response, "current_step": workflow_current_step}
         )
 
     async def _perform_model_extraction_request(self, workflow_id: UUID, data: Dict, current_user_id: UUID) -> None:
@@ -1195,20 +1204,20 @@ class LocalModelWorkflowService(SessionMixin):
                 async with session.post(model_extraction_endpoint, json=model_extraction_request) as response:
                     response_data = await response.json()
                     if response.status >= 400:
-                        raise ClientException("unable to perform model extraction request")
+                        raise ClientException("Unable to perform model extraction")
 
                     return response_data
         except ClientException as e:
             raise e
         except Exception as e:
             logger.error(f"Failed to perform model extraction request: {e}")
-            raise ClientException("unable to perform model extraction request") from e
+            raise ClientException("Unable to perform model extraction") from e
 
     @staticmethod
     async def _get_decrypted_token(credential_id: UUID) -> str:
         """Get decrypted token."""
         # TODO: remove this function after implementing dapr decryption
-        url = f"https://api-dev.bud.studio/proprietary/credentials/{credential_id}/details"
+        url = f"{app_settings.budserve_host}/proprietary/credentials/{credential_id}/details"
 
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
@@ -1284,8 +1293,14 @@ class LocalModelWorkflowService(SessionMixin):
         current_step_number = step_number
 
         # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.MODEL_SECURITY_SCAN,
+            title="Model Security Scan",
+            total_steps=workflow_total_steps,
+            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+        )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
-            workflow_id, workflow_total_steps, current_user_id
+            workflow_id, workflow_create, current_user_id
         )
 
         # Validate model id
@@ -1295,6 +1310,21 @@ class LocalModelWorkflowService(SessionMixin):
             )
             if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
                 raise ClientException("Security scan is only supported for local models")
+
+            # Update icon on workflow
+            if db_model.provider_type == ModelProviderTypeEnum.HUGGING_FACE:
+                db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                    ProviderModel, {"id": db_model.provider_id}
+                )
+                model_icon = db_provider.icon
+            else:
+                model_icon = db_model.icon
+
+            # Update title, icon on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": db_model.name, "icon": model_icon},
+            )
 
         # Prepare workflow step data
         workflow_step_data = LocalModelScanWorkflowStepData(
@@ -1341,6 +1371,12 @@ class LocalModelWorkflowService(SessionMixin):
         workflow_current_step = max(current_step_number, db_max_workflow_step_number)
         logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
 
+        # This will ensure workflow step number is updated to the latest step number
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": workflow_current_step},
+        )
+
         if trigger_workflow:
             # query workflow steps again to get latest data
             db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -1367,46 +1403,36 @@ class LocalModelWorkflowService(SessionMixin):
 
             try:
                 # Perform model security scan
-                await self._perform_model_security_scan(db_workflow.id, current_step_number, required_data)
+                await self._perform_model_security_scan(current_step_number, required_data, db_workflow)
             except ClientException as e:
-                workflow_current_step = current_step_number
+                # NOTE: Update workflow status to failed only for model security scan workflow. if micro-service fails,
+                # For remaining workflows, if microservice fails, the workflow steps won't be created from backend
+                # According to ui model_id and trigger workflow required in request body
+                # But Orchestration perspective, the workflow steps can also provided separately in request body
+                # So, we need to update the workflow status to failed only for model security scan workflow
                 db_workflow = await WorkflowDataManager(self.session).update_by_fields(
                     db_workflow,
-                    {"current_step": workflow_current_step},
+                    {"status": WorkflowStatusEnum.FAILED},
                 )
                 logger.debug("Workflow updated with latest step")
                 raise e
 
-            # Create next workflow step to store model scan result
-            current_step_number = current_step_number + 1
-            workflow_current_step = current_step_number
-
-            # Update or create next workflow step
-            # NOTE: The when scanning is completed, the subscriber will create scan result and update scan result id to the step
-            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                db_workflow.id, current_step_number, {}
-            )
-
-        # This will ensure workflow step number is updated to the latest step number
-        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-            db_workflow,
-            {"current_step": workflow_current_step},
-        )
-
         return db_workflow
 
-    async def _perform_model_security_scan(self, workflow_id: UUID, step_number: int, data: Dict) -> None:
+    async def _perform_model_security_scan(
+        self, current_step_number: int, data: Dict, db_workflow: WorkflowModel
+    ) -> None:
         """Perform model security scan."""
         # Retrieve workflow step
         db_workflow_step = await WorkflowDataManager(self.session).retrieve_by_fields(
-            WorkflowStepModel, {"workflow_id": workflow_id, "step_number": step_number}
+            WorkflowStepModel, {"workflow_id": db_workflow.id, "step_number": current_step_number}
         )
 
-        # Add created_by to data for notification purpose in micro service
-        data["created_by"] = str(db_workflow_step.workflow.created_by)
-
         # Perform model security scan request
-        model_security_scan_response = await self._perform_model_security_scan_request(workflow_id, data)
+        current_user_id = db_workflow_step.workflow.created_by
+        model_security_scan_response = await self._perform_model_security_scan_request(
+            db_workflow.id, data, current_user_id
+        )
 
         # Add payload dict to response
         for step in model_security_scan_response["steps"]:
@@ -1418,7 +1444,14 @@ class LocalModelWorkflowService(SessionMixin):
         # Update workflow step with response
         await WorkflowStepDataManager(self.session).update_by_fields(db_workflow_step, {"data": data})
 
-    async def _perform_model_security_scan_request(self, workflow_id: UUID, data: Dict) -> None:
+        # Update progress in workflow
+        model_security_scan_response["progress_type"] = BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value
+
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": model_security_scan_response}
+        )
+
+    async def _perform_model_security_scan_request(self, workflow_id: UUID, data: Dict, current_user_id: UUID) -> None:
         """Perform model security scan request."""
         model_security_scan_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/model-info/scan"
@@ -1435,7 +1468,7 @@ class LocalModelWorkflowService(SessionMixin):
             "model_path": local_path,
             "notification_metadata": {
                 "name": "bud-notification",
-                "subscriber_ids": data["created_by"],
+                "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
             "source_topic": f"{app_settings.source_topic}",
@@ -1468,9 +1501,6 @@ class LocalModelWorkflowService(SessionMixin):
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
             {"workflow_id": workflow_id}
         )
-
-        # Get last step
-        db_latest_workflow_step = db_workflow_steps[-1]
 
         # Define the keys required for endpoint creation
         keys_of_interest = [
@@ -1544,10 +1574,19 @@ class LocalModelWorkflowService(SessionMixin):
                 ModelSecurityScanResultModel(**model_security_scan_result.model_dump())
             )
 
+        # Update workflow current step
+        current_step_number = db_workflow.current_step + 1
+        workflow_current_step = current_step_number
+
         # Update workflow step with model security scan result id
-        await WorkflowStepDataManager(self.session).update_by_fields(
-            db_latest_workflow_step,
-            {"data": {"security_scan_result_id": str(db_model_security_scan_result.id)}},
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, {"security_scan_result_id": str(db_model_security_scan_result.id)}
+        )
+
+        # Update workflow current step
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": workflow_current_step},
         )
 
         # Mark scan_verified according to overall scan status
@@ -1561,16 +1600,19 @@ class LocalModelWorkflowService(SessionMixin):
         # Get dummy leaderboard data
         leaderboard_data = await self.get_leaderboard()
 
+        # Update workflow current step
+        current_step_number = db_workflow.current_step + 1
+        workflow_current_step = current_step_number
+
         # Create workflow step to store model scan result
-        end_step_number = db_latest_workflow_step.step_number + 1
         db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-            workflow_id, end_step_number, {"leaderboard": leaderboard_data}
+            workflow_id, current_step_number, {"leaderboard": leaderboard_data}
         )
 
         # Update workflow current step and status
         await WorkflowDataManager(self.session).update_by_fields(
             db_workflow,
-            {"current_step": end_step_number, "status": WorkflowStatusEnum.COMPLETED},
+            {"current_step": workflow_current_step, "status": WorkflowStatusEnum.COMPLETED},
         )
 
     async def _group_model_issues(self, model_issues: list, local_path: str) -> list[ModelIssue]:

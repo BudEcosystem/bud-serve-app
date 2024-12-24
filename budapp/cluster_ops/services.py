@@ -24,12 +24,11 @@ from uuid import UUID
 
 import aiohttp
 import yaml
-from fastapi import UploadFile
+from fastapi import UploadFile, status
 
 from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension
 from budapp.commons.config import app_settings
-from budapp.commons.constants import BudServeWorkflowStepEventName, ClusterStatusEnum, WorkflowStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.core.schemas import NotificationPayload
@@ -40,6 +39,8 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
+from ..commons.constants import BudServeWorkflowStepEventName, ClusterStatusEnum, WorkflowStatusEnum, WorkflowTypeEnum
+from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import ClusterDataManager
 from .models import Cluster as ClusterModel
 from .schemas import (
@@ -67,11 +68,8 @@ class ClusterService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[ClusterPaginatedResponse], int]:
         """Get all active clusters."""
-        filters_dict = filters
-        filters_dict["is_active"] = True
-
         clusters, count = await ClusterDataManager(self.session).get_all_clusters(
-            offset, limit, filters_dict, order_by, search
+            offset, limit, filters, order_by, search
         )
         # Add dummy data and additional fields
         updated_clusters = []
@@ -128,8 +126,14 @@ class ClusterService(SessionMixin):
         current_step_number = step_number
 
         # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.CLUSTER_ONBOARDING,
+            title="Cluster Onboarding",
+            total_steps=workflow_total_steps,
+            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+        )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
-            workflow_id, workflow_total_steps, current_user_id
+            workflow_id, workflow_create, current_user_id
         )
 
         # Validate the configuration file
@@ -147,10 +151,27 @@ class ClusterService(SessionMixin):
         if cluster_name:
             # Check duplicate cluster name
             db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-                ClusterModel, {"name": cluster_name, "is_active": True}, missing_ok=True
+                ClusterModel,
+                fields={"name": cluster_name},
+                exclude_fields={"status": ClusterStatusEnum.DELETED},
+                missing_ok=True,
             )
             if db_cluster:
                 raise ClientException("Cluster name already exists")
+
+            # Update title on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": cluster_name},
+            )
+
+        if cluster_icon:
+            # Update icon on workflow
+            # NOTE: Multiple queries because of considering future orchestration upgrade
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"icon": cluster_icon},
+            )
 
         # Prepare workflow step data
         workflow_step_data = CreateClusterWorkflowSteps(
@@ -200,25 +221,16 @@ class ClusterService(SessionMixin):
         workflow_current_step = max(current_step_number, db_max_workflow_step_number)
         logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
 
+        # Update workflow step data in db
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": workflow_current_step},
+        )
+
         # Execute workflow
         # Create next step if workflow is triggered
         if trigger_workflow:
             logger.debug("Workflow triggered")
-
-            # Increment step number of workflow and workflow step
-            current_step_number = current_step_number + 1
-            workflow_current_step = current_step_number
-
-            # Update or create next workflow step
-            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                db_workflow.id, current_step_number, {}
-            )
-
-            # Update workflow step data in db
-            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-                db_workflow,
-                {"current_step": workflow_current_step},
-            )
 
             # TODO: Currently querying workflow steps again by ordering steps in ascending order
             # To ensure the latest step update is fetched, Consider excluding it later
@@ -249,54 +261,28 @@ class ClusterService(SessionMixin):
 
             # Check duplicate cluster name
             db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-                ClusterModel, {"name": required_data["name"], "is_active": True}, missing_ok=True
+                ClusterModel,
+                {"name": required_data["name"]},
+                exclude_fields={"status": ClusterStatusEnum.DELETED},
+                missing_ok=True,
             )
             if db_cluster:
                 raise ClientException("Cluster name already exists")
 
             # Trigger create cluster workflow by step
-            await self._execute_create_cluster_workflow(required_data, db_workflow.id, current_user_id)
-            logger.debug("Successfully executed create cluster workflow")
-
-            # Increment step number of workflow and workflow step
-            current_step_number = current_step_number + 1
-            workflow_current_step = current_step_number
-
-            # Create next step for storing success event
-            await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                db_workflow.id, current_step_number, {}
+            await self._execute_create_cluster_workflow(
+                required_data, current_user_id, db_workflow, current_step_number
             )
-
-        # Update workflow step data in db
-        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-            db_workflow,
-            {"current_step": workflow_current_step},
-        )
+            logger.debug("Successfully executed create cluster workflow")
 
         return db_workflow
 
     async def _execute_create_cluster_workflow(
-        self, data: Dict[str, Any], workflow_id: UUID, current_user_id: UUID
+        self, data: Dict[str, Any], current_user_id: UUID, db_workflow: WorkflowModel, current_step_number: int
     ) -> None:
         """Execute create cluster workflow."""
-        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
-            {"workflow_id": workflow_id}
-        )
-
-        # Latest step
-        db_latest_workflow_step = db_workflow_steps[-1]
-
-        # Check for duplicate cluster name
-        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel, {"name": data["name"], "is_active": True}, missing_ok=True
-        )
-
-        if db_cluster:
-            logger.error(f"Cluster {data['name']} already exists")
-            raise ClientException(f"Cluster {data['name']} already exists")
-
         # Create cluster in bud_cluster app
-        bud_cluster_response = await self._perform_create_cluster_request(data, workflow_id, current_user_id)
+        bud_cluster_response = await self._perform_create_cluster_request(data, db_workflow.id, current_user_id)
 
         # Add payload dict to response
         for step in bud_cluster_response["steps"]:
@@ -304,10 +290,22 @@ class ClusterService(SessionMixin):
 
         create_cluster_events = {BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value: bud_cluster_response}
 
-        # Update workflow step with response
-        await WorkflowStepDataManager(self.session).update_by_fields(
-            db_latest_workflow_step, {"data": create_cluster_events}
+        # Increment step number of workflow and workflow step
+        current_step_number = current_step_number + 1
+        workflow_current_step = current_step_number
+
+        # Update or create next workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, create_cluster_events
         )
+        logger.debug(f"Created workflow step {db_workflow_step.id} for storing create cluster events")
+
+        # Update progress in workflow
+        bud_cluster_response["progress_type"] = BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": bud_cluster_response, "current_step": workflow_current_step}
+        )
+        logger.debug(f"Updated progress, current step in workflow {db_workflow.id}")
 
     async def _perform_create_cluster_request(
         self, data: Dict[str, str], workflow_id: UUID, current_user_id: UUID
@@ -410,9 +408,6 @@ class ClusterService(SessionMixin):
             {"workflow_id": workflow_id}
         )
 
-        # Get last step
-        db_latest_workflow_step = db_workflow_steps[-1]
-
         # Define the keys required for endpoint creation
         keys_of_interest = [
             "name",
@@ -431,7 +426,10 @@ class ClusterService(SessionMixin):
 
         # Check duplicate cluster name
         db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel, {"name": required_data["name"], "is_active": True}, missing_ok=True
+            ClusterModel,
+            {"name": required_data["name"]},
+            exclude_fields={"status": ClusterStatusEnum.DELETED},
+            missing_ok=True,
         )
 
         if db_cluster:
@@ -474,9 +472,19 @@ class ClusterService(SessionMixin):
             workflow_data = {"status": WorkflowStatusEnum.COMPLETED}
         finally:
             execution_status_data = {"workflow_execution_status": execution_status}
-            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
-                db_latest_workflow_step, {"data": execution_status_data}
+
+            # Update current step number
+            current_step_number = db_workflow.current_step + 1
+            workflow_current_step = current_step_number
+
+            # Update or create next workflow step
+            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                db_workflow.id, current_step_number, execution_status_data
             )
+            logger.debug(f"Upsert workflow step {db_workflow_step.id} for storing create cluster status")
+
+            # Update workflow step data
+            workflow_data.update({"current_step": workflow_current_step})
             await WorkflowDataManager(self.session).update_by_fields(db_workflow, workflow_data)
 
     async def delete_cluster_from_notification_event(self, payload: NotificationPayload) -> None:
@@ -513,13 +521,16 @@ class ClusterService(SessionMixin):
 
         # Retrieve cluster from db
         db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel, {"id": required_data["cluster_id"], "is_active": True}, missing_ok=True
+            ClusterModel,
+            {"id": required_data["cluster_id"]},
+            exclude_fields={"status": ClusterStatusEnum.DELETED},
+            missing_ok=True,
         )
         logger.debug(f"Cluster retrieved successfully: {db_cluster.id}")
 
         # Mark cluster as deleted
         db_cluster = await ClusterDataManager(self.session).update_by_fields(
-            db_cluster, {"status": ClusterStatusEnum.DELETED, "is_active": False}
+            db_cluster, {"status": ClusterStatusEnum.DELETED}
         )
         logger.debug(f"Cluster {db_cluster.id} marked as deleted")
 
@@ -584,8 +595,8 @@ class ClusterService(SessionMixin):
         if "name" in data:
             duplicate_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
                 model=ClusterModel,
-                fields={"name": data["name"], "is_active": True},
-                exclude_fields={"id": cluster_id},
+                fields={"name": data["name"]},
+                exclude_fields={"id": cluster_id, "status": ClusterStatusEnum.DELETED},
                 missing_ok=True,
             )
             if duplicate_cluster:
@@ -611,30 +622,42 @@ class ClusterService(SessionMixin):
             cluster_id: The ID of the cluster to delete.
         """
         db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel, {"id": cluster_id, "is_active": True}
+            ClusterModel, fields={"id": cluster_id}, exclude_fields={"status": ClusterStatusEnum.DELETED}
         )
 
         # Check for active endpoints
-        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-            EndpointModel, {"cluster_id": cluster_id, "is_active": True}, missing_ok=True
+        db_endpoints = await EndpointDataManager(self.session).get_all_by_fields(
+            EndpointModel, {"cluster_id": cluster_id, "is_active": True}
         )
 
         # Raise error if cluster has active endpoints
-        if db_endpoint:
-            raise ClientException("Cannot delete cluster with active endpoints")
+        if db_endpoints:
+            raise ClientException("Cannot delete cluster with active deployments")
 
         current_step_number = 1
 
         # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.CLUSTER_DELETION,
+            title=db_cluster.name,
+            total_steps=current_step_number,
+            icon=db_cluster.icon,
+        )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
-            workflow_id=None, workflow_total_steps=current_step_number, current_user_id=current_user_id
+            workflow_id=None, workflow_data=workflow_create, current_user_id=current_user_id
         )
         logger.debug(f"Delete cluster workflow {db_workflow.id} created")
 
         # Perform delete cluster request to bud_cluster app
-        bud_cluster_response = await self._perform_bud_cluster_delete_request(
-            db_cluster.cluster_id, current_user_id, db_workflow.id
-        )
+        try:
+            bud_cluster_response = await self._perform_bud_cluster_delete_request(
+                db_cluster.cluster_id, current_user_id, db_workflow.id
+            )
+        except ClientException as e:
+            await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"status": WorkflowStatusEnum.FAILED}
+            )
+            raise e
 
         # Add payload dict to response
         for step in bud_cluster_response["steps"]:
@@ -656,6 +679,12 @@ class ClusterService(SessionMixin):
             )
         )
         logger.debug(f"Created workflow step {current_step_number} for workflow {db_workflow.id}")
+
+        # Update progress in workflow
+        bud_cluster_response["progress_type"] = BudServeWorkflowStepEventName.DELETE_CLUSTER_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": bud_cluster_response, "current_step": current_step_number}
+        )
 
         # Update cluster status to deleting
         await ClusterDataManager(self.session).update_by_fields(db_cluster, {"status": ClusterStatusEnum.DELETING})
@@ -692,10 +721,12 @@ class ClusterService(SessionMixin):
                     response_data = await response.json()
                     if response.status != 200:
                         logger.error(f"Failed to delete cluster: {response.status} {response_data}")
-                        raise ClientException("Failed to delete cluster")
+                        raise ClientException(
+                            "Failed to delete cluster", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
 
                     logger.debug("Successfully deleted cluster from budcluster")
                     return response_data
         except Exception as e:
             logger.exception(f"Failed to send delete cluster request: {e}")
-            raise ClientException("Failed to delete cluster") from e
+            raise ClientException("Failed to delete cluster", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR) from e

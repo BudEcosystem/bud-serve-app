@@ -1,8 +1,11 @@
+from datetime import datetime
+
 from pydantic import UUID4, BaseModel, ConfigDict, Field
 
-from budapp.commons.constants import ModelProviderTypeEnum, WorkflowStatusEnum
-from budapp.commons.schemas import SuccessResponse, Tag
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 from budapp.model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider
+
+from ..commons.constants import ModelProviderTypeEnum, WorkflowStatusEnum, WorkflowTypeEnum
 
 
 class RetrieveWorkflowStepData(BaseModel):
@@ -58,3 +61,44 @@ class WorkflowResponse(SuccessResponse):
     status: WorkflowStatusEnum
     current_step: int
     reason: str | None = None
+
+
+class Workflow(BaseModel):
+    """Workflow schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: UUID4
+    title: str | None = None
+    icon: str | None = None
+    progress: dict | None = None
+    workflow_type: WorkflowTypeEnum
+    total_steps: int = Field(..., gt=0)
+    status: WorkflowStatusEnum
+    current_step: int
+    reason: str | None = None
+    created_at: datetime
+    modified_at: datetime
+
+
+class WorkflowListResponse(PaginatedSuccessResponse):
+    """Workflow list response schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    workflows: list[Workflow]
+
+
+class WorkflowFilter(BaseModel):
+    """Workflow filter schema."""
+
+    workflow_type: WorkflowTypeEnum | None = None
+
+
+class WorkflowUtilCreate(BaseModel):
+    """Workflow create schema."""
+
+    workflow_type: WorkflowTypeEnum
+    title: str
+    icon: str | None = None
+    total_steps: int | None = None
