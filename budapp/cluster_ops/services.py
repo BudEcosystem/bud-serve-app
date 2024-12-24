@@ -39,7 +39,13 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
-from ..commons.constants import BudServeWorkflowStepEventName, ClusterStatusEnum, WorkflowStatusEnum, WorkflowTypeEnum
+from ..commons.constants import (
+    BudServeWorkflowStepEventName,
+    ClusterStatusEnum,
+    WorkflowStatusEnum,
+    WorkflowTypeEnum,
+    EndpointStatusEnum,
+)
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import ClusterDataManager
 from .models import Cluster as ClusterModel
@@ -627,7 +633,10 @@ class ClusterService(SessionMixin):
 
         # Check for active endpoints
         db_endpoints = await EndpointDataManager(self.session).get_all_by_fields(
-            EndpointModel, {"cluster_id": cluster_id, "is_active": True}
+            EndpointModel,
+            fields={"cluster_id": cluster_id},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+            missing_ok=True,
         )
 
         # Raise error if cluster has active endpoints

@@ -30,6 +30,7 @@ from budapp.commons.exceptions import DatabaseException
 from budapp.endpoint_ops.models import Endpoint
 from budapp.model_ops.models import CloudModel, Model, PaperPublished
 from budapp.model_ops.models import Provider as ProviderModel
+from budapp.commons.constants import EndpointStatusEnum
 
 
 logger = logging.get_logger(__name__)
@@ -308,7 +309,9 @@ class ModelDataManager(DataManagerUtils):
             stmt = (
                 select(
                     Model,
-                    func.count(Endpoint.id).filter(Endpoint.is_active == True).label("endpoints_count"),
+                    func.count(Endpoint.id)
+                    .filter(Endpoint.status != EndpointStatusEnum.DELETED)
+                    .label("endpoints_count"),
                 )
                 .select_from(Model)
                 .filter(or_(*search_conditions))
@@ -328,7 +331,9 @@ class ModelDataManager(DataManagerUtils):
             stmt = (
                 select(
                     Model,
-                    func.count(Endpoint.id).filter(Endpoint.is_active == True).label("endpoints_count"),
+                    func.count(Endpoint.id)
+                    .filter(Endpoint.status != EndpointStatusEnum.DELETED)
+                    .label("endpoints_count"),
                 )
                 .select_from(Model)
                 .filter_by(**filters)
