@@ -453,7 +453,7 @@ class PayloadType(str, Enum):
         DEPLOY_MODEL: Represents the model deployment payload type.
     """
 
-    DEPLOYMENT_RECOMMENDATION = "deployment_recommendation"
+    DEPLOYMENT_RECOMMENDATION = "get_cluster_recommendations"
     DEPLOY_MODEL = "deploy_model"
     REGISTER_CLUSTER = "register_cluster"
     DELETE_CLUSTER = "delete_cluster"
