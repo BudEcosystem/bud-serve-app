@@ -103,10 +103,16 @@ class EndpointService(SessionMixin):
         )
         logger.debug(f"Delete endpoint workflow {db_workflow.id} created")
 
-        # Perform delete endpoint request to bud_cluster app
-        bud_cluster_response = await self._perform_bud_cluster_delete_endpoint_request(
-            db_endpoint.cluster.cluster_id, db_endpoint.namespace, current_user_id, db_workflow.id
-        )
+        try:
+            # Perform delete endpoint request to bud_cluster app
+            bud_cluster_response = await self._perform_bud_cluster_delete_endpoint_request(
+                db_endpoint.cluster.cluster_id, db_endpoint.namespace, current_user_id, db_workflow.id
+            )
+        except ClientException as e:
+            await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"status": WorkflowStatusEnum.FAILED}
+            )
+            raise e
 
         # Add payload dict to response
         for step in bud_cluster_response["steps"]:
