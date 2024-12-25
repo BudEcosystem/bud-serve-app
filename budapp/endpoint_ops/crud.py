@@ -25,7 +25,7 @@ from budapp.cluster_ops.models import Cluster as ClusterModel
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.model_ops.models import Model as Model
-
+from budapp.commons.constants import EndpointStatusEnum
 from .models import Endpoint as EndpointModel
 
 
@@ -83,7 +83,9 @@ class EndpointDataManager(DataManagerUtils):
                 .join(Model)
                 .join(ClusterModel)
                 .filter(or_(*search_conditions))
-                .filter(and_(EndpointModel.is_active == True, EndpointModel.project_id == project_id))
+                .filter(
+                    and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
+                )
             )
             count_stmt = (
                 select(func.count())
@@ -91,7 +93,9 @@ class EndpointDataManager(DataManagerUtils):
                 .join(Model)
                 .join(ClusterModel)
                 .filter(and_(*search_conditions))
-                .filter(and_(EndpointModel.is_active == True, EndpointModel.project_id == project_id))
+                .filter(
+                    and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
+                )
             )
         else:
             stmt = select(EndpointModel).join(Model).join(ClusterModel)
@@ -99,9 +103,11 @@ class EndpointDataManager(DataManagerUtils):
             for key, value in filters.items():
                 stmt = stmt.filter(getattr(EndpointModel, key) == value)
                 count_stmt = count_stmt.filter(getattr(EndpointModel, key) == value)
-            stmt = stmt.filter(and_(EndpointModel.is_active == True, EndpointModel.project_id == project_id))
+            stmt = stmt.filter(
+                and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
+            )
             count_stmt = count_stmt.filter(
-                and_(EndpointModel.is_active == True, EndpointModel.project_id == project_id)
+                and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
             )
 
         # Calculate count before applying limit and offset

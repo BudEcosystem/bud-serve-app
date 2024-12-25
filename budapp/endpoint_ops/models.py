@@ -24,6 +24,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Uuid
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import JSONB
 
 from budapp.cluster_ops.models import Cluster
 from budapp.commons.constants import EndpointStatusEnum
@@ -38,7 +39,6 @@ class Endpoint(Base):
     __tablename__ = "endpoint"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     project_id: Mapped[UUID] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), nullable=False)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id", ondelete="CASCADE"), nullable=False)
     cache_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -60,6 +60,7 @@ class Endpoint(Base):
     )
     credential_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("proprietary_credential.id"), nullable=True)
     status_sync_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    model_configuration: Mapped[dict] = mapped_column(JSONB, nullable=True)
 
     model: Mapped[Model] = relationship("Model", back_populates="endpoints", foreign_keys=[model_id])
     # worker: Mapped[Worker] = relationship(
@@ -85,7 +86,7 @@ class Endpoint(Base):
     def to_dict(self):
         return {
             "id": str(self.id),
-            "is_active": self.is_active,
+            "status": self.status,
             "project_id": str(self.project_id),
             "model_id": str(self.model_id),
             "cache_enabled": self.cache_enabled,
@@ -102,7 +103,7 @@ class Endpoint(Base):
     def from_dict(cls, data: dict):
         return cls(
             id=data.get("id"),
-            is_active=data.get("is_active"),
+            status=data.get("status"),
             project_id=UUID(data.get("project_id")),
             model_id=UUID(data.get("model_id")),
             cache_enabled=data.get("cache_enabled"),

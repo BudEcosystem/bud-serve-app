@@ -51,6 +51,7 @@ from ..commons.constants import (
     ModelStatusEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
+    EndpointStatusEnum,
 )
 from ..commons.helpers import validate_huggingface_repo_format
 from ..endpoint_ops.models import Endpoint as EndpointModel
@@ -1743,7 +1744,7 @@ class ModelService(SessionMixin):
         )
 
         db_endpoint_count = await ModelDataManager(self.session).get_count_by_fields(
-            EndpointModel, {"model_id": model_id, "is_active": True}
+            EndpointModel, fields={"model_id": model_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
         )
 
         return ModelDetailSuccessResponse(

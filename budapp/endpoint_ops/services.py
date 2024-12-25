@@ -78,7 +78,7 @@ class EndpointService(SessionMixin):
     async def delete_endpoint(self, endpoint_id: UUID, current_user_id: UUID) -> WorkflowModel:
         """Delete an endpoint by its ID."""
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-            EndpointModel, {"id": endpoint_id, "is_active": True}
+            EndpointModel, {"id": endpoint_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
         )
 
         if db_endpoint.model.provider_type in [ModelProviderTypeEnum.HUGGING_FACE, ModelProviderTypeEnum.CLOUD_MODEL]:
@@ -220,13 +220,13 @@ class EndpointService(SessionMixin):
 
         # Retrieve endpoint from db
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-            EndpointModel, {"id": required_data["endpoint_id"], "is_active": True}
+            EndpointModel, {"id": required_data["endpoint_id"]}, exclude_fields={"status": EndpointStatusEnum.DELETED}
         )
         logger.debug(f"Endpoint retrieved successfully: {db_endpoint.id}")
 
         # Mark endpoint as deleted
         db_endpoint = await EndpointDataManager(self.session).update_by_fields(
-            db_endpoint, {"status": EndpointStatusEnum.DELETED, "is_active": False}
+            db_endpoint, {"status": EndpointStatusEnum.DELETED}
         )
         logger.debug(f"Endpoint {db_endpoint.id} marked as deleted")
 
