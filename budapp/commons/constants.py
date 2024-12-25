@@ -610,6 +610,7 @@ class CloudModelStatusEnum(StrEnum):
 
 class ProjectStatusEnum(StrEnum):
     """Enumeration of entity statuses in the system.
+
     Attributes:
         ACTIVE: Represents an active entity.
         DELETED: Represents an deleted entity.
@@ -617,3 +618,8 @@ class ProjectStatusEnum(StrEnum):
 
     ACTIVE = auto()
     DELETED = auto()
+
+
+# Bud Notify Workflow
+BUD_NOTIFICATION_WORKFLOW = "bud-notification"
+BUD_INTERNAL_WORKFLOW = "bud-internal"

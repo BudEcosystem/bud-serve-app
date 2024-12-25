@@ -40,18 +40,19 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 from ..commons.constants import (
+    BUD_INTERNAL_WORKFLOW,
     LICENSE_DIR,
     BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     CloudModelStatusEnum,
     CredentialTypeEnum,
+    EndpointStatusEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
     ModelStatusEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
-    EndpointStatusEnum,
 )
 from ..commons.helpers import validate_huggingface_repo_format
 from ..endpoint_ops.models import Endpoint as EndpointModel
@@ -1193,7 +1194,7 @@ class LocalModelWorkflowService(SessionMixin):
             "provider_type": data["provider_type"],
             "hf_token": hf_token,
             "notification_metadata": {
-                "name": "bud-notification",
+                "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
@@ -1468,7 +1469,7 @@ class LocalModelWorkflowService(SessionMixin):
         model_security_scan_request = {
             "model_path": local_path,
             "notification_metadata": {
-                "name": "bud-notification",
+                "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },

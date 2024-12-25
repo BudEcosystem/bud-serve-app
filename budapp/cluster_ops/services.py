@@ -40,11 +40,12 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 from ..commons.constants import (
+    BUD_INTERNAL_WORKFLOW,
     BudServeWorkflowStepEventName,
     ClusterStatusEnum,
+    EndpointStatusEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
-    EndpointStatusEnum,
 )
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import ClusterDataManager
@@ -335,7 +336,7 @@ class ClusterService(SessionMixin):
             "name": data["name"],
             "ingress_url": data["ingress_url"],
             "notification_metadata": {
-                "name": "bud-notification",
+                "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
@@ -716,7 +717,7 @@ class ClusterService(SessionMixin):
         payload = {
             "cluster_id": str(bud_cluster_id),
             "notification_metadata": {
-                "name": "bud-notification",
+                "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
