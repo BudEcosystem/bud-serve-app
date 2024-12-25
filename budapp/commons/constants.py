@@ -623,3 +623,12 @@ class ProjectStatusEnum(StrEnum):
 # Bud Notify Workflow
 BUD_NOTIFICATION_WORKFLOW = "bud-notification"
 BUD_INTERNAL_WORKFLOW = "bud-internal"
+
+
+class NotificationStatus(Enum):
+    """Enumerate notification statuses."""
+
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    PENDING = "PENDING"
