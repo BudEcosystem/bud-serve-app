@@ -1,7 +1,7 @@
 """removed is active from user table
 
 Revision ID: da9cd25f9dcc
-Revises: d92d92c1c90c
+Revises: e3ac5a852b2c
 Create Date: 2024-12-23 06:33:11.002691
 
 """
@@ -14,7 +14,7 @@ from alembic_postgresql_enum import TableReference
 
 # revision identifiers, used by Alembic.
 revision: str = "da9cd25f9dcc"
-down_revision: Union[str, None] = "892c31d1e086"
+down_revision: Union[str, None] = "e3ac5a852b2c"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
