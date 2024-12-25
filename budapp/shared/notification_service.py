@@ -14,7 +14,7 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""Provides utility functions for managing notification utils."""
+"""Provides shared functions for managing notification service."""
 
 from typing import List, Optional, Union
 
@@ -78,32 +78,39 @@ class NotificationBuilder:
         return self
 
 
-async def send_notification(notification: NotificationRequest) -> dict:
-    """Send a notification.
+class NotificationService:
+    """Service for sending notifications."""
 
-    Args:
-        notification (NotificationRequest): The notification to send
+    def __init__(self):
+        """Initialize the notification service."""
+        self.notification_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_notify_app_id}/method/notifications"
+        )
 
-    Returns:
-        dict: The response from the notification service
-    """
-    notification_endpoint = (
-        f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_notify_app_id}/method/notifications"
-    )
+    async def send_notification(self, notification: NotificationRequest) -> dict:
+        """Send a notification.
 
-    payload = notification.model_dump(exclude_none=True, mode="json")
-    logger.debug(f"Sending notification with payload {payload}")
+        Args:
+            notification (NotificationRequest): The notification to send
 
-    try:
-        async with aiohttp.ClientSession() as session, session.post(notification_endpoint, json=payload) as response:
-            response_data = await response.json()
-            if response.status != 200:
-                logger.error(f"Failed to send notification: {response.status} {response_data}")
+        Returns:
+            dict: The response from the notification service
+        """
+        payload = notification.model_dump(exclude_none=True, mode="json")
+        logger.debug(f"Sending notification with payload {payload}")
 
-            logger.debug("Successfully sent notification")
-            return response_data
-    except Exception as e:
-        logger.exception(f"Failed to send notification: {e}")
+        try:
+            async with aiohttp.ClientSession() as session, session.post(
+                self.notification_endpoint, json=payload
+            ) as response:
+                response_data = await response.json()
+                if response.status != 200:
+                    logger.error(f"Failed to send notification: {response.status} {response_data}")
+
+                logger.debug("Successfully sent notification")
+                return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send notification: {e}")
 
 
 if __name__ == "__main__":
@@ -116,6 +123,6 @@ if __name__ == "__main__":
     )
     import asyncio
 
-    asyncio.run(send_notification(notification))
+    asyncio.run(NotificationService().send_notification(notification))
 
     # python -m budapp.commons.notification_utils
