@@ -40,21 +40,23 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 from ..commons.constants import (
+    BUD_INTERNAL_WORKFLOW,
     LICENSE_DIR,
     BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     CloudModelStatusEnum,
     CredentialTypeEnum,
+    EndpointStatusEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
     ModelStatusEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
-    EndpointStatusEnum,
 )
 from ..commons.helpers import validate_huggingface_repo_format
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..shared.notification_service import NotificationBuilder, NotificationService
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import (
     CloudModelDataManager,
@@ -1072,6 +1074,17 @@ class LocalModelWorkflowService(SessionMixin):
             db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
         )
 
+        # Send notification to workflow creator
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
+        notification_request = (
+            NotificationBuilder()
+            .set_content(title=db_model.name, message="Added to Repository", icon=model_icon)
+            .set_payload(workflow_id=str(db_workflow.id))
+            .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+            .build()
+        )
+        await NotificationService().send_notification(notification_request)
+
     async def _verify_provider_type_uri_duplication(
         self,
         provider_type: ModelProviderTypeEnum,
@@ -1193,7 +1206,7 @@ class LocalModelWorkflowService(SessionMixin):
             "provider_type": data["provider_type"],
             "hf_token": hf_token,
             "notification_metadata": {
-                "name": "bud-notification",
+                "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
@@ -1468,7 +1481,7 @@ class LocalModelWorkflowService(SessionMixin):
         model_security_scan_request = {
             "model_path": local_path,
             "notification_metadata": {
-                "name": "bud-notification",
+                "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
@@ -1939,3 +1952,21 @@ class ModelService(SessionMixin):
             await PaperPublishedDataManager(self.session).delete_paper_by_urls(
                 model_id=model_id, paper_urls={"url": urls_to_remove}
             )
+
+
+class ModelServiceUtil(SessionMixin):
+    """Model util service."""
+
+    async def get_model_icon(self, db_model: Model) -> Optional[str]:
+        """Get model icon.
+
+        Args:
+            db_model: The model to get the icon for.
+
+        Returns:
+            The model icon.
+        """
+        if db_model.provider_type in [ModelProviderTypeEnum.CLOUD_MODEL, ModelProviderTypeEnum.HUGGING_FACE]:
+            return db_model.provider.icon
+        else:
+            return db_model.icon
