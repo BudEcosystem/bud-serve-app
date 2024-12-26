@@ -120,18 +120,3 @@ class NotificationService:
                 return response_data
         except Exception as e:
             logger.exception(f"Failed to send notification: {e}")
-
-
-if __name__ == "__main__":
-    notification = (
-        NotificationBuilder()
-        .set_content(title="example test", message="Test 3", icon="test")
-        .set_payload()
-        .set_notification_request(subscriber_ids=["3c0d43d8-5d11-4549-966d-1492c9063638"], name="bud-notification")
-        .build()
-    )
-    import asyncio
-
-    asyncio.run(NotificationService().send_notification(notification))
-
-    # python -m budapp.commons.notification_utils
