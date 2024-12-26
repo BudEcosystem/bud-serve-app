@@ -36,6 +36,7 @@ class NotificationBuilder:
         """Initialize the builder."""
         self.content = None
         self.payload = None
+        self.notification_request = None
 
     def set_content(
         self,
@@ -51,17 +52,25 @@ class NotificationBuilder:
         return self
 
     def set_payload(
-        self, *, category: NotificationCategory = NotificationCategory.INAPP, source: str = app_settings.source_topic
+        self,
+        *,
+        category: NotificationCategory = NotificationCategory.INAPP,
+        source: str = app_settings.source_topic,
+        workflow_id: str = None,
     ) -> "NotificationBuilder":
         """Set the payload for the notification."""
-        self.payload = NotificationPayload(category=category, source=source, content=self.content)
+        self.payload = NotificationPayload(
+            category=category, source=source, content=self.content, workflow_id=workflow_id
+        )
         return self
 
     def set_notification_request(
         self, *, subscriber_ids: Union[str, List[str]], name: str = BUD_NOTIFICATION_WORKFLOW
-    ) -> NotificationRequest:
+    ) -> "NotificationBuilder":
         """Build the notification request."""
-        self.notification_request = NotificationRequest(name=name, subscriber_ids=subscriber_ids, payload=self.payload)
+        self.notification_request = NotificationRequest.model_construct(
+            name=name, subscriber_ids=subscriber_ids, payload=self.payload
+        )
         return self
 
     def build(self) -> NotificationRequest:
