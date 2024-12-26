@@ -43,7 +43,7 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
 from ..endpoint_ops.services import EndpointService
 from ..model_ops.services import LocalModelWorkflowService, ModelServiceUtil
-from ..shared.notification_service import NotificationBuilder, NotificationService
+from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from .crud import IconDataManager
 from .models import Icon as IconModel
 from .schemas import NotificationPayload, NotificationResponse
@@ -418,7 +418,7 @@ class NotificationService(SessionMixin):
             .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
             .build()
         )
-        await NotificationService().send_notification(notification_request)
+        await BudNotifyService().send_notification(notification_request)
 
         return db_endpoint
 

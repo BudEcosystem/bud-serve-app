@@ -87,7 +87,7 @@ class NotificationBuilder:
         return self
 
 
-class NotificationService:
+class BudNotifyService:
     """Service for sending notifications."""
 
     def __init__(self):

@@ -47,7 +47,7 @@ from ..commons.constants import (
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
-from ..shared.notification_service import NotificationBuilder, NotificationService
+from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import ClusterDataManager
 from .models import Cluster as ClusterModel
@@ -503,7 +503,7 @@ class ClusterService(SessionMixin):
                 .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
                 .build()
             )
-            await NotificationService().send_notification(notification_request)
+            await BudNotifyService().send_notification(notification_request)
 
     async def delete_cluster_from_notification_event(self, payload: NotificationPayload) -> None:
         """Delete a cluster in database.
