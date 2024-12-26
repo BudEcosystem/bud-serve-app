@@ -384,6 +384,18 @@ class CloudModelWorkflowService(SessionMixin):
                 db_workflow,
                 {"current_step": end_step_number, "status": WorkflowStatusEnum.COMPLETED},
             )
+
+            # Send notification to workflow creator
+            model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
+            notification_request = (
+                NotificationBuilder()
+                .set_content(title=db_model.name, message="Added to Repository", icon=model_icon)
+                .set_payload(workflow_id=str(db_workflow.id))
+                .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+                .build()
+            )
+            await NotificationService().send_notification(notification_request)
+
         return db_model
 
     async def _validate_duplicate_source_uri_model(
