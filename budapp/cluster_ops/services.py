@@ -47,6 +47,7 @@ from ..commons.constants import (
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
+from ..shared.notification_service import NotificationBuilder, NotificationService
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import ClusterDataManager
 from .models import Cluster as ClusterModel
@@ -493,6 +494,16 @@ class ClusterService(SessionMixin):
             # Update workflow step data
             workflow_data.update({"current_step": workflow_current_step})
             await WorkflowDataManager(self.session).update_by_fields(db_workflow, workflow_data)
+
+            # Send notification to workflow creator
+            notification_request = (
+                NotificationBuilder()
+                .set_content(title=db_cluster.name, message="Cluster is onboarded", icon=db_cluster.icon)
+                .set_payload(workflow_id=str(db_workflow.id))
+                .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+                .build()
+            )
+            await NotificationService().send_notification(notification_request)
 
     async def delete_cluster_from_notification_event(self, payload: NotificationPayload) -> None:
         """Delete a cluster in database.
