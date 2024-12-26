@@ -73,6 +73,13 @@ class NotificationService(SessionMixin):
         # Update progress in workflow
         await self._update_workflow_progress(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
 
+        # Send number of recommended cluster as notification
+        if (
+            payload.content.status == "COMPLETED"
+            and payload.content.title == "Ranked the clusters based on performance"
+        ):
+            await ClusterService(self.session)._notify_recommended_cluster_from_notification_event(payload)
+
     async def update_model_deployment_events(self, payload: NotificationPayload) -> None:
         """Update the model deployment events for a workflow step.
 
