@@ -88,6 +88,7 @@ from .schemas import (
     ModelTree,
     PaperPublishedCreate,
 )
+from ..endpoint_ops.crud import EndpointDataManager
 
 
 logger = logging.get_logger(__name__)
@@ -1939,3 +1940,46 @@ class ModelService(SessionMixin):
             await PaperPublishedDataManager(self.session).delete_paper_by_urls(
                 model_id=model_id, paper_urls={"url": urls_to_remove}
             )
+
+    async def delete_active_model(self, model_id: UUID) -> Model:
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, fields={"id": model_id, "status": ModelStatusEnum.ACTIVE}
+        )
+
+        # Check for active endpoint
+        db_endpoints = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            fields={"model_id": model_id},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+            missing_ok=True,
+        )
+
+        # Raise error if model has active endpoint
+        if db_endpoints:
+            raise ClientException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete model because it has active endpoint.",
+            )
+
+        db_model = await ModelDataManager(self.session).update_by_fields(db_model, {"status": ModelStatusEnum.DELETED})
+
+        if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
+                CloudModel,
+                fields={
+                    "status": CloudModelStatusEnum.ACTIVE,
+                    "source": db_model.source,
+                    "uri": db_model.uri,
+                    "provider_id": db_model.provider_id,
+                    "is_present_in_model": True,
+                },
+            )
+            db_cloud_model = await CloudModelDataManager(self.session).update_by_fields(
+                db_cloud_model, fields={"is_present_in_model": False}
+            )
+
+        elif db_model.provider_type == ModelProviderTypeEnum.HUGGING_FACE:
+            # TODO:service yet to be implemented for huggingface models to clear model space
+            pass
+
+        return db_model
