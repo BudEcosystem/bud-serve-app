@@ -37,12 +37,13 @@ from budapp.commons.db_utils import SessionMixin
 from budapp.endpoint_ops.crud import EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.endpoint_ops.schemas import EndpointCreate
-from budapp.model_ops.services import LocalModelWorkflowService
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
 from ..endpoint_ops.services import EndpointService
+from ..model_ops.services import LocalModelWorkflowService, ModelServiceUtil
+from ..shared.notification_service import NotificationBuilder, NotificationService
 from .crud import IconDataManager
 from .models import Icon as IconModel
 from .schemas import NotificationPayload, NotificationResponse
@@ -407,6 +408,17 @@ class NotificationService(SessionMixin):
         # Mark workflow as completed
         logger.debug(f"Marking workflow as completed: {workflow_id}")
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
+
+        # Send notification to workflow creator
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_endpoint.model)
+        notification_request = (
+            NotificationBuilder()
+            .set_content(title=db_endpoint.name, message="Deployment is Done", icon=model_icon)
+            .set_payload(workflow_id=str(db_workflow.id))
+            .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+            .build()
+        )
+        await NotificationService().send_notification(notification_request)
 
         return db_endpoint
 
