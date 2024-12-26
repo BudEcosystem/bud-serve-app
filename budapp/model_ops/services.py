@@ -1641,6 +1641,19 @@ class LocalModelWorkflowService(SessionMixin):
             {"current_step": workflow_current_step, "status": WorkflowStatusEnum.COMPLETED},
         )
 
+        # Send notification to workflow creator
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
+        notification_request = (
+            NotificationBuilder()
+            .set_content(
+                title=db_model.name, message="Scan is Completed", icon=model_icon, tag=overall_scan_status.value
+            )
+            .set_payload(workflow_id=str(db_workflow.id))
+            .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)
+
     async def _group_model_issues(self, model_issues: list, local_path: str) -> list[ModelIssue]:
         """Group model issues by severity."""
         grouped_issues = {}
