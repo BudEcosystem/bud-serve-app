@@ -1978,6 +1978,30 @@ class ModelService(SessionMixin):
                 model_id=model_id, paper_urls={"url": urls_to_remove}
             )
 
+    async def count_models(self) -> Tuple[int, int, int]:
+        """
+        Retrieve the counts of cloud models, local models, and total active models.
+
+        Returns:
+            tuple[int, int, int]: A tuple containing:
+                - Count of cloud models (provider_type = 'cloud_model')
+                - Count of local models (provider_type != 'cloud_model')
+                - Total count of active models
+        """
+        db_total_model_count = await ModelDataManager(self.session).get_count_by_fields(
+            Model, fields={"status": ModelStatusEnum.ACTIVE}
+        )
+        db_cloud_model_count = await ModelDataManager(self.session).get_count_by_fields(
+            Model, fields={"status": ModelStatusEnum.ACTIVE, "provider_type": ModelProviderTypeEnum.CLOUD_MODEL}
+        )
+        db_local_model_count = await ModelDataManager(self.session).get_count_by_fields(
+            Model,
+            fields={"status": ModelStatusEnum.ACTIVE},
+            exclude_fields={"provider_type": ModelProviderTypeEnum.CLOUD_MODEL},
+        )
+        logger.info(f"data count: {db_total_model_count}, {db_cloud_model_count}, {db_local_model_count}")
+        return db_total_model_count, db_cloud_model_count, db_local_model_count
+
 
 class ModelServiceUtil(SessionMixin):
     """Model util service."""

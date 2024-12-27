@@ -700,3 +700,11 @@ class LocalModelScanWorkflowStepData(BaseModel):
     """Local model scan workflow step data schema."""
 
     model_id: UUID4 | None
+
+
+class ModelCountResponse(SuccessResponse):
+    """Model count response schema."""
+
+    total_models_count: int
+    cloud_models_count: int
+    local_models_count: int

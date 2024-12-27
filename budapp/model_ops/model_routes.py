@@ -57,6 +57,7 @@ from .schemas import (
     TagsListResponse,
     TasksListResponse,
     EditModel,
+    ModelCountResponse,
 )
 from .services import (
     CloudModelService,
@@ -661,6 +662,57 @@ async def list_all_model_authors(
         object="author.list",
         code=status.HTTP_200_OK,
     ).to_http_response()
+
+
+@model_router.get(
+    "/count",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ModelCountResponse,
+            "description": "Successfully retrieved model count",
+        },
+    },
+    description="Retrieve the total count of available models",
+)
+async def get_model_count(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> ModelCountResponse:
+    """
+    Retrieves the total count of models available in the system.
+
+    Args:
+        current_user (User): The current authenticated user.
+        session (Session): The database session.
+
+    Returns:
+        ModelCountSuccessResponse: The total count of models.
+    """
+    try:
+        total_models_count, cloud_models_count, local_models_count = await ModelService(session).count_models()
+        return ModelCountResponse(
+            total_models_count=total_models_count,
+            cloud_models_count=cloud_models_count,
+            local_models_count=local_models_count,
+            message="models count retriieved successfully",
+            object="model.count",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to get model count: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get model count: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get model count"
+        ).to_http_response()
 
 
 @model_router.get(
