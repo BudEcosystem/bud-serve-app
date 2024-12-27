@@ -1978,8 +1978,8 @@ class ModelService(SessionMixin):
                 db_cloud_model, fields={"is_present_in_model": False}
             )
 
-        elif db_model.provider_type == ModelProviderTypeEnum.HUGGING_FACE:
-            # TODO:service yet to be implemented for huggingface models to clear model space
+        else:
+            # TODO:service yet to be implemented for other provider types models to clear model space
             pass
 
         return db_model

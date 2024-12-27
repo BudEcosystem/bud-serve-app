@@ -769,4 +769,4 @@ async def delete_model(
     _ = await ModelService(session).delete_active_model(model_id)
     logger.debug(f"Model deleted: {model_id}")
 
-    return SuccessResponse(message="Model deleted successfully")
+    return SuccessResponse(message="Model deleted successfully", code=status.HTTP_200_OK, object="model.delete")
