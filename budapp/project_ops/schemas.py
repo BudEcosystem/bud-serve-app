@@ -63,7 +63,7 @@ class ProjectDetailResponse(SuccessResponse):
 
 
 class UserProjectResponse(SuccessResponse):
-    """Model count response schema."""
+    """User project count response schema."""
 
     total_projects: int
     total_users: int
