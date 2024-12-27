@@ -56,7 +56,7 @@ from ..commons.constants import (
 )
 from ..commons.helpers import validate_huggingface_repo_format
 from ..endpoint_ops.models import Endpoint as EndpointModel
-from ..shared.notification_service import NotificationBuilder, NotificationService
+from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import (
     CloudModelDataManager,
@@ -384,6 +384,18 @@ class CloudModelWorkflowService(SessionMixin):
                 db_workflow,
                 {"current_step": end_step_number, "status": WorkflowStatusEnum.COMPLETED},
             )
+
+            # Send notification to workflow creator
+            model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
+            notification_request = (
+                NotificationBuilder()
+                .set_content(title=db_model.name, message="Added to Repository", icon=model_icon)
+                .set_payload(workflow_id=str(db_workflow.id))
+                .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+                .build()
+            )
+            await BudNotifyService().send_notification(notification_request)
+
         return db_model
 
     async def _validate_duplicate_source_uri_model(
@@ -1083,7 +1095,7 @@ class LocalModelWorkflowService(SessionMixin):
             .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
             .build()
         )
-        await NotificationService().send_notification(notification_request)
+        await BudNotifyService().send_notification(notification_request)
 
     async def _verify_provider_type_uri_duplication(
         self,
@@ -1628,6 +1640,19 @@ class LocalModelWorkflowService(SessionMixin):
             db_workflow,
             {"current_step": workflow_current_step, "status": WorkflowStatusEnum.COMPLETED},
         )
+
+        # Send notification to workflow creator
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
+        notification_request = (
+            NotificationBuilder()
+            .set_content(
+                title=db_model.name, message="Scan is Completed", icon=model_icon, tag=overall_scan_status.value
+            )
+            .set_payload(workflow_id=str(db_workflow.id))
+            .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)
 
     async def _group_model_issues(self, model_issues: list, local_path: str) -> list[ModelIssue]:
         """Group model issues by severity."""
