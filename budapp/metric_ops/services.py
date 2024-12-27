@@ -17,6 +17,7 @@
 """The metric ops services. Contains business logic for metric ops."""
 
 from typing import Dict
+from uuid import UUID
 
 import aiohttp
 from fastapi import status
@@ -31,8 +32,9 @@ from .schemas import (
     CountAnalyticsResponse,
     PerformanceAnalyticsRequest,
     PerformanceAnalyticsResponse,
+    DashboardStatsResponse,
 )
-
+from .crud import MetricDataManager
 
 logger = logging.get_logger(__name__)
 
@@ -133,3 +135,25 @@ class MetricService(SessionMixin):
             raise ClientException(
                 "Failed to get request performance analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
+
+    async def get_dashboard_stats(self, user_id: UUID) -> DashboardStatsResponse:
+        """
+        Fetches dashboard statistics for the given user, including counts of models, endpoints, clusters,
+        and projects the user is associated with.
+
+        Args:
+            user_id (UUID): The ID of the user.
+
+        Returns:
+            DashboardStatsResponse: Contains statistics like model counts, project counts, endpoint counts,
+            and cluster counts.
+        """
+
+        db_dashboard_stats = await MetricDataManager(self.session).get_dashboard_stats(user_id)
+
+        return DashboardStatsResponse(
+            code=status.HTTP_200_OK,
+            object="dashboard.count",
+            message="Successfully fetched dashboard count statistics",
+            **db_dashboard_stats,
+        )
