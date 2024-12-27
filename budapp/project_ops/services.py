@@ -16,7 +16,7 @@
 
 """The project ops services. Contains business logic for project ops."""
 
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 from uuid import UUID
 
 from budapp.commons import logging
@@ -55,3 +55,14 @@ class ProjectService(SessionMixin):
         db_project = await ProjectDataManager(self.session).update_by_fields(db_project, data)
 
         return db_project
+
+    async def get_user_project_stats(self, user_id: UUID) -> Tuple[int, int]:
+        """
+        Retrieve the counts of projects user is present in and total members.
+        Returns:
+            tuple[int, int]: A tuple containing:
+                - Count of projects user is present in
+                - Count of users in the projects
+        """
+
+        return await ProjectDataManager(self.session).get_user_project_stats(user_id)

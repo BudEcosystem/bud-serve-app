@@ -58,5 +58,12 @@ class ProjectResponse(ProjectBase):
     id: UUID4
 
 
-class SingleProjectResponse(SuccessResponse):
+class ProjectDetailResponse(SuccessResponse):
     project: ProjectResponse
+
+
+class UserProjectResponse(SuccessResponse):
+    """Model count response schema."""
+
+    total_projects: int
+    total_users: int

@@ -29,7 +29,7 @@ from budapp.commons.dependencies import (
     parse_ordering_fields,
 )
 from budapp.user_ops.schemas import User
-from .schemas import EditProjectRequest, SingleProjectResponse
+from .schemas import EditProjectRequest, ProjectDetailResponse, UserProjectResponse
 from .services import ProjectService
 from typing import List, Union
 from uuid import UUID
@@ -51,7 +51,7 @@ project_router = APIRouter(prefix="/projects", tags=["project"])
             "description": "Service is unavailable due to client error",
         },
         status.HTTP_200_OK: {
-            "model": SingleProjectResponse,
+            "model": ProjectDetailResponse,
             "description": "Successfully edited project",
         },
     },
@@ -62,13 +62,13 @@ async def edit_project(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     edit_project: EditProjectRequest,
-) -> Union[SingleProjectResponse, ErrorResponse]:
+) -> Union[ProjectDetailResponse, ErrorResponse]:
     """Edit project"""
     try:
         db_project = await ProjectService(session).edit_project(
             project_id=project_id, data=edit_project.model_dump(exclude_unset=True, exclude_none=True)
         )
-        return SingleProjectResponse(
+        return ProjectDetailResponse(
             project=db_project,
             message="Project details updated successfully",
             code=status.HTTP_200_OK,
@@ -81,4 +81,52 @@ async def edit_project(
         logger.exception(f"Failed to edit project: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit project"
+        ).to_http_response()
+
+
+@project_router.get(
+    "/count",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": UserProjectResponse,
+            "description": "Successfully retrieved user projects stats",
+        },
+    },
+    description="Retrieve user projects stats",
+)
+async def get_user_project_stats(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> UserProjectResponse:
+    """
+    Retrieves the total count of projects the user participated and the total count of users in those projects.
+    Args:
+        current_user (User): The current authenticated user.
+        session (Session): The database session.
+    Returns:
+        UserProjectResponse: total count of projects the user participated and the total count of users in those projects.
+    """
+    try:
+        total_projects, total_users = await ProjectService(session).get_user_project_stats(current_user.id)
+        return UserProjectResponse(
+            total_projects=total_projects,
+            total_users=total_users,
+            message="user projects stats retriieved successfully",
+            object="project.count",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to get user projects stats: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get user projects stats: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get user projects stats"
         ).to_http_response()
