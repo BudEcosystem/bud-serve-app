@@ -28,6 +28,7 @@ from budapp.project_ops.models import Project as ProjectModel
 
 from ..commons.config import app_settings
 from ..commons.constants import (
+    BUD_INTERNAL_WORKFLOW,
     BudServeWorkflowStepEventName,
     EndpointStatusEnum,
     ModelProviderTypeEnum,
@@ -164,7 +165,7 @@ class EndpointService(SessionMixin):
             "cluster_id": str(bud_cluster_id),
             "namespace": namespace,
             "notification_metadata": {
-                "name": "bud-notification",
+                "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },

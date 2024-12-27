@@ -40,12 +40,18 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 from ..commons.constants import (
+    BUD_INTERNAL_WORKFLOW,
     BudServeWorkflowStepEventName,
     ClusterStatusEnum,
+    EndpointStatusEnum,
+    ModelStatusEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
-    EndpointStatusEnum,
 )
+from ..model_ops.crud import ModelDataManager
+from ..model_ops.models import Model
+from ..model_ops.services import ModelServiceUtil
+from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import ClusterDataManager
 from .models import Cluster as ClusterModel
@@ -335,7 +341,7 @@ class ClusterService(SessionMixin):
             "name": data["name"],
             "ingress_url": data["ingress_url"],
             "notification_metadata": {
-                "name": "bud-notification",
+                "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
@@ -493,6 +499,16 @@ class ClusterService(SessionMixin):
             workflow_data.update({"current_step": workflow_current_step})
             await WorkflowDataManager(self.session).update_by_fields(db_workflow, workflow_data)
 
+            # Send notification to workflow creator
+            notification_request = (
+                NotificationBuilder()
+                .set_content(title=db_cluster.name, message="Cluster is onboarded", icon=db_cluster.icon)
+                .set_payload(workflow_id=str(db_workflow.id))
+                .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+                .build()
+            )
+            await BudNotifyService().send_notification(notification_request)
+
     async def delete_cluster_from_notification_event(self, payload: NotificationPayload) -> None:
         """Delete a cluster in database.
 
@@ -636,7 +652,6 @@ class ClusterService(SessionMixin):
             EndpointModel,
             fields={"cluster_id": cluster_id},
             exclude_fields={"status": EndpointStatusEnum.DELETED},
-            missing_ok=True,
         )
 
         # Raise error if cluster has active endpoints
@@ -716,7 +731,7 @@ class ClusterService(SessionMixin):
         payload = {
             "cluster_id": str(bud_cluster_id),
             "notification_metadata": {
-                "name": "bud-notification",
+                "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
@@ -739,3 +754,42 @@ class ClusterService(SessionMixin):
         except Exception as e:
             logger.exception(f"Failed to send delete cluster request: {e}")
             raise ClientException("Failed to delete cluster", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR) from e
+
+    async def _notify_recommended_cluster_from_notification_event(self, payload: NotificationPayload) -> None:
+        logger.debug("Received event of recommending cluster")
+
+        # Get workflow and steps
+        workflow_id = payload.workflow_id
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for endpoint creation
+        keys_of_interest = [
+            "model_id",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+        logger.debug("Collected required data from workflow steps")
+
+        # Check for model with duplicate name
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": required_data["model_id"], "status": ModelStatusEnum.ACTIVE}, missing_ok=True
+        )
+
+        # Send notification to workflow creator
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
+        notification_request = (
+            NotificationBuilder()
+            .set_content(title=db_model.name, message=payload.content.message, icon=model_icon)
+            .set_payload(workflow_id=str(db_workflow.id))
+            .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)

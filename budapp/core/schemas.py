@@ -92,6 +92,8 @@ class NotificationContent(BaseModel):
     result: Optional[Dict[str, Any]] = None
     primary_action: str | None = None
     secondary_action: str | None = None
+    icon: str | None = None
+    tag: str | None = None
 
 
 class NotificationPayload(BaseModel):
