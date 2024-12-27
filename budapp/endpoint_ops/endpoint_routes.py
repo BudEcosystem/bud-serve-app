@@ -33,7 +33,7 @@ from budapp.commons.exceptions import ClientException
 from budapp.user_ops.schemas import User
 
 from ..commons.schemas import ErrorResponse, SuccessResponse
-from .schemas import EndpointFilter, EndpointPaginatedResponse
+from .schemas import EndpointFilter, EndpointPaginatedResponse, EndpointCountResponse
 from .services import EndpointService
 
 
@@ -141,4 +141,52 @@ async def delete_endpoint(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to delete endpoint",
+        ).to_http_response()
+
+
+@endpoint_router.get(
+    "/count",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": EndpointCountResponse,
+            "description": "Successfully retrieved endpoint count",
+        },
+    },
+    description="Retrieve the total count of available endpoints",
+)
+async def get_endpoint_count(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> EndpointCountResponse:
+    """
+    Retrieves the total count of endpoints available in the system.
+    Args:
+        current_user (User): The current authenticated user.
+        session (Session): The database session.
+    Returns:
+        EndpointCountResponse: The total count of endpoints.
+    """
+    try:
+        total_endpoints_count, running_endpoints_count = await EndpointService(session).count_endpoints()
+        return EndpointCountResponse(
+            total_endpoints_count=total_endpoints_count,
+            running_endpoints_count=running_endpoints_count,
+            message="endpoints count retrieved successfully",
+            object="endpoint.count",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to get endpoint count: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get endpoint count: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get endpoint count"
         ).to_http_response()

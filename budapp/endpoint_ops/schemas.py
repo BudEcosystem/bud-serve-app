@@ -20,7 +20,7 @@ from pydantic import UUID4, BaseModel, ConfigDict
 
 from budapp.cluster_ops.schemas import ClusterResponse
 from budapp.commons.constants import EndpointStatusEnum
-from budapp.commons.schemas import PaginatedSuccessResponse
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from budapp.model_ops.schemas import ModelResponse
 
 
@@ -68,3 +68,10 @@ class EndpointPaginatedResponse(PaginatedSuccessResponse):
     """Endpoint paginated response schema."""
 
     endpoints: list[EndpointListResponse] = []
+
+
+class EndpointCountResponse(SuccessResponse):
+    """Endpoint count response schema."""
+
+    total_endpoints_count: int
+    running_endpoints_count: int

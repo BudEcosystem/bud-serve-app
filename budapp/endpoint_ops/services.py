@@ -234,3 +234,24 @@ class EndpointService(SessionMixin):
         # Mark workflow as completed
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
         logger.debug(f"Workflow {db_workflow.id} marked as completed")
+
+    async def count_endpoints(self) -> Tuple[int, int]:
+        """
+        Retrieves the total count of endpoints available in the system.
+        Returns:
+            tuple[int, int]: A tuple containing:
+                - Count of total endpoints
+                - Count of running endpoints
+        """
+        db_total_endpoint_count = await EndpointDataManager(self.session).get_count_by_fields(
+            EndpointModel, fields={}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+        )
+        db_running_endpoint_count = await EndpointDataManager(self.session).get_count_by_fields(
+            EndpointModel, fields={"status": EndpointStatusEnum.RUNNING}
+        )
+
+        logger.debug(
+            f"total endpoints count: {db_total_endpoint_count}, running endpoints count: {db_running_endpoint_count}"
+        )
+
+        return db_total_endpoint_count, db_running_endpoint_count
