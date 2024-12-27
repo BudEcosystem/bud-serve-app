@@ -131,10 +131,10 @@ async def get_request_performance_analytics(
         },
         status.HTTP_200_OK: {
             "model": DashboardStatsResponse,
-            "description": "Successfully retrieved model count",
+            "description": "Successfully retrieved dashboard statistics",
         },
     },
-    description="Retrieve the total count of available models",
+    description="Retrieve the dashboard statistics, including counts for models, projects, endpoints, and clusters.",
 )
 async def get_dashboard_stats(
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -155,7 +155,7 @@ async def get_dashboard_stats(
         return await MetricService(session).get_dashboard_stats(current_user.id)
     except ClientException as e:
         logger.exception(f"Failed to fetch dashboard statistics: {e}")
-        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to fetch dashboard statistics: {e}")
         return ErrorResponse(

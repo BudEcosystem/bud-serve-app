@@ -34,7 +34,19 @@ from .schemas import (
     PerformanceAnalyticsResponse,
     DashboardStatsResponse,
 )
-from .crud import MetricDataManager
+from ..commons.constants import (
+    EndpointStatusEnum,
+    ModelStatusEnum,
+    ClusterStatusEnum,
+    ModelProviderTypeEnum,
+)
+from ..cluster_ops.crud import ClusterDataManager
+from ..model_ops.crud import ModelDataManager
+from ..endpoint_ops.crud import EndpointDataManager
+from ..project_ops.crud import ProjectDataManager
+from ..cluster_ops.models import Cluster as ClusterModel
+from ..model_ops.models import Model
+from ..endpoint_ops.models import Endpoint as EndpointModel
 
 logger = logging.get_logger(__name__)
 
@@ -149,11 +161,53 @@ class MetricService(SessionMixin):
             and cluster counts.
         """
 
-        db_dashboard_stats = await MetricDataManager(self.session).get_dashboard_stats(user_id)
+        db_total_model_count = await ModelDataManager(self.session).get_count_by_fields(
+            Model, fields={"status": ModelStatusEnum.ACTIVE}
+        )
+        db_cloud_model_count = await ModelDataManager(self.session).get_count_by_fields(
+            Model, fields={"status": ModelStatusEnum.ACTIVE, "provider_type": ModelProviderTypeEnum.CLOUD_MODEL}
+        )
+        db_local_model_count = await ModelDataManager(self.session).get_count_by_fields(
+            Model,
+            fields={"status": ModelStatusEnum.ACTIVE},
+            exclude_fields={"provider_type": ModelProviderTypeEnum.CLOUD_MODEL},
+        )
+        db_total_endpoint_count = await EndpointDataManager(self.session).get_count_by_fields(
+            EndpointModel, fields={}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+        )
+        db_running_endpoint_count = await EndpointDataManager(self.session).get_count_by_fields(
+            EndpointModel, fields={"status": EndpointStatusEnum.RUNNING}
+        )
 
-        return DashboardStatsResponse(
+        db_total_clusters = await ClusterDataManager(self.session).get_count_by_fields(
+            ClusterModel, fields={}, exclude_fields={"status": ClusterStatusEnum.DELETED}
+        )
+
+        db_inactive_clusters = await ClusterDataManager(self.session).get_count_by_fields(
+            ClusterModel, fields={"status": ClusterStatusEnum.NOT_AVAILABLE}
+        )
+
+        db_total_projects, db_total_project_users = await ProjectDataManager(self.session).get_user_project_stats(
+            user_id
+        )
+
+        db_dashboard_stats = {
+            "total_model_count": db_total_model_count,
+            "cloud_model_count": db_cloud_model_count,
+            "local_model_count": db_local_model_count,
+            "total_projects": db_total_projects,
+            "total_project_users": db_total_project_users,
+            "total_endpoints_count": db_total_endpoint_count,
+            "running_endpoints_count": db_running_endpoint_count,
+            "total_clusters": db_total_clusters,
+            "inactive_clusters": db_inactive_clusters,
+        }
+
+        db_dashboard_stats = DashboardStatsResponse(
             code=status.HTTP_200_OK,
             object="dashboard.count",
             message="Successfully fetched dashboard count statistics",
             **db_dashboard_stats,
         )
+
+        return db_dashboard_stats
