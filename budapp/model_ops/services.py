@@ -1999,8 +1999,6 @@ class ModelService(SessionMixin):
                 detail="Cannot delete model because it has active endpoint.",
             )
 
-        db_model = await ModelDataManager(self.session).update_by_fields(db_model, {"status": ModelStatusEnum.DELETED})
-
         if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
             db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
                 CloudModel,
@@ -2019,6 +2017,8 @@ class ModelService(SessionMixin):
         else:
             # TODO:service yet to be implemented for other provider types models to clear model space
             pass
+
+        db_model = await ModelDataManager(self.session).update_by_fields(db_model, {"status": ModelStatusEnum.DELETED})
 
         return db_model
 
