@@ -36,6 +36,7 @@ from .schemas import (
     CountAnalyticsResponse,
     PerformanceAnalyticsRequest,
     PerformanceAnalyticsResponse,
+    DashboardStatsResponse,
 )
 from .services import MetricService
 
@@ -114,4 +115,49 @@ async def get_request_performance_analytics(
         logger.exception(f"Failed to get request performance analytics: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get request performance analytics"
+        ).to_http_response()
+
+
+@metric_router.get(
+    "/count",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": DashboardStatsResponse,
+            "description": "Successfully retrieved dashboard statistics",
+        },
+    },
+    description="Retrieve the dashboard statistics, including counts for models, projects, endpoints, and clusters.",
+)
+async def get_dashboard_stats(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> DashboardStatsResponse:
+    """
+    Retrieves the dashboard statistics, including counts for models, projects, endpoints, and clusters.
+
+    Args:
+        current_user (User): The current authenticated user making the request.
+        session (Session): The database session used for querying data.
+
+    Returns:
+        DashboardStatsResponse: An object containing aggregated statistics for the dashboard,
+        such as model counts, project counts, endpoint counts, and cluster counts.
+    """
+    try:
+        return await MetricService(session).get_dashboard_stats(current_user.id)
+    except ClientException as e:
+        logger.exception(f"Failed to fetch dashboard statistics: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to fetch dashboard statistics: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to fetch dashboard statistics"
         ).to_http_response()

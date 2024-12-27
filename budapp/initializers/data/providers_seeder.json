@@ -290,7 +290,7 @@
     "github": {
         "name": "Github",
         "type": "github",
-        "description": "GitHub Models enable more than 100 million developers to build with industry-leading AI models.",
+        "description": "All GitHub model are available for deployment.",
         "icon": "icons/providers/github.png"
     },
     "petals": {
