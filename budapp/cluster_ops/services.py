@@ -652,7 +652,6 @@ class ClusterService(SessionMixin):
             EndpointModel,
             fields={"cluster_id": cluster_id},
             exclude_fields={"status": EndpointStatusEnum.DELETED},
-            missing_ok=True,
         )
 
         # Raise error if cluster has active endpoints
