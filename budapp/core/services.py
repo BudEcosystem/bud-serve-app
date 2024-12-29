@@ -214,7 +214,7 @@ class NotificationService(SessionMixin):
             await LocalModelWorkflowService(self.session).create_scan_result_from_notification_event(payload)
 
     async def update_cluster_status_update_events(self, payload: NotificationPayload) -> None:
-        """Update the delete endpoint events for a workflow step.
+        """Update the cluster status update events for a workflow step.
 
         Args:
             payload: The payload to update the step with.
@@ -222,13 +222,30 @@ class NotificationService(SessionMixin):
         Returns:
             None
         """
-        # Create cluster in database if node info fetched successfully
+        # Update cluster status in database
         if (
             payload.content.status == "COMPLETED"
             and payload.content.result
             and payload.content.title == "Cluster status updated"
         ):
             await ClusterService(self.session).update_cluster_status_from_notification_event(payload)
+
+    async def update_endpoint_status_update_events(self, payload: NotificationPayload) -> None:
+        """Update the endpoint status update events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        # Update endpoint status in database
+        if (
+            payload.content.status == "COMPLETED"
+            and payload.content.result
+            and payload.content.title == "Deployment status updated"
+        ):
+            await EndpointService(self.session).update_endpoint_status_from_notification_event(payload)
 
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
         """Update the workflow step events for a workflow step.
@@ -474,6 +491,7 @@ class SubscriberHandler:
             PayloadType.DELETE_CLUSTER: self._handle_delete_cluster,
             PayloadType.DELETE_DEPLOYMENT: self._handle_delete_endpoint,
             PayloadType.CLUSTER_STATUS_UPDATE: self._handle_cluster_status_update,
+            PayloadType.DEPLOYMENT_STATUS_UPDATE: self._handle_endpoint_status_update,
         }
 
         handler = handlers.get(payload.type)
@@ -547,6 +565,14 @@ class SubscriberHandler:
         return NotificationResponse(
             object="notification",
             message="Update cluster status in db",
+        ).to_http_response()
+
+    async def _handle_endpoint_status_update(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the endpoint status update event."""
+        await NotificationService(self.session).update_endpoint_status_update_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Update endpoint status in db",
         ).to_http_response()
 
 

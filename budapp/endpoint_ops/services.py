@@ -378,3 +378,53 @@ class EndpointService(SessionMixin):
             raise ClientException(
                 "Failed to update endpoint status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
+
+    async def update_endpoint_status_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Update an endpoint status in database.
+
+        Args:
+            payload: The payload to update the endpoint status with.
+
+        Raises:
+            ClientException: If the endpoint already exists.
+        """
+        logger.debug("Received event for updating endpoint status")
+
+        # Get endpoint from db
+        logger.debug(
+            f"Retrieving endpoint with bud_cluster_id: {payload.content.result['cluster_id']} and namespace: {payload.content.result['deployment_name']}"
+        )
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            {
+                "bud_cluster_id": payload.content.result["cluster_id"],
+                "namespace": payload.content.result["deployment_name"],
+            },
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+        )
+        logger.debug(f"Endpoint retrieved successfully: {db_endpoint.id}")
+
+        # Update cluster status
+        endpoint_status = await self._get_endpoint_status(payload.content.result["status"])
+        db_endpoint = await EndpointDataManager(self.session).update_by_fields(
+            db_endpoint, {"status": endpoint_status}
+        )
+        logger.debug(f"Endpoint {db_endpoint.id} status updated to {endpoint_status}")
+
+    @staticmethod
+    async def _get_endpoint_status(status: str) -> EndpointStatusEnum:
+        """Get the endpoint status from the payload.
+
+        Args:
+            status: The status to get the endpoint status from.
+
+        Returns:
+            EndpointStatusEnum: The endpoint status.
+        """
+        if status == "Ingress Unhealthy":
+            return EndpointStatusEnum.UNHEALTHY
+        elif status == "Deployment healthy":
+            return EndpointStatusEnum.RUNNING
+        else:
+            logger.error(f"Unknown endpoint status: {status}")
+            raise ClientException(f"Unknown endpoint status: {status}")
