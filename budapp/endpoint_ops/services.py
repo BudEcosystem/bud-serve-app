@@ -18,9 +18,10 @@
 
 from datetime import datetime, timezone
 from typing import Dict, List, Tuple
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import aiohttp
+from fastapi import status
 
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
@@ -327,4 +328,53 @@ class EndpointService(SessionMixin):
         )
         await BudNotifyService().send_notification(notification_request)
 
+        # Create request to trigger endpoint status update periodic task
+        await self._perform_endpoint_status_update_request(
+            db_endpoint.bud_cluster_id, db_endpoint.namespace, db_workflow.created_by
+        )
+
         return db_endpoint
+
+    async def _perform_endpoint_status_update_request(
+        self, cluster_id: UUID, namespace: str, current_user_id: UUID
+    ) -> Dict:
+        """Perform update endpoint status request to bud_cluster app.
+
+        Args:
+            cluster_id: The ID of the cluster to update.
+            namespace: The namespace of the cluster to update.
+            current_user_id: The ID of the current user.
+        """
+        update_cluster_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/update-deployment-status"
+
+        try:
+            payload = {
+                "deployment_name": namespace,
+                "cluster_id": str(cluster_id),
+                "notification_metadata": {
+                    "name": BUD_INTERNAL_WORKFLOW,
+                    "subscriber_ids": str(current_user_id),
+                    "workflow_id": str(uuid4()),
+                },
+                "source_topic": f"{app_settings.source_topic}",
+            }
+            logger.debug(
+                f"Performing update endpoint status request. payload: {payload}, endpoint: {update_cluster_endpoint}"
+            )
+            async with aiohttp.ClientSession() as session, session.post(
+                update_cluster_endpoint, json=payload
+            ) as response:
+                response_data = await response.json()
+                if response.status != 200:
+                    logger.error(f"Failed to update endpoint status: {response.status} {response_data}")
+                    raise ClientException(
+                        "Failed to update endpoint status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+
+                logger.debug("Successfully updated endpoint status")
+                return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send update endpoint status request: {e}")
+            raise ClientException(
+                "Failed to update endpoint status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
