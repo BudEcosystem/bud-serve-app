@@ -16,6 +16,7 @@
 
 """The endpoint ops services. Contains business logic for endpoint ops."""
 
+from datetime import datetime, timezone
 from typing import Dict, List, Tuple
 from uuid import UUID
 
@@ -26,6 +27,8 @@ from budapp.commons.db_utils import SessionMixin
 from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.models import Project as ProjectModel
 
+from ..cluster_ops.crud import ClusterDataManager
+from ..cluster_ops.models import Cluster as ClusterModel
 from ..commons.config import app_settings
 from ..commons.constants import (
     BUD_INTERNAL_WORKFLOW,
@@ -39,6 +42,8 @@ from ..commons.exceptions import ClientException
 from ..core.schemas import NotificationPayload
 from ..model_ops.crud import ProviderDataManager
 from ..model_ops.models import Provider as ProviderModel
+from ..model_ops.services import ModelServiceUtil
+from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
@@ -46,6 +51,7 @@ from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService
 from .crud import EndpointDataManager
 from .models import Endpoint as EndpointModel
+from .schemas import EndpointCreate
 
 
 logger = logging.get_logger(__name__)
@@ -234,3 +240,91 @@ class EndpointService(SessionMixin):
         # Mark workflow as completed
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
         logger.debug(f"Workflow {db_workflow.id} marked as completed")
+
+    async def create_endpoint_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Create an endpoint in database.
+
+        Args:
+            payload: The payload to create the endpoint with.
+        """
+        logger.debug("Received event for creating endpoint")
+
+        # Get namespace and deployment URL from event
+        namespace = payload.content.result.get("namespace")
+        deployment_url = payload.content.result["result"]["deployment_url"]
+        credential_id = payload.content.result.get("credential_id")
+
+        if not namespace or not deployment_url:
+            logger.warning("Namespace or deployment URL is missing from event")
+            return
+
+        # Get workflow steps
+        workflow_id = payload.workflow_id
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for endpoint creation
+        keys_of_interest = [
+            "model_id",
+            "project_id",
+            "cluster_id",  # bud_cluster_id
+            "endpoint_name",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        logger.debug("Collected required data from workflow steps")
+
+        # Get cluster id
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            ClusterModel, {"cluster_id": required_data["cluster_id"]}, missing_ok=True
+        )
+
+        if not db_cluster:
+            logger.error(f"Cluster with id {required_data['cluster_id']} not found")
+            return
+
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+
+        # Create endpoint in database
+        endpoint_data = EndpointCreate(
+            model_id=required_data["model_id"],
+            project_id=required_data["project_id"],
+            cluster_id=db_cluster.id,
+            bud_cluster_id=required_data["cluster_id"],
+            name=required_data["endpoint_name"],
+            url=deployment_url,
+            namespace=namespace,
+            status=EndpointStatusEnum.RUNNING,
+            created_by=db_workflow.created_by,
+            status_sync_at=datetime.now(tz=timezone.utc),
+            credential_id=credential_id,
+        )
+
+        db_endpoint = await EndpointDataManager(self.session).insert_one(
+            EndpointModel(**endpoint_data.model_dump(exclude_unset=True, exclude_none=True))
+        )
+        logger.debug(f"Endpoint created successfully: {db_endpoint.id}")
+
+        # Mark workflow as completed
+        logger.debug(f"Marking workflow as completed: {workflow_id}")
+        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
+
+        # Send notification to workflow creator
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_endpoint.model)
+        notification_request = (
+            NotificationBuilder()
+            .set_content(title=db_endpoint.name, message="Deployment is Done", icon=model_icon)
+            .set_payload(workflow_id=str(db_workflow.id))
+            .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)
+
+        return db_endpoint

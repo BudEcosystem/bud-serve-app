@@ -102,7 +102,7 @@ class NotificationService(SessionMixin):
             and isinstance(payload.content.result, dict)
             and "result" in payload.content.result
         ):
-            await self._create_endpoint(payload)
+            await EndpointService(self.session).create_endpoint_from_notification_event(payload)
 
     async def update_cluster_creation_events(self, payload: NotificationPayload) -> None:
         """Update the cluster creation events for a workflow step.
