@@ -546,7 +546,7 @@ class SubscriberHandler:
         await NotificationService(self.session).update_cluster_status_update_events(payload)
         return NotificationResponse(
             object="notification",
-            message="Updated cluster status update event in workflow step",
+            message="Update cluster status in db",
         ).to_http_response()
 
 
