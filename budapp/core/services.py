@@ -213,6 +213,23 @@ class NotificationService(SessionMixin):
         ):
             await LocalModelWorkflowService(self.session).create_scan_result_from_notification_event(payload)
 
+    async def update_cluster_status_update_events(self, payload: NotificationPayload) -> None:
+        """Update the delete endpoint events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        # Create cluster in database if node info fetched successfully
+        if (
+            payload.content.status == "COMPLETED"
+            and payload.content.result
+            and payload.content.title == "Cluster status updated"
+        ):
+            await ClusterService(self.session).update_cluster_status_from_notification_event(payload)
+
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
         """Update the workflow step events for a workflow step.
 
@@ -456,6 +473,7 @@ class SubscriberHandler:
             PayloadType.PERFORM_MODEL_SECURITY_SCAN: self._handle_perform_model_security_scan,
             PayloadType.DELETE_CLUSTER: self._handle_delete_cluster,
             PayloadType.DELETE_DEPLOYMENT: self._handle_delete_endpoint,
+            PayloadType.CLUSTER_STATUS_UPDATE: self._handle_cluster_status_update,
         }
 
         handler = handlers.get(payload.type)
@@ -521,6 +539,14 @@ class SubscriberHandler:
         return NotificationResponse(
             object="notification",
             message="Updated delete endpoint event in workflow step",
+        ).to_http_response()
+
+    async def _handle_cluster_status_update(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the cluster status update event."""
+        await NotificationService(self.session).update_cluster_status_update_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated cluster status update event in workflow step",
         ).to_http_response()
 
 

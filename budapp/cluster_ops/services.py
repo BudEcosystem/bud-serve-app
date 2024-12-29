@@ -563,6 +563,31 @@ class ClusterService(SessionMixin):
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
         logger.debug(f"Workflow {db_workflow.id} marked as completed")
 
+    async def update_cluster_status_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Delete a cluster in database.
+
+        Args:
+            payload: The payload to delete the cluster with.
+
+        Raises:
+            ClientException: If the cluster already exists.
+        """
+        logger.debug("Received event for updating cluster status")
+
+        # Get cluster from db
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            ClusterModel,
+            {"cluster_id": payload.content.result["cluster_id"]},
+            exclude_fields={"status": ClusterStatusEnum.DELETED},
+        )
+        logger.debug(f"Cluster retrieved successfully: {db_cluster.id}")
+
+        # Update cluster status
+        db_cluster = await ClusterDataManager(self.session).update_by_fields(
+            db_cluster, {"status": payload.content.result["status"]}
+        )
+        logger.debug(f"Cluster {db_cluster.id} status updated to {payload.content.result['status']}")
+
     async def _calculate_cluster_resources(self, data: Dict[str, Any]) -> ClusterResourcesInfo:
         """Calculate the cluster resources.
 
