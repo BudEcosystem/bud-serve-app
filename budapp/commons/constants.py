@@ -460,6 +460,7 @@ class PayloadType(str, Enum):
     DELETE_DEPLOYMENT = "delete_deployment"
     PERFORM_MODEL_EXTRACTION = "perform_model_extraction"
     PERFORM_MODEL_SECURITY_SCAN = "perform_model_security_scan"
+    CLUSTER_STATUS_UPDATE = "cluster-status-update"
 
 
 class BudServeWorkflowStepEventName(str, Enum):

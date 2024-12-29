@@ -20,7 +20,7 @@ import json
 import tempfile
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import aiohttp
 import yaml
@@ -509,6 +509,9 @@ class ClusterService(SessionMixin):
             )
             await BudNotifyService().send_notification(notification_request)
 
+            # Create request to trigger cluster status update periodic task
+            await self._perform_cluster_status_update_request(db_cluster.cluster_id, db_workflow.created_by)
+
     async def delete_cluster_from_notification_event(self, payload: NotificationPayload) -> None:
         """Delete a cluster in database.
 
@@ -559,6 +562,31 @@ class ClusterService(SessionMixin):
         # Mark workflow as completed
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
         logger.debug(f"Workflow {db_workflow.id} marked as completed")
+
+    async def update_cluster_status_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Delete a cluster in database.
+
+        Args:
+            payload: The payload to delete the cluster with.
+
+        Raises:
+            ClientException: If the cluster already exists.
+        """
+        logger.debug("Received event for updating cluster status")
+
+        # Get cluster from db
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            ClusterModel,
+            {"cluster_id": payload.content.result["cluster_id"]},
+            exclude_fields={"status": ClusterStatusEnum.DELETED},
+        )
+        logger.debug(f"Cluster retrieved successfully: {db_cluster.id}")
+
+        # Update cluster status
+        db_cluster = await ClusterDataManager(self.session).update_by_fields(
+            db_cluster, {"status": payload.content.result["status"]}
+        )
+        logger.debug(f"Cluster {db_cluster.id} status updated to {payload.content.result['status']}")
 
     async def _calculate_cluster_resources(self, data: Dict[str, Any]) -> ClusterResourcesInfo:
         """Calculate the cluster resources.
@@ -849,4 +877,44 @@ class ClusterService(SessionMixin):
             logger.exception(f"Failed to send cancel cluster onboarding request: {e}")
             raise ClientException(
                 "Failed to cancel cluster onboarding", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def _perform_cluster_status_update_request(self, cluster_id: UUID, current_user_id: UUID) -> Dict:
+        """Perform update cluster node status request to bud_cluster app.
+
+        Args:
+            cluster_id: The ID of the cluster to update.
+            current_user_id: The ID of the current user.
+        """
+        update_cluster_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/update-node-status"
+
+        try:
+            payload = {
+                "cluster_id": str(cluster_id),
+                "notification_metadata": {
+                    "name": BUD_INTERNAL_WORKFLOW,
+                    "subscriber_ids": str(current_user_id),
+                    "workflow_id": str(uuid4()),
+                },
+                "source_topic": f"{app_settings.source_topic}",
+            }
+            logger.debug(
+                f"Performing update cluster node status request. payload: {payload}, endpoint: {update_cluster_endpoint}"
+            )
+            async with aiohttp.ClientSession() as session, session.post(
+                update_cluster_endpoint, json=payload
+            ) as response:
+                response_data = await response.json()
+                if response.status != 200:
+                    logger.error(f"Failed to update cluster node status: {response.status} {response_data}")
+                    raise ClientException(
+                        "Failed to update cluster node status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+
+                logger.debug("Successfully updated cluster node status")
+                return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send update cluster node status request: {e}")
+            raise ClientException(
+                "Failed to update cluster node status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
