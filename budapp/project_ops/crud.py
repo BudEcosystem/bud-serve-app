@@ -30,30 +30,30 @@ logger = logging.get_logger(__name__)
 class ProjectDataManager(DataManagerUtils):
     """Data manager for the Project model."""
 
-    async def get_user_project_stats(self, user_id: UUID) -> tuple[int, int]:
+    async def get_total_projects_by_user_id(self, user_id: UUID) -> int:
         """
-        Get the count of total projects a user is part of and the number of unique users
-        in those projects.
+        Get the count of total projects a user is part of.
         Args:
             user_id (UUID): The ID of the user.
         Returns:
-            tuple[int, int]: A tuple containing:
-                - Count of total projects the user is present in.
-                - Count of unique users present in those projects.
+            int: Count of total projects the user is part of.
         """
-
-        # Query to count the total projects the user is part of
         projects_count_stmt = select(func.count(distinct(project_user_association.c.project_id))).where(
             project_user_association.c.user_id == user_id
         )
-        projects_count = self.scalar_one_or_none(projects_count_stmt) or 0
+        return self.scalar_one_or_none(projects_count_stmt) or 0
 
-        # Query to count unique users in the projects the user is part of
+    async def get_project_members_by_user_id(self, user_id: UUID) -> int:
+        """
+        Get the count of unique users in the projects a user is part of.
+        Args:
+            user_id (UUID): The ID of the user.
+        Returns:
+            int: Count of unique users in those projects.
+        """
         users_count_stmt = select(func.count(distinct(project_user_association.c.user_id))).where(
             project_user_association.c.project_id.in_(
                 select(project_user_association.c.project_id).where(project_user_association.c.user_id == user_id)
             )
         )
-        users_count = self.scalar_one_or_none(users_count_stmt) or 0
-
-        return projects_count, users_count
+        return self.scalar_one_or_none(users_count_stmt) or 0
