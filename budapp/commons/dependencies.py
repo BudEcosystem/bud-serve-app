@@ -138,7 +138,6 @@ async def get_current_active_invite_user(current_user: Annotated[User, Depends(g
     Returns:
         User: The current active invite user.
     """
-    # NOTE: for invited, active user will have is_active False and status INVITED | ACTIVE
     if current_user.status == UserStatusEnum.DELETED:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
     return current_user
