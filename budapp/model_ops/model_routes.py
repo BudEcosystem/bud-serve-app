@@ -778,3 +778,34 @@ async def cancel_model_deployment(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to cancel model deployment"
         ).to_http_response()
+
+
+@model_router.delete(
+    "/{model_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Model not found",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully deleted model",
+        },
+    },
+    description="Delete an active model from the database",
+)
+async def delete_model(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    model_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a model by its ID."""
+
+    _ = await ModelService(session).delete_active_model(model_id)
+    logger.debug(f"Model deleted: {model_id}")
+
+    return SuccessResponse(message="Model deleted successfully", code=status.HTTP_200_OK, object="model.delete")
