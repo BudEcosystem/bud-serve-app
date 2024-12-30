@@ -23,7 +23,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Query, UploadFile, status
 from fastapi.exceptions import RequestValidationError
-from pydantic import ValidationError, HttpUrl
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -35,7 +35,7 @@ from budapp.commons.dependencies import (
     parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
-from budapp.commons.schemas import ErrorResponse, SuccessResponse, Tag, Task
+from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
@@ -56,7 +56,6 @@ from .schemas import (
     RecommendedTagsResponse,
     TagsListResponse,
     TasksListResponse,
-    EditModel,
 )
 from .services import (
     CloudModelService,
@@ -326,7 +325,6 @@ async def edit_model(
     license_url: str | None = Form(None),
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Edit cloud model with file upload"""
-
     logger.debug(
         f"Received data: name={name}, description={description}, tags={tags}, tasks={tasks}, paper_urls={paper_urls}, github_url={github_url}, huggingface_url={huggingface_url}, website_url={website_url}, license_file={license_file}, license_url={license_url}"
     )
@@ -738,4 +736,45 @@ async def scan_local_model_workflow(
         logger.exception(f"Failed to scan local model: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to scan local model"
+        ).to_http_response()
+
+
+@model_router.post(
+    "/cancel-deployment",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully cancel model deployment",
+        },
+    },
+    description="Cancel model deployment",
+)
+async def cancel_model_deployment(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    workflow_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Cancel model deployment."""
+    try:
+        await ModelService(session).cancel_model_deployment_workflow(workflow_id)
+        return SuccessResponse(
+            message="Model deployment cancelled successfully",
+            code=status.HTTP_200_OK,
+            object="model.cancel_deployment",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to cancel model deployment: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to cancel model deployment: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to cancel model deployment"
         ).to_http_response()

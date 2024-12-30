@@ -1978,6 +1978,63 @@ class ModelService(SessionMixin):
                 model_id=model_id, paper_urls={"url": urls_to_remove}
             )
 
+    async def cancel_model_deployment_workflow(self, workflow_id: UUID) -> None:
+        """Cancel model deployment workflow."""
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": db_workflow.id}
+        )
+
+        # Define the keys required for endpoint creation
+        keys_of_interest = [
+            BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value,
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+        logger.debug("Collected required data from workflow steps")
+
+        if required_data.get(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value) is None:
+            raise ClientException("Model deployment process has not been initiated")
+
+        budserve_cluster_response = required_data.get(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value)
+        dapr_workflow_id = budserve_cluster_response.get("workflow_id")
+
+        try:
+            await self._perform_cancel_model_deployment_request(dapr_workflow_id)
+        except ClientException as e:
+            raise e
+
+    async def _perform_cancel_model_deployment_request(self, workflow_id: str) -> Dict:
+        """Perform cancel model deployment request to bud_cluster app.
+
+        Args:
+            workflow_id: The ID of the workflow to cancel.
+        """
+        cancel_model_deployment_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/cancel/{workflow_id}"
+
+        logger.debug(f"Performing cancel model deployment request to budcluster {cancel_model_deployment_endpoint}")
+        try:
+            async with aiohttp.ClientSession() as session, session.post(cancel_model_deployment_endpoint) as response:
+                response_data = await response.json()
+                if response.status != 200:
+                    logger.error(f"Failed to cancel model deployment: {response.status} {response_data}")
+                    raise ClientException(
+                        "Failed to cancel model deployment", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+
+                logger.debug("Successfully cancelled model deployment")
+                return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send cancel model deployment request: {e}")
+            raise ClientException(
+                "Failed to cancel model deployment", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
 
 class ModelServiceUtil(SessionMixin):
     """Model util service."""

@@ -323,3 +323,44 @@ async def delete_cluster(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to delete cluster",
         ).to_http_response()
+
+
+@cluster_router.post(
+    "/cancel-onboarding",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully cancel cluster onboarding",
+        },
+    },
+    description="Cancel cluster onboarding",
+)
+async def cancel_cluster_onboarding(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    workflow_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Cancel cluster onboarding."""
+    try:
+        await ClusterService(session).cancel_cluster_onboarding_workflow(workflow_id)
+        return SuccessResponse(
+            message="Cluster onboarding cancelled successfully",
+            code=status.HTTP_200_OK,
+            object="cluster.cancel",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to cancel cluster onboarding: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to cancel cluster onboarding: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to cancel cluster onboarding"
+        ).to_http_response()
