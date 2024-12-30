@@ -138,8 +138,9 @@ class NotificationRequest(CloudEventBase):
         Returns:
             Self: The instance of the class.
         """
-        if self.notification_type == NotificationType.EVENT and not self.subscriber_ids:
-            raise ValueError("subscriber_ids is required for event notifications")
+        # NOTE: Commented out this condition for deployment, cluster status updates.
+        # if self.notification_type == NotificationType.EVENT and not self.subscriber_ids:
+        #     raise ValueError("subscriber_ids is required for event notifications")
         if self.notification_type == NotificationType.TOPIC and not self.topic_keys:
             raise ValueError("topic_keys is required for topic notifications")
         if self.notification_type == NotificationType.BROADCAST and (self.subscriber_ids or self.topic_keys):

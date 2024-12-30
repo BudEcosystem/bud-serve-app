@@ -102,7 +102,7 @@ class NotificationService(SessionMixin):
             and isinstance(payload.content.result, dict)
             and "result" in payload.content.result
         ):
-            await self._create_endpoint(payload)
+            await EndpointService(self.session).create_endpoint_from_notification_event(payload)
 
     async def update_cluster_creation_events(self, payload: NotificationPayload) -> None:
         """Update the cluster creation events for a workflow step.
@@ -212,6 +212,40 @@ class NotificationService(SessionMixin):
             and payload.content.title == "Model Security Scan Results"
         ):
             await LocalModelWorkflowService(self.session).create_scan_result_from_notification_event(payload)
+
+    async def update_cluster_status_update_events(self, payload: NotificationPayload) -> None:
+        """Update the cluster status update events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        # Update cluster status in database
+        if (
+            payload.content.status == "COMPLETED"
+            and payload.content.result
+            and payload.content.title == "Cluster status updated"
+        ):
+            await ClusterService(self.session).update_cluster_status_from_notification_event(payload)
+
+    async def update_endpoint_status_update_events(self, payload: NotificationPayload) -> None:
+        """Update the endpoint status update events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        # Update endpoint status in database
+        if (
+            payload.content.status == "COMPLETED"
+            and payload.content.result
+            and payload.content.title == "Deployment status updated"
+        ):
+            await EndpointService(self.session).update_endpoint_status_from_notification_event(payload)
 
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
         """Update the workflow step events for a workflow step.
@@ -456,6 +490,8 @@ class SubscriberHandler:
             PayloadType.PERFORM_MODEL_SECURITY_SCAN: self._handle_perform_model_security_scan,
             PayloadType.DELETE_CLUSTER: self._handle_delete_cluster,
             PayloadType.DELETE_DEPLOYMENT: self._handle_delete_endpoint,
+            PayloadType.CLUSTER_STATUS_UPDATE: self._handle_cluster_status_update,
+            PayloadType.DEPLOYMENT_STATUS_UPDATE: self._handle_endpoint_status_update,
         }
 
         handler = handlers.get(payload.type)
@@ -521,6 +557,22 @@ class SubscriberHandler:
         return NotificationResponse(
             object="notification",
             message="Updated delete endpoint event in workflow step",
+        ).to_http_response()
+
+    async def _handle_cluster_status_update(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the cluster status update event."""
+        await NotificationService(self.session).update_cluster_status_update_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Update cluster status in db",
+        ).to_http_response()
+
+    async def _handle_endpoint_status_update(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the endpoint status update event."""
+        await NotificationService(self.session).update_endpoint_status_update_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Update endpoint status in db",
         ).to_http_response()
 
 

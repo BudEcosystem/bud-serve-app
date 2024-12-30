@@ -16,16 +16,20 @@
 
 """The endpoint ops services. Contains business logic for endpoint ops."""
 
+from datetime import datetime, timezone
 from typing import Dict, List, Tuple
 from uuid import UUID
 
 import aiohttp
+from fastapi import status
 
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
 from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.models import Project as ProjectModel
 
+from ..cluster_ops.crud import ClusterDataManager
+from ..cluster_ops.models import Cluster as ClusterModel
 from ..commons.config import app_settings
 from ..commons.constants import (
     BUD_INTERNAL_WORKFLOW,
@@ -39,6 +43,8 @@ from ..commons.exceptions import ClientException
 from ..core.schemas import NotificationPayload
 from ..model_ops.crud import ProviderDataManager
 from ..model_ops.models import Provider as ProviderModel
+from ..model_ops.services import ModelServiceUtil
+from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
@@ -46,6 +52,7 @@ from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService
 from .crud import EndpointDataManager
 from .models import Endpoint as EndpointModel
+from .schemas import EndpointCreate
 
 
 logger = logging.get_logger(__name__)
@@ -234,3 +241,180 @@ class EndpointService(SessionMixin):
         # Mark workflow as completed
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
         logger.debug(f"Workflow {db_workflow.id} marked as completed")
+
+    async def create_endpoint_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Create an endpoint in database.
+
+        Args:
+            payload: The payload to create the endpoint with.
+        """
+        logger.debug("Received event for creating endpoint")
+
+        # Get namespace and deployment URL from event
+        namespace = payload.content.result.get("namespace")
+        deployment_url = payload.content.result["result"]["deployment_url"]
+        credential_id = payload.content.result.get("credential_id")
+
+        if not namespace or not deployment_url:
+            logger.warning("Namespace or deployment URL is missing from event")
+            return
+
+        # Get workflow steps
+        workflow_id = payload.workflow_id
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for endpoint creation
+        keys_of_interest = [
+            "model_id",
+            "project_id",
+            "cluster_id",  # bud_cluster_id
+            "endpoint_name",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        logger.debug("Collected required data from workflow steps")
+
+        # Get cluster id
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            ClusterModel, {"cluster_id": required_data["cluster_id"]}, missing_ok=True
+        )
+
+        if not db_cluster:
+            logger.error(f"Cluster with id {required_data['cluster_id']} not found")
+            return
+
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+
+        # Create endpoint in database
+        endpoint_data = EndpointCreate(
+            model_id=required_data["model_id"],
+            project_id=required_data["project_id"],
+            cluster_id=db_cluster.id,
+            bud_cluster_id=required_data["cluster_id"],
+            name=required_data["endpoint_name"],
+            url=deployment_url,
+            namespace=namespace,
+            status=EndpointStatusEnum.RUNNING,
+            created_by=db_workflow.created_by,
+            status_sync_at=datetime.now(tz=timezone.utc),
+            credential_id=credential_id,
+        )
+
+        db_endpoint = await EndpointDataManager(self.session).insert_one(
+            EndpointModel(**endpoint_data.model_dump(exclude_unset=True, exclude_none=True))
+        )
+        logger.debug(f"Endpoint created successfully: {db_endpoint.id}")
+
+        # Mark workflow as completed
+        logger.debug(f"Marking workflow as completed: {workflow_id}")
+        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
+
+        # Send notification to workflow creator
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_endpoint.model)
+        notification_request = (
+            NotificationBuilder()
+            .set_content(title=db_endpoint.name, message="Deployment is Done", icon=model_icon)
+            .set_payload(workflow_id=str(db_workflow.id))
+            .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)
+
+        # Create request to trigger endpoint status update periodic task
+        await self._perform_endpoint_status_update_request(db_endpoint.bud_cluster_id, db_endpoint.namespace)
+
+        return db_endpoint
+
+    async def _perform_endpoint_status_update_request(self, cluster_id: UUID, namespace: str) -> Dict:
+        """Perform update endpoint status request to bud_cluster app.
+
+        Args:
+            cluster_id: The ID of the cluster to update.
+            namespace: The namespace of the cluster to update.
+            current_user_id: The ID of the current user.
+        """
+        update_cluster_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/update-deployment-status"
+
+        try:
+            payload = {
+                "deployment_name": namespace,
+                "cluster_id": str(cluster_id),
+            }
+            logger.debug(
+                f"Performing update endpoint status request. payload: {payload}, endpoint: {update_cluster_endpoint}"
+            )
+            async with aiohttp.ClientSession() as session, session.post(
+                update_cluster_endpoint, json=payload
+            ) as response:
+                response_data = await response.json()
+                if response.status != 200:
+                    logger.error(f"Failed to update endpoint status: {response.status} {response_data}")
+                    raise ClientException(
+                        "Failed to update endpoint status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+
+                logger.debug("Successfully updated endpoint status")
+                return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send update endpoint status request: {e}")
+            raise ClientException(
+                "Failed to update endpoint status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def update_endpoint_status_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Update an endpoint status in database.
+
+        Args:
+            payload: The payload to update the endpoint status with.
+
+        Raises:
+            ClientException: If the endpoint already exists.
+        """
+        logger.debug("Received event for updating endpoint status")
+
+        # Get endpoint from db
+        logger.debug(
+            f"Retrieving endpoint with bud_cluster_id: {payload.content.result['cluster_id']} and namespace: {payload.content.result['deployment_name']}"
+        )
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            {
+                "bud_cluster_id": payload.content.result["cluster_id"],
+                "namespace": payload.content.result["deployment_name"],
+            },
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+        )
+        logger.debug(f"Endpoint retrieved successfully: {db_endpoint.id}")
+
+        # Update cluster status
+        endpoint_status = await self._get_endpoint_status(payload.content.result["status"])
+        db_endpoint = await EndpointDataManager(self.session).update_by_fields(
+            db_endpoint, {"status": endpoint_status}
+        )
+        logger.debug(f"Endpoint {db_endpoint.id} status updated to {endpoint_status}")
+
+    @staticmethod
+    async def _get_endpoint_status(status: str) -> EndpointStatusEnum:
+        """Get the endpoint status from the payload.
+
+        Args:
+            status: The status to get the endpoint status from.
+
+        Returns:
+            EndpointStatusEnum: The endpoint status.
+        """
+        if status == "Ingress Unhealthy":
+            return EndpointStatusEnum.UNHEALTHY
+        elif status == "Deployment healthy":
+            return EndpointStatusEnum.RUNNING
+        else:
+            logger.error(f"Unknown endpoint status: {status}")
+            raise ClientException(f"Unknown endpoint status: {status}")

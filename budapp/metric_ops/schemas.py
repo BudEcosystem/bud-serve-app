@@ -61,3 +61,17 @@ class PerformanceAnalyticsResponse(SuccessResponse):
     ttft_metrics: dict | None = None
     latency_metrics: dict | None = None
     throughput_metrics: dict | None = None
+
+
+class DashboardStatsResponse(SuccessResponse):
+    """Dashboard stats response schema."""
+
+    total_model_count: int
+    cloud_model_count: int
+    local_model_count: int
+    total_projects: int
+    total_project_users: int
+    total_endpoints_count: int
+    running_endpoints_count: int
+    total_clusters: int
+    inactive_clusters: int
