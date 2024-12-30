@@ -94,7 +94,7 @@ class ClusterService(SessionMixin):
                 ingress_url=cluster.ingress_url,
                 created_at=cluster.created_at,
                 modified_at=cluster.modified_at,
-                endpoint_count=12,  # TODO: Add endpoint count
+                endpoint_count=len(cluster.endpoints),
                 status=cluster.status,
                 gpu_count=cluster.gpu_count,
                 cpu_count=cluster.cpu_count,

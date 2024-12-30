@@ -22,6 +22,7 @@ from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 
 from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy.orm import selectinload
 
 from budapp.cluster_ops.models import Cluster
 from ..commons.constants import ClusterStatusEnum
@@ -47,10 +48,10 @@ class ClusterDataManager(DataManagerUtils):
         # Generate statements based on search or filters
         if search:
             search_conditions = await self.generate_search_stmt(Cluster, filters)
-            stmt = select(Cluster).filter(and_(*search_conditions))
+            stmt = select(Cluster).options(selectinload(Cluster.endpoints)).filter(and_(*search_conditions))
             count_stmt = select(func.count()).select_from(Cluster).filter(and_(*search_conditions))
         else:
-            stmt = select(Cluster).filter_by(**filters)
+            stmt = select(Cluster).options(selectinload(Cluster.endpoints)).filter_by(**filters)
             count_stmt = select(func.count()).select_from(Cluster).filter_by(**filters)
 
         # Exclude deleted clusters
