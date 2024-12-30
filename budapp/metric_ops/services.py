@@ -187,9 +187,9 @@ class MetricService(SessionMixin):
             ClusterModel, fields={"status": ClusterStatusEnum.NOT_AVAILABLE}
         )
 
-        db_total_projects = await ProjectDataManager(self.session).get_total_projects_by_user_id(user_id)
-
-        db_total_project_users = await ProjectDataManager(self.session).get_project_members_by_user_id(user_id)
+        db_total_projects, db_total_project_users = await ProjectDataManager(self.session).get_user_project_statistics(
+            user_id
+        )
 
         db_dashboard_stats = {
             "total_model_count": db_total_model_count,

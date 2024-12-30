@@ -17,6 +17,7 @@
 """The crud package, containing essential business logic, services, and routing configurations for the project ops."""
 
 from uuid import UUID
+from typing import Tuple
 from sqlalchemy import func, distinct, select
 
 from budapp.commons import logging
@@ -30,30 +31,48 @@ logger = logging.get_logger(__name__)
 class ProjectDataManager(DataManagerUtils):
     """Data manager for the Project model."""
 
-    async def get_total_projects_by_user_id(self, user_id: UUID) -> int:
+    async def get_user_project_ids(self, user_id: UUID) -> Tuple[list[UUID], int]:
         """
-        Get the count of total projects a user is part of.
+        Get the list of project IDs a user is part of.
         Args:
             user_id (UUID): The ID of the user.
         Returns:
-            int: Count of total projects the user is part of.
+            list[UUID]: A list of project IDs the user is part of.
         """
-        projects_count_stmt = select(func.count(distinct(project_user_association.c.project_id))).where(
+        project_ids_stmt = select(project_user_association.c.project_id).where(
             project_user_association.c.user_id == user_id
         )
-        return self.scalar_one_or_none(projects_count_stmt) or 0
+        db_project_ids = [row for row in self.scalars_all(project_ids_stmt)]
+        return db_project_ids, len(db_project_ids)
 
-    async def get_project_members_by_user_id(self, user_id: UUID) -> int:
+    async def get_unique_user_count_in_projects(self, project_ids: list[UUID]) -> int:
         """
-        Get the count of unique users in the projects a user is part of.
+        Get the count of unique users in the specified projects.
         Args:
-            user_id (UUID): The ID of the user.
+            project_ids (list[UUID]): A list of project IDs.
         Returns:
             int: Count of unique users in those projects.
         """
-        users_count_stmt = select(func.count(distinct(project_user_association.c.user_id))).where(
-            project_user_association.c.project_id.in_(
-                select(project_user_association.c.project_id).where(project_user_association.c.user_id == user_id)
-            )
+        if not project_ids:
+            return 0
+
+        unique_users_stmt = select(func.count(distinct(project_user_association.c.user_id))).where(
+            project_user_association.c.project_id.in_(project_ids)
         )
-        return self.scalar_one_or_none(users_count_stmt) or 0
+        return self.scalar_one_or_none(unique_users_stmt) or 0
+
+    async def get_user_project_statistics(self, user_id: UUID) -> tuple[int, int]:
+        """
+        Get the count of total projects a user is part of, the number of unique users
+        in those projects, and the list of project IDs.
+        Args:
+            user_id (UUID): The ID of the user.
+        Returns:
+            tuple[int, int, list[UUID]]:
+                - Count of total projects the user is part of.
+                - Count of unique users in those projects.
+                - List of project IDs the user is part of.
+        """
+        project_ids, project_count = await self.get_user_project_ids(user_id)
+        unique_user_count = await self.get_unique_user_count_in_projects(project_ids)
+        return project_count, unique_user_count
