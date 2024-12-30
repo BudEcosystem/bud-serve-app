@@ -18,7 +18,7 @@
 
 from datetime import datetime, timezone
 from typing import Dict, List, Tuple
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import aiohttp
 from fastapi import status
@@ -329,15 +329,11 @@ class EndpointService(SessionMixin):
         await BudNotifyService().send_notification(notification_request)
 
         # Create request to trigger endpoint status update periodic task
-        await self._perform_endpoint_status_update_request(
-            db_endpoint.bud_cluster_id, db_endpoint.namespace, db_workflow.created_by
-        )
+        await self._perform_endpoint_status_update_request(db_endpoint.bud_cluster_id, db_endpoint.namespace)
 
         return db_endpoint
 
-    async def _perform_endpoint_status_update_request(
-        self, cluster_id: UUID, namespace: str, current_user_id: UUID
-    ) -> Dict:
+    async def _perform_endpoint_status_update_request(self, cluster_id: UUID, namespace: str) -> Dict:
         """Perform update endpoint status request to bud_cluster app.
 
         Args:
@@ -351,12 +347,6 @@ class EndpointService(SessionMixin):
             payload = {
                 "deployment_name": namespace,
                 "cluster_id": str(cluster_id),
-                "notification_metadata": {
-                    "name": BUD_INTERNAL_WORKFLOW,
-                    "subscriber_ids": str(current_user_id),
-                    "workflow_id": str(uuid4()),
-                },
-                "source_topic": f"{app_settings.source_topic}",
             }
             logger.debug(
                 f"Performing update endpoint status request. payload: {payload}, endpoint: {update_cluster_endpoint}"
