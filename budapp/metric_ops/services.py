@@ -39,6 +39,7 @@ from ..commons.constants import (
     ModelStatusEnum,
     ClusterStatusEnum,
     ModelProviderTypeEnum,
+    ProjectStatusEnum,
 )
 from ..cluster_ops.crud import ClusterDataManager
 from ..model_ops.crud import ModelDataManager
@@ -47,6 +48,7 @@ from ..project_ops.crud import ProjectDataManager
 from ..cluster_ops.models import Cluster as ClusterModel
 from ..model_ops.models import Model
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..project_ops.models import Project as ProjectModel
 
 logger = logging.get_logger(__name__)
 
@@ -162,19 +164,18 @@ class MetricService(SessionMixin):
         """
 
         db_total_model_count = await ModelDataManager(self.session).get_count_by_fields(
-            Model, fields={"status": ModelStatusEnum.ACTIVE, "created_by": user_id}
+            Model, fields={"status": ModelStatusEnum.ACTIVE}
         )
         db_cloud_model_count = await ModelDataManager(self.session).get_count_by_fields(
             Model,
             fields={
                 "status": ModelStatusEnum.ACTIVE,
                 "provider_type": ModelProviderTypeEnum.CLOUD_MODEL,
-                "created_by": user_id,
             },
         )
         db_local_model_count = await ModelDataManager(self.session).get_count_by_fields(
             Model,
-            fields={"status": ModelStatusEnum.ACTIVE, "created_by": user_id},
+            fields={"status": ModelStatusEnum.ACTIVE},
             exclude_fields={"provider_type": ModelProviderTypeEnum.CLOUD_MODEL},
         )
         db_total_endpoint_count = await EndpointDataManager(self.session).get_count_by_fields(
@@ -192,11 +193,11 @@ class MetricService(SessionMixin):
             ClusterModel, fields={"status": ClusterStatusEnum.NOT_AVAILABLE}
         )
 
-        db_project_ids, db_project_count = await ProjectDataManager(self.session).get_project_count_by_user(user_id)
-
-        db_total_project_users = await ProjectDataManager(self.session).get_unique_user_count_in_projects(
-            db_project_ids
+        db_project_count = await ProjectDataManager(self.session).get_count_by_fields(
+            ProjectModel, fields={"status": ProjectStatusEnum.ACTIVE}
         )
+
+        db_total_project_users = await ProjectDataManager(self.session).get_unique_user_count_in_all_projects()
 
         db_dashboard_stats = {
             "total_model_count": db_total_model_count,

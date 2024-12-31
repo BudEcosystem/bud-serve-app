@@ -31,36 +31,16 @@ logger = logging.get_logger(__name__)
 class ProjectDataManager(DataManagerUtils):
     """Data manager for the Project model."""
 
-    async def get_project_count_by_user(self, user_id: UUID) -> Tuple[list[UUID], int]:
+    async def get_unique_user_count_in_all_projects(self) -> int:
         """
-        Get the list of active project IDs a user is part of.
-        Args:
-            user_id (UUID): The ID of the user.
-        Returns:
-            list[UUID]: A list of active project IDs the user is part of.
-        """
-        project_ids_stmt = (
-            select(distinct(project_user_association.c.project_id))
-            .join(Project, project_user_association.c.project_id == Project.id)
-            .where(project_user_association.c.user_id == user_id, Project.status == ProjectStatusEnum.ACTIVE)
-        )
-        db_project_ids = [row for row in self.scalars_all(project_ids_stmt)]
-        return db_project_ids, len(db_project_ids)
+        Get the count of unique users across all active projects.
 
-    async def get_unique_user_count_in_projects(self, project_ids: list[UUID]) -> int:
-        """
-        Get the count of unique users in the specified active projects.
-        Args:
-            project_ids (list[UUID]): A list of project IDs.
         Returns:
-            int: Count of unique users in those active projects.
+            int: Count of unique users in all active projects.
         """
-        if not project_ids:
-            return 0
-
         unique_users_stmt = (
             select(func.count(distinct(project_user_association.c.user_id)))
             .join(Project, project_user_association.c.project_id == Project.id)
-            .where(project_user_association.c.project_id.in_(project_ids), Project.status == ProjectStatusEnum.ACTIVE)
+            .where(Project.status == ProjectStatusEnum.ACTIVE)
         )
         return self.scalar_one_or_none(unique_users_stmt) or 0
