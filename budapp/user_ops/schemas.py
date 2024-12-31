@@ -48,7 +48,6 @@ class User(UserInfo):
 
     auth_id: UUID4
     password: str
-    is_active: bool
     status: UserStatusEnum
     created_at: datetime
     modified_at: datetime

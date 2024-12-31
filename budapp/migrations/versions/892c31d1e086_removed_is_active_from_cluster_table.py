@@ -1,7 +1,7 @@
 """removed is active from cluster table
 
 Revision ID: 892c31d1e086
-Revises: d92d92c1c90c
+Revises: b2c9ac9ba65b
 Create Date: 2024-12-19 09:58:34.806743
 
 """

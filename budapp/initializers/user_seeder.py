@@ -40,7 +40,7 @@ class UserSeeder(BaseSeeder):
         # Check whether super user exists or not
         db_user = await UserDataManager(session).retrieve_by_fields(
             UserModel,
-            {"email": app_settings.superuser_email, "is_active": True, "is_superuser": True},
+            {"email": app_settings.superuser_email, "status": UserStatusEnum.ACTIVE, "is_superuser": True},
             missing_ok=True,
         )
 
@@ -56,7 +56,6 @@ class UserSeeder(BaseSeeder):
                 color=UserColorEnum.get_random_color(),
                 is_reset_password=False,
                 first_login=True,
-                is_active=True,
                 status=UserStatusEnum.ACTIVE.value,
                 role=UserRoleEnum.SUPER_ADMIN.value,
             )
