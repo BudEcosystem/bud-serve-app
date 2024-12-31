@@ -41,6 +41,7 @@ from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
 from .schemas import (
+    CancelDeploymentWorkflowRequest,
     CreateCloudModelWorkflowRequest,
     CreateCloudModelWorkflowResponse,
     CreateLocalModelWorkflowRequest,
@@ -760,11 +761,11 @@ async def scan_local_model_workflow(
 async def cancel_model_deployment(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    workflow_id: UUID,
+    cancel_request: CancelDeploymentWorkflowRequest,
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Cancel model deployment."""
     try:
-        await ModelService(session).cancel_model_deployment_workflow(workflow_id)
+        await ModelService(session).cancel_model_deployment_workflow(cancel_request.workflow_id)
         return SuccessResponse(
             message="Model deployment cancelled successfully",
             code=status.HTTP_200_OK,
@@ -804,7 +805,6 @@ async def delete_model(
     model_id: UUID,
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Delete a model by its ID."""
-
     _ = await ModelService(session).delete_active_model(model_id)
     logger.debug(f"Model deleted: {model_id}")
 

@@ -700,3 +700,9 @@ class LocalModelScanWorkflowStepData(BaseModel):
     """Local model scan workflow step data schema."""
 
     model_id: UUID4 | None
+
+
+class CancelDeploymentWorkflowRequest(BaseModel):
+    """Cancel deployment workflow request schema."""
+
+    workflow_id: UUID4
