@@ -162,14 +162,19 @@ class MetricService(SessionMixin):
         """
 
         db_total_model_count = await ModelDataManager(self.session).get_count_by_fields(
-            Model, fields={"status": ModelStatusEnum.ACTIVE}
+            Model, fields={"status": ModelStatusEnum.ACTIVE, "created_by": user_id}
         )
         db_cloud_model_count = await ModelDataManager(self.session).get_count_by_fields(
-            Model, fields={"status": ModelStatusEnum.ACTIVE, "provider_type": ModelProviderTypeEnum.CLOUD_MODEL}
+            Model,
+            fields={
+                "status": ModelStatusEnum.ACTIVE,
+                "provider_type": ModelProviderTypeEnum.CLOUD_MODEL,
+                "created_by": user_id,
+            },
         )
         db_local_model_count = await ModelDataManager(self.session).get_count_by_fields(
             Model,
-            fields={"status": ModelStatusEnum.ACTIVE},
+            fields={"status": ModelStatusEnum.ACTIVE, "created_by": user_id},
             exclude_fields={"provider_type": ModelProviderTypeEnum.CLOUD_MODEL},
         )
         db_total_endpoint_count = await EndpointDataManager(self.session).get_count_by_fields(
