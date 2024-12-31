@@ -314,8 +314,7 @@ class ModelDataManager(DataManagerUtils):
                     .label("endpoints_count"),
                 )
                 .select_from(Model)
-                .filter(or_(*search_conditions))
-                .where(or_(*explicit_conditions))
+                .filter(or_(*search_conditions, *explicit_conditions))
                 .filter(Model.status == ModelStatusEnum.ACTIVE)
                 .outerjoin(Endpoint, Endpoint.model_id == Model.id)
                 .group_by(Model.id)
@@ -323,8 +322,7 @@ class ModelDataManager(DataManagerUtils):
             count_stmt = (
                 select(func.count())
                 .select_from(Model)
-                .filter(or_(*search_conditions))
-                .where(or_(*explicit_conditions))
+                .filter(or_(*search_conditions, *explicit_conditions))
                 .filter(Model.status == ModelStatusEnum.ACTIVE)
             )
         else:
