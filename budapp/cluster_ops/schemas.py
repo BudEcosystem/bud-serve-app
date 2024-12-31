@@ -169,3 +169,9 @@ class EditClusterRequest(BaseModel):
 
 class SingleClusterResponse(SuccessResponse):
     cluster: ClusterResponse
+
+
+class CancelClusterOnboardingRequest(BaseModel):
+    """Cancel cluster onboarding request schema."""
+
+    workflow_id: UUID4

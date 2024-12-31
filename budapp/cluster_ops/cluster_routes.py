@@ -39,6 +39,7 @@ from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
 from .schemas import (
+    CancelClusterOnboardingRequest,
     ClusterFilter,
     ClusterListResponse,
     CreateClusterWorkflowRequest,
@@ -346,11 +347,11 @@ async def delete_cluster(
 async def cancel_cluster_onboarding(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    workflow_id: UUID,
+    cancel_request: CancelClusterOnboardingRequest,
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Cancel cluster onboarding."""
     try:
-        await ClusterService(session).cancel_cluster_onboarding_workflow(workflow_id)
+        await ClusterService(session).cancel_cluster_onboarding_workflow(cancel_request.workflow_id)
         return SuccessResponse(
             message="Cluster onboarding cancelled successfully",
             code=status.HTTP_200_OK,
