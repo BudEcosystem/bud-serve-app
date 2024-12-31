@@ -52,7 +52,7 @@ class AuthService(SessionMixin):
             logger.debug(f"Password incorrect for {user.email}")
             raise ClientException("Incorrect email or password")
 
-        if db_user.status == UserStatusEnum.INACTIVE:
+        if db_user.status == UserStatusEnum.DELETED:
             logger.debug(f"User account is not active: {user.email}")
             raise ClientException("User account is not active")
 

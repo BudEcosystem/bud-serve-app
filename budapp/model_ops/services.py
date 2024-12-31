@@ -90,6 +90,7 @@ from .schemas import (
     ModelTree,
     PaperPublishedCreate,
 )
+from ..endpoint_ops.crud import EndpointDataManager
 
 
 logger = logging.get_logger(__name__)
@@ -2034,6 +2035,49 @@ class ModelService(SessionMixin):
             raise ClientException(
                 "Failed to cancel model deployment", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
+
+    async def delete_active_model(self, model_id: UUID) -> Model:
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, fields={"id": model_id, "status": ModelStatusEnum.ACTIVE}
+        )
+
+        # Check for active endpoint
+        db_endpoints = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            fields={"model_id": model_id},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+            missing_ok=True,
+        )
+
+        # Raise error if model has active endpoint
+        if db_endpoints:
+            raise ClientException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete model because it has active endpoint.",
+            )
+
+        if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
+                CloudModel,
+                fields={
+                    "status": CloudModelStatusEnum.ACTIVE,
+                    "source": db_model.source,
+                    "uri": db_model.uri,
+                    "provider_id": db_model.provider_id,
+                    "is_present_in_model": True,
+                },
+            )
+            db_cloud_model = await CloudModelDataManager(self.session).update_by_fields(
+                db_cloud_model, fields={"is_present_in_model": False}
+            )
+
+        else:
+            # TODO:service yet to be implemented for other provider types models to clear model space
+            pass
+
+        db_model = await ModelDataManager(self.session).update_by_fields(db_model, {"status": ModelStatusEnum.DELETED})
+
+        return db_model
 
 
 class ModelServiceUtil(SessionMixin):

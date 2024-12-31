@@ -675,6 +675,9 @@ class ClusterService(SessionMixin):
             ClusterModel, fields={"id": cluster_id}, exclude_fields={"status": ClusterStatusEnum.DELETED}
         )
 
+        if db_cluster.status == ClusterStatusEnum.DELETING:
+            raise ClientException("Cluster is already deleting")
+
         # Check for active endpoints
         db_endpoints = await EndpointDataManager(self.session).get_all_by_fields(
             EndpointModel,
