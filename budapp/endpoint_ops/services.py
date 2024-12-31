@@ -89,6 +89,9 @@ class EndpointService(SessionMixin):
             EndpointModel, {"id": endpoint_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
         )
 
+        if db_endpoint.status == EndpointStatusEnum.DELETING:
+            raise ClientException("Deployment is already deleting")
+
         if db_endpoint.model.provider_type in [ModelProviderTypeEnum.HUGGING_FACE, ModelProviderTypeEnum.CLOUD_MODEL]:
             db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
                 ProviderModel, {"id": db_endpoint.model.provider_id}
