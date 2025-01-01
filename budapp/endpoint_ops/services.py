@@ -108,6 +108,7 @@ class EndpointService(SessionMixin):
             title=db_endpoint.name,
             total_steps=current_step_number,
             icon=model_icon,
+            tag=db_endpoint.project.name,
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
             workflow_id=None, workflow_data=workflow_create, current_user_id=current_user_id
