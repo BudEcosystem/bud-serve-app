@@ -17,12 +17,14 @@
 """The crud package, containing essential business logic, services, and routing configurations for the project ops."""
 
 from uuid import UUID
+from typing import Tuple
 from sqlalchemy import func, distinct, select
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
-from .models import project_user_association
-
+from .models import project_user_association, Project
+from ..commons.constants import ProjectStatusEnum, UserStatusEnum
+from ..user_ops.models import User
 
 logger = logging.get_logger(__name__)
 
@@ -30,30 +32,20 @@ logger = logging.get_logger(__name__)
 class ProjectDataManager(DataManagerUtils):
     """Data manager for the Project model."""
 
-    async def get_user_project_stats(self, user_id: UUID) -> tuple[int, int]:
+    def get_unique_user_count_in_all_projects(self) -> int:
         """
-        Get the count of total projects a user is part of and the number of unique users
-        in those projects.
-        Args:
-            user_id (UUID): The ID of the user.
+        Get the count of unique users across all active projects.
+
         Returns:
-            tuple[int, int]: A tuple containing:
-                - Count of total projects the user is present in.
-                - Count of unique users present in those projects.
+            int: Count of unique users in all active projects.
         """
-
-        # Query to count the total projects the user is part of
-        projects_count_stmt = select(func.count(distinct(project_user_association.c.project_id))).where(
-            project_user_association.c.user_id == user_id
-        )
-        projects_count = self.scalar_one_or_none(projects_count_stmt) or 0
-
-        # Query to count unique users in the projects the user is part of
-        users_count_stmt = select(func.count(distinct(project_user_association.c.user_id))).where(
-            project_user_association.c.project_id.in_(
-                select(project_user_association.c.project_id).where(project_user_association.c.user_id == user_id)
+        unique_users_stmt = (
+            select(func.count(distinct(project_user_association.c.user_id)))
+            .join(Project, project_user_association.c.project_id == Project.id)
+            .join(User, project_user_association.c.user_id == User.id)
+            .where(
+                Project.status == ProjectStatusEnum.ACTIVE,
+                User.status != UserStatusEnum.DELETED,
             )
         )
-        users_count = self.scalar_one_or_none(users_count_stmt) or 0
-
-        return projects_count, users_count
+        return self.scalar_one_or_none(unique_users_stmt) or 0
