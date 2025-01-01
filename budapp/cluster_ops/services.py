@@ -143,6 +143,7 @@ class ClusterService(SessionMixin):
             title="Cluster Onboarding",
             total_steps=workflow_total_steps,
             icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+            tag="Cluster Onboarding",
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
             workflow_id, workflow_create, current_user_id
@@ -697,6 +698,7 @@ class ClusterService(SessionMixin):
             title=db_cluster.name,
             total_steps=current_step_number,
             icon=db_cluster.icon,
+            tag="Cluster Repository",
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
             workflow_id=None, workflow_data=workflow_create, current_user_id=current_user_id
