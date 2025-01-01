@@ -246,6 +246,17 @@ class EndpointService(SessionMixin):
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
         logger.debug(f"Workflow {db_workflow.id} marked as completed")
 
+        # Send notification to workflow creator
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_endpoint.model)
+        notification_request = (
+            NotificationBuilder()
+            .set_content(title=db_endpoint.name, message="Deployment Deleted", icon=model_icon)
+            .set_payload(workflow_id=str(db_workflow.id))
+            .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)
+
     async def create_endpoint_from_notification_event(self, payload: NotificationPayload) -> None:
         """Create an endpoint in database.
 

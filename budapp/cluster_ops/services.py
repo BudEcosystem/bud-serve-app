@@ -564,6 +564,16 @@ class ClusterService(SessionMixin):
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
         logger.debug(f"Workflow {db_workflow.id} marked as completed")
 
+        # Send notification to workflow creator
+        notification_request = (
+            NotificationBuilder()
+            .set_content(title=db_cluster.name, message="Cluster Deleted", icon=db_cluster.icon)
+            .set_payload(workflow_id=str(db_workflow.id))
+            .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)
+
     async def update_cluster_status_from_notification_event(self, payload: NotificationPayload) -> None:
         """Delete a cluster in database.
 
