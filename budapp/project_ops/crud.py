@@ -23,7 +23,8 @@ from sqlalchemy import func, distinct, select
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 from .models import project_user_association, Project
-from ..commons.constants import ProjectStatusEnum
+from ..commons.constants import ProjectStatusEnum, UserStatusEnum
+from ..user_ops.models import User
 
 logger = logging.get_logger(__name__)
 
@@ -31,7 +32,7 @@ logger = logging.get_logger(__name__)
 class ProjectDataManager(DataManagerUtils):
     """Data manager for the Project model."""
 
-    async def get_unique_user_count_in_all_projects(self) -> int:
+    def get_unique_user_count_in_all_projects(self) -> int:
         """
         Get the count of unique users across all active projects.
 
@@ -41,6 +42,10 @@ class ProjectDataManager(DataManagerUtils):
         unique_users_stmt = (
             select(func.count(distinct(project_user_association.c.user_id)))
             .join(Project, project_user_association.c.project_id == Project.id)
-            .where(Project.status == ProjectStatusEnum.ACTIVE)
+            .join(User, project_user_association.c.user_id == User.id)
+            .where(
+                Project.status == ProjectStatusEnum.ACTIVE,
+                User.status != UserStatusEnum.DELETED,
+            )
         )
         return self.scalar_one_or_none(unique_users_stmt) or 0

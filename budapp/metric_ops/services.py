@@ -197,7 +197,7 @@ class MetricService(SessionMixin):
             ProjectModel, fields={"status": ProjectStatusEnum.ACTIVE}
         )
 
-        db_total_project_users = await ProjectDataManager(self.session).get_unique_user_count_in_all_projects()
+        db_total_project_users = ProjectDataManager(self.session).get_unique_user_count_in_all_projects()
 
         db_dashboard_stats = {
             "total_model_count": db_total_model_count,
