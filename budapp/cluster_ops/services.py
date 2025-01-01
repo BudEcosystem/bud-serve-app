@@ -80,14 +80,35 @@ class ClusterService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[ClusterPaginatedResponse], int]:
         """Get all active clusters."""
-        result, count = await ClusterDataManager(self.session).get_all_clusters(
+        results, count = await ClusterDataManager(self.session).get_all_clusters(
             offset, limit, filters, order_by, search
         )
-        cluster_list = []
-        for db_result in result:
-            db_cluster, endpoints_count = db_result
-            cluster_list.append(ClusterPaginatedResponse(cluster=db_cluster, endpoint_count=endpoints_count))
-        return cluster_list, count
+        updated_clusters = []
+        for result in results:
+            cluster, endpoints_count = result
+            updated_cluster = ClusterPaginatedResponse(
+                id=cluster.id,
+                cluster_id=cluster.cluster_id,
+                name=cluster.name,
+                icon=cluster.icon,
+                ingress_url=cluster.ingress_url,
+                created_at=cluster.created_at,
+                modified_at=cluster.modified_at,
+                endpoint_count=endpoints_count,
+                status=cluster.status,
+                gpu_count=cluster.gpu_count,
+                cpu_count=cluster.cpu_count,
+                hpu_count=cluster.hpu_count,
+                cpu_total_workers=cluster.cpu_total_workers,
+                cpu_available_workers=cluster.cpu_available_workers,
+                gpu_total_workers=cluster.gpu_total_workers,
+                gpu_available_workers=cluster.gpu_available_workers,
+                hpu_total_workers=cluster.hpu_total_workers,
+                hpu_available_workers=cluster.hpu_available_workers,
+            )
+            updated_clusters.append(updated_cluster)
+
+        return updated_clusters, count
 
     async def create_cluster_workflow(
         self,
