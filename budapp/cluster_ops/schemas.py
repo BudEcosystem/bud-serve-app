@@ -103,8 +103,7 @@ class ClusterResponse(BaseModel):
         return self.cpu_available_workers + self.gpu_available_workers + self.hpu_available_workers
 
 
-class ClusterPaginatedResponse(BaseModel):
-    cluster: ClusterResponse
+class ClusterPaginatedResponse(ClusterResponse):
     endpoint_count: int
 
 
