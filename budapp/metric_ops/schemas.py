@@ -18,9 +18,9 @@
 """Contains core Pydantic schemas used for data validation and serialization within the metric ops services."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Dict, Literal
 
-from pydantic import UUID4, BaseModel
+from pydantic import UUID4, BaseModel, model_validator
 
 from ..commons.schemas import SuccessResponse
 
@@ -40,6 +40,16 @@ class CountAnalyticsRequest(BaseAnalyticsRequest):
     """Request count analytics request schema."""
 
     metrics: Literal["overall", "concurrency"] | None = None
+    filter_by: Literal["project", "model", "endpoint"] | None = None
+
+    @model_validator(mode="before")
+    def validate_filter_by(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate filter_by for concurrency metrics."""
+        if data.get("metrics") == "concurrency":
+            assert (
+                data.get("filter_by") is not None
+            ), "filter_by should be either project, model or endpoint for concurrency metrics"
+        return data
 
 
 class CountAnalyticsResponse(SuccessResponse):
