@@ -22,9 +22,11 @@ from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 
 from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy.orm import selectinload
 
 from budapp.cluster_ops.models import Cluster
-from ..commons.constants import ClusterStatusEnum
+from ..endpoint_ops.models import Endpoint
+from ..commons.constants import ClusterStatusEnum, EndpointStatusEnum
 
 logger = logging.get_logger(__name__)
 
@@ -44,13 +46,48 @@ class ClusterDataManager(DataManagerUtils):
 
         await self.validate_fields(Cluster, filters)
 
+        # Subquery to count endpoints per cluster
+        endpoint_count_subquery = (
+            select(
+                Endpoint.cluster_id,
+                func.count(Endpoint.id.distinct()).label("endpoint_count"),
+            )
+            .where(Endpoint.status != EndpointStatusEnum.DELETED)
+            .group_by(Endpoint.cluster_id)
+            .alias("endpoint_count_subquery")
+        )
+
         # Generate statements based on search or filters
         if search:
             search_conditions = await self.generate_search_stmt(Cluster, filters)
-            stmt = select(Cluster).filter(and_(*search_conditions))
+            stmt = (
+                select(
+                    Cluster,
+                    func.coalesce(endpoint_count_subquery.c.endpoint_count, 0).label("endpoint_count"),
+                )
+                .filter(and_(*search_conditions))
+                .select_from(Cluster)
+                .join(
+                    endpoint_count_subquery,
+                    Cluster.id == endpoint_count_subquery.c.cluster_id,
+                    isouter=True,
+                )
+            )
             count_stmt = select(func.count()).select_from(Cluster).filter(and_(*search_conditions))
         else:
-            stmt = select(Cluster).filter_by(**filters)
+            stmt = (
+                select(
+                    Cluster,
+                    func.coalesce(endpoint_count_subquery.c.endpoint_count, 0).label("endpoint_count"),
+                )
+                .filter_by(**filters)
+                .select_from(Cluster)
+                .join(
+                    endpoint_count_subquery,
+                    Cluster.id == endpoint_count_subquery.c.cluster_id,
+                    isouter=True,
+                )
+            )
             count_stmt = select(func.count()).select_from(Cluster).filter_by(**filters)
 
         # Exclude deleted clusters
@@ -68,6 +105,6 @@ class ClusterDataManager(DataManagerUtils):
             sort_conditions = await self.generate_sorting_stmt(Cluster, order_by)
             stmt = stmt.order_by(*sort_conditions)
 
-        result = self.scalars_all(stmt)
+        result = self.execute_all(stmt)
 
         return result, count
