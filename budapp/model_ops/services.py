@@ -55,6 +55,7 @@ from ..commons.constants import (
     WorkflowTypeEnum,
 )
 from ..commons.helpers import validate_huggingface_repo_format
+from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.schemas import WorkflowUtilCreate
@@ -90,7 +91,6 @@ from .schemas import (
     ModelTree,
     PaperPublishedCreate,
 )
-from ..endpoint_ops.crud import EndpointDataManager
 
 
 logger = logging.get_logger(__name__)
@@ -137,6 +137,7 @@ class CloudModelWorkflowService(SessionMixin):
             title="Cloud Model Onboarding",
             total_steps=workflow_total_steps,
             icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+            tag="Model Onboarding",
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
             workflow_id, workflow_create, current_user_id
@@ -687,6 +688,7 @@ class LocalModelWorkflowService(SessionMixin):
             title="Local Model Onboarding",
             total_steps=workflow_total_steps,
             icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+            tag="Model Onboarding",
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
             workflow_id, workflow_create, current_user_id
