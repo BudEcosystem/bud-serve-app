@@ -54,6 +54,7 @@ class Workflow(Base):
     )
     title: Mapped[str] = mapped_column(String, nullable=True)
     icon: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    tag: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     progress: Mapped[Union[Dict[str, Any], List[Any]]] = mapped_column(JSONB, nullable=True)
     current_step: Mapped[int] = mapped_column(Integer, default=0)
     total_steps: Mapped[int] = mapped_column(Integer, nullable=False)
