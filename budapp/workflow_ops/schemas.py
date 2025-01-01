@@ -71,6 +71,7 @@ class Workflow(BaseModel):
     id: UUID4
     title: str | None = None
     icon: str | None = None
+    tag: str | None = None
     progress: dict | None = None
     workflow_type: WorkflowTypeEnum
     total_steps: int = Field(..., gt=0)
@@ -102,3 +103,4 @@ class WorkflowUtilCreate(BaseModel):
     title: str
     icon: str | None = None
     total_steps: int | None = None
+    tag: str | None = None
