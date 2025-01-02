@@ -967,11 +967,19 @@ class LocalModelWorkflowService(SessionMixin):
             ),
         )
 
+        # Get base model relation
+        model_tree = model_info.get("model_tree", {})
+        base_model_relation = await self.get_base_model_relation(model_tree)
+
         # Sanitize base model
-        base_model = model_info.get("model_tree", {}).get("base_model", [])
+        base_model = model_tree.get("base_model", [])
         if base_model is not None and len(base_model) > 0:
             base_model = base_model[0]
         base_model = normalize_value(base_model)
+
+        # If base model is the same as the model uri, set base model to None
+        if required_data["uri"] == base_model:
+            base_model = None
 
         # Dummy Values
         # TODO: remove this after implementing actual service
@@ -990,12 +998,6 @@ class LocalModelWorkflowService(SessionMixin):
             },
         ]
         minimum_requirements = {"device_name": "Xenon Dev", "core": 3, "memory": "32 GB", "RAM": "32 GB"}
-        base_model_relation = BaseModelRelationEnum.ADAPTER
-
-        # Base model, Base model relation, fields will be none for base models
-        if required_data["uri"] == base_model:
-            base_model = None
-            base_model_relation = None
 
         # Set provider id and icon
         provider_id = None
@@ -1302,6 +1304,27 @@ class LocalModelWorkflowService(SessionMixin):
         return await ModelLicensesDataManager(self.session).insert_one(
             ModelLicenses(**license_data.model_dump(exclude_none=True))
         )
+
+    @staticmethod
+    async def get_base_model_relation(model_tree: dict) -> Optional[BaseModelRelationEnum]:
+        """Get base model relation.
+
+        Args:
+            model_tree (dict): Model tree.
+
+        Returns:
+            Optional[BaseModelRelationEnum]: Base model relation.
+        """
+        if model_tree.get("is_finetune"):
+            return BaseModelRelationEnum.FINETUNE
+        elif model_tree.get("is_adapter"):
+            return BaseModelRelationEnum.ADAPTER
+        elif model_tree.get("is_quantization"):
+            return BaseModelRelationEnum.QUANTIZED
+        elif model_tree.get("is_merge"):
+            return BaseModelRelationEnum.MERGE
+        else:
+            return None
 
     async def scan_local_model_workflow(self, current_user_id: UUID, request: LocalModelScanRequest) -> WorkflowModel:
         """Scan a local model."""
