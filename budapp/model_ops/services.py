@@ -1258,17 +1258,6 @@ class LocalModelWorkflowService(SessionMixin):
         license_name = normalize_value(extracted_license.get("name"))
         license_url = normalize_value(extracted_license.get("url"))
         license_faqs = normalize_value(extracted_license.get("faqs"))
-        # TODO: Remove when faqs are implemented
-        license_faqs = [
-            {
-                "answer": True,
-                "question": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-            },
-            {
-                "answer": False,
-                "question": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-            },
-        ]
         license_data = ModelLicensesCreate(
             name=license_name,
             url=license_url,
