@@ -16,11 +16,17 @@
 
 """Provides helper functions for the project."""
 
+import re
+import os
 from enum import Enum
 from typing import Dict, List, Optional, Union
 
+from budapp.commons import logging
+
 from huggingface_hub.utils import validate_repo_id
 from huggingface_hub.utils._validators import HFValidationError
+
+logger = logging.get_logger(__name__)
 
 
 def create_dynamic_enum(enum_name: str, enum_values: List[str]) -> Enum:
@@ -133,3 +139,29 @@ def validate_huggingface_repo_format(repo_id: str) -> bool:
         return False
 
     return True
+
+
+def validate_icon(icon: str = None) -> bool:
+    """
+    Validates the icon based on the provided emoji or path.
+
+    Args:
+        emoji (str, optional): Emoji to validate.
+        path (str, optional): Relative path to validate.
+
+    Returns:
+        bool: True if valid, False otherwise.
+    """
+    from .config import app_settings
+
+    emoji_regex = re.compile(r"(\u00a9|\u00ae|[\u2000-\u3300]|[\U0001F300-\U0001F6FF]|[\U0001F900-\U0001F9FF])")
+
+    if emoji_regex.fullmatch(icon):
+        logger.debug(f"icon validated: {icon}")
+        return True
+    elif os.path.exists(os.path.join(app_settings.static_dir, icon)):
+        logger.debug(f"icon validated: {icon}")
+        return True
+    else:
+        logger.debug(f"icon invalid: {icon}")
+        return False
