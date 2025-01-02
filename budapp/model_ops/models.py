@@ -29,12 +29,12 @@ from sqlalchemy.sql import false as sa_false
 
 from budapp.commons.constants import (
     BaseModelRelationEnum,
+    CloudModelStatusEnum,
     CredentialTypeEnum,
     ModalityEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelStatusEnum,
-    CloudModelStatusEnum,
 )
 from budapp.commons.database import Base
 
@@ -74,11 +74,10 @@ class Model(Base):
     )
     model_type: Mapped[str] = mapped_column(String, nullable=True)
     family: Mapped[str] = mapped_column(String, nullable=True)
-    num_layers: Mapped[int] = mapped_column(Integer, nullable=True)
-    hidden_size: Mapped[int] = mapped_column(BigInteger, nullable=True)
-    context_length: Mapped[int] = mapped_column(BigInteger, nullable=True)
-    torch_dtype: Mapped[str] = mapped_column(String, nullable=True)
-    architecture: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    model_weights_size: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    kv_cache_size: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    architecture_text_config: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    architecture_vision_config: Mapped[dict] = mapped_column(JSONB, nullable=True)
     website_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(
         Enum(

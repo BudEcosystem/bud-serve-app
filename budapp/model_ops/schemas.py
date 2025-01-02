@@ -161,16 +161,27 @@ class Model(ModelBase):
     provider: Provider | None = None
 
 
-class ModelArchitecture(BaseModel):
+class ModelArchitectureLLMConfig(BaseModel):
     """Model architecture schema."""
 
+    num_layers: int | None = None
+    hidden_size: int | None = None
     intermediate_size: int | None = None
+    context_length: int | None = None
     vocab_size: int | None = None
+    torch_dtype: str | None = None
     num_attention_heads: int | None = None
     num_key_value_heads: int | None = None
     rope_scaling: dict | None = None
-    model_weights_size: int | None = None
-    kv_cache_size: int | None = None
+
+
+class ModelArchitectureVisionConfig(BaseModel):
+    """Model architecture schema."""
+
+    num_layers: int | None = None
+    hidden_size: int | None = None
+    intermediate_size: int | None = None
+    torch_dtype: str | None = None
 
 
 class ModelCreate(ModelBase):
@@ -195,11 +206,10 @@ class ModelCreate(ModelBase):
     base_model_relation: BaseModelRelationEnum | None = None
     model_type: str | None = None
     family: str | None = None
-    num_layers: int | None = None
-    hidden_size: int | None = None
-    context_length: int | None = None
-    torch_dtype: str | None = None
-    architecture: ModelArchitecture | None = None
+    model_weights_size: int | None = None
+    kv_cache_size: int | None = None
+    architecture_text_config: ModelArchitectureLLMConfig | None = None
+    architecture_vision_config: ModelArchitectureVisionConfig | None = None
     scan_verified: bool | None = None
 
 
@@ -231,11 +241,10 @@ class ModelDetailResponse(BaseModel):
     base_model: str | None = None
     model_type: str | None = None
     family: str | None = None
-    num_layers: int | None = None
-    hidden_size: int | None = None
-    context_length: int | None = None
-    torch_dtype: str | None = None
-    architecture: ModelArchitecture | None = None
+    model_weights_size: int | None = None
+    kv_cache_size: int | None = None
+    architecture_text_config: ModelArchitectureLLMConfig | None = None
+    architecture_vision_config: ModelArchitectureVisionConfig | None = None
     modality: ModalityEnum
     source: str
     provider_type: ModelProviderTypeEnum

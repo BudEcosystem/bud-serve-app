@@ -129,6 +129,7 @@ class ModalityEnum(Enum):
     """
 
     LLM = "llm"
+    MLLM = "mllm"
     IMAGE = "image"
     EMBEDDING = "embedding"
     TEXT_TO_SPEECH = "text_to_speech"

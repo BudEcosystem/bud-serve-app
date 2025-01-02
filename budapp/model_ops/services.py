@@ -79,7 +79,8 @@ from .schemas import (
     CreateLocalModelWorkflowSteps,
     LocalModelScanRequest,
     LocalModelScanWorkflowStepData,
-    ModelArchitecture,
+    ModelArchitectureLLMConfig,
+    ModelArchitectureVisionConfig,
     ModelCreate,
     ModelDetailSuccessResponse,
     ModelIssue,
@@ -894,78 +895,52 @@ class LocalModelWorkflowService(SessionMixin):
         use_cases = normalize_value(model_info.get("use_cases", None))
         strengths = normalize_value(model_info.get("strengths", None))
         limitations = normalize_value(model_info.get("limitations", None))
-        model_size = normalize_value(
-            model_info.get("architecture", {}).get("num_params", None)
-            if model_info.get("architecture") is not None
-            else None
-        )
-        model_type = normalize_value(
-            model_info.get("architecture", {}).get("type", None)
-            if model_info.get("architecture") is not None
-            else None
-        )
-        family = normalize_value(
-            model_info.get("architecture", {}).get("family", None)
-            if model_info.get("architecture") is not None
-            else None
-        )
-        num_layers = normalize_value(
-            model_info.get("architecture", {}).get("num_layers", None)
-            if model_info.get("architecture") is not None
-            else None
-        )
-        hidden_size = normalize_value(
-            model_info.get("architecture", {}).get("hidden_size", None)
-            if model_info.get("architecture") is not None
-            else None
-        )
-        context_length = normalize_value(
-            model_info.get("architecture", {}).get("context_length", None)
-            if model_info.get("architecture") is not None
-            else None
-        )
-        torch_dtype = normalize_value(
-            model_info.get("architecture", {}).get("torch_dtype", None)
-            if model_info.get("architecture") is not None
-            else None
-        )
-        model_architecture = ModelArchitecture(
-            intermediate_size=normalize_value(
-                model_info.get("architecture", {}).get("intermediate_size", None)
-                if model_info.get("architecture") is not None
-                else None
-            ),
-            vocab_size=normalize_value(
-                model_info.get("architecture", {}).get("vocab_size", None)
-                if model_info.get("architecture") is not None
-                else None
-            ),
-            num_attention_heads=normalize_value(
-                model_info.get("architecture", {}).get("num_attention_heads", None)
-                if model_info.get("architecture") is not None
-                else None
-            ),
-            num_key_value_heads=normalize_value(
-                model_info.get("architecture", {}).get("num_key_value_heads", None)
-                if model_info.get("architecture") is not None
-                else None
-            ),
-            rope_scaling=normalize_value(
-                model_info.get("architecture", {}).get("rope_scaling", None)
-                if model_info.get("architecture") is not None
-                else None
-            ),
-            model_weights_size=normalize_value(
-                model_info.get("architecture", {}).get("model_weights_size", None)
-                if model_info.get("architecture") is not None
-                else None
-            ),
-            kv_cache_size=normalize_value(
-                model_info.get("architecture", {}).get("kv_cache_size", None)
-                if model_info.get("architecture") is not None
-                else None
-            ),
-        )
+
+        # Architecture
+        model_info_architecture = model_info.get("architecture", {})
+        if model_info_architecture is not None:
+            model_size = normalize_value(model_info_architecture.get("num_params", None))
+            model_type = normalize_value(model_info_architecture.get("type", None))
+            family = normalize_value(model_info_architecture.get("family", None))
+            model_weights_size = normalize_value(model_info_architecture.get("model_weights_size", None))
+            kv_cache_size = normalize_value(model_info_architecture.get("kv_cache_size", None))
+
+            # LLM Config
+            model_info_text_config = model_info_architecture.get("text_config", {})
+            if model_info_text_config is not None:
+                text_config = ModelArchitectureLLMConfig(
+                    num_layers=normalize_value(model_info_text_config.get("num_layers", None)),
+                    hidden_size=normalize_value(model_info_text_config.get("hidden_size", None)),
+                    intermediate_size=normalize_value(model_info_text_config.get("intermediate_size", None)),
+                    context_length=normalize_value(model_info_text_config.get("context_length", None)),
+                    vocab_size=normalize_value(model_info_text_config.get("vocab_size", None)),
+                    torch_dtype=normalize_value(model_info_text_config.get("torch_dtype", None)),
+                    num_attention_heads=normalize_value(model_info_text_config.get("num_attention_heads", None)),
+                    num_key_value_heads=normalize_value(model_info_text_config.get("num_key_value_heads", None)),
+                    rope_scaling=normalize_value(model_info_text_config.get("rope_scaling", None)),
+                )
+            else:
+                text_config = None
+
+            # Vision Config
+            model_info_vision_config = model_info_architecture.get("vision_config", {})
+            if model_info_vision_config is not None:
+                vision_config = ModelArchitectureVisionConfig(
+                    num_layers=normalize_value(model_info_vision_config.get("num_layers", None)),
+                    hidden_size=normalize_value(model_info_vision_config.get("hidden_size", None)),
+                    intermediate_size=normalize_value(model_info_vision_config.get("intermediate_size", None)),
+                    torch_dtype=normalize_value(model_info_vision_config.get("torch_dtype", None)),
+                )
+            else:
+                vision_config = None
+        else:
+            model_size = None
+            model_type = None
+            family = None
+            model_weights_size = None
+            kv_cache_size = None
+            text_config = None
+            vision_config = None
 
         # Get base model relation
         model_tree = model_info.get("model_tree", {})
@@ -1039,11 +1014,10 @@ class LocalModelWorkflowService(SessionMixin):
             base_model_relation=base_model_relation,
             model_type=model_type,
             family=family,
-            num_layers=num_layers,
-            hidden_size=hidden_size,
-            context_length=context_length,
-            torch_dtype=torch_dtype,
-            architecture=model_architecture,
+            model_weights_size=model_weights_size,
+            kv_cache_size=kv_cache_size,
+            architecture_text_config=text_config,
+            architecture_vision_config=vision_config,
         )
 
         # Create model
