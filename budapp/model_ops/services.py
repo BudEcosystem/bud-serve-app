@@ -887,8 +887,8 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Finalize model details
         model_description = normalize_value(model_info.get("description", None))
-        model_github_url = normalize_value(model_info.get("huggingface_url", None))
-        model_huggingface_url = normalize_value(model_info.get("huggingface_url", None))
+        model_github_url = normalize_value(model_info.get("github_url", None))
+        model_huggingface_url = normalize_value(model_info.get("provider_url", None))
         model_website_url = normalize_value(model_info.get("website_url", None))
         languages = normalize_value(model_info.get("languages", None))
         use_cases = normalize_value(model_info.get("use_cases", None))
