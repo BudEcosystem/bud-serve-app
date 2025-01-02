@@ -28,13 +28,6 @@ from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from ..commons.helpers import validate_icon
 
 
-def validate_icon_field(value: str | None) -> str | None:
-    """Utility function to validate the icon field."""
-    if value is not None and not validate_icon(value):
-        raise ValueError("invalid icon")
-    return value
-
-
 class ClusterBase(BaseModel):
     """Cluster base schema."""
 
@@ -178,7 +171,9 @@ class EditClusterRequest(BaseModel):
     @classmethod
     def icon_validate(cls, value: str | None) -> str | None:
         """Validate the icon."""
-        return validate_icon_field(value)
+        if value is not None and not validate_icon(value):
+            raise ValueError("invalid icon")
+        return value
 
 
 class SingleClusterResponse(SuccessResponse):

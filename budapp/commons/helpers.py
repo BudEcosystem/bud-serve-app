@@ -141,27 +141,57 @@ def validate_huggingface_repo_format(repo_id: str) -> bool:
     return True
 
 
-def validate_icon(icon: str = None) -> bool:
+def validate_icon(icon: str, raise_exception: bool = False) -> bool:
     """
-    Validates the icon based on the provided emoji or path.
+    Validates if the provided string is either an emoji or a valid path to an icon.
 
     Args:
-        emoji (str, optional): Emoji to validate.
-        path (str, optional): Relative path to validate.
+        icon (str): String to validate as emoji or path
+        raise_exception (bool, optional): If True, raises ValueError for invalid icons
 
     Returns:
-        bool: True if valid, False otherwise.
+        bool: True if valid emoji or existing path
+
+    Raises:
+        ValueError: If raise_exception is True and icon is invalid
     """
     from .config import app_settings
 
-    emoji_regex = re.compile(r"(\u00a9|\u00ae|[\u2000-\u3300]|[\U0001F300-\U0001F6FF]|[\U0001F900-\U0001F9FF])")
+    if not icon:
+        error_msg = "No icon provided"
+        logger.debug(error_msg)
+        if raise_exception:
+            raise ValueError(error_msg)
+        return False
 
-    if emoji_regex.fullmatch(icon):
-        logger.debug(f"icon validated: {icon}")
-        return True
-    elif os.path.exists(os.path.join(app_settings.static_dir, icon)):
-        logger.debug(f"icon validated: {icon}")
-        return True
-    else:
-        logger.debug(f"icon invalid: {icon}")
+    emoji_regex = re.compile(
+        r"["
+        r"\U0001F300-\U0001F64F"  # Emoticons
+        r"\U0001F680-\U0001F6FF"  # Transport & Map
+        r"\U0001F900-\U0001F9FF"  # Supplemental Symbols
+        r"\u2600-\u26FF"  # Misc Symbols
+        r"\u2700-\u27BF"  # Dingbats
+        r"]"
+    )
+    try:
+        if emoji_regex.fullmatch(icon):
+            logger.debug(f"Valid emoji icon: {icon}")
+            return True
+
+        icon_path = os.path.join(app_settings.static_dir, icon)
+        if os.path.exists(icon_path) and os.path.isfile(icon_path):
+            logger.debug(f"Valid file icon: {icon}")
+            return True
+
+        error_msg = f"Invalid icon: {icon}"
+        logger.debug(error_msg)
+        if raise_exception:
+            raise ValueError(error_msg)
+        return False
+
+    except Exception as e:
+        error_msg = f"Error validating icon: {e}"
+        logger.error(error_msg)
+        if raise_exception:
+            raise ValueError(error_msg)
         return False
