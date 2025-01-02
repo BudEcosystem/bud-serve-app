@@ -892,6 +892,8 @@ class LocalModelWorkflowService(SessionMixin):
         model_website_url = normalize_value(model_info.get("website_url", None))
         languages = normalize_value(model_info.get("languages", None))
         use_cases = normalize_value(model_info.get("use_cases", None))
+        strengths = normalize_value(model_info.get("strengths", None))
+        limitations = normalize_value(model_info.get("limitations", None))
         model_size = normalize_value(
             model_info.get("architecture", {}).get("num_params", None)
             if model_info.get("architecture") is not None
@@ -973,15 +975,6 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Dummy Values
         # TODO: remove this after implementing actual service
-        strengths = [
-            "Efficient processing of large-scale data with optimized memory usage",
-            "Fast inference time with efficient model architecture.",
-            "Scalable architecture suitable for various deployment scenarios",
-        ]
-        limitations = [
-            "Limited performance on out-of-distribution data",
-            "May produce inconsistent outputs for complex queries",
-        ]
         examples = [
             {
                 "prompt": "Explain the concept of machine learning in simple terms.",
