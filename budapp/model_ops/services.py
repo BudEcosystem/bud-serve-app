@@ -40,6 +40,7 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 from ..commons.constants import (
+    APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
     LICENSE_DIR,
     BaseModelRelationEnum,
@@ -137,7 +138,7 @@ class CloudModelWorkflowService(SessionMixin):
             workflow_type=WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING,
             title="Cloud Model Onboarding",
             total_steps=workflow_total_steps,
-            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+            icon=APP_ICONS["general"]["model_mono"],
             tag="Model Onboarding",
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
@@ -155,7 +156,13 @@ class CloudModelWorkflowService(SessionMixin):
             # Update icon on workflow
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
                 db_workflow,
-                {"icon": db_provider.icon},
+                {"icon": db_provider.icon, "title": db_provider.name},
+            )
+
+        if provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": "Cloud Model"},
             )
 
         if cloud_model_id:
@@ -688,7 +695,7 @@ class LocalModelWorkflowService(SessionMixin):
             workflow_type=WorkflowTypeEnum.LOCAL_MODEL_ONBOARDING,
             title="Local Model Onboarding",
             total_steps=workflow_total_steps,
-            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+            icon=APP_ICONS["general"]["model_mono"],
             tag="Model Onboarding",
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
@@ -723,10 +730,22 @@ class LocalModelWorkflowService(SessionMixin):
             )
             provider_id = db_provider.id
 
-            # Update icon on workflow
+            # Update icon, title on workflow
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
                 db_workflow,
-                {"icon": db_provider.icon},
+                {"icon": db_provider.icon, "title": "Huggingface Model"},
+            )
+        elif provider_type == ModelProviderTypeEnum.URL:
+            # Update icon, title on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"icon": APP_ICONS["general"]["model_mono"], "title": "URL"},
+            )
+        elif provider_type == ModelProviderTypeEnum.DISK:
+            # Update icon, title on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"icon": APP_ICONS["general"]["model_mono"], "title": "Disk"},
             )
 
         # Prepare workflow step data
@@ -1305,7 +1324,7 @@ class LocalModelWorkflowService(SessionMixin):
             workflow_type=WorkflowTypeEnum.MODEL_SECURITY_SCAN,
             title="Model Security Scan",
             total_steps=workflow_total_steps,
-            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+            icon=APP_ICONS["general"]["model_mono"],
             tag="Model Repository",
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
