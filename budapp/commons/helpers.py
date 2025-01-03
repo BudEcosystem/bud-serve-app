@@ -155,15 +155,14 @@ def validate_icon(icon: str) -> bool:
         ValueError: If raise_exception is True and icon is invalid
     """
     from .config import app_settings
+    from .constants import EMOJIS
 
     if not icon:
         logger.debug("No icon provided")
         return False
 
-    emoji_regex = re.compile(r"(\u00a9|\u00ae|[\u2000-\u3300]|[\U0001F300-\U0001F6FF]|[\U0001F900-\U0001F9FF])")
-
     try:
-        if emoji_regex.fullmatch(icon):
+        if icon in EMOJIS:
             logger.debug(f"Valid emoji icon: {icon}")
             return True
 
