@@ -1324,7 +1324,7 @@ class LocalModelWorkflowService(SessionMixin):
             workflow_type=WorkflowTypeEnum.MODEL_SECURITY_SCAN,
             title="Model Security Scan",
             total_steps=workflow_total_steps,
-            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+            icon=APP_ICONS["general"]["model_mono"],
             tag="Model Repository",
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
