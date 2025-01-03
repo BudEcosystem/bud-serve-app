@@ -141,13 +141,12 @@ def validate_huggingface_repo_format(repo_id: str) -> bool:
     return True
 
 
-def validate_icon(icon: str, raise_exception: bool = False) -> bool:
+def validate_icon(icon: str) -> bool:
     """
     Validates if the provided string is either an emoji or a valid path to an icon.
 
     Args:
         icon (str): String to validate as emoji or path
-        raise_exception (bool, optional): If True, raises ValueError for invalid icons
 
     Returns:
         bool: True if valid emoji or existing path
@@ -158,21 +157,11 @@ def validate_icon(icon: str, raise_exception: bool = False) -> bool:
     from .config import app_settings
 
     if not icon:
-        error_msg = "No icon provided"
-        logger.debug(error_msg)
-        if raise_exception:
-            raise ValueError(error_msg)
+        logger.debug("No icon provided")
         return False
 
-    emoji_regex = re.compile(
-        r"["
-        r"\U0001F300-\U0001F64F"  # Emoticons
-        r"\U0001F680-\U0001F6FF"  # Transport & Map
-        r"\U0001F900-\U0001F9FF"  # Supplemental Symbols
-        r"\u2600-\u26FF"  # Misc Symbols
-        r"\u2700-\u27BF"  # Dingbats
-        r"]"
-    )
+    emoji_regex = re.compile(r"(\u00a9|\u00ae|[\u2000-\u3300]|[\U0001F300-\U0001F6FF]|[\U0001F900-\U0001F9FF])")
+
     try:
         if emoji_regex.fullmatch(icon):
             logger.debug(f"Valid emoji icon: {icon}")
@@ -183,15 +172,9 @@ def validate_icon(icon: str, raise_exception: bool = False) -> bool:
             logger.debug(f"Valid file icon: {icon}")
             return True
 
-        error_msg = f"Invalid icon: {icon}"
-        logger.debug(error_msg)
-        if raise_exception:
-            raise ValueError(error_msg)
+        logger.debug(f"Invalid icon: {icon}")
         return False
 
     except Exception as e:
-        error_msg = f"Error validating icon: {e}"
-        logger.error(error_msg)
-        if raise_exception:
-            raise ValueError(error_msg)
+        logger.error(f"Error validating icon: {e}")
         return False
