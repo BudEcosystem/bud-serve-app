@@ -6,6 +6,7 @@ from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Ta
 from budapp.model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider
 
 from ..commons.constants import ModelProviderTypeEnum, WorkflowStatusEnum, WorkflowTypeEnum
+from ..commons.helpers import validate_icon
 
 
 class RetrieveWorkflowStepData(BaseModel):
@@ -104,3 +105,11 @@ class WorkflowUtilCreate(BaseModel):
     icon: str | None = None
     total_steps: int | None = None
     tag: str | None = None
+
+    @field_validator("icon", mode="before")
+    @classmethod
+    def icon_validate(cls, value: str | None) -> str | None:
+        """Validate the icon."""
+        if value is not None and not validate_icon(value):
+            raise ValueError("invalid icon")
+        return value
