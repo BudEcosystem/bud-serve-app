@@ -35,14 +35,6 @@ class ProjectBase(BaseModel):
     tags: List[Tag] | None = None
     icon: str | None = None
 
-    @field_validator("icon", mode="before")
-    @classmethod
-    def icon_validate(cls, value: str | None) -> str | None:
-        """Validate the icon."""
-        if value is not None and not validate_icon(value):
-            raise ValueError("invalid icon")
-        return value
-
 
 class EditProjectRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)

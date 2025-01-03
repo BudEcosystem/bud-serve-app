@@ -32,7 +32,6 @@ from budapp.commons.schemas import (
     PaginatedSuccessResponse,
     SuccessResponse,
 )
-from ..commons.helpers import validate_icon
 
 
 logger = logging.get_logger(__name__)
@@ -95,14 +94,6 @@ class NotificationContent(BaseModel):
     secondary_action: str | None = None
     icon: str | None = None
     tag: str | None = None
-
-    @field_validator("icon", mode="before")
-    @classmethod
-    def icon_validate(cls, value: str | None) -> str | None:
-        """Validate the icon."""
-        if value is not None and not validate_icon(value):
-            raise ValueError("invalid icon")
-        return value
 
 
 class NotificationPayload(BaseModel):
@@ -184,14 +175,6 @@ class ModelTemplateCreate(BaseModel):
             not isinstance(value, list) or len(value) != 2 or not all(isinstance(x, int) for x in value)
         ):
             raise ValueError("Must be a list of two integers")
-        return value
-
-    @field_validator("icon", mode="before")
-    @classmethod
-    def icon_validate(cls, value: str | None) -> str | None:
-        """Validate the icon."""
-        if value is not None and not validate_icon(value):
-            raise ValueError("invalid icon")
         return value
 
 

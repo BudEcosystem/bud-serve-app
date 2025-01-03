@@ -161,14 +161,6 @@ class Model(ModelBase):
     modified_at: datetime
     provider: Provider | None = None
 
-    @field_validator("icon", mode="before")
-    @classmethod
-    def icon_validate(cls, value: str | None) -> str | None:
-        """Validate the icon."""
-        if value is not None and not validate_icon(value):
-            raise ValueError("invalid icon")
-        return value
-
 
 class ModelArchitecture(BaseModel):
     """Model architecture schema."""

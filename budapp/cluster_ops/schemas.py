@@ -35,14 +35,6 @@ class ClusterBase(BaseModel):
     ingress_url: str
     icon: str
 
-    @field_validator("icon", mode="before")
-    @classmethod
-    def icon_validate(cls, value: str | None) -> str | None:
-        """Validate the icon."""
-        if value is not None and not validate_icon(value):
-            raise ValueError("invalid icon")
-        return value
-
 
 class ClusterCreate(ClusterBase):
     """Cluster create schema."""
@@ -60,6 +52,14 @@ class ClusterCreate(ClusterBase):
     created_by: UUID4
     cluster_id: UUID4
     status_sync_at: datetime
+
+    @field_validator("icon", mode="before")
+    @classmethod
+    def icon_validate(cls, value: str | None) -> str | None:
+        """Validate the icon."""
+        if value is not None and not validate_icon(value):
+            raise ValueError("invalid icon")
+        return value
 
 
 class ClusterResourcesInfo(BaseModel):
