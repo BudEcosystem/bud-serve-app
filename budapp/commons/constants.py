@@ -636,6 +636,9 @@ class NotificationStatus(Enum):
     FAILED = "FAILED"
     PENDING = "PENDING"
 
+APP_ICONS = {
+    "general": {"model_mono": "icons/general/model_mono.png", "cluster_mono": "icons/general/cluster_mono.png"}
+}
 
 EMOJIS = [
     "😀",
