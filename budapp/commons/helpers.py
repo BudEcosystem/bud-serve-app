@@ -16,11 +16,17 @@
 
 """Provides helper functions for the project."""
 
+import re
+import os
 from enum import Enum
 from typing import Dict, List, Optional, Union
 
+from budapp.commons import logging
+
 from huggingface_hub.utils import validate_repo_id
 from huggingface_hub.utils._validators import HFValidationError
+
+logger = logging.get_logger(__name__)
 
 
 def create_dynamic_enum(enum_name: str, enum_values: List[str]) -> Enum:
@@ -133,3 +139,42 @@ def validate_huggingface_repo_format(repo_id: str) -> bool:
         return False
 
     return True
+
+
+def validate_icon(icon: str) -> bool:
+    """
+    Validates if the provided string is either an emoji or a valid path to an icon.
+
+    Args:
+        icon (str): String to validate as emoji or path
+
+    Returns:
+        bool: True if valid emoji or existing path
+
+    Raises:
+        ValueError: If raise_exception is True and icon is invalid
+    """
+    from .config import app_settings
+
+    if not icon:
+        logger.debug("No icon provided")
+        return False
+
+    emoji_regex = re.compile(r"(\u00a9|\u00ae|[\u2000-\u3300]|[\U0001F300-\U0001F6FF]|[\U0001F900-\U0001F9FF])")
+
+    try:
+        if emoji_regex.fullmatch(icon):
+            logger.debug(f"Valid emoji icon: {icon}")
+            return True
+
+        icon_path = os.path.join(app_settings.static_dir, icon)
+        if os.path.exists(icon_path) and os.path.isfile(icon_path):
+            logger.debug(f"Valid file icon: {icon}")
+            return True
+
+        logger.debug(f"Invalid icon: {icon}")
+        return False
+
+    except Exception as e:
+        logger.error(f"Error validating icon: {e}")
+        return False

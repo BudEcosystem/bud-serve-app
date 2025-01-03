@@ -25,6 +25,7 @@ from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, Field, computed_f
 
 from budapp.commons.constants import ClusterStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
+from ..commons.helpers import validate_icon
 
 
 class ClusterBase(BaseModel):
@@ -165,6 +166,14 @@ class EditClusterRequest(BaseModel):
     def convert_url_to_string(cls, value: AnyHttpUrl | None) -> str | None:
         """Convert AnyHttpUrl to string."""
         return str(value) if value is not None else None
+
+    @field_validator("icon", mode="before")
+    @classmethod
+    def icon_validate(cls, value: str | None) -> str | None:
+        """Validate the icon."""
+        if value is not None and not validate_icon(value):
+            raise ValueError("invalid icon")
+        return value
 
 
 class SingleClusterResponse(SuccessResponse):
