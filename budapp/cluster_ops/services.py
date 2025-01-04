@@ -832,6 +832,7 @@ class ClusterService(SessionMixin):
         recommendations = payload.content.result.get("recommendations", [])
         bud_cluster_ids = [UUID(recommendation["cluster_id"]) for recommendation in recommendations]
         logger.debug(f"Found {len(bud_cluster_ids)} clusters from budsim")
+        logger.debug(f"bud cluster_ids from budsim: {bud_cluster_ids}")
 
         # Get active clusters by cluster ids
         _, db_active_clusters_count = await ClusterDataManager(self.session).get_active_clusters_by_cluster_ids(

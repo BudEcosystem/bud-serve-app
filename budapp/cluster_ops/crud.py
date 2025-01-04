@@ -119,6 +119,6 @@ class ClusterDataManager(DataManagerUtils):
         )
 
         count = self.execute_scalar(count_stmt)
-        result = self.execute_all(stmt)
+        result = self.scalars_all(stmt)
 
         return result, count
