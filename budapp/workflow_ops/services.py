@@ -22,7 +22,7 @@ from uuid import UUID
 from fastapi import status
 
 from budapp.commons import logging
-from budapp.commons.constants import BudServeWorkflowStepEventName, WorkflowStatusEnum
+from budapp.commons.constants import BudServeWorkflowStepEventName, WorkflowStatusEnum, WorkflowTypeEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.model_ops.crud import (
@@ -301,7 +301,22 @@ class WorkflowService(SessionMixin):
             logger.error("Unable to delete failed or completed workflow")
             raise ClientException("Workflow is not in progress state")
 
+        # Define success messages for different workflow types
+        WORKFLOW_DELETE_MESSAGES = {
+            WorkflowTypeEnum.MODEL_DEPLOYMENT: "Successfully cancelled model deployment.",
+            WorkflowTypeEnum.MODEL_SECURITY_SCAN: "Successfully cancelled model security scan.",
+            WorkflowTypeEnum.CLUSTER_ONBOARDING: "Successfully cancelled cluster onboarding.",
+            WorkflowTypeEnum.CLUSTER_DELETION: "Successfully cancelled cluster deletion.",
+            WorkflowTypeEnum.ENDPOINT_DELETION: "Successfully cancelled deployment deletion.",
+            WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
+            WorkflowTypeEnum.LOCAL_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
+        }
+        success_response = WORKFLOW_DELETE_MESSAGES.get(db_workflow.workflow_type, "Workflow deleted successfully")
+
+        # Delete workflow
         await WorkflowDataManager(self.session).delete_one(db_workflow)
+
+        return success_response
 
     async def get_all_active_workflows(
         self,

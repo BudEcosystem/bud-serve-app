@@ -208,11 +208,11 @@ async def delete_workflow(
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Delete workflow."""
     try:
-        await WorkflowService(session).delete_workflow(workflow_id, current_user.id)
+        success_response = await WorkflowService(session).delete_workflow(workflow_id, current_user.id)
         return SuccessResponse(
             code=status.HTTP_200_OK,
             object="workflow.delete",
-            message="Workflow deleted",
+            message=success_response,
         ).to_http_response()
     except ClientException as e:
         logger.exception(f"Failed to delete workflow: {e}")
