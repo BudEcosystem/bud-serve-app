@@ -16,17 +16,18 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the cluster ops."""
 
-from typing import List, Tuple, Dict
+from typing import Dict, List, Tuple
+from uuid import UUID
 
+from sqlalchemy import and_, func, select
+
+from budapp.cluster_ops.models import Cluster
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 
-from sqlalchemy import and_, desc, func, or_, select
-from sqlalchemy.orm import selectinload
-
-from budapp.cluster_ops.models import Cluster
-from ..endpoint_ops.models import Endpoint
 from ..commons.constants import ClusterStatusEnum, EndpointStatusEnum
+from ..endpoint_ops.models import Endpoint
+
 
 logger = logging.get_logger(__name__)
 
@@ -43,7 +44,6 @@ class ClusterDataManager(DataManagerUtils):
         search: bool = False,
     ) -> Tuple[List[Cluster], int]:
         """List all clusters from the database."""
-
         await self.validate_fields(Cluster, filters)
 
         # Subquery to count endpoints per cluster
@@ -105,6 +105,20 @@ class ClusterDataManager(DataManagerUtils):
             sort_conditions = await self.generate_sorting_stmt(Cluster, order_by)
             stmt = stmt.order_by(*sort_conditions)
 
+        result = self.execute_all(stmt)
+
+        return result, count
+
+    async def get_active_clusters_by_cluster_ids(self, cluster_ids: List[UUID]) -> List[Cluster]:
+        """Get active clusters by cluster ids."""
+        stmt = select(Cluster).filter(Cluster.cluster_id.in_(cluster_ids), Cluster.status != ClusterStatusEnum.DELETED)
+        count_stmt = (
+            select(func.count())
+            .select_from(Cluster)
+            .filter(Cluster.cluster_id.in_(cluster_ids), Cluster.status != ClusterStatusEnum.DELETED)
+        )
+
+        count = self.execute_scalar(count_stmt)
         result = self.execute_all(stmt)
 
         return result, count
