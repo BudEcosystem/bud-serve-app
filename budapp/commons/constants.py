@@ -512,6 +512,8 @@ class EndpointStatusEnum(StrEnum):
         DEPLOYING: Represents the deploying endpoint status.
         UNHEALTHY: Represents the unhealthy endpoint status.
         DELETING: Represents the deleting endpoint status.
+        DELETED: Represents the deleted endpoint status.
+        PENDING: Represents the pending endpoint status.
     """
 
     RUNNING = auto()
@@ -520,6 +522,7 @@ class EndpointStatusEnum(StrEnum):
     UNHEALTHY = auto()
     DELETING = auto()
     DELETED = auto()
+    PENDING = auto()
 
 
 class ModelTemplateTypeEnum(StrEnum):
