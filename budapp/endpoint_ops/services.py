@@ -344,11 +344,20 @@ class EndpointService(SessionMixin):
         await BudNotifyService().send_notification(notification_request)
 
         # Create request to trigger endpoint status update periodic task
-        await self._perform_endpoint_status_update_request(db_endpoint.bud_cluster_id, db_endpoint.namespace)
+        if db_endpoint.model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            is_cloud_model = True
+        else:
+            is_cloud_model = False
+
+        await self._perform_endpoint_status_update_request(
+            db_endpoint.bud_cluster_id, db_endpoint.namespace, is_cloud_model
+        )
 
         return db_endpoint
 
-    async def _perform_endpoint_status_update_request(self, cluster_id: UUID, namespace: str) -> Dict:
+    async def _perform_endpoint_status_update_request(
+        self, cluster_id: UUID, namespace: str, is_cloud_model: bool
+    ) -> Dict:
         """Perform update endpoint status request to bud_cluster app.
 
         Args:
@@ -362,6 +371,7 @@ class EndpointService(SessionMixin):
             payload = {
                 "deployment_name": namespace,
                 "cluster_id": str(cluster_id),
+                "cloud_model": is_cloud_model,
             }
             logger.debug(
                 f"Performing update endpoint status request. payload: {payload}, endpoint: {update_cluster_endpoint}"
@@ -426,10 +436,12 @@ class EndpointService(SessionMixin):
         Returns:
             EndpointStatusEnum: The endpoint status.
         """
-        if status == "Ingress Unhealthy":
-            return EndpointStatusEnum.UNHEALTHY
-        elif status == "Deployment healthy":
+        if status == "ready":
             return EndpointStatusEnum.RUNNING
+        elif status == "pending":
+            return EndpointStatusEnum.PENDING
+        elif status == "ingress_failed" or status == "failed":
+            return EndpointStatusEnum.UNHEALTHY
         else:
             logger.error(f"Unknown endpoint status: {status}")
             raise ClientException(f"Unknown endpoint status: {status}")
