@@ -636,6 +636,7 @@ class NotificationStatus(Enum):
     FAILED = "FAILED"
     PENDING = "PENDING"
 
+
 APP_ICONS = {
     "general": {"model_mono": "icons/general/model_mono.png", "cluster_mono": "icons/general/cluster_mono.png"}
 }
@@ -2135,8 +2136,8 @@ EMOJIS = [
     "©️",
     "®️",
     "™️",
-    "\#️⃣",
-    "\*️⃣",
+    r"\#️⃣",
+    r"\*️⃣",
     "0️⃣",
     "1️⃣",
     "2️⃣",
@@ -2491,3 +2492,14 @@ EMOJIS = [
     "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
     "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
 ]
+
+# Define success messages for different workflow types
+WORKFLOW_DELETE_MESSAGES = {
+    WorkflowTypeEnum.MODEL_DEPLOYMENT: "Successfully cancelled model deployment.",
+    WorkflowTypeEnum.MODEL_SECURITY_SCAN: "Successfully cancelled model security scan.",
+    WorkflowTypeEnum.CLUSTER_ONBOARDING: "Successfully cancelled cluster onboarding.",
+    WorkflowTypeEnum.CLUSTER_DELETION: "Successfully cancelled cluster deletion.",
+    WorkflowTypeEnum.ENDPOINT_DELETION: "Successfully cancelled deployment deletion.",
+    WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
+    WorkflowTypeEnum.LOCAL_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
+}
