@@ -49,7 +49,7 @@ from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
-from ..workflow_ops.services import WorkflowService
+from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .crud import EndpointDataManager
 from .models import Endpoint as EndpointModel
 from .schemas import EndpointCreate
@@ -328,18 +328,23 @@ class EndpointService(SessionMixin):
         )
         logger.debug(f"Endpoint created successfully: {db_endpoint.id}")
 
+        # Update endpoint details as next step
+        # Update current step number
+        current_step_number = db_workflow.current_step + 1
+        workflow_current_step = current_step_number
+
+        # Update or create next workflow step
+        endpoint_details = payload.content.result
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, endpoint_details
+        )
+        logger.debug(f"Upsert workflow step {db_workflow_step.id} for storing endpoint details")
+
         # Mark workflow as completed
         logger.debug(f"Marking workflow as completed: {workflow_id}")
-        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
-
-        # Get latest workflow step
-        latest_workflow_step = db_workflow_steps[-1]
-        latest_workflow_step_data = latest_workflow_step.data
-        latest_workflow_step_data["endpoint_details"] = payload.content.result
-        await WorkflowStepDataManager(self.session).update_by_fields(
-            latest_workflow_step, {"data": latest_workflow_step_data}
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
         )
-        logger.debug("Updated latest workflow step with endpoint details")
 
         # Send notification to workflow creator
         model_icon = await ModelServiceUtil(self.session).get_model_icon(db_endpoint.model)
