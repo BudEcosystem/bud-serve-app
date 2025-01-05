@@ -334,7 +334,7 @@ class EndpointService(SessionMixin):
         workflow_current_step = current_step_number
 
         # Update or create next workflow step
-        endpoint_details = payload.content.result
+        endpoint_details = {"endpoint_details": payload.content.result}
         db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
             db_workflow.id, current_step_number, endpoint_details
         )
