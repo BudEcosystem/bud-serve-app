@@ -336,6 +336,7 @@ class EndpointService(SessionMixin):
         latest_workflow_step = db_workflow_steps[-1]
         latest_workflow_step_data = latest_workflow_step.data
         latest_workflow_step_data["endpoint_details"] = payload.content.result
+        self.session.refresh(latest_workflow_step)
         await WorkflowStepDataManager(self.session).update_by_fields(
             latest_workflow_step, {"data": latest_workflow_step_data}
         )
