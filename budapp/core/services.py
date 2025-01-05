@@ -99,8 +99,8 @@ class NotificationService(SessionMixin):
         # Create endpoint when deployment is completed
         if (
             payload.content.status == "COMPLETED"
+            and payload.content.title == "Performance benchmark successful"
             and payload.content.result
-            and isinstance(payload.content.result, dict)
             and "result" in payload.content.result
         ):
             await EndpointService(self.session).create_endpoint_from_notification_event(payload)

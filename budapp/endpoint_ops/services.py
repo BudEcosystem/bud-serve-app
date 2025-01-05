@@ -332,6 +332,15 @@ class EndpointService(SessionMixin):
         logger.debug(f"Marking workflow as completed: {workflow_id}")
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
 
+        # Get latest workflow step
+        latest_workflow_step = db_workflow_steps[-1]
+        latest_workflow_step_data = latest_workflow_step.data
+        latest_workflow_step_data["endpoint_details"] = payload.content.result
+        await WorkflowStepDataManager(self.session).update_by_fields(
+            latest_workflow_step, {"data": latest_workflow_step_data}
+        )
+        logger.debug("Updated latest workflow step with endpoint details")
+
         # Send notification to workflow creator
         model_icon = await ModelServiceUtil(self.session).get_model_icon(db_endpoint.model)
         notification_request = (
@@ -344,10 +353,7 @@ class EndpointService(SessionMixin):
         await BudNotifyService().send_notification(notification_request)
 
         # Create request to trigger endpoint status update periodic task
-        if db_endpoint.model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
-            is_cloud_model = True
-        else:
-            is_cloud_model = False
+        is_cloud_model = db_endpoint.model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL
 
         await self._perform_endpoint_status_update_request(
             db_endpoint.bud_cluster_id, db_endpoint.namespace, is_cloud_model
