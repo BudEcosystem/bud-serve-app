@@ -105,11 +105,3 @@ class WorkflowUtilCreate(BaseModel):
     icon: str | None = None
     total_steps: int | None = None
     tag: str | None = None
-
-    @field_validator("icon", mode="before")
-    @classmethod
-    def icon_validate(cls, value: str | None) -> str | None:
-        """Validate the icon."""
-        if value is not None and not validate_icon(value):
-            raise ValueError("invalid icon")
-        return value
