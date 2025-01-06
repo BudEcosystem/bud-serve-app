@@ -390,7 +390,6 @@ class DataManagerUtils(SQLAlchemyMixin):
             conditions = []
             for field_name, value in fields.items():
                 field = getattr(model, field_name)
-                logger.info(f"srting conditions: {field}, {field.type}")
                 if isinstance(field.type, SqlAlchemyString):
                     # NOTE: didn't use ilike because of escape character issue
                     conditions.append(func.lower(cast(field, SqlAlchemyString)) == func.lower(value))
