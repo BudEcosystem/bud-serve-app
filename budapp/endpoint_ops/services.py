@@ -49,7 +49,7 @@ from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
-from ..workflow_ops.services import WorkflowService
+from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .crud import EndpointDataManager
 from .models import Endpoint as EndpointModel
 from .schemas import EndpointCreate
@@ -328,9 +328,23 @@ class EndpointService(SessionMixin):
         )
         logger.debug(f"Endpoint created successfully: {db_endpoint.id}")
 
+        # Update endpoint details as next step
+        # Update current step number
+        current_step_number = db_workflow.current_step + 1
+        workflow_current_step = current_step_number
+
+        # Update or create next workflow step
+        endpoint_details = {"endpoint_details": payload.content.result}
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, endpoint_details
+        )
+        logger.debug(f"Upsert workflow step {db_workflow_step.id} for storing endpoint details")
+
         # Mark workflow as completed
         logger.debug(f"Marking workflow as completed: {workflow_id}")
-        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
+        )
 
         # Send notification to workflow creator
         model_icon = await ModelServiceUtil(self.session).get_model_icon(db_endpoint.model)
@@ -344,11 +358,17 @@ class EndpointService(SessionMixin):
         await BudNotifyService().send_notification(notification_request)
 
         # Create request to trigger endpoint status update periodic task
-        await self._perform_endpoint_status_update_request(db_endpoint.bud_cluster_id, db_endpoint.namespace)
+        is_cloud_model = db_endpoint.model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL
+
+        await self._perform_endpoint_status_update_request(
+            db_endpoint.bud_cluster_id, db_endpoint.namespace, is_cloud_model
+        )
 
         return db_endpoint
 
-    async def _perform_endpoint_status_update_request(self, cluster_id: UUID, namespace: str) -> Dict:
+    async def _perform_endpoint_status_update_request(
+        self, cluster_id: UUID, namespace: str, is_cloud_model: bool
+    ) -> Dict:
         """Perform update endpoint status request to bud_cluster app.
 
         Args:
@@ -362,6 +382,7 @@ class EndpointService(SessionMixin):
             payload = {
                 "deployment_name": namespace,
                 "cluster_id": str(cluster_id),
+                "cloud_model": is_cloud_model,
             }
             logger.debug(
                 f"Performing update endpoint status request. payload: {payload}, endpoint: {update_cluster_endpoint}"
@@ -426,10 +447,12 @@ class EndpointService(SessionMixin):
         Returns:
             EndpointStatusEnum: The endpoint status.
         """
-        if status == "Ingress Unhealthy":
-            return EndpointStatusEnum.UNHEALTHY
-        elif status == "Deployment healthy":
+        if status == "ready":
             return EndpointStatusEnum.RUNNING
+        elif status == "pending":
+            return EndpointStatusEnum.PENDING
+        elif status == "ingress_failed" or status == "failed":
+            return EndpointStatusEnum.UNHEALTHY
         else:
             logger.error(f"Unknown endpoint status: {status}")
             raise ClientException(f"Unknown endpoint status: {status}")

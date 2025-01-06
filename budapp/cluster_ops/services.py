@@ -40,6 +40,7 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 from ..commons.constants import (
+    APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
     BudServeWorkflowStepEventName,
     ClusterStatusEnum,
@@ -142,7 +143,7 @@ class ClusterService(SessionMixin):
             workflow_type=WorkflowTypeEnum.CLUSTER_ONBOARDING,
             title="Cluster Onboarding",
             total_steps=workflow_total_steps,
-            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+            icon=APP_ICONS["general"]["cluster_mono"],
             tag="Cluster Onboarding",
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
@@ -825,12 +826,29 @@ class ClusterService(SessionMixin):
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
             Model, {"id": required_data["model_id"], "status": ModelStatusEnum.ACTIVE}, missing_ok=True
         )
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
+
+        # Get bud cluster ids from recommendations
+        recommendations = payload.content.result.get("recommendations", [])
+        bud_cluster_ids = [UUID(recommendation["cluster_id"]) for recommendation in recommendations]
+        logger.debug(f"Found {len(bud_cluster_ids)} clusters from budsim")
+        logger.debug(f"bud cluster_ids from budsim: {bud_cluster_ids}")
+
+        # Get active clusters by cluster ids
+        _, db_active_clusters_count = await ClusterDataManager(self.session).get_active_clusters_by_cluster_ids(
+            bud_cluster_ids
+        )
+        logger.debug(f"Found {db_active_clusters_count} active clusters from db")
+
+        if db_active_clusters_count == 0:
+            message = "Found 0 Clusters"
+        else:
+            message = f"Found Top {db_active_clusters_count} Clusters"
 
         # Send notification to workflow creator
-        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
         notification_request = (
             NotificationBuilder()
-            .set_content(title=db_model.name, message=payload.content.message, icon=model_icon)
+            .set_content(title=db_model.name, message=message, icon=model_icon)
             .set_payload(workflow_id=str(db_workflow.id))
             .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
             .build()

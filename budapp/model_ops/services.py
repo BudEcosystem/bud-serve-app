@@ -40,6 +40,7 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 from ..commons.constants import (
+    APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
     LICENSE_DIR,
     BaseModelRelationEnum,
@@ -79,7 +80,8 @@ from .schemas import (
     CreateLocalModelWorkflowSteps,
     LocalModelScanRequest,
     LocalModelScanWorkflowStepData,
-    ModelArchitecture,
+    ModelArchitectureLLMConfig,
+    ModelArchitectureVisionConfig,
     ModelCreate,
     ModelDetailSuccessResponse,
     ModelIssue,
@@ -136,7 +138,7 @@ class CloudModelWorkflowService(SessionMixin):
             workflow_type=WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING,
             title="Cloud Model Onboarding",
             total_steps=workflow_total_steps,
-            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+            icon=APP_ICONS["general"]["model_mono"],
             tag="Model Onboarding",
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
@@ -154,7 +156,13 @@ class CloudModelWorkflowService(SessionMixin):
             # Update icon on workflow
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
                 db_workflow,
-                {"icon": db_provider.icon},
+                {"icon": db_provider.icon, "title": db_provider.name},
+            )
+
+        if provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": "Cloud Model"},
             )
 
         if cloud_model_id:
@@ -687,7 +695,7 @@ class LocalModelWorkflowService(SessionMixin):
             workflow_type=WorkflowTypeEnum.LOCAL_MODEL_ONBOARDING,
             title="Local Model Onboarding",
             total_steps=workflow_total_steps,
-            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+            icon=APP_ICONS["general"]["model_mono"],
             tag="Model Onboarding",
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
@@ -722,10 +730,22 @@ class LocalModelWorkflowService(SessionMixin):
             )
             provider_id = db_provider.id
 
-            # Update icon on workflow
+            # Update icon, title on workflow
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
                 db_workflow,
-                {"icon": db_provider.icon},
+                {"icon": db_provider.icon, "title": "Huggingface Model"},
+            )
+        elif provider_type == ModelProviderTypeEnum.URL:
+            # Update icon, title on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"icon": APP_ICONS["general"]["model_mono"], "title": "URL"},
+            )
+        elif provider_type == ModelProviderTypeEnum.DISK:
+            # Update icon, title on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"icon": APP_ICONS["general"]["model_mono"], "title": "Disk"},
             )
 
         # Prepare workflow step data
@@ -887,101 +907,76 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Finalize model details
         model_description = normalize_value(model_info.get("description", None))
-        model_github_url = normalize_value(model_info.get("huggingface_url", None))
-        model_huggingface_url = normalize_value(model_info.get("huggingface_url", None))
+        model_github_url = normalize_value(model_info.get("github_url", None))
+        model_huggingface_url = normalize_value(model_info.get("provider_url", None))
         model_website_url = normalize_value(model_info.get("website_url", None))
         languages = normalize_value(model_info.get("languages", None))
         use_cases = normalize_value(model_info.get("use_cases", None))
-        model_size = normalize_value(
-            model_info.get("architecture", {}).get("num_params", None)
-            if model_info.get("architecture") is not None
-            else None
-        )
-        model_type = normalize_value(
-            model_info.get("architecture", {}).get("type", None)
-            if model_info.get("architecture") is not None
-            else None
-        )
-        family = normalize_value(
-            model_info.get("architecture", {}).get("family", None)
-            if model_info.get("architecture") is not None
-            else None
-        )
-        num_layers = normalize_value(
-            model_info.get("architecture", {}).get("num_layers", None)
-            if model_info.get("architecture") is not None
-            else None
-        )
-        hidden_size = normalize_value(
-            model_info.get("architecture", {}).get("hidden_size", None)
-            if model_info.get("architecture") is not None
-            else None
-        )
-        context_length = normalize_value(
-            model_info.get("architecture", {}).get("context_length", None)
-            if model_info.get("architecture") is not None
-            else None
-        )
-        torch_dtype = normalize_value(
-            model_info.get("architecture", {}).get("torch_dtype", None)
-            if model_info.get("architecture") is not None
-            else None
-        )
-        model_architecture = ModelArchitecture(
-            intermediate_size=normalize_value(
-                model_info.get("architecture", {}).get("intermediate_size", None)
-                if model_info.get("architecture") is not None
-                else None
-            ),
-            vocab_size=normalize_value(
-                model_info.get("architecture", {}).get("vocab_size", None)
-                if model_info.get("architecture") is not None
-                else None
-            ),
-            num_attention_heads=normalize_value(
-                model_info.get("architecture", {}).get("num_attention_heads", None)
-                if model_info.get("architecture") is not None
-                else None
-            ),
-            num_key_value_heads=normalize_value(
-                model_info.get("architecture", {}).get("num_key_value_heads", None)
-                if model_info.get("architecture") is not None
-                else None
-            ),
-            rope_scaling=normalize_value(
-                model_info.get("architecture", {}).get("rope_scaling", None)
-                if model_info.get("architecture") is not None
-                else None
-            ),
-            model_weights_size=normalize_value(
-                model_info.get("architecture", {}).get("model_weights_size", None)
-                if model_info.get("architecture") is not None
-                else None
-            ),
-            kv_cache_size=normalize_value(
-                model_info.get("architecture", {}).get("kv_cache_size", None)
-                if model_info.get("architecture") is not None
-                else None
-            ),
-        )
+        strengths = normalize_value(model_info.get("strengths", None))
+        limitations = normalize_value(model_info.get("limitations", None))
+
+        # Architecture
+        model_info_architecture = model_info.get("architecture", {})
+        if model_info_architecture is not None:
+            model_size = normalize_value(model_info_architecture.get("num_params", None))
+            model_type = normalize_value(model_info_architecture.get("type", None))
+            family = normalize_value(model_info_architecture.get("family", None))
+            model_weights_size = normalize_value(model_info_architecture.get("model_weights_size", None))
+            kv_cache_size = normalize_value(model_info_architecture.get("kv_cache_size", None))
+
+            # LLM Config
+            model_info_text_config = model_info_architecture.get("text_config", {})
+            if model_info_text_config is not None:
+                text_config = ModelArchitectureLLMConfig(
+                    num_layers=normalize_value(model_info_text_config.get("num_layers", None)),
+                    hidden_size=normalize_value(model_info_text_config.get("hidden_size", None)),
+                    intermediate_size=normalize_value(model_info_text_config.get("intermediate_size", None)),
+                    context_length=normalize_value(model_info_text_config.get("context_length", None)),
+                    vocab_size=normalize_value(model_info_text_config.get("vocab_size", None)),
+                    torch_dtype=normalize_value(model_info_text_config.get("torch_dtype", None)),
+                    num_attention_heads=normalize_value(model_info_text_config.get("num_attention_heads", None)),
+                    num_key_value_heads=normalize_value(model_info_text_config.get("num_key_value_heads", None)),
+                    rope_scaling=normalize_value(model_info_text_config.get("rope_scaling", None)),
+                )
+            else:
+                text_config = None
+
+            # Vision Config
+            model_info_vision_config = model_info_architecture.get("vision_config", {})
+            if model_info_vision_config is not None:
+                vision_config = ModelArchitectureVisionConfig(
+                    num_layers=normalize_value(model_info_vision_config.get("num_layers", None)),
+                    hidden_size=normalize_value(model_info_vision_config.get("hidden_size", None)),
+                    intermediate_size=normalize_value(model_info_vision_config.get("intermediate_size", None)),
+                    torch_dtype=normalize_value(model_info_vision_config.get("torch_dtype", None)),
+                )
+            else:
+                vision_config = None
+        else:
+            model_size = None
+            model_type = None
+            family = None
+            model_weights_size = None
+            kv_cache_size = None
+            text_config = None
+            vision_config = None
+
+        # Get base model relation
+        model_tree = model_info.get("model_tree", {})
+        base_model_relation = await self.get_base_model_relation(model_tree)
 
         # Sanitize base model
-        base_model = model_info.get("model_tree", {}).get("base_model", [])
+        base_model = model_tree.get("base_model", [])
         if base_model is not None and len(base_model) > 0:
             base_model = base_model[0]
         base_model = normalize_value(base_model)
 
+        # If base model is the same as the model uri, set base model to None
+        if required_data["uri"] == base_model:
+            base_model = None
+
         # Dummy Values
         # TODO: remove this after implementing actual service
-        strengths = [
-            "Efficient processing of large-scale data with optimized memory usage",
-            "Fast inference time with efficient model architecture.",
-            "Scalable architecture suitable for various deployment scenarios",
-        ]
-        limitations = [
-            "Limited performance on out-of-distribution data",
-            "May produce inconsistent outputs for complex queries",
-        ]
         examples = [
             {
                 "prompt": "Explain the concept of machine learning in simple terms.",
@@ -997,12 +992,6 @@ class LocalModelWorkflowService(SessionMixin):
             },
         ]
         minimum_requirements = {"device_name": "Xenon Dev", "core": 3, "memory": "32 GB", "RAM": "32 GB"}
-        base_model_relation = BaseModelRelationEnum.ADAPTER
-
-        # Base model, Base model relation, fields will be none for base models
-        if required_data["uri"] == base_model:
-            base_model = None
-            base_model_relation = None
 
         # Set provider id and icon
         provider_id = None
@@ -1044,11 +1033,10 @@ class LocalModelWorkflowService(SessionMixin):
             base_model_relation=base_model_relation,
             model_type=model_type,
             family=family,
-            num_layers=num_layers,
-            hidden_size=hidden_size,
-            context_length=context_length,
-            torch_dtype=torch_dtype,
-            architecture=model_architecture,
+            model_weights_size=model_weights_size,
+            kv_cache_size=kv_cache_size,
+            architecture_text_config=text_config,
+            architecture_vision_config=vision_config,
         )
 
         # Create model
@@ -1289,17 +1277,6 @@ class LocalModelWorkflowService(SessionMixin):
         license_name = normalize_value(extracted_license.get("name"))
         license_url = normalize_value(extracted_license.get("url"))
         license_faqs = normalize_value(extracted_license.get("faqs"))
-        # TODO: Remove when faqs are implemented
-        license_faqs = [
-            {
-                "answer": True,
-                "question": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-            },
-            {
-                "answer": False,
-                "question": "Bud Studio Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-            },
-        ]
         license_data = ModelLicensesCreate(
             name=license_name,
             url=license_url,
@@ -1309,6 +1286,27 @@ class LocalModelWorkflowService(SessionMixin):
         return await ModelLicensesDataManager(self.session).insert_one(
             ModelLicenses(**license_data.model_dump(exclude_none=True))
         )
+
+    @staticmethod
+    async def get_base_model_relation(model_tree: dict) -> Optional[BaseModelRelationEnum]:
+        """Get base model relation.
+
+        Args:
+            model_tree (dict): Model tree.
+
+        Returns:
+            Optional[BaseModelRelationEnum]: Base model relation.
+        """
+        if model_tree.get("is_finetune"):
+            return BaseModelRelationEnum.FINETUNE
+        elif model_tree.get("is_adapter"):
+            return BaseModelRelationEnum.ADAPTER
+        elif model_tree.get("is_quantization"):
+            return BaseModelRelationEnum.QUANTIZED
+        elif model_tree.get("is_merge"):
+            return BaseModelRelationEnum.MERGE
+        else:
+            return None
 
     async def scan_local_model_workflow(self, current_user_id: UUID, request: LocalModelScanRequest) -> WorkflowModel:
         """Scan a local model."""
@@ -1326,7 +1324,7 @@ class LocalModelWorkflowService(SessionMixin):
             workflow_type=WorkflowTypeEnum.MODEL_SECURITY_SCAN,
             title="Model Security Scan",
             total_steps=workflow_total_steps,
-            icon="icons/providers/openai.png",  # TODO: Replace this icon when UI is ready
+            icon=APP_ICONS["general"]["model_mono"],
             tag="Model Repository",
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(

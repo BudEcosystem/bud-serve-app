@@ -76,7 +76,8 @@ class NotificationService(SessionMixin):
         # Send number of recommended cluster as notification
         if (
             payload.content.status == "COMPLETED"
-            and payload.content.title == "Ranked the clusters based on performance"
+            and payload.content.title == "Deployment Recommendation Results"
+            and payload.content.result
         ):
             await ClusterService(self.session)._notify_recommended_cluster_from_notification_event(payload)
 
@@ -98,8 +99,8 @@ class NotificationService(SessionMixin):
         # Create endpoint when deployment is completed
         if (
             payload.content.status == "COMPLETED"
+            and payload.content.title == "Performance benchmark successful"
             and payload.content.result
-            and isinstance(payload.content.result, dict)
             and "result" in payload.content.result
         ):
             await EndpointService(self.session).create_endpoint_from_notification_event(payload)
