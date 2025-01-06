@@ -583,9 +583,6 @@ class ClusterService(SessionMixin):
                 title=db_cluster.name,
                 message="Cluster Deleted",
                 icon=db_cluster.icon,
-                result=NotificationResult(target_id=db_cluster.id, target_type="cluster").model_dump(
-                    exclude_none=True, exclude_unset=True
-                ),
             )
             .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.CLUSTER_DELETION_SUCCESS.value)
             .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
