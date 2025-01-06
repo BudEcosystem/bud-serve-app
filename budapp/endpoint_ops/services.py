@@ -251,8 +251,15 @@ class EndpointService(SessionMixin):
         model_icon = await ModelServiceUtil(self.session).get_model_icon(db_endpoint.model)
         notification_request = (
             NotificationBuilder()
-            .set_content(title=db_endpoint.name, message="Deployment Deleted", icon=model_icon)
-            .set_payload(workflow_id=str(db_workflow.id))
+            .set_content(
+                title=db_endpoint.name,
+                message="Deployment Deleted",
+                icon=model_icon,
+                result=NotificationResult(target_id=db_endpoint.project.id, target_type="project").model_dump(
+                    exclude_none=True, exclude_unset=True
+                ),
+            )
+            .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.DEPLOYMENT_DELETION_SUCCESS.value)
             .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
             .build()
         )

@@ -46,9 +46,11 @@ from ..commons.constants import (
     ClusterStatusEnum,
     EndpointStatusEnum,
     ModelStatusEnum,
+    NotificationTypeEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
+from ..core.schemas import NotificationResult
 from ..model_ops.crud import ModelDataManager
 from ..model_ops.models import Model
 from ..model_ops.services import ModelServiceUtil
@@ -504,8 +506,17 @@ class ClusterService(SessionMixin):
             # Send notification to workflow creator
             notification_request = (
                 NotificationBuilder()
-                .set_content(title=db_cluster.name, message="Cluster is onboarded", icon=db_cluster.icon)
-                .set_payload(workflow_id=str(db_workflow.id))
+                .set_content(
+                    title=db_cluster.name,
+                    message="Cluster is onboarded",
+                    icon=db_cluster.icon,
+                    result=NotificationResult(target_id=db_cluster.id, target_type="cluster").model_dump(
+                        exclude_none=True, exclude_unset=True
+                    ),
+                )
+                .set_payload(
+                    workflow_id=str(db_workflow.id), type=NotificationTypeEnum.CLUSTER_ONBOARDING_SUCCESS.value
+                )
                 .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
                 .build()
             )
@@ -568,8 +579,12 @@ class ClusterService(SessionMixin):
         # Send notification to workflow creator
         notification_request = (
             NotificationBuilder()
-            .set_content(title=db_cluster.name, message="Cluster Deleted", icon=db_cluster.icon)
-            .set_payload(workflow_id=str(db_workflow.id))
+            .set_content(
+                title=db_cluster.name,
+                message="Cluster Deleted",
+                icon=db_cluster.icon,
+            )
+            .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.CLUSTER_DELETION_SUCCESS.value)
             .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
             .build()
         )
@@ -848,8 +863,15 @@ class ClusterService(SessionMixin):
         # Send notification to workflow creator
         notification_request = (
             NotificationBuilder()
-            .set_content(title=db_model.name, message=message, icon=model_icon)
-            .set_payload(workflow_id=str(db_workflow.id))
+            .set_content(
+                title=db_model.name,
+                message=message,
+                icon=model_icon,
+                result=NotificationResult(target_id=db_workflow.id, target_type="workflow").model_dump(
+                    exclude_none=True, exclude_unset=True
+                ),
+            )
+            .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.RECOMMENDED_CLUSTER_SUCCESS.value)
             .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
             .build()
         )
