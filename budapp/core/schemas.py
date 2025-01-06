@@ -17,7 +17,7 @@
 
 """Contains core Pydantic schemas used for data validation and serialization within the core services."""
 
-from typing import Any, Dict, List, Optional, Self, Union
+from typing import Any, Dict, List, Literal, Optional, Self, Union
 
 from pydantic import UUID4, BaseModel, ConfigDict, field_validator, model_validator
 
@@ -182,3 +182,10 @@ class ModelTemplateUpdate(ModelTemplateCreate):
     """Model template update schema."""
 
     pass
+
+
+class NotificationResult(BaseModel):
+    """Notification result schema."""
+
+    target_type: Literal["model", "cluster", "endpoint", "project", "workflow", "user"] | None = None
+    target_id: UUID4 | None = None
