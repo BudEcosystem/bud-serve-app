@@ -16,13 +16,17 @@
 
 """Provides shared functions for managing notification service."""
 
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import aiohttp
 
 from ..commons import logging
 from ..commons.config import app_settings
-from ..commons.constants import BUD_NOTIFICATION_WORKFLOW, NotificationCategory, NotificationStatus
+from ..commons.constants import (
+    BUD_NOTIFICATION_WORKFLOW,
+    NotificationCategory,
+    NotificationStatus,
+)
 from ..core.schemas import NotificationContent, NotificationPayload, NotificationRequest
 
 
@@ -45,22 +49,26 @@ class NotificationBuilder:
         message: Optional[str] = None,
         icon: Optional[str] = None,
         tag: Optional[str] = None,
+        result: Optional[Dict[str, Any]] = None,
         status: NotificationStatus = NotificationStatus.COMPLETED,
     ) -> "NotificationBuilder":
         """Set the content for the notification."""
-        self.content = NotificationContent(title=title, message=message, icon=icon, tag=tag, status=status)
+        self.content = NotificationContent(
+            title=title, message=message, icon=icon, tag=tag, status=status, result=result
+        )
         return self
 
     def set_payload(
         self,
         *,
         category: NotificationCategory = NotificationCategory.INAPP,
+        type: str = None,
         source: str = app_settings.source_topic,
         workflow_id: str = None,
     ) -> "NotificationBuilder":
         """Set the payload for the notification."""
         self.payload = NotificationPayload(
-            category=category, source=source, content=self.content, workflow_id=workflow_id
+            category=category, type=type, source=source, content=self.content, workflow_id=workflow_id
         )
         return self
 

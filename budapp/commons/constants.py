@@ -2506,3 +2506,28 @@ WORKFLOW_DELETE_MESSAGES = {
     WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
     WorkflowTypeEnum.LOCAL_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
 }
+
+
+# Notification types
+class NotificationTypeEnum(StrEnum):
+    """Notification types.
+
+    Attributes:
+        DEPLOYMENT_SUCCESS: Represents the deployment success notification.
+        MODEL_ONBOARDING_SUCCESS: Represents the model onboarding success notification.
+        CLUSTER_ONBOARDING_SUCCESS: Represents the cluster onboarding success notification.
+        MODEL_SCAN_SUCCESS: Represents the model scan success notification.
+        RECOMMENDED_CLUSTER_SUCCESS: Represents the recommended cluster success notification.
+        UPDATE_PASSWORD_SUCCESS: Represents the update password success notification.
+        CLUSTER_DELETION_SUCCESS: Represents the cluster deletion success notification.
+        DEPLOYMENT_DELETION_SUCCESS: Represents the deployment deletion success notification.
+    """
+
+    DEPLOYMENT_SUCCESS = auto()
+    MODEL_ONBOARDING_SUCCESS = auto()
+    CLUSTER_ONBOARDING_SUCCESS = auto()
+    MODEL_SCAN_SUCCESS = auto()
+    RECOMMENDED_CLUSTER_SUCCESS = auto()
+    UPDATE_PASSWORD_SUCCESS = auto()
+    CLUSTER_DELETION_SUCCESS = auto()
+    DEPLOYMENT_DELETION_SUCCESS = auto()

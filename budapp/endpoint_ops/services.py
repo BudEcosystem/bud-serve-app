@@ -36,11 +36,12 @@ from ..commons.constants import (
     BudServeWorkflowStepEventName,
     EndpointStatusEnum,
     ModelProviderTypeEnum,
+    NotificationTypeEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
 from ..commons.exceptions import ClientException
-from ..core.schemas import NotificationPayload
+from ..core.schemas import NotificationPayload, NotificationResult
 from ..model_ops.crud import ProviderDataManager
 from ..model_ops.models import Provider as ProviderModel
 from ..model_ops.services import ModelServiceUtil
@@ -350,8 +351,15 @@ class EndpointService(SessionMixin):
         model_icon = await ModelServiceUtil(self.session).get_model_icon(db_endpoint.model)
         notification_request = (
             NotificationBuilder()
-            .set_content(title=db_endpoint.name, message="Deployment is Done", icon=model_icon)
-            .set_payload(workflow_id=str(db_workflow.id))
+            .set_content(
+                title=db_endpoint.name,
+                message="Deployment is Done",
+                icon=model_icon,
+                result=NotificationResult(target_id=db_endpoint.id, target_type="endpoint").model_dump(
+                    exclude_none=True, exclude_unset=True
+                ),
+            )
+            .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.DEPLOYMENT_SUCCESS.value)
             .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
             .build()
         )
