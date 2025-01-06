@@ -390,9 +390,10 @@ class DataManagerUtils(SQLAlchemyMixin):
             conditions = []
             for field_name, value in fields.items():
                 field = getattr(model, field_name)
+                logger.info(f"srting conditions: {field}, {field.type}")
                 if isinstance(field.type, SqlAlchemyString):
                     # NOTE: didn't use ilike because of escape character issue
-                    conditions.append(func.lower(field) == func.lower(value))
+                    conditions.append(func.lower(cast(field, SqlAlchemyString)) == func.lower(value))
                 else:
                     conditions.append(field == value)
             stmt = select(model).filter(*conditions)
@@ -403,7 +404,7 @@ class DataManagerUtils(SQLAlchemyMixin):
             for field_name, value in exclude_fields.items():
                 field = getattr(model, field_name)
                 if not case_sensitive and isinstance(field.type, SqlAlchemyString):
-                    exclude_conditions.append(func.lower(field) != func.lower(value))
+                    exclude_conditions.append(func.lower(cast(field, SqlAlchemyString)) != func.lower(value))
                 else:
                     exclude_conditions.append(field != value)
             stmt = stmt.filter(*exclude_conditions)

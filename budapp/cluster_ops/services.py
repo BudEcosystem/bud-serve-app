@@ -169,6 +169,7 @@ class ClusterService(SessionMixin):
                 fields={"name": cluster_name},
                 exclude_fields={"status": ClusterStatusEnum.DELETED},
                 missing_ok=True,
+                case_sensitive=False,
             )
             if db_cluster:
                 raise ClientException("Cluster name already exists")
@@ -279,6 +280,7 @@ class ClusterService(SessionMixin):
                 {"name": required_data["name"]},
                 exclude_fields={"status": ClusterStatusEnum.DELETED},
                 missing_ok=True,
+                case_sensitive=False,
             )
             if db_cluster:
                 raise ClientException("Cluster name already exists")
@@ -444,6 +446,7 @@ class ClusterService(SessionMixin):
             {"name": required_data["name"]},
             exclude_fields={"status": ClusterStatusEnum.DELETED},
             missing_ok=True,
+            case_sensitive=False,
         )
 
         if db_cluster:
@@ -660,6 +663,7 @@ class ClusterService(SessionMixin):
                 fields={"name": data["name"]},
                 exclude_fields={"id": cluster_id, "status": ClusterStatusEnum.DELETED},
                 missing_ok=True,
+                case_sensitive=False,
             )
             if duplicate_cluster:
                 raise ClientException("Cluster name already exists")

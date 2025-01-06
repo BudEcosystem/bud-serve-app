@@ -298,7 +298,10 @@ class CloudModelWorkflowService(SessionMixin):
 
             # Check duplicate name exist in model
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"name": required_data["name"], "status": ModelStatusEnum.ACTIVE}, missing_ok=True
+                Model,
+                {"name": required_data["name"], "status": ModelStatusEnum.ACTIVE},
+                missing_ok=True,
+                case_sensitive=False,
             )
             if db_model:
                 raise ClientException("Model name already exists")
@@ -875,7 +878,10 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Check for model with duplicate name
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"name": required_data["name"], "status": ModelStatusEnum.ACTIVE}, missing_ok=True
+            Model,
+            {"name": required_data["name"], "status": ModelStatusEnum.ACTIVE},
+            missing_ok=True,
+            case_sensitive=False,
         )
         if db_model:
             logger.error(f"Unable to create model with name {required_data['name']} as it already exists")
@@ -1865,6 +1871,7 @@ class ModelService(SessionMixin):
                 fields={"name": data["name"], "status": ModelStatusEnum.ACTIVE},
                 exclude_fields={"id": model_id},
                 missing_ok=True,
+                case_sensitive=False,
             )
             if duplicate_model:
                 raise ClientException("Model name already exists")
