@@ -31,7 +31,6 @@ from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.helpers import assign_random_colors_to_names, normalize_value
 from budapp.commons.schemas import Tag, Task
-from budapp.core.schemas import NotificationPayload
 from budapp.credential_ops.crud import ProprietaryCredentialDataManager
 from budapp.credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
@@ -52,10 +51,12 @@ from ..commons.constants import (
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
     ModelStatusEnum,
+    NotificationTypeEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
 from ..commons.helpers import validate_huggingface_repo_format
+from ..core.schemas import NotificationPayload, NotificationResult
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
@@ -399,8 +400,15 @@ class CloudModelWorkflowService(SessionMixin):
             model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
             notification_request = (
                 NotificationBuilder()
-                .set_content(title=db_model.name, message="Added to Repository", icon=model_icon)
-                .set_payload(workflow_id=str(db_workflow.id))
+                .set_content(
+                    title=db_model.name,
+                    message="Added to Repository",
+                    icon=model_icon,
+                    result=NotificationResult(target_id=db_model.id, target_type="model").model_dump(
+                        exclude_none=True, exclude_unset=True
+                    ),
+                )
+                .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.MODEL_ONBOARDING_SUCCESS.value)
                 .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
                 .build()
             )
@@ -1081,8 +1089,15 @@ class LocalModelWorkflowService(SessionMixin):
         model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
         notification_request = (
             NotificationBuilder()
-            .set_content(title=db_model.name, message="Added to Repository", icon=model_icon)
-            .set_payload(workflow_id=str(db_workflow.id))
+            .set_content(
+                title=db_model.name,
+                message="Added to Repository",
+                icon=model_icon,
+                result=NotificationResult(target_id=db_model.id, target_type="model").model_dump(
+                    exclude_none=True, exclude_unset=True
+                ),
+            )
+            .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.MODEL_ONBOARDING_SUCCESS.value)
             .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
             .build()
         )
@@ -1648,9 +1663,15 @@ class LocalModelWorkflowService(SessionMixin):
         notification_request = (
             NotificationBuilder()
             .set_content(
-                title=db_model.name, message="Scan is Completed", icon=model_icon, tag=overall_scan_status.value
+                title=db_model.name,
+                message="Scan is Completed",
+                icon=model_icon,
+                tag=overall_scan_status.value,
+                result=NotificationResult(target_id=db_model.id, target_type="model").model_dump(
+                    exclude_none=True, exclude_unset=True
+                ),
             )
-            .set_payload(workflow_id=str(db_workflow.id))
+            .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.MODEL_SCAN_SUCCESS.value)
             .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
             .build()
         )
