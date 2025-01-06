@@ -358,6 +358,7 @@ class DataManagerUtils(SQLAlchemyMixin):
         fields: Dict[str, Any],
         exclude_fields: Optional[Dict[str, Any]] = None,
         missing_ok: bool = False,
+        case_sensitive: bool = True,
     ) -> Optional[DeclarativeBase]:
         """Retrieve a model instance from the database based on given fields.
 
@@ -369,6 +370,9 @@ class DataManagerUtils(SQLAlchemyMixin):
             fields (Dict): A dictionary of field names and their values to filter by.
             missing_ok (bool, optional): If True, return None when no instance is found
                                          instead of raising an exception. Defaults to False.
+            case_sensitive (bool, optional): If True, the search will be case-sensitive.
+                                             Defaults to True.
+            exclude_fields (Optional[Dict[str, Any]]): A dictionary of field names and values to exclude from the results.
 
         Returns:
             Optional[DeclarativeBase]: The found model instance, or None if not found and missing_ok is True.
@@ -379,11 +383,29 @@ class DataManagerUtils(SQLAlchemyMixin):
         """
         await self.validate_fields(model, fields)
 
-        stmt = select(model).filter_by(**fields)
+        # Build main query
+        if case_sensitive:
+            stmt = select(model).filter_by(**fields)
+        else:
+            conditions = []
+            for field_name, value in fields.items():
+                field = getattr(model, field_name)
+                if isinstance(field.type, SqlAlchemyString):
+                    # NOTE: didn't use ilike because of escape character issue
+                    conditions.append(func.lower(field) == func.lower(value))
+                else:
+                    conditions.append(field == value)
+            stmt = select(model).filter(*conditions)
 
         if exclude_fields is not None:
             await self.validate_fields(model, exclude_fields)
-            exclude_conditions = [getattr(model, field) != value for field, value in exclude_fields.items()]
+            exclude_conditions = []
+            for field_name, value in exclude_fields.items():
+                field = getattr(model, field_name)
+                if not case_sensitive and isinstance(field.type, SqlAlchemyString):
+                    exclude_conditions.append(func.lower(field) != func.lower(value))
+                else:
+                    exclude_conditions.append(field != value)
             stmt = stmt.filter(*exclude_conditions)
 
         db_model = self.scalar_one_or_none(stmt)
