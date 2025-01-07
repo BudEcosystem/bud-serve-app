@@ -330,6 +330,15 @@ class CloudModelWorkflowService(SessionMixin):
             db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
                 CloudModel, {"id": cloud_model_id, "status": CloudModelStatusEnum.ACTIVE}, missing_ok=True
             )
+        # Check duplicate name exist in model
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model,
+            {"name": data["name"], "status": ModelStatusEnum.ACTIVE},
+            missing_ok=True,
+            case_sensitive=False,
+        )
+        if db_model:
+            raise ClientException("Model name already exists")
 
         # Prepare model creation data from input
         model_data = await self._prepare_model_data(data, current_user_id, db_cloud_model)
