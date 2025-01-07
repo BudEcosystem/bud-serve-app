@@ -870,6 +870,10 @@ class ClusterService(SessionMixin):
         )
         logger.debug(f"Found {db_active_clusters_count} active clusters from db")
 
+        # Update cluster count in workflow current progress
+        await self._update_workflow_progress_cluster_count(db_workflow, db_active_clusters_count)
+        logger.debug(f"Updated cluster count in workflow progress: {db_workflow.id}")
+
         if db_active_clusters_count == 0:
             message = "Found 0 Clusters"
         else:
@@ -891,6 +895,29 @@ class ClusterService(SessionMixin):
             .build()
         )
         await BudNotifyService().send_notification(notification_request)
+
+    async def _update_workflow_progress_cluster_count(self, db_workflow: WorkflowModel, cluster_count: int) -> None:
+        """Update workflow progress cluster count."""
+        if not isinstance(db_workflow.progress, dict):
+            logger.warning(f"Workflow {db_workflow.id} progress is not in expected format")
+            return
+
+        progress_type = db_workflow.progress.get("progress_type")
+        if progress_type != BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value:
+            logger.warning(
+                f"Progress type {progress_type} does not match event name {BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value}"
+            )
+            return
+
+        workflow_progress = db_workflow.progress
+        workflow_progress["recommended_cluster_count"] = cluster_count
+
+        # Update progress in workflow
+        self.session.refresh(db_workflow)
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": workflow_progress}
+        )
+        logger.debug(f"Updated workflow progress cluster count: {db_workflow.id}")
 
     async def cancel_cluster_onboarding_workflow(self, workflow_id: UUID) -> None:
         """Cancel cluster onboarding workflow."""
