@@ -837,7 +837,22 @@ class ClusterService(SessionMixin):
                     required_data[key] = db_workflow_step.data[key]
         logger.debug("Collected required data from workflow steps")
 
-        # Check for model with duplicate name
+        # NOTE: Frontend will fetch this step details from clusters/recommended/{workflow_id}
+        # In order to navigate from widget this extra step need to be created.
+        # Update current step number
+        current_step_number = db_workflow.current_step + 1
+        workflow_current_step = current_step_number
+
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, {}
+        )
+        logger.debug(f"Upsert workflow step {db_workflow_step.id} as empty step")
+
+        # Update current step number in workflow
+        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"current_step": workflow_current_step})
+        logger.debug(f"Updated current step number in workflow: {workflow_id}")
+
+        # Fetch model
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
             Model, {"id": required_data["model_id"], "status": ModelStatusEnum.ACTIVE}, missing_ok=True
         )
