@@ -109,13 +109,15 @@ class ClusterDataManager(DataManagerUtils):
 
         return result, count
 
-    async def get_active_clusters_by_cluster_ids(self, cluster_ids: List[UUID]) -> List[Cluster]:
+    async def get_available_clusters_by_cluster_ids(self, cluster_ids: List[UUID]) -> List[Cluster]:
         """Get active clusters by cluster ids."""
-        stmt = select(Cluster).filter(Cluster.cluster_id.in_(cluster_ids), Cluster.status != ClusterStatusEnum.DELETED)
+        stmt = select(Cluster).filter(
+            Cluster.cluster_id.in_(cluster_ids), Cluster.status == ClusterStatusEnum.AVAILABLE
+        )
         count_stmt = (
             select(func.count())
             .select_from(Cluster)
-            .filter(Cluster.cluster_id.in_(cluster_ids), Cluster.status != ClusterStatusEnum.DELETED)
+            .filter(Cluster.cluster_id.in_(cluster_ids), Cluster.status == ClusterStatusEnum.AVAILABLE)
         )
 
         count = self.execute_scalar(count_stmt)
