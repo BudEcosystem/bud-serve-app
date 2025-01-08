@@ -318,6 +318,7 @@ class EndpointService(SessionMixin):
 
         # Check duplicate name exist in endpoints
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
             fields={"name": required_data["endpoint_name"], "project_id": required_data["project_id"]},
             exclude_fields={"status": EndpointStatusEnum.DELETED},
             missing_ok=True,
