@@ -44,6 +44,7 @@ from budapp.commons.constants import (
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
 from budapp.user_ops.schemas import UserInfo
+from ..commons.helpers import validate_icon
 
 
 class ProviderFilter(BaseModel):
@@ -400,6 +401,14 @@ class CreateLocalModelWorkflowRequest(BaseModel):
 
         return self
 
+    @field_validator("icon", mode="before")
+    @classmethod
+    def icon_validate(cls, value: str | None) -> str | None:
+        """Validate the icon."""
+        if value is not None and not validate_icon(value):
+            raise ValueError("invalid icon")
+        return value
+
 
 class CreateLocalModelWorkflowSteps(BaseModel):
     """Create cluster workflow step data schema."""
@@ -433,6 +442,14 @@ class EditModel(BaseModel):
             value = value.strip()
             if len(value) == 0:
                 raise ValueError("Model name cannot be empty or only whitespace.")
+        return value
+
+    @field_validator("icon", mode="before")
+    @classmethod
+    def icon_validate(cls, value: str | None) -> str | None:
+        """Validate the icon."""
+        if value is not None and not validate_icon(value):
+            raise ValueError("invalid icon")
         return value
 
     @model_validator(mode="before")

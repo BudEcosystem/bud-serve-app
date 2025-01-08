@@ -26,6 +26,7 @@ from pydantic import (
     Field,
     field_validator,
 )
+from ..commons.helpers import validate_icon
 
 
 class ProjectBase(BaseModel):
@@ -47,6 +48,14 @@ class EditProjectRequest(BaseModel):
         """Ensure the name is not empty or only whitespace."""
         if value is not None and not value.strip():
             raise ValueError("Project name cannot be empty or only whitespace.")
+        return value
+
+    @field_validator("icon", mode="before")
+    @classmethod
+    def icon_validate(cls, value: str | None) -> str | None:
+        """Validate the icon."""
+        if value is not None and not validate_icon(value):
+            raise ValueError("invalid icon")
         return value
 
 
