@@ -65,11 +65,12 @@ class NotificationService(SessionMixin):
         await self._update_workflow_progress(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
 
         # Send number of recommended cluster as notification
-        if (
-            payload.content.status == "COMPLETED"
-            and payload.content.title == "Deployment Recommendation Results"
-            and payload.content.result
-        ):
+        # if (
+        #     payload.content.status == "COMPLETED"
+        #     and payload.content.title == "Deployment Recommendation Results"
+        #     and payload.content.result
+        # ):
+        if payload.event == "results":
             await ClusterService(self.session)._notify_recommended_cluster_from_notification_event(payload)
 
     async def update_model_deployment_events(self, payload: NotificationPayload) -> None:
@@ -88,12 +89,13 @@ class NotificationService(SessionMixin):
         await self._update_workflow_progress(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value, payload)
 
         # Create endpoint when deployment is completed
-        if (
-            payload.content.status == "COMPLETED"
-            and payload.content.title == "Performance benchmark successful"
-            and payload.content.result
-            and "result" in payload.content.result
-        ):
+        # if (
+        #     payload.content.status == "COMPLETED"
+        #     and payload.content.title == "Performance benchmark successful"
+        #     and payload.content.result
+        #     and "result" in payload.content.result
+        # ):
+        if payload.event == "results":
             await EndpointService(self.session).create_endpoint_from_notification_event(payload)
 
     async def update_cluster_creation_events(self, payload: NotificationPayload) -> None:
@@ -112,11 +114,12 @@ class NotificationService(SessionMixin):
         await self._update_workflow_progress(BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value, payload)
 
         # Create cluster in database if node info fetched successfully
-        if (
-            payload.content.status == "COMPLETED"
-            and payload.content.result
-            and payload.content.title == "Fetching cluster nodes info successful"
-        ):
+        # if (
+        #     payload.content.status == "COMPLETED"
+        #     and payload.content.result
+        #     and payload.content.title == "Fetching cluster nodes info successful"
+        # ):
+        if payload.event == "results":
             await ClusterService(self.session).create_cluster_from_notification_event(payload)
 
     async def update_model_extraction_events(self, payload: NotificationPayload) -> None:
@@ -135,11 +138,12 @@ class NotificationService(SessionMixin):
         await self._update_workflow_progress(BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value, payload)
 
         # Create cluster in database if node info fetched successfully
-        if (
-            payload.content.status == "COMPLETED"
-            and payload.content.result
-            and payload.content.title == "Model Extraction Results"
-        ):
+        # if (
+        #     payload.content.status == "COMPLETED"
+        #     and payload.content.result
+        #     and payload.content.title == "Model Extraction Results"
+        # ):
+        if payload.event == "results":
             await LocalModelWorkflowService(self.session).create_model_from_notification_event(payload)
 
     async def update_delete_cluster_events(self, payload: NotificationPayload) -> None:
@@ -158,7 +162,8 @@ class NotificationService(SessionMixin):
         await self._update_workflow_progress(BudServeWorkflowStepEventName.DELETE_CLUSTER_EVENTS.value, payload)
 
         # Create cluster in database if node info fetched successfully
-        if payload.content.status == "COMPLETED" and payload.content.title == "Cluster deleted successfully":
+        # if payload.content.status == "COMPLETED" and payload.content.title == "Cluster deleted successfully":
+        if payload.event == "results":
             await ClusterService(self.session).delete_cluster_from_notification_event(payload)
 
     async def update_delete_endpoint_events(self, payload: NotificationPayload) -> None:
@@ -177,7 +182,8 @@ class NotificationService(SessionMixin):
         await self._update_workflow_progress(BudServeWorkflowStepEventName.DELETE_ENDPOINT_EVENTS.value, payload)
 
         # Create cluster in database if node info fetched successfully
-        if payload.content.status == "COMPLETED" and payload.content.title == "Deployment deleted successfully":
+        # if payload.content.status == "COMPLETED" and payload.content.title == "Deployment deleted successfully":
+        if payload.event == "results":
             await EndpointService(self.session).delete_endpoint_from_notification_event(payload)
 
     async def update_model_security_scan_events(self, payload: NotificationPayload) -> None:
@@ -198,11 +204,12 @@ class NotificationService(SessionMixin):
         await self._update_workflow_progress(BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value, payload)
 
         # Create cluster in database if node info fetched successfully
-        if (
-            payload.content.status == "COMPLETED"
-            and payload.content.result
-            and payload.content.title == "Model Security Scan Results"
-        ):
+        # if (
+        #     payload.content.status == "COMPLETED"
+        #     and payload.content.result
+        #     and payload.content.title == "Model Security Scan Results"
+        # ):
+        if payload.event == "results":
             await LocalModelWorkflowService(self.session).create_scan_result_from_notification_event(payload)
 
     async def update_cluster_status_update_events(self, payload: NotificationPayload) -> None:
@@ -215,11 +222,12 @@ class NotificationService(SessionMixin):
             None
         """
         # Update cluster status in database
-        if (
-            payload.content.status == "COMPLETED"
-            and payload.content.result
-            and payload.content.title == "Cluster status updated"
-        ):
+        # if (
+        #     payload.content.status == "COMPLETED"
+        #     and payload.content.result
+        #     and payload.content.title == "Cluster status updated"
+        # ):
+        if payload.event == "results":
             await ClusterService(self.session).update_cluster_status_from_notification_event(payload)
 
     async def update_endpoint_status_update_events(self, payload: NotificationPayload) -> None:
@@ -232,11 +240,12 @@ class NotificationService(SessionMixin):
             None
         """
         # Update endpoint status in database
-        if (
-            payload.content.status == "COMPLETED"
-            and payload.content.result
-            and payload.content.title == "Deployment status updated"
-        ):
+        # if (
+        #     payload.content.status == "COMPLETED"
+        #     and payload.content.result
+        #     and payload.content.title == "Deployment status updated"
+        # ):
+        if payload.event == "results":
             await EndpointService(self.session).update_endpoint_status_from_notification_event(payload)
 
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
