@@ -110,13 +110,6 @@ async def create_cluster_workflow(
             message=f"At least one of {', '.join(required_fields)} is required when workflow_id is provided",
         )
 
-    # check if icon is a valid file path
-    if icon and not os.path.exists(os.path.join(app_settings.static_dir, icon)):
-        return ErrorResponse(
-            code=status.HTTP_400_BAD_REQUEST,
-            message="Invalid icon file path",
-        ).to_http_response()
-
     try:
         db_workflow = await ClusterService(session).create_cluster_workflow(
             current_user_id=current_user.id,
