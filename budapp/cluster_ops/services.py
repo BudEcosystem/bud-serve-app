@@ -869,7 +869,7 @@ class ClusterService(SessionMixin):
         logger.debug(f"bud cluster_ids from budsim: {bud_cluster_ids}")
 
         # Get active clusters by cluster ids
-        _, db_active_clusters_count = await ClusterDataManager(self.session).get_active_clusters_by_cluster_ids(
+        _, db_active_clusters_count = await ClusterDataManager(self.session).get_available_clusters_by_cluster_ids(
             bud_cluster_ids
         )
         logger.debug(f"Found {db_active_clusters_count} active clusters from db")
