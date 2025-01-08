@@ -319,7 +319,7 @@ class EndpointService(SessionMixin):
             logger.error(
                 f"An endpoint with name {required_data["endpoint_name"]} already exists in project: {required_data["project_id"]}"
             )
-            raise ClientException("An endpoint with this name already exists in this project")
+            return
 
         # Create endpoint in database
         endpoint_data = EndpointCreate(
