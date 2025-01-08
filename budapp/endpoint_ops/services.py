@@ -325,7 +325,7 @@ class EndpointService(SessionMixin):
         )
         if db_endpoint:
             logger.error(
-                f"An endpoint with name {required_data["endpoint_name"]} already exists in project: {required_data["project_id"]}"
+                f"An endpoint with name {required_data['endpoint_name']} already exists in project: {required_data['project_id']}"
             )
             return
 
