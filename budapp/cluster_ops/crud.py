@@ -109,7 +109,7 @@ class ClusterDataManager(DataManagerUtils):
 
         return result, count
 
-    async def get_available_clusters_by_cluster_ids(self, cluster_ids: List[UUID]) -> List[Cluster]:
+    async def get_available_clusters_by_cluster_ids(self, cluster_ids: List[UUID]) -> Tuple[List[Cluster], int]:
         """Get active clusters by cluster ids."""
         stmt = select(Cluster).filter(
             Cluster.cluster_id.in_(cluster_ids), Cluster.status == ClusterStatusEnum.AVAILABLE
@@ -118,6 +118,26 @@ class ClusterDataManager(DataManagerUtils):
             select(func.count())
             .select_from(Cluster)
             .filter(Cluster.cluster_id.in_(cluster_ids), Cluster.status == ClusterStatusEnum.AVAILABLE)
+        )
+
+        count = self.execute_scalar(count_stmt)
+        result = self.scalars_all(stmt)
+
+        return result, count
+
+    async def get_inactive_clusters(self) -> Tuple[List[Cluster], int]:
+        """Retrieve a list of inactive clusters and count."""
+        stmt = select(Cluster).filter(
+            Cluster.status.in_([ClusterStatusEnum.NOT_AVAILABLE, ClusterStatusEnum.ERROR, ClusterStatusEnum.DELETING])
+        )
+        count_stmt = (
+            select(func.count())
+            .select_from(Cluster)
+            .filter(
+                Cluster.status.in_(
+                    [ClusterStatusEnum.NOT_AVAILABLE, ClusterStatusEnum.ERROR, ClusterStatusEnum.DELETING]
+                )
+            )
         )
 
         count = self.execute_scalar(count_stmt)
