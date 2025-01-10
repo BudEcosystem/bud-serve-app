@@ -16,15 +16,15 @@
 
 """Provides helper functions for the project."""
 
-import re
 import os
 from enum import Enum
-from typing import Dict, List, Optional, Union
-
-from budapp.commons import logging
+from typing import Dict, List, Literal, Optional, Union
 
 from huggingface_hub.utils import validate_repo_id
 from huggingface_hub.utils._validators import HFValidationError
+
+from budapp.commons import logging
+
 
 logger = logging.get_logger(__name__)
 
@@ -142,8 +142,7 @@ def validate_huggingface_repo_format(repo_id: str) -> bool:
 
 
 def validate_icon(icon: str) -> bool:
-    """
-    Validates if the provided string is either an emoji or a valid path to an icon.
+    """Validates if the provided string is either an emoji or a valid path to an icon.
 
     Args:
         icon (str): String to validate as emoji or path
@@ -177,3 +176,25 @@ def validate_icon(icon: str) -> bool:
     except Exception as e:
         logger.error(f"Error validating icon: {e}")
         return False
+
+
+def get_hardware_types(cpu_count: int, gpu_count: int, hpu_count: int) -> List[Literal["CPU", "GPU", "HPU"]]:
+    """Get list of hardware types based on hardware counts.
+
+    Args:
+        cpu_count: Number of CPUs
+        gpu_count: Number of GPUs
+        hpu_count: Number of HPUs
+
+    Returns:
+        List of hardware types available
+    """
+    hardware = []
+    if cpu_count > 0:
+        hardware.append("CPU")
+    if gpu_count > 0:
+        hardware.append("GPU")
+    if hpu_count > 0:
+        hardware.append("HPU")
+
+    return hardware
