@@ -19,7 +19,7 @@
 from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, asc, desc, distinct, func, select
+from sqlalchemy import and_, asc, case, desc, distinct, func, select
 
 from budapp.cluster_ops.models import Cluster
 from budapp.commons import logging
@@ -219,6 +219,15 @@ class ClusterDataManager(DataManagerUtils):
                 if field == "endpoint_count":
                     sort_func = asc if direction == "asc" else desc
                     stmt = stmt.order_by(sort_func(endpoint_count_subquery))
+                elif field == "hardware_type":
+                    # Sorting by hardware type
+                    hardware_type_expr = (
+                        case((Cluster.cpu_count > 0, 1), else_=0)
+                        + case((Cluster.gpu_count > 0, 1), else_=0)
+                        + case((Cluster.hpu_count > 0, 1), else_=0)
+                    ).label("hardware_type")
+                    sort_func = asc if direction == "asc" else desc
+                    stmt = stmt.order_by(sort_func(hardware_type_expr))
 
             stmt = stmt.order_by(*sort_conditions)
 
