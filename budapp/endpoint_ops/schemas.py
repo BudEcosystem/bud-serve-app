@@ -23,7 +23,7 @@ from pydantic import UUID4, BaseModel, ConfigDict
 
 from budapp.cluster_ops.schemas import ClusterResponse
 from budapp.commons.constants import EndpointStatusEnum
-from budapp.commons.schemas import PaginatedSuccessResponse
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from budapp.model_ops.schemas import ModelResponse
 
 
@@ -123,3 +123,11 @@ class WorkerInfoResponse(PaginatedSuccessResponse):
     model_config = ConfigDict(extra="allow")
 
     workers: list[WorkerInfo]
+    
+
+class WorkerDetailResponse(SuccessResponse):
+    """Worker detail response."""
+
+    model_config = ConfigDict(extra="allow")
+
+    worker: WorkerInfo

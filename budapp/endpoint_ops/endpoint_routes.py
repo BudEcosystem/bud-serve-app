@@ -33,7 +33,7 @@ from budapp.commons.exceptions import ClientException
 from budapp.user_ops.schemas import User
 
 from ..commons.schemas import ErrorResponse, SuccessResponse
-from .schemas import EndpointFilter, EndpointPaginatedResponse, WorkerInfoFilter, WorkerInfoResponse
+from .schemas import EndpointFilter, EndpointPaginatedResponse, WorkerDetailResponse, WorkerInfoFilter, WorkerInfoResponse
 from .services import EndpointService
 
 
@@ -172,7 +172,42 @@ async def get_endpoint_workers(
     try:
         workers = await EndpointService(session).get_endpoint_workers(endpoint_id, filters, refresh, page, limit, order_by, search)
         response = WorkerInfoResponse(**workers)
+    except ClientException as e:
+        logger.exception(f"Failed to get endpoint workers: {e}")
+        response = ErrorResponse(message=e.message, code=e.status_code)
     except Exception as e:
         logger.exception(f"Failed to get endpoint workers: {e}")
         response = ErrorResponse(message="Failed to get endpoint workers", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return response.to_http_response()
+
+
+@endpoint_router.get(
+    "/{endpoint_id}/workers/{worker_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": WorkerDetailResponse,
+            "description": "Successfully get endpoint detail",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to get endpoint workers",
+        },
+    },
+)
+async def get_endpoint_worker_detail(
+    endpoint_id: UUID,
+    worker_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[WorkerDetailResponse, ErrorResponse]:
+    """Get endpoint workers."""
+    try:
+        worker_detail = await EndpointService(session).get_endpoint_worker_detail(endpoint_id, worker_id)
+        response = WorkerDetailResponse(**worker_detail)
+    except ClientException as e:
+        logger.exception(f"Failed to get endpoint worker detail: {e}")
+        response = ErrorResponse(message=e.message, code=e.status_code)
+    except Exception as e:
+        logger.exception(f"Failed to get endpoint worker detail: {e}")
+        response = ErrorResponse(message="Failed to get endpoint worker detail", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
     return response.to_http_response()
