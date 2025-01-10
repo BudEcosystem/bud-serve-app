@@ -531,7 +531,7 @@ class EndpointService(SessionMixin):
             
     async def get_endpoint_worker_detail(self, endpoint_id: UUID, worker_id: UUID) -> dict:
         """Get endpoint worker detail."""
-        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})
+        _ = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})
         get_worker_detail_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/worker-info/{worker_id}"
         headers = {
             "accept": "application/json",
