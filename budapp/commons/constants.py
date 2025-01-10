@@ -497,7 +497,6 @@ class ClusterStatusEnum(StrEnum):
 
     AVAILABLE = auto()
     NOT_AVAILABLE = auto()
-    REGISTERING = auto()
     ERROR = auto()
     DELETING = auto()
     DELETED = auto()
