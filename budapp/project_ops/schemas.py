@@ -17,8 +17,9 @@
 
 """Contains core Pydantic schemas used for data validation and serialization within the project ops services."""
 
-from budapp.commons.schemas import SuccessResponse, Tag
-from typing import List
+from datetime import datetime
+from typing import List, Literal
+
 from pydantic import (
     UUID4,
     BaseModel,
@@ -26,6 +27,10 @@ from pydantic import (
     Field,
     field_validator,
 )
+
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
+
+from ..commons.constants import ClusterStatusEnum
 from ..commons.helpers import validate_icon
 
 
@@ -69,3 +74,32 @@ class ProjectResponse(ProjectBase):
 
 class SingleProjectResponse(SuccessResponse):
     project: ProjectResponse
+
+
+class ProjectClusterListResponse(BaseModel):
+    """Project cluster list response schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    endpoint_count: int
+    hardware_type: list[Literal["CPU", "GPU", "HPU"]]
+    node_count: int = 0  # TODO: remove this
+    worker_count: int = 0  # TODO: remove this
+    status: ClusterStatusEnum
+    created_at: datetime
+    modified_at: datetime
+
+
+class ProjectClusterPaginatedResponse(PaginatedSuccessResponse):
+    """Project cluster paginated response schema."""
+
+    clusters: list[ProjectClusterListResponse] = []
+
+
+class ProjectClusterFilter(BaseModel):
+    """Filter project cluster schema for filtering clusters based on specific criteria."""
+
+    name: str | None = None
+    status: ClusterStatusEnum | None = None
