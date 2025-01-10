@@ -16,10 +16,10 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the cluster ops."""
 
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, asc, desc, distinct, func, select
 
 from budapp.cluster_ops.models import Cluster
 from budapp.commons import logging
@@ -142,5 +142,86 @@ class ClusterDataManager(DataManagerUtils):
 
         count = self.execute_scalar(count_stmt)
         result = self.scalars_all(stmt)
+
+        return result, count
+
+    async def get_all_clusters_in_project(
+        self, project_id: UUID, offset: int, limit: int, filters: Dict[str, Any], order_by: List[str], search: bool
+    ) -> Tuple[List[Cluster], int]:
+        """Get all clusters in a project."""
+        await self.validate_fields(Cluster, filters)
+
+        # Subquery to count endpoints per cluster
+        endpoint_count_subquery = (
+            select(func.count(Endpoint.id))
+            .filter(
+                Endpoint.cluster_id == Cluster.id,
+                Endpoint.project_id == project_id,
+                Endpoint.status != EndpointStatusEnum.DELETED,
+            )
+            .correlate(Cluster)
+            .scalar_subquery()
+            .label("endpoint_count")
+        )
+
+        # Generate statements based on search or filters
+        base_conditions = [
+            Endpoint.project_id == project_id,
+            Cluster.status != ClusterStatusEnum.DELETED,
+            Endpoint.status != EndpointStatusEnum.DELETED,
+        ]
+        if search:
+            search_conditions = await self.generate_search_stmt(Cluster, filters)
+
+            stmt = (
+                select(Cluster, endpoint_count_subquery)
+                .join(Endpoint, Endpoint.cluster_id == Cluster.id)
+                .filter(*base_conditions)
+                .filter(and_(*search_conditions))
+                .group_by(Cluster.id)
+            )
+            count_stmt = (
+                select(func.count(distinct(Cluster.id)))
+                .select_from(Cluster)
+                .join(Endpoint, Endpoint.cluster_id == Cluster.id)
+                .filter(*base_conditions)
+                .filter(and_(*search_conditions))
+            )
+        else:
+            filter_conditions = [getattr(Cluster, field) == value for field, value in filters.items()]
+            stmt = (
+                select(Cluster, endpoint_count_subquery)
+                .join(Endpoint, Endpoint.cluster_id == Cluster.id)
+                .filter(*base_conditions)
+                .filter(*filter_conditions)
+                .group_by(Cluster.id)
+            )
+            count_stmt = (
+                select(func.count(distinct(Cluster.id)))
+                .select_from(Cluster)
+                .join(Endpoint, Endpoint.cluster_id == Cluster.id)
+                .filter(*base_conditions)
+                .filter(*filter_conditions)
+            )
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(Cluster, order_by)
+
+            # Handle endpoint_count sorting
+            for field, direction in order_by:
+                if field == "endpoint_count":
+                    sort_func = asc if direction == "asc" else desc
+                    stmt = stmt.order_by(sort_func(endpoint_count_subquery))
+
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.session.execute(stmt)
 
         return result, count
