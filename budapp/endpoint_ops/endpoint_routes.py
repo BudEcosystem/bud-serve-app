@@ -155,6 +155,10 @@ async def delete_endpoint(
             "model": ErrorResponse,
             "description": "Failed to get endpoint workers",
         },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Endpoint not found",
+        },
     },
 )
 async def get_endpoint_workers(
@@ -191,6 +195,10 @@ async def get_endpoint_workers(
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
             "description": "Failed to get endpoint workers",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Worker not found",
         },
     },
 )
