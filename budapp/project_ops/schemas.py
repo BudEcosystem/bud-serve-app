@@ -85,8 +85,8 @@ class ProjectClusterListResponse(BaseModel):
     name: str
     endpoint_count: int
     hardware_type: list[Literal["CPU", "GPU", "HPU"]]
-    node_count: int = 0  # TODO: remove this
-    worker_count: int = 0  # TODO: remove this
+    node_count: int
+    worker_count: int
     status: ClusterStatusEnum
     created_at: datetime
     modified_at: datetime

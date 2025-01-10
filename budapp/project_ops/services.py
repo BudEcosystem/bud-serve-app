@@ -76,6 +76,8 @@ class ProjectService(SessionMixin):
                     name=db_cluster.name,
                     endpoint_count=endpoint_count,
                     hardware_type=get_hardware_types(db_cluster.cpu_count, db_cluster.gpu_count, db_cluster.hpu_count),
+                    node_count=0,  # TODO: get node count
+                    worker_count=0,  # TODO: get worker count
                     status=db_cluster.status,
                     created_at=db_cluster.created_at,
                     modified_at=db_cluster.modified_at,
