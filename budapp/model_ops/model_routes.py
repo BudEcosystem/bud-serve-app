@@ -121,6 +121,12 @@ async def list_all_models(
             message="Author is not allowed for cloud models.",
         ).to_http_response()
 
+    if filters.table_source == "cloud_model" and (filters.base_model or filters.base_model_relation):
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            message="Base model and base model relation are not allowed for cloud models.",
+        ).to_http_response()
+
     if filters.model_size_min and filters.model_size_max and filters.model_size_min > filters.model_size_max:
         return ErrorResponse(
             code=status.HTTP_400_BAD_REQUEST,

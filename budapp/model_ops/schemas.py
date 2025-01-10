@@ -44,6 +44,7 @@ from budapp.commons.constants import (
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
 from budapp.user_ops.schemas import UserInfo
+
 from ..commons.helpers import validate_icon
 
 
@@ -533,6 +534,8 @@ class ModelFilter(BaseModel):
     model_size_max: int | None = Field(None, ge=0, le=500)
     provider_type: ModelProviderTypeEnum | None = None
     table_source: Literal["cloud_model", "model"] = "cloud_model"
+    base_model: str | None = None
+    base_model_relation: BaseModelRelationEnum | None = None
 
     @field_validator("source")
     @classmethod
