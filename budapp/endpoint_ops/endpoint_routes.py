@@ -33,7 +33,7 @@ from budapp.commons.exceptions import ClientException
 from budapp.user_ops.schemas import User
 
 from ..commons.schemas import ErrorResponse, SuccessResponse
-from .schemas import EndpointFilter, EndpointPaginatedResponse
+from .schemas import EndpointFilter, EndpointPaginatedResponse, WorkerInfoFilter, WorkerInfoResponse
 from .services import EndpointService
 
 
@@ -142,3 +142,37 @@ async def delete_endpoint(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to delete endpoint",
         ).to_http_response()
+
+
+@endpoint_router.get(
+    "/{endpoint_id}/workers",
+    responses={
+        status.HTTP_200_OK: {
+            "model": WorkerInfoResponse,
+            "description": "Successfully get endpoint detail",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to get endpoint workers",
+        },
+    },
+)
+async def get_endpoint_workers(
+    endpoint_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[WorkerInfoFilter, Depends()],
+    refresh: bool = Query(False),  # noqa: B008
+    page: int = Query(1, ge=1),  # noqa: B008
+    limit: int = Query(10, ge=0),  # noqa: B008
+    order_by: Optional[List[str]] = Query(None),  # noqa: B008
+    search: bool = Query(False),  # noqa: B008
+) -> Union[WorkerInfoResponse, ErrorResponse]:
+    """Get endpoint workers."""
+    try:
+        workers = await EndpointService(session).get_endpoint_workers(endpoint_id, filters, refresh, page, limit, order_by, search)
+        response = WorkerInfoResponse(**workers)
+    except Exception as e:
+        logger.exception(f"Failed to get endpoint workers: {e}")
+        response = ErrorResponse(message="Failed to get endpoint workers", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return response.to_http_response()

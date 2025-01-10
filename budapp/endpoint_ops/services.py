@@ -53,7 +53,7 @@ from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .crud import EndpointDataManager
 from .models import Endpoint as EndpointModel
-from .schemas import EndpointCreate
+from .schemas import EndpointCreate, WorkerInfoFilter
 
 
 logger = logging.get_logger(__name__)
@@ -485,3 +485,48 @@ class EndpointService(SessionMixin):
         else:
             logger.error(f"Unknown endpoint status: {status}")
             raise ClientException(f"Unknown endpoint status: {status}")
+
+    async def get_endpoint_workers(
+        self,
+        endpoint_id: UUID,
+        filters: WorkerInfoFilter,
+        refresh: bool,
+        page: int,
+        limit: int,
+        order_by: List[str],
+        search: bool,
+    ) -> dict:
+        """Get endpoint workers."""
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel, {"id": endpoint_id}
+        )
+        get_workers_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/worker-info"
+        )
+        filters_dict = filters.model_dump(exclude_none=True)
+        payload = {
+            "namespace": db_endpoint.namespace,
+            "cluster_id": str(db_endpoint.bud_cluster_id),
+            "page": page,
+            "limit": limit,
+            "order_by": order_by or [],
+            "search": str(search).lower(),
+            "refresh": str(refresh).lower(),
+        }
+        logger.info(f"Services : payload: {payload}")
+        payload.update(filters_dict)
+        headers = {
+            "accept": "application/json",
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.get(get_workers_endpoint, params=payload, headers=headers) as response:
+                response_data = await response.json()
+                if response.status != 200:
+                    error_message = response_data.get("message", "Failed to get endpoint workers")
+                    logger.error(f"Failed to get endpoint workers: {error_message}")
+                    raise ClientException(error_message)
+
+                logger.debug("Successfully retrieved endpoint workers")
+                return response_data
+
+

@@ -15,6 +15,9 @@
 """Contains core Pydantic schemas used for data validation and serialization within the core services."""
 
 from datetime import datetime
+from enum import Enum
+from typing import Optional
+from uuid import UUID
 
 from pydantic import UUID4, BaseModel, ConfigDict
 
@@ -68,3 +71,55 @@ class EndpointPaginatedResponse(PaginatedSuccessResponse):
     """Endpoint paginated response schema."""
 
     endpoints: list[EndpointListResponse] = []
+    
+
+class WorkerInfoFilter(BaseModel):
+    """Filter for worker info."""
+
+    status: str | None = None
+    hardware: str | None = None
+    utilization_min: int | None = None
+    utilization_max: int | None = None
+
+
+class DeploymentStatusEnum(str, Enum):
+    READY = "ready"
+    PENDING = "pending"
+    INGRESS_FAILED = "ingress_failed"
+    FAILED = "failed"
+
+
+class WorkerData(BaseModel):
+    """Worker data."""
+
+    cluster_id: Optional[UUID] = None
+    namespace: Optional[str] = None
+    name: str
+    status: str
+    node_name: str
+    utilization: Optional[str] = None
+    hardware: str
+    uptime: str
+    last_restart_date: Optional[str] = None
+    last_updated_date: Optional[str] = None
+    created_date: str
+    node_ip: str
+    cores: int
+    memory: str
+    deployment_status: Optional[DeploymentStatusEnum] = None
+
+
+class WorkerInfo(WorkerData):
+    """Worker info."""
+
+    model_config = ConfigDict(orm_mode=True, from_attributes=True)
+
+    id: UUID
+    
+
+class WorkerInfoResponse(PaginatedSuccessResponse):
+    """Response body for getting worker info."""
+    
+    model_config = ConfigDict(extra="allow")
+
+    workers: list[WorkerInfo]
