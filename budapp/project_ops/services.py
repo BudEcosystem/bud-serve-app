@@ -64,20 +64,24 @@ class ProjectService(SessionMixin):
         self, project_id: UUID, offset: int, limit: int, filters: Dict[str, Any], order_by: List[str], search: bool
     ) -> Tuple[List[ProjectClusterListResponse], int]:
         """Get all clusters in a project."""
-        db_clusters, count = await ClusterDataManager(self.session).get_all_clusters_in_project(
+        db_results, count = await ClusterDataManager(self.session).get_all_clusters_in_project(
             project_id, offset, limit, filters, order_by, search
         )
 
         result = []
-        for db_cluster, endpoint_count in db_clusters:
+        for db_result in db_results:
+            db_cluster = db_result[0]
+            endpoint_count = db_result[1]
+            total_nodes = db_result[2]
+            total_replicas = db_result[3]
             result.append(
                 ProjectClusterListResponse(
                     id=db_cluster.id,
                     name=db_cluster.name,
                     endpoint_count=endpoint_count,
                     hardware_type=get_hardware_types(db_cluster.cpu_count, db_cluster.gpu_count, db_cluster.hpu_count),
-                    node_count=0,  # TODO: get node count
-                    worker_count=0,  # TODO: get worker count
+                    node_count=total_nodes,
+                    worker_count=total_replicas,
                     status=db_cluster.status,
                     created_at=db_cluster.created_at,
                     modified_at=db_cluster.modified_at,

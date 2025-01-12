@@ -147,22 +147,9 @@ class ClusterDataManager(DataManagerUtils):
 
     async def get_all_clusters_in_project(
         self, project_id: UUID, offset: int, limit: int, filters: Dict[str, Any], order_by: List[str], search: bool
-    ) -> Tuple[List[Cluster], int]:
+    ) -> Tuple[List[Cluster], int, int, int]:
         """Get all clusters in a project."""
         await self.validate_fields(Cluster, filters)
-
-        # Subquery to count endpoints per cluster
-        endpoint_count_subquery = (
-            select(func.count(Endpoint.id))
-            .filter(
-                Endpoint.cluster_id == Cluster.id,
-                Endpoint.project_id == project_id,
-                Endpoint.status != EndpointStatusEnum.DELETED,
-            )
-            .correlate(Cluster)
-            .scalar_subquery()
-            .label("endpoint_count")
-        )
 
         # Generate statements based on search or filters
         base_conditions = [
@@ -174,7 +161,12 @@ class ClusterDataManager(DataManagerUtils):
             search_conditions = await self.generate_search_stmt(Cluster, filters)
 
             stmt = (
-                select(Cluster, endpoint_count_subquery)
+                select(
+                    Cluster,
+                    func.count(Endpoint.id).label("endpoint_count"),
+                    func.coalesce(func.sum(Endpoint.number_of_nodes), 0).label("total_nodes"),
+                    func.coalesce(func.sum(Endpoint.total_replicas), 0).label("total_replicas"),
+                )
                 .join(Endpoint, Endpoint.cluster_id == Cluster.id)
                 .filter(*base_conditions)
                 .filter(and_(*search_conditions))
@@ -190,7 +182,12 @@ class ClusterDataManager(DataManagerUtils):
         else:
             filter_conditions = [getattr(Cluster, field) == value for field, value in filters.items()]
             stmt = (
-                select(Cluster, endpoint_count_subquery)
+                select(
+                    Cluster,
+                    func.count(Endpoint.id).label("endpoint_count"),
+                    func.coalesce(func.sum(Endpoint.number_of_nodes), 0).label("total_nodes"),
+                    func.coalesce(func.sum(Endpoint.total_replicas), 0).label("total_replicas"),
+                )
                 .join(Endpoint, Endpoint.cluster_id == Cluster.id)
                 .filter(*base_conditions)
                 .filter(*filter_conditions)
@@ -218,7 +215,13 @@ class ClusterDataManager(DataManagerUtils):
             for field, direction in order_by:
                 if field == "endpoint_count":
                     sort_func = asc if direction == "asc" else desc
-                    stmt = stmt.order_by(sort_func(endpoint_count_subquery))
+                    stmt = stmt.order_by(sort_func("endpoint_count"))
+                elif field == "node_count":
+                    sort_func = asc if direction == "asc" else desc
+                    stmt = stmt.order_by(sort_func("total_nodes"))
+                elif field == "worker_count":
+                    sort_func = asc if direction == "asc" else desc
+                    stmt = stmt.order_by(sort_func("total_replicas"))
                 elif field == "hardware_type":
                     # Sorting by hardware type
                     hardware_type_expr = (

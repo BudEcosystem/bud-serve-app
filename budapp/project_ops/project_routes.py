@@ -103,7 +103,7 @@ async def edit_project(
             "description": "Successfully list all clusters in a project",
         },
     },
-    description="List all clusters in a project.\n\nOrder by values are: name, endpoint_count, hardware_type, status, created_at, modified_at",
+    description="List all clusters in a project.\n\nOrder by values are: name, endpoint_count, hardware_type, node_count, worker_count, status, created_at, modified_at",
 )
 async def list_all_clusters(
     current_user: Annotated[User, Depends(get_current_active_user)],
