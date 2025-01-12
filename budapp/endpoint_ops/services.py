@@ -277,6 +277,8 @@ class EndpointService(SessionMixin):
         namespace = payload.content.result.get("namespace")
         deployment_url = payload.content.result["result"]["deployment_url"]
         credential_id = payload.content.result.get("credential_id")
+        number_of_nodes = payload.content.result.get("number_of_nodes")
+        total_replicas = payload.content.result["deployment_status"]["replicas"]["total"]
 
         if not namespace or not deployment_url:
             logger.warning("Namespace or deployment URL is missing from event")
@@ -343,6 +345,8 @@ class EndpointService(SessionMixin):
             created_by=db_workflow.created_by,
             status_sync_at=datetime.now(tz=timezone.utc),
             credential_id=credential_id,
+            number_of_nodes=number_of_nodes,
+            total_replicas=total_replicas,
         )
 
         db_endpoint = await EndpointDataManager(self.session).insert_one(
@@ -497,9 +501,7 @@ class EndpointService(SessionMixin):
         search: bool,
     ) -> dict:
         """Get endpoint workers."""
-        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-            EndpointModel, {"id": endpoint_id}
-        )
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})
         get_workers_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/worker-info"
         )
@@ -528,7 +530,7 @@ class EndpointService(SessionMixin):
 
                 logger.debug("Successfully retrieved endpoint workers")
                 return response_data
-            
+
     async def get_endpoint_worker_detail(self, endpoint_id: UUID, worker_id: UUID) -> dict:
         """Get endpoint worker detail."""
         _ = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})

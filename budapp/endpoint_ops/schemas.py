@@ -44,6 +44,8 @@ class EndpointCreate(BaseModel):
     created_by: UUID4
     status_sync_at: datetime
     credential_id: UUID4 | None
+    total_replicas: int
+    number_of_nodes: int
 
 
 class EndpointFilter(BaseModel):
@@ -71,7 +73,7 @@ class EndpointPaginatedResponse(PaginatedSuccessResponse):
     """Endpoint paginated response schema."""
 
     endpoints: list[EndpointListResponse] = []
-    
+
 
 class WorkerInfoFilter(BaseModel):
     """Filter for worker info."""
@@ -115,15 +117,15 @@ class WorkerInfo(WorkerData):
     model_config = ConfigDict(orm_mode=True, from_attributes=True)
 
     id: UUID
-    
+
 
 class WorkerInfoResponse(PaginatedSuccessResponse):
     """Response body for getting worker info."""
-    
+
     model_config = ConfigDict(extra="allow")
 
     workers: list[WorkerInfo]
-    
+
 
 class WorkerDetailResponse(SuccessResponse):
     """Worker detail response."""
