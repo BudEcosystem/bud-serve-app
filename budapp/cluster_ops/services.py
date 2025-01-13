@@ -879,7 +879,7 @@ class ClusterService(SessionMixin):
         logger.debug(f"Updated cluster count in workflow progress: {db_workflow.id}")
 
         if db_active_clusters_count == 0:
-            message = "Found 0 Clusters"
+            message = "Clusters Not Found"
         else:
             message = f"Found Top {db_active_clusters_count} Clusters"
 
