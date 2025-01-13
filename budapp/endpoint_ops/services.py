@@ -16,6 +16,7 @@
 
 """The endpoint ops services. Contains business logic for endpoint ops."""
 
+import json
 from datetime import datetime, timezone
 from typing import Dict, List, Tuple
 from uuid import UUID
@@ -42,9 +43,10 @@ from ..commons.constants import (
 )
 from ..commons.exceptions import ClientException
 from ..core.schemas import NotificationPayload, NotificationResult
+from ..cluster_ops.services import ClusterService
 from ..model_ops.crud import ProviderDataManager
 from ..model_ops.models import Provider as ProviderModel
-from ..model_ops.services import ModelServiceUtil
+from ..model_ops.services import ModelServiceUtil, ModelService
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
@@ -53,7 +55,7 @@ from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .crud import EndpointDataManager
 from .models import Endpoint as EndpointModel
-from .schemas import EndpointCreate, WorkerInfoFilter
+from .schemas import EndpointCreate, ModelClusterDetail, WorkerInfoFilter
 
 
 logger = logging.get_logger(__name__)
@@ -548,3 +550,13 @@ class EndpointService(SessionMixin):
 
                 logger.debug("Successfully retrieved endpoint worker detail")
                 return response_data
+
+    async def get_model_cluster_detail(self, endpoint_id: UUID) -> ModelClusterDetail:
+        """Get model cluster detail."""
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})
+        model_id = db_endpoint.model_id
+        model_detail_json_response = await ModelService(self.session).retrieve_model(model_id)
+        model_detail = json.loads(model_detail_json_response.body.decode("utf-8"))
+        cluster_id = db_endpoint.cluster_id
+        cluster_detail = await ClusterService(self.session).get_cluster_details(cluster_id)
+        return ModelClusterDetail(model=model_detail["model"], cluster=cluster_detail)

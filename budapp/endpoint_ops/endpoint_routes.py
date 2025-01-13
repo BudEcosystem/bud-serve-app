@@ -33,7 +33,7 @@ from budapp.commons.exceptions import ClientException
 from budapp.user_ops.schemas import User
 
 from ..commons.schemas import ErrorResponse, SuccessResponse
-from .schemas import EndpointFilter, EndpointPaginatedResponse, WorkerDetailResponse, WorkerInfoFilter, WorkerInfoResponse
+from .schemas import EndpointFilter, EndpointPaginatedResponse, ModelClusterDetail, ModelClusterDetailResponse, WorkerDetailResponse, WorkerInfoFilter, WorkerInfoResponse
 from .services import EndpointService
 
 
@@ -218,4 +218,39 @@ async def get_endpoint_worker_detail(
     except Exception as e:
         logger.exception(f"Failed to get endpoint worker detail: {e}")
         response = ErrorResponse(message="Failed to get endpoint worker detail", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return response.to_http_response()
+
+
+@endpoint_router.get(
+    "/{endpoint_id}/model-cluster-detail",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ModelClusterDetailResponse,
+            "description": "Successfully get model cluster detail",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Endpoint not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to get model cluster detail",
+        },
+    },
+)
+async def get_model_cluster_detail(
+    endpoint_id: UUID,
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[ModelClusterDetailResponse, ErrorResponse]:
+    """Get model cluster detail."""
+    try:
+        model_cluster_detail = await EndpointService(session).get_model_cluster_detail(endpoint_id)
+        response = ModelClusterDetailResponse(object="endpoint.detail", result=model_cluster_detail, message="Successfully fetched model cluster detail for the deployment.")
+    except ClientException as e:
+        logger.exception(f"Failed to get model cluster detail: {e}")
+        response = ErrorResponse(message=e.message, code=e.status_code)
+    except Exception as e:
+        logger.exception(f"Failed to get model cluster detail: {e}")
+        response = ErrorResponse(message="Failed to get model cluster detail", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
     return response.to_http_response()

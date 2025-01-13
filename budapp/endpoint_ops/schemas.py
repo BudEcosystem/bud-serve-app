@@ -24,7 +24,7 @@ from pydantic import UUID4, BaseModel, ConfigDict
 from budapp.cluster_ops.schemas import ClusterResponse
 from budapp.commons.constants import EndpointStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
-from budapp.model_ops.schemas import ModelResponse
+from budapp.model_ops.schemas import ModelDetailResponse, ModelResponse
 
 
 # Endpoint schemas
@@ -133,3 +133,20 @@ class WorkerDetailResponse(SuccessResponse):
     model_config = ConfigDict(extra="allow")
 
     worker: WorkerInfo
+
+
+class ModelClusterDetail(BaseModel):
+    """Model cluster detail."""
+
+    model_config = ConfigDict(extra="allow")
+
+    model: ModelDetailResponse
+    cluster: ClusterResponse
+
+
+class ModelClusterDetailResponse(SuccessResponse):
+    """Model cluster detail response."""
+
+    model_config = ConfigDict(extra="allow")
+
+    result: ModelClusterDetail
