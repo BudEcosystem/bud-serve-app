@@ -31,6 +31,8 @@ class BaseAnalyticsRequest(BaseModel):
     frequency: Literal["hourly", "daily", "weekly", "monthly", "quarterly", "yearly"]
     filter_by: Literal["project", "model", "endpoint"]
     filter_conditions: list[UUID4] | None = None
+    project_id: UUID4 | None = None
+    model_id: UUID4 | None = None
     from_date: datetime
     to_date: datetime | None = None
     top_k: int | None = None
@@ -39,16 +41,14 @@ class BaseAnalyticsRequest(BaseModel):
 class CountAnalyticsRequest(BaseAnalyticsRequest):
     """Request count analytics request schema."""
 
-    metrics: Literal["overall", "concurrency"] | None = None
+    metrics: Literal["overall", "concurrency", "queuing_time"] | None = None
     filter_by: Literal["project", "model", "endpoint"] | None = None
 
     @model_validator(mode="before")
     def validate_filter_by(cls, data: Dict[str, Any]) -> Dict[str, Any]:
         """Validate filter_by for concurrency metrics."""
-        if data.get("metrics") == "concurrency":
-            assert (
-                data.get("filter_by") is not None
-            ), "filter_by should be either project, model or endpoint for concurrency metrics"
+        if data.get("filter_by") is None and data.get("metrics") in ["concurrency", "queuing_time"]:
+            raise ValueError("filter_by should be either project, model or endpoint for concurrency metrics")
         return data
 
 
@@ -57,6 +57,7 @@ class CountAnalyticsResponse(SuccessResponse):
 
     overall_metrics: dict | None = None
     concurrency_metrics: dict | None = None
+    queuing_time_metrics: dict | None = None
 
 
 class PerformanceAnalyticsRequest(BaseAnalyticsRequest):
