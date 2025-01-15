@@ -566,3 +566,4 @@ class EndpointService(SessionMixin):
             model=model_detail["model"],
             cluster=cluster_detail,
         )
+

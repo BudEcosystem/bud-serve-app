@@ -70,6 +70,7 @@ class MetricService(SessionMixin):
             message="Successfully fetched request count analytics",
             overall_metrics=bud_metric_response["overall_metrics"],
             concurrency_metrics=bud_metric_response["concurrency_metrics"],
+            queuing_time_metrics=bud_metric_response["queuing_time_metrics"],
         )
 
     async def get_request_performance_analytics(
