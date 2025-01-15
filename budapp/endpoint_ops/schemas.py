@@ -140,6 +140,9 @@ class ModelClusterDetail(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
+    id: UUID
+    name: str
+    status: str
     model: ModelDetailResponse
     cluster: ClusterResponse
 
