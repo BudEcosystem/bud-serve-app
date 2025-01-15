@@ -254,6 +254,7 @@ class ModelDetailResponse(BaseModel):
     paper_published: list[PaperPublishedModel] | None = None
     model_licenses: ModelLicensesModel | None = None
     provider: Provider | None = None
+    created_at: datetime
 
 
 class ModelTree(BaseModel):

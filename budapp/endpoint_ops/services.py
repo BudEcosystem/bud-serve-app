@@ -559,4 +559,11 @@ class EndpointService(SessionMixin):
         model_detail = json.loads(model_detail_json_response.body.decode("utf-8"))
         cluster_id = db_endpoint.cluster_id
         cluster_detail = await ClusterService(self.session).get_cluster_details(cluster_id)
-        return ModelClusterDetail(model=model_detail["model"], cluster=cluster_detail)
+        return ModelClusterDetail(
+            id=db_endpoint.id,
+            name=db_endpoint.name,
+            status=db_endpoint.status,
+            model=model_detail["model"],
+            cluster=cluster_detail,
+        )
+
