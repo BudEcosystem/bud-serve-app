@@ -234,6 +234,9 @@ class AppConfig(BaseConfig):
     # Budserve host
     budserve_host: str = Field(alias="BUD_SERVE_HOST", default="https://api-dev.bud.studio")
 
+    # Model
+    model_download_dir: DirectoryPath = Field(alias="MODEL_DOWNLOAD_DIR")
+
     @computed_field
     def static_dir(self) -> str:
         """Get the static directory."""
