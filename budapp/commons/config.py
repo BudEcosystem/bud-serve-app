@@ -42,7 +42,7 @@ from .constants import Environment, LogLevel
 
 
 def parse_cors(v: Any) -> List[str] | str:
-    """Parse CORS_ORIGINS into a list of strings"""
+    """Parse CORS_ORIGINS into a list of strings."""
     if isinstance(v, str) and not v.startswith("["):
         return [i.strip() for i in v.split(",")]
     elif isinstance(v, list | str):
@@ -247,7 +247,7 @@ class AppConfig(BaseConfig):
 
     @computed_field
     def icon_dir(self) -> DirectoryPath:
-        """The directory for icons."""
+        """Directory for icon."""
         return os.path.join(self.static_dir, "icons")
 
     @computed_field
@@ -360,6 +360,13 @@ class SecretsConfig(BaseConfig):
     dapr_api_token: Optional[str] = Field(None, alias="DAPR_API_TOKEN")
     password_salt: str = Field("bud_password_salt", alias="PASSWORD_SALT")
     jwt_secret_key: str = Field(alias="JWT_SECRET_KEY")
+    redis_password: str = Field(alias="SECRETS_REDIS_PASSWORD")
+    redis_uri: str = Field(alias="SECRETS_REDIS_URI")
+
+    @computed_field
+    def redis_url(self) -> str:
+        """Construct and returns a Redis connection URL."""
+        return f"redis://:{self.redis_password}@{self.redis_uri}"
 
 
 app_settings = AppConfig()

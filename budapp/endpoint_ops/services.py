@@ -31,6 +31,7 @@ from budapp.project_ops.models import Project as ProjectModel
 
 from ..cluster_ops.crud import ClusterDataManager
 from ..cluster_ops.models import Cluster as ClusterModel
+from ..cluster_ops.services import ClusterService
 from ..commons.config import app_settings
 from ..commons.constants import (
     BUD_INTERNAL_WORKFLOW,
@@ -41,13 +42,13 @@ from ..commons.constants import (
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
-from ..commons.exceptions import ClientException
+from ..commons.exceptions import ClientException, RedisException
 from ..core.schemas import NotificationPayload, NotificationResult
-from ..cluster_ops.services import ClusterService
 from ..model_ops.crud import ProviderDataManager
 from ..model_ops.models import Provider as ProviderModel
-from ..model_ops.services import ModelServiceUtil, ModelService
+from ..model_ops.services import ModelService, ModelServiceUtil
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
+from ..shared.redis_service import RedisService
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
@@ -244,6 +245,15 @@ class EndpointService(SessionMixin):
             db_endpoint, {"status": EndpointStatusEnum.DELETED}
         )
         logger.debug(f"Endpoint {db_endpoint.id} marked as deleted")
+
+        # Delete endpoint details with pattern “router_config:*:<endpoint_name>“,
+        try:
+            redis_service = RedisService()
+            endpoint_redis_keys = await redis_service.keys(f"router_config:*:{db_endpoint.name}")
+            endpoint_redis_keys_count = await redis_service.delete(*endpoint_redis_keys)
+            logger.debug(f"Deleted endpoint data from redis: {endpoint_redis_keys_count} keys")
+        except (RedisException, Exception) as e:
+            logger.error(f"Failed to delete endpoint details from redis: {e}")
 
         # Mark workflow as completed
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
