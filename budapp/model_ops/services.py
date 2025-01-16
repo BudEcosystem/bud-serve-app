@@ -1700,10 +1700,9 @@ class LocalModelWorkflowService(SessionMixin):
             severity = model_issue["severity"].lower()
 
             # Clean up the source path by removing local_path prefix
-            local_absolute_path = os.path.join(app_settings.model_download_dir, local_path)
             source = model_issue["source"]
-            if source.startswith(local_absolute_path):
-                source = source[len(local_absolute_path) :].lstrip("/")
+            if source.startswith(local_path):
+                source = source[len(local_path) :].lstrip("/")
 
             # Group issues by severity
             if severity not in grouped_issues:
