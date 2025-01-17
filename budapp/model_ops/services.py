@@ -1699,10 +1699,11 @@ class LocalModelWorkflowService(SessionMixin):
         for model_issue in model_issues:
             severity = model_issue["severity"].lower()
 
+            # NOTE: changed this formatting to budmodel
             # Clean up the source path by removing local_path prefix
-            source = model_issue["source"]
-            if source.startswith(local_path):
-                source = source[len(local_path) :].lstrip("/")
+            # source = model_issue["source"]
+            # if source.startswith(local_path):
+            #     source = source[len(local_path) :].lstrip("/")
 
             # Group issues by severity
             if severity not in grouped_issues:
@@ -1712,7 +1713,7 @@ class LocalModelWorkflowService(SessionMixin):
                     title=model_issue["title"],
                     severity=severity,
                     description=model_issue["description"],
-                    source=source,
+                    source=model_issue["source"],
                 ).model_dump()
             )
 
