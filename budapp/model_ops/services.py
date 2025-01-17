@@ -2111,12 +2111,32 @@ class ModelService(SessionMixin):
             )
 
         else:
-            # TODO:service yet to be implemented for other provider types models to clear model space
-            pass
+            await self._perform_model_deletion_request(db_model.local_path)
+            logger.debug(f"Model deletion successful for {db_model.local_path}")
 
         db_model = await ModelDataManager(self.session).update_by_fields(db_model, {"status": ModelStatusEnum.DELETED})
 
         return db_model
+
+    async def _perform_model_deletion_request(self, local_path: str) -> None:
+        """Perform model deletion request."""
+        model_deletion_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/model-info/local-models"
+        )
+
+        params = {"path": local_path}
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.delete(model_deletion_endpoint, params=params) as response:
+                    if response.status >= 400:
+                        raise ClientException("Unable to perform model deletion")
+
+        except ClientException as e:
+            raise e
+        except Exception as e:
+            logger.error(f"Failed to perform model deletion request: {e}")
+            raise ClientException("Unable to perform local model deletion") from e
 
 
 class ModelServiceUtil(SessionMixin):
