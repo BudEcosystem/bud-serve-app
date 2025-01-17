@@ -615,9 +615,14 @@ class ClusterService(SessionMixin):
         # Update data
         update_data = {"status": payload.content.result["status"]}
 
-        # Get cluster resources from event
-        cluster_resources = await self._calculate_cluster_resources(payload.content.result["node_info"])
-        update_data.update(cluster_resources.model_dump(exclude_unset=True, exclude_none=True))
+        if "node_info" in payload.content.result:
+            if (
+                "nodes" in payload.content.result["node_info"]
+                and len(payload.content.result["node_info"]["nodes"]) > 0
+            ):
+                cluster_resources = await self._calculate_cluster_resources(payload.content.result["node_info"])
+                update_data.update(cluster_resources.model_dump(exclude_unset=True, exclude_none=True))
+                logger.debug(f"Cluster resources updated: {update_data}")
 
         # Update cluster status
         db_cluster = await ClusterDataManager(self.session).update_by_fields(db_cluster, update_data)
