@@ -102,9 +102,9 @@ class WorkerData(BaseModel):
     utilization: Optional[str] = None
     hardware: str
     uptime: str
-    last_restart_date: Optional[str] = None
-    last_updated_date: Optional[str] = None
-    created_date: str
+    last_restart_datetime: Optional[datetime] = None
+    last_updated_datetime: Optional[datetime] = None
+    created_datetime: datetime
     node_ip: str
     cores: int
     memory: str
