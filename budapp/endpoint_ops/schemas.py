@@ -46,6 +46,7 @@ class EndpointCreate(BaseModel):
     credential_id: UUID4 | None
     total_replicas: int
     number_of_nodes: int
+    deployment_config: dict | None
 
 
 class EndpointFilter(BaseModel):
