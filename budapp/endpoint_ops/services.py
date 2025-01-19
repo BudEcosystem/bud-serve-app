@@ -308,6 +308,7 @@ class EndpointService(SessionMixin):
             "project_id",
             "cluster_id",  # bud_cluster_id
             "endpoint_name",
+            "deploy_config",
         ]
 
         # from workflow steps extract necessary information
@@ -359,6 +360,7 @@ class EndpointService(SessionMixin):
             credential_id=credential_id,
             number_of_nodes=number_of_nodes,
             total_replicas=total_replicas,
+            deployment_config=required_data["deploy_config"],
         )
 
         db_endpoint = await EndpointDataManager(self.session).insert_one(
@@ -576,4 +578,3 @@ class EndpointService(SessionMixin):
             model=model_detail["model"],
             cluster=cluster_detail,
         )
-
