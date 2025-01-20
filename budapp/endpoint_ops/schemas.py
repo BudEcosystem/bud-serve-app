@@ -19,7 +19,7 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID
 
-from pydantic import UUID4, BaseModel, ConfigDict
+from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator
 
 from budapp.cluster_ops.schemas import ClusterResponse
 from budapp.commons.constants import EndpointStatusEnum
@@ -54,6 +54,19 @@ class EndpointFilter(BaseModel):
 
     name: str | None = None
     status: EndpointStatusEnum | None = None
+
+
+class EndpointResponse(BaseModel):
+    """Endpoint response schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    status: EndpointStatusEnum
+    deployment_config: dict
+    created_at: datetime
+    modified_at: datetime
 
 
 class EndpointListResponse(BaseModel):
@@ -154,3 +167,40 @@ class ModelClusterDetailResponse(SuccessResponse):
     model_config = ConfigDict(extra="allow")
 
     result: ModelClusterDetail
+
+
+class AddWorkerRequest(BaseModel):
+    """Add worker request."""
+
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None
+    step_number: int = Field(..., gt=0)
+    trigger_workflow: bool = False
+    endpoint_id: UUID4 | None = None
+    additional_concurrency: int | None = Field(None, gt=0)
+    cluster_id: UUID4 | None = None
+
+    @model_validator(mode="after")
+    def validate_fields(self) -> "AddWorkerRequest":
+        """Validate the fields of the request."""
+        if self.workflow_id is None and self.workflow_total_steps is None:
+            raise ValueError("workflow_total_steps is required when workflow_id is not provided")
+
+        if self.workflow_id is not None and self.workflow_total_steps is not None:
+            raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
+
+        # Check if at least one of the other fields is provided
+        other_fields = [self.endpoint_id, self.additional_concurrency, self.cluster_id]
+        required_fields = ["endpoint_id", "additional_concurrency", "cluster_id"]
+        if not any(other_fields):
+            raise ValueError(f"At least one of {', '.join(required_fields)} is required")
+
+        return self
+
+
+class AddWorkerWorkflowStepData(BaseModel):
+    """Add worker workflow step data."""
+
+    endpoint_id: UUID4 | None = None
+    cluster_id: UUID4 | None = None
+    additional_concurrency: int | None = None
