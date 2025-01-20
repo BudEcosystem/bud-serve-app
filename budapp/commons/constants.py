@@ -2509,6 +2509,7 @@ WORKFLOW_DELETE_MESSAGES = {
     WorkflowTypeEnum.ENDPOINT_DELETION: "Successfully cancelled deployment deletion.",
     WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
     WorkflowTypeEnum.LOCAL_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
+    WorkflowTypeEnum.ADD_WORKER_TO_ENDPOINT: "Successfully cancelled worker to deployment.",
 }
 
 
