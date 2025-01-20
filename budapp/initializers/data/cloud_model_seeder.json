@@ -188,12 +188,6 @@
                 "uri": "gpt-3.5-turbo-16k"
             },
             {
-                "name": "gpt-3.5-turbo-16k-0613",
-                "modality": "llm",
-                "source": "openai",
-                "uri": "gpt-3.5-turbo-16k-0613"
-            },
-            {
                 "name": "ft:gpt-3.5-turbo",
                 "modality": "llm",
                 "source": "openai",

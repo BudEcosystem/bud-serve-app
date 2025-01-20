@@ -240,6 +240,24 @@ curl --location 'https://<base_url>/clusters/clusters' \
   "workflow_total_steps": 3,
   "step_number": 1,
   "trigger_workflow": true,
-  "model_id": "d023bba4-9367-4b74-a096-c0045ee581fa"
+  "model_id": "1cda88f7-0747-4f97-8fc3-fca9091f44d5"
+}
+```
+
+## Add Worker to Endpoint
+
+```json
+{
+  "workflow_total_steps": 5,
+  "step_number": 1,
+  "trigger_workflow": false,
+  "endpoint_id": "7835329b-97aa-4658-b421-56473aef0500",
+  "additional_concurrency": 10
+}
+
+{
+  "workflow_id": "da939c36-3d5f-434f-9b61-19095024e4e7",
+  "step_number": 3,
+  "trigger_workflow": true
 }
 ```
