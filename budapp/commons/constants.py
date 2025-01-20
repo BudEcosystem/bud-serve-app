@@ -418,6 +418,7 @@ class WorkflowTypeEnum(StrEnum):
     ENDPOINT_DELETION = auto()
     CLOUD_MODEL_ONBOARDING = auto()
     LOCAL_MODEL_ONBOARDING = auto()
+    ADD_WORKER_TO_ENDPOINT = auto()
 
 
 class NotificationType(Enum):
@@ -640,7 +641,11 @@ class NotificationStatus(Enum):
 
 
 APP_ICONS = {
-    "general": {"model_mono": "icons/general/model_mono.png", "cluster_mono": "icons/general/cluster_mono.png"}
+    "general": {
+        "model_mono": "icons/general/model_mono.png",
+        "cluster_mono": "icons/general/cluster_mono.png",
+        "deployment_mono": "icons/general/deployment_mono.png",
+    }
 }
 
 EMOJIS = [
@@ -2504,6 +2509,7 @@ WORKFLOW_DELETE_MESSAGES = {
     WorkflowTypeEnum.ENDPOINT_DELETION: "Successfully cancelled deployment deletion.",
     WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
     WorkflowTypeEnum.LOCAL_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
+    WorkflowTypeEnum.ADD_WORKER_TO_ENDPOINT: "Successfully cancelled worker to deployment.",
 }
 
 

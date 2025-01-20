@@ -63,6 +63,7 @@ class Endpoint(Base):
     model_configuration: Mapped[dict] = mapped_column(JSONB, nullable=True)
     total_replicas: Mapped[int] = mapped_column(Integer, nullable=False)
     number_of_nodes: Mapped[int] = mapped_column(Integer, nullable=False)
+    deployment_config: Mapped[dict] = mapped_column(JSONB, nullable=True)
 
     model: Mapped[Model] = relationship("Model", back_populates="endpoints", foreign_keys=[model_id])
     # worker: Mapped[Worker] = relationship(
