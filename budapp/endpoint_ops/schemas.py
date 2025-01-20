@@ -178,7 +178,6 @@ class AddWorkerRequest(BaseModel):
     trigger_workflow: bool = False
     endpoint_id: UUID4 | None = None
     additional_concurrency: int | None = Field(None, gt=0)
-    cluster_id: UUID4 | None = None
 
     @model_validator(mode="after")
     def validate_fields(self) -> "AddWorkerRequest":
@@ -189,12 +188,6 @@ class AddWorkerRequest(BaseModel):
         if self.workflow_id is not None and self.workflow_total_steps is not None:
             raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
 
-        # Check if at least one of the other fields is provided
-        other_fields = [self.endpoint_id, self.additional_concurrency, self.cluster_id]
-        required_fields = ["endpoint_id", "additional_concurrency", "cluster_id"]
-        if not any(other_fields):
-            raise ValueError(f"At least one of {', '.join(required_fields)} is required")
-
         return self
 
 
@@ -202,5 +195,4 @@ class AddWorkerWorkflowStepData(BaseModel):
     """Add worker workflow step data."""
 
     endpoint_id: UUID4 | None = None
-    cluster_id: UUID4 | None = None
     additional_concurrency: int | None = None

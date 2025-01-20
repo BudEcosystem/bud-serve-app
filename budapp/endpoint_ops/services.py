@@ -37,7 +37,6 @@ from ..commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
     BudServeWorkflowStepEventName,
-    ClusterStatusEnum,
     EndpointStatusEnum,
     ModelProviderTypeEnum,
     NotificationTypeEnum,
@@ -588,7 +587,6 @@ class EndpointService(SessionMixin):
         workflow_id = request.workflow_id
         workflow_total_steps = request.workflow_total_steps
         trigger_workflow = request.trigger_workflow
-        cluster_id = request.cluster_id
         endpoint_id = request.endpoint_id
         additional_concurrency = request.additional_concurrency
         current_step_number = step_number
@@ -629,17 +627,10 @@ class EndpointService(SessionMixin):
                 {"title": db_endpoint.name, "icon": model_icon, "tag": db_endpoint.project.name},
             )
 
-        # Validate cluster id
-        if cluster_id:
-            db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-                ClusterModel, {"id": cluster_id}, exclude_fields={"status": ClusterStatusEnum.DELETED}
-            )
-
         # Prepare workflow step data
         workflow_step_data = AddWorkerWorkflowStepData(
             endpoint_id=endpoint_id,
             additional_concurrency=additional_concurrency,
-            cluster_id=cluster_id,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
@@ -723,7 +714,115 @@ class EndpointService(SessionMixin):
 
         # Trigger workflow
         if trigger_workflow:
-            pass
+            # TODO: remove this dummy events ==============================================
+            dummy_events = {
+                "budserve_cluster_events": {
+                    "eta": 1800,
+                    "steps": [
+                        {
+                            "id": "verify_cluster_connection",
+                            "title": "Verifying cluster connection",
+                            "payload": {
+                                "type": "deploy_model",
+                                "event": "verify_cluster_connection",
+                                "source": "budcluster",
+                                "content": {
+                                    "title": "Cluster connection verification successful",
+                                    "result": None,
+                                    "status": "COMPLETED",
+                                    "message": "Cluster connection verified successfully",
+                                    "primary_action": None,
+                                    "secondary_action": None,
+                                },
+                                "category": "internal",
+                                "workflow_id": "530e948d-b97a-4f91-84d6-3f00a6783309",
+                            },
+                            "description": "Verify the cluster connection",
+                        },
+                        {
+                            "id": "deploy_to_engine",
+                            "title": "Deploying model to engine",
+                            "payload": {
+                                "type": "deploy_model",
+                                "event": "deploy_to_engine",
+                                "source": "budcluster",
+                                "content": {
+                                    "title": "Model deployment to engine successful",
+                                    "result": None,
+                                    "status": "COMPLETED",
+                                    "message": "Engine deployed successfully",
+                                    "primary_action": None,
+                                    "secondary_action": None,
+                                },
+                                "category": "internal",
+                                "workflow_id": "530e948d-b97a-4f91-84d6-3f00a6783309",
+                            },
+                            "description": "Deploy the model to the engine",
+                        },
+                        {
+                            "id": "verify_deployment_status",
+                            "title": "Verifying deployment status",
+                            "payload": {
+                                "type": "deploy_model",
+                                "event": "verify_deployment_status",
+                                "source": "budcluster",
+                                "content": {
+                                    "title": "Model deployment is healthy",
+                                    "result": None,
+                                    "status": "COMPLETED",
+                                    "message": "Engine health verified successfully",
+                                    "primary_action": None,
+                                    "secondary_action": None,
+                                },
+                                "category": "internal",
+                                "workflow_id": "530e948d-b97a-4f91-84d6-3f00a6783309",
+                            },
+                            "description": "Verify the deployment status",
+                        },
+                        {
+                            "id": "run_performance_benchmark",
+                            "title": "Running performance benchmark",
+                            "payload": {
+                                "type": "deploy_model",
+                                "event": "run_performance_benchmark",
+                                "source": "budcluster",
+                                "content": {
+                                    "title": "Performance benchmark successful",
+                                    "result": None,
+                                    "status": "COMPLETED",
+                                    "message": "Performance benchmark successful",
+                                    "primary_action": None,
+                                    "secondary_action": None,
+                                },
+                                "category": "internal",
+                                "workflow_id": "530e948d-b97a-4f91-84d6-3f00a6783309",
+                            },
+                            "description": "Run the performance benchmark",
+                        },
+                    ],
+                    "object": "workflow_metadata",
+                    "status": "PENDING",
+                    "workflow_id": "c1ad4cdc-7b67-4df1-9beb-ad1ef9c8643c",
+                    "workflow_name": "create_cloud_deployment",
+                }
+            }
+
+            # Increment current step number
+            current_step_number = current_step_number + 1
+            workflow_current_step = current_step_number
+
+            # Update or create next workflow step
+            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                db_workflow.id, current_step_number, dummy_events
+            )
+            logger.debug(f"Workflow step created with id {db_workflow_step.id}")
+
+            # Update progress in workflow
+            dummy_events["progress_type"] = BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value
+            await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"progress": dummy_events, "current_step": workflow_current_step}
+            )
+            # TODO: remove till here ==============================================
 
         return db_workflow
 

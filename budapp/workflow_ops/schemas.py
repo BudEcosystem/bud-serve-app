@@ -40,6 +40,7 @@ class RetrieveWorkflowStepData(BaseModel):
     security_scan_result: ModelSecurityScanResult | None = None
     endpoint: EndpointResponse | None = None
     additional_concurrency: int | None = None
+    bud_serve_cluster_events: dict | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
