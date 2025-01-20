@@ -874,9 +874,14 @@ class EndpointService(SessionMixin):
             step["payload"] = {}
 
         simulator_id = bud_simulation_response.get("workflow_id")
+
+        # replace concurrent_requests with additional_concurrency
+        deployment_config["concurrent_requests"] = data["additional_concurrency"]
         bud_simulation_events = {
             "simulator_id": simulator_id,
             BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value: bud_simulation_response,
+            "deploy_config": deployment_config,
+            "model_id": str(db_endpoint.model.id),
         }
 
         # Increment current step number
