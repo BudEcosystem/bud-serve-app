@@ -6,6 +6,7 @@ from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Ta
 from budapp.model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider
 
 from ..commons.constants import ModelProviderTypeEnum, WorkflowStatusEnum, WorkflowTypeEnum
+from ..endpoint_ops.schemas import EndpointResponse
 
 
 class RetrieveWorkflowStepData(BaseModel):
@@ -28,6 +29,7 @@ class RetrieveWorkflowStepData(BaseModel):
     delete_cluster_events: dict | None = None
     delete_endpoint_events: dict | None = None
     model_security_scan_events: dict | None = None
+    bud_simulator_events: dict | None = None
     icon: str | None = None
     uri: str | None = None
     author: str | None = None
@@ -36,6 +38,8 @@ class RetrieveWorkflowStepData(BaseModel):
     description: str | None = None
     security_scan_result_id: UUID4 | None = None
     security_scan_result: ModelSecurityScanResult | None = None
+    endpoint: EndpointResponse | None = None
+    additional_concurrency: int | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):

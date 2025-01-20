@@ -37,6 +37,8 @@ from budapp.model_ops.models import Provider as ProviderModel
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
+from ..endpoint_ops.crud import EndpointDataManager
+from ..endpoint_ops.models import Endpoint as EndpointModel
 from .crud import WorkflowDataManager, WorkflowStepDataManager
 from .schemas import RetrieveWorkflowDataResponse, RetrieveWorkflowStepData, WorkflowUtilCreate
 
@@ -113,12 +115,14 @@ class WorkflowService(SessionMixin):
             model_security_scan_events = required_data.get(
                 BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value
             )
+            bud_simulator_events = required_data.get(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value)
             security_scan_result_id = required_data.get("security_scan_result_id")
             icon = required_data.get("icon")
             uri = required_data.get("uri")
             author = required_data.get("author")
             tags = required_data.get("tags")
             description = required_data.get("description")
+            additional_concurrency = required_data.get("additional_concurrency")
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -152,6 +156,14 @@ class WorkflowService(SessionMixin):
                 else None
             )
 
+            db_endpoint = (
+                await EndpointDataManager(self.session).retrieve_by_fields(
+                    EndpointModel, {"id": UUID(required_data["endpoint_id"])}, missing_ok=True
+                )
+                if "endpoint_id" in required_data
+                else None
+            )
+
             workflow_steps = RetrieveWorkflowStepData(
                 provider_type=provider_type if provider_type else None,
                 provider=db_provider if db_provider else None,
@@ -176,6 +188,9 @@ class WorkflowService(SessionMixin):
                 security_scan_result=db_model_security_scan_result if db_model_security_scan_result else None,
                 delete_cluster_events=delete_cluster_events if delete_cluster_events else None,
                 delete_endpoint_events=delete_endpoint_events if delete_endpoint_events else None,
+                endpoint=db_endpoint if db_endpoint else None,
+                additional_concurrency=additional_concurrency if additional_concurrency else None,
+                bud_simulator_events=bud_simulator_events if bud_simulator_events else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -240,6 +255,12 @@ class WorkflowService(SessionMixin):
             ],
             "delete_endpoint": [
                 BudServeWorkflowStepEventName.DELETE_ENDPOINT_EVENTS.value,
+            ],
+            "add_worker_to_endpoint": [
+                BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value,
+                "endpoint_id",
+                "additional_concurrency",
+                "cluster_id",
             ],
         }
 
