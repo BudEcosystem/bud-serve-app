@@ -19,7 +19,7 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID
 
-from pydantic import UUID4, BaseModel, ConfigDict
+from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator
 
 from budapp.cluster_ops.schemas import ClusterResponse
 from budapp.commons.constants import EndpointStatusEnum
@@ -46,6 +46,7 @@ class EndpointCreate(BaseModel):
     credential_id: UUID4 | None
     total_replicas: int
     number_of_nodes: int
+    deployment_config: dict | None
 
 
 class EndpointFilter(BaseModel):
@@ -53,6 +54,19 @@ class EndpointFilter(BaseModel):
 
     name: str | None = None
     status: EndpointStatusEnum | None = None
+
+
+class EndpointResponse(BaseModel):
+    """Endpoint response schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    status: EndpointStatusEnum
+    deployment_config: dict
+    created_at: datetime
+    modified_at: datetime
 
 
 class EndpointListResponse(BaseModel):
@@ -145,6 +159,7 @@ class ModelClusterDetail(BaseModel):
     status: str
     model: ModelDetailResponse
     cluster: ClusterResponse
+    deployment_config: dict
 
 
 class ModelClusterDetailResponse(SuccessResponse):
@@ -153,3 +168,32 @@ class ModelClusterDetailResponse(SuccessResponse):
     model_config = ConfigDict(extra="allow")
 
     result: ModelClusterDetail
+
+
+class AddWorkerRequest(BaseModel):
+    """Add worker request."""
+
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None
+    step_number: int = Field(..., gt=0)
+    trigger_workflow: bool = False
+    endpoint_id: UUID4 | None = None
+    additional_concurrency: int | None = Field(None, gt=0)
+
+    @model_validator(mode="after")
+    def validate_fields(self) -> "AddWorkerRequest":
+        """Validate the fields of the request."""
+        if self.workflow_id is None and self.workflow_total_steps is None:
+            raise ValueError("workflow_total_steps is required when workflow_id is not provided")
+
+        if self.workflow_id is not None and self.workflow_total_steps is not None:
+            raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
+
+        return self
+
+
+class AddWorkerWorkflowStepData(BaseModel):
+    """Add worker workflow step data."""
+
+    endpoint_id: UUID4 | None = None
+    additional_concurrency: int | None = None
