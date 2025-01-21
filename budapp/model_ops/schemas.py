@@ -204,7 +204,7 @@ class ModelCreate(ModelBase):
     use_cases: list[str] | None = None
     minimum_requirements: dict | None = None
     examples: list[dict] | None = None
-    base_model: str | None = None
+    base_model: list[str] | None = None
     base_model_relation: BaseModelRelationEnum | None = None
     model_type: str | None = None
     family: str | None = None
@@ -240,7 +240,7 @@ class ModelDetailResponse(BaseModel):
     use_cases: list[str] | None = None
     minimum_requirements: dict | None = None
     examples: list[dict] | None = None
-    base_model: str | None = None
+    base_model: list[str] | None = None
     model_type: str | None = None
     family: str | None = None
     model_weights_size: int | None = None
