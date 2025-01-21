@@ -694,6 +694,14 @@ class EndpointService(SessionMixin):
             logger.error(f"Endpoint with id {endpoint_id} not found")
             raise ClientException(f"Endpoint with id {endpoint_id} not found")
         
+        if db_endpoint.model.provider_type in [ModelProviderTypeEnum.HUGGING_FACE, ModelProviderTypeEnum.CLOUD_MODEL]:
+            db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                ProviderModel, {"id": db_endpoint.model.provider_id}
+            )
+            model_icon = db_provider.icon
+        else:
+            model_icon = db_endpoint.model.icon
+        
         current_step_number = 1
 
         # Retrieve or create workflow
@@ -701,7 +709,7 @@ class EndpointService(SessionMixin):
             workflow_type=WorkflowTypeEnum.ENDPOINT_WORKER_DELETION,
             title=worker_name,
             total_steps=current_step_number,
-            icon=None,
+            icon=model_icon,
             tag=db_endpoint.project.name,
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
