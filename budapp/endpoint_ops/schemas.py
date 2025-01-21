@@ -159,6 +159,7 @@ class ModelClusterDetail(BaseModel):
     status: str
     model: ModelDetailResponse
     cluster: ClusterResponse
+    deployment_config: dict
 
 
 class ModelClusterDetailResponse(SuccessResponse):
