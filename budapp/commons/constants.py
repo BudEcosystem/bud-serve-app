@@ -416,6 +416,7 @@ class WorkflowTypeEnum(StrEnum):
     CLUSTER_ONBOARDING = auto()
     CLUSTER_DELETION = auto()
     ENDPOINT_DELETION = auto()
+    ENDPOINT_WORKER_DELETION = auto()
     CLOUD_MODEL_ONBOARDING = auto()
     LOCAL_MODEL_ONBOARDING = auto()
     ADD_WORKER_TO_ENDPOINT = auto()
@@ -464,6 +465,7 @@ class PayloadType(str, Enum):
     PERFORM_MODEL_SECURITY_SCAN = "perform_model_security_scan"
     CLUSTER_STATUS_UPDATE = "cluster-status-update"
     DEPLOYMENT_STATUS_UPDATE = "deployment-status-update"
+    DELETE_WORKER = "delete_worker"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -484,6 +486,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     MODEL_SECURITY_SCAN_EVENTS = "model_security_scan_events"
     DELETE_CLUSTER_EVENTS = "delete_cluster_events"
     DELETE_ENDPOINT_EVENTS = "delete_endpoint_events"
+    DELETE_WORKER_EVENTS = "delete_worker_events"
 
 
 class ClusterStatusEnum(StrEnum):

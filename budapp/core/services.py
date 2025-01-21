@@ -163,6 +163,20 @@ class NotificationService(SessionMixin):
         if payload.event == "results":
             await EndpointService(self.session).delete_endpoint_from_notification_event(payload)
 
+    async def update_delete_worker_events(self, payload: NotificationPayload) -> None:
+        """Update the delete worker events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.DELETE_WORKER_EVENTS.value, payload)
+        # Create cluster in database if node info fetched successfully
+        if payload.event == "results":
+            await EndpointService(self.session).delete_worker_from_notification_event(payload)
+
     async def update_model_security_scan_events(self, payload: NotificationPayload) -> None:
         """Update the model security scan events for a workflow step.
 
@@ -367,6 +381,7 @@ class SubscriberHandler:
             PayloadType.DELETE_DEPLOYMENT: self._handle_delete_endpoint,
             PayloadType.CLUSTER_STATUS_UPDATE: self._handle_cluster_status_update,
             PayloadType.DEPLOYMENT_STATUS_UPDATE: self._handle_endpoint_status_update,
+            PayloadType.DELETE_WORKER: self._handle_delete_worker,
         }
 
         handler = handlers.get(payload.type)
@@ -448,6 +463,14 @@ class SubscriberHandler:
         return NotificationResponse(
             object="notification",
             message="Update endpoint status in db",
+        ).to_http_response()
+
+    async def _handle_delete_worker(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the delete worker event."""
+        await NotificationService(self.session).update_delete_worker_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated delete worker event in workflow step",
         ).to_http_response()
 
 

@@ -37,6 +37,7 @@ from ..workflow_ops.schemas import RetrieveWorkflowDataResponse
 from ..workflow_ops.services import WorkflowService
 from .schemas import (
     AddWorkerRequest,
+    DeleteWorkerRequest,
     EndpointFilter,
     EndpointPaginatedResponse,
     ModelClusterDetailResponse,
@@ -277,6 +278,46 @@ async def get_model_cluster_detail(
 
 
 @endpoint_router.post(
+    "/delete-worker",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully deleted deploymentworker",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Worker not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to delete deployment worker",
+        },
+    },
+)
+async def delete_endpoint_worker(
+    request: DeleteWorkerRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a endpoint worker by its ID."""
+    try:
+        db_workflow = await EndpointService(session).delete_endpoint_worker(request.endpoint_id, request.worker_id, request.worker_name, current_user.id)
+        logger.debug(f"Endpoint deleting initiated with workflow id: {db_workflow.id}")
+        response = SuccessResponse(
+            message="Worker deleting initiated successfully",
+            code=status.HTTP_200_OK,
+            object="worker.delete",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to get endpoint worker detail: {e}")
+        response = ErrorResponse(message=e.message, code=e.status_code)
+    except Exception as e:
+        logger.exception(f"Failed to get endpoint worker detail: {e}")
+        response = ErrorResponse(message="Failed to get endpoint worker detail", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return response.to_http_response()
+
+
+@endpoint_router.post(
     "/add-worker",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
@@ -315,3 +356,4 @@ async def add_worker_to_endpoint(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add worker to endpoint"
         ).to_http_response()
+

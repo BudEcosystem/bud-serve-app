@@ -17,6 +17,7 @@
 """The endpoint ops services. Contains business logic for endpoint ops."""
 
 import json
+import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Tuple
 from uuid import UUID
@@ -26,6 +27,7 @@ from fastapi import status
 
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
+from budapp.commons.schemas import BudNotificationMetadata
 from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.models import Project as ProjectModel
 
@@ -468,6 +470,8 @@ class EndpointService(SessionMixin):
         logger.debug(
             f"Retrieving endpoint with bud_cluster_id: {payload.content.result['cluster_id']} and namespace: {payload.content.result['deployment_name']}"
         )
+        total_replicas = len(payload.content.result['worker_data_list'])
+        logger.debug(f"Number of workers : {total_replicas}")
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
             EndpointModel,
             {
@@ -481,9 +485,9 @@ class EndpointService(SessionMixin):
         # Update cluster status
         endpoint_status = await self._get_endpoint_status(payload.content.result["status"])
         db_endpoint = await EndpointDataManager(self.session).update_by_fields(
-            db_endpoint, {"status": endpoint_status}
+            db_endpoint, {"status": endpoint_status, "total_replicas": total_replicas}
         )
-        logger.debug(f"Endpoint {db_endpoint.id} status updated to {endpoint_status}")
+        logger.debug(f"Endpoint {db_endpoint.id} status updated to {endpoint_status} and total replicas to {total_replicas}")
 
     @staticmethod
     async def _get_endpoint_status(status: str) -> EndpointStatusEnum:
@@ -580,6 +584,190 @@ class EndpointService(SessionMixin):
             cluster=cluster_detail,
             deployment_config=db_endpoint.deployment_config,
         )
+
+
+    async def delete_worker_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Delete a worker in database.
+
+        Args:
+            payload: The payload to delete the worker with.
+
+        Raises:
+            ClientException: If the worker already exists.
+        """
+        logger.debug("Received event for deleting worker")
+
+        # Get workflow and steps
+        workflow_id = payload.workflow_id
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for worker deletion
+        keys_of_interest = [
+            "endpoint_id",
+            "worker_id",
+            "worker_name",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        logger.debug("Collected required data from workflow steps")
+        
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel, {"id": required_data["endpoint_id"]}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+        )
+        logger.debug(f"Endpoint retrieved successfully: {db_endpoint.id}")
+
+        # Mark workflow as completed
+        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
+        logger.debug(f"Workflow {db_workflow.id} marked as completed")
+
+        # Send notification to workflow creator
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_endpoint.model)
+        notification_request = (
+            NotificationBuilder()
+            .set_content(
+                title=db_endpoint.name,
+                message="Worker Deleted",
+                icon=model_icon,
+                result=NotificationResult(target_id=db_endpoint.project.id, target_type="project").model_dump(
+                    exclude_none=True, exclude_unset=True
+                ),
+            )
+            .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.DEPLOYMENT_DELETION_SUCCESS.value)
+            .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)
+
+    async def _perform_endpoint_worker_delete_request(
+        self, worker_id: UUID, workflow_id: UUID, current_user_id: UUID
+    ) -> Dict:
+        """Perform update endpoint status request to bud_cluster app.
+
+        Args:
+            cluster_id: The ID of the cluster to update.
+            namespace: The namespace of the cluster to update.
+            current_user_id: The ID of the current user.
+        """
+        delete_worker_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/worker-info"
+
+        try:
+            notification_metadata = BudNotificationMetadata(
+                workflow_id=str(workflow_id),
+                subscriber_ids=str(current_user_id),
+                name=BUD_INTERNAL_WORKFLOW,
+            )
+            payload = {
+                "worker_id": str(worker_id),
+                "notification_metadata": notification_metadata.model_dump(mode="json"),
+                "source_topic": f"{app_settings.source_topic}",
+            }
+            logger.debug(
+                f"Performing update endpoint status request. payload: {payload}, endpoint: {delete_worker_endpoint}"
+            )
+            async with aiohttp.ClientSession() as session, session.delete(
+                delete_worker_endpoint, json=payload
+            ) as response:
+                response_data = await response.json()
+                if response.status != 200:
+                    logger.error(f"Failed to delete worker: {response.status} {response_data}")
+                    error_message = response_data.get("message", "Failed to delete worker")
+                    raise ClientException(
+                        error_message, status_code=response.status
+                    )
+
+                logger.debug("Successfully deleted worker")
+                return response_data
+        except ClientException as e:
+            raise e
+        except Exception as e:
+            logger.exception(f"Failed to send delete worker request: {e}")
+            raise ClientException(
+                "Failed to delete worker", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def delete_endpoint_worker(self, endpoint_id: UUID, worker_id: UUID, worker_name: str, current_user_id: UUID) -> None:
+        """Delete a endpoint worker by its ID."""
+        # To check if endpoint exists
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel, {"id": endpoint_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+        )
+        if not db_endpoint:
+            logger.error(f"Endpoint with id {endpoint_id} not found")
+            raise ClientException(f"Endpoint with id {endpoint_id} not found")
+        
+        if db_endpoint.model.provider_type in [ModelProviderTypeEnum.HUGGING_FACE, ModelProviderTypeEnum.CLOUD_MODEL]:
+            db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                ProviderModel, {"id": db_endpoint.model.provider_id}
+            )
+            model_icon = db_provider.icon
+        else:
+            model_icon = db_endpoint.model.icon
+        
+        current_step_number = 1
+
+        # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.ENDPOINT_WORKER_DELETION,
+            title=worker_name,
+            total_steps=current_step_number,
+            icon=model_icon,
+            tag=db_endpoint.project.name,
+        )
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id=None, workflow_data=workflow_create, current_user_id=current_user_id
+        )
+        logger.debug(f"Delete worker workflow {db_workflow.id} created")
+
+        try:
+            # Perform delete endpoint request to bud_cluster app
+            bud_cluster_response = await self._perform_endpoint_worker_delete_request(
+                worker_id, db_workflow.id, current_user_id
+            )
+        except ClientException as e:
+            await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"status": WorkflowStatusEnum.FAILED}
+            )
+            raise e
+
+        # Add payload dict to response
+        for step in bud_cluster_response["steps"]:
+            step["payload"] = {}
+
+        delete_worker_workflow_id = bud_cluster_response.get("workflow_id")
+        delete_worker_events = {
+            BudServeWorkflowStepEventName.DELETE_WORKER_EVENTS.value: bud_cluster_response,
+            "delete_worker_workflow_id": delete_worker_workflow_id,
+            "endpoint_id": str(db_endpoint.id),
+            "worker_id": str(worker_id),
+            "worker_name": worker_name,
+        }
+
+        # Insert step details in db
+        db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+            WorkflowStepModel(
+                workflow_id=db_workflow.id,
+                step_number=current_step_number,
+                data=delete_worker_events,
+            )
+        )
+        logger.debug(f"Created workflow step {current_step_number} for workflow {db_workflow.id}")
+
+        # Update progress in workflow
+        bud_cluster_response["progress_type"] = BudServeWorkflowStepEventName.DELETE_WORKER_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": bud_cluster_response, "current_step": current_step_number}
+        )
+
+        return db_workflow
 
     async def add_worker_to_endpoint_workflow(self, current_user_id: UUID, request: AddWorkerRequest) -> WorkflowModel:
         """Add worker to endpoint workflow."""
@@ -921,3 +1109,4 @@ class EndpointService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to perform model extraction request: {e}")
             raise ClientException("Unable to perform model extraction") from e
+
