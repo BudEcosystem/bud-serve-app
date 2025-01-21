@@ -578,6 +578,7 @@ class EndpointService(SessionMixin):
             status=db_endpoint.status,
             model=model_detail["model"],
             cluster=cluster_detail,
+            deployment_config=db_endpoint.deployment_config,
         )
 
     async def add_worker_to_endpoint_workflow(self, current_user_id: UUID, request: AddWorkerRequest) -> WorkflowModel:
