@@ -255,6 +255,10 @@ class ModelDataManager(DataManagerUtils):
         search: bool = False,
     ) -> Tuple[List[Model], int]:
         """List all models in the database."""
+        # Convert base_model to list if it is a string
+        base_model = filters.pop("base_model", None)
+        base_model = [base_model] if base_model else None
+
         # Tags and tasks are not filterable
         # Also remove from filters dict
         explicit_conditions = []
@@ -264,6 +268,7 @@ class ModelDataManager(DataManagerUtils):
             "author": filters.pop("author", []),
             "model_size_min": filters.pop("model_size_min", None),
             "model_size_max": filters.pop("model_size_max", None),
+            "base_model": base_model,
         }
 
         # Validate the remaining filters
@@ -292,6 +297,11 @@ class ModelDataManager(DataManagerUtils):
             # Check any of author present in the field
             author_condition = Model.author.in_(explicit_filters["author"])
             explicit_conditions.append(author_condition)
+
+        if explicit_filters["base_model"]:
+            # Check any of base_model present in the field
+            base_model_condition = Model.base_model.contains(explicit_filters["base_model"])
+            explicit_conditions.append(base_model_condition)
 
         if explicit_filters["model_size_min"] is not None or explicit_filters["model_size_max"] is not None:
             # Add model size range condition
@@ -417,12 +427,12 @@ class ModelDataManager(DataManagerUtils):
 
         return result, count
 
-    async def get_model_tree_count(self, base_model: str) -> List[dict]:
+    async def get_model_tree_count(self, uri: str) -> List[dict]:
         """Get the model tree count."""
         stmt = (
             select(Model.base_model_relation, func.count(Model.id).label("count"))
             .filter(
-                Model.base_model == base_model,
+                Model.base_model.contains([uri]),
                 Model.status == ModelStatusEnum.ACTIVE,
                 Model.base_model_relation.is_not(None),
             )

@@ -990,8 +990,10 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Sanitize base model
         base_model = model_tree.get("base_model", [])
-        if base_model is not None and len(base_model) > 0:
-            base_model = base_model[0]
+        if isinstance(base_model, list) and len(base_model) > 0:
+            base_model = base_model
+        elif isinstance(base_model, str):
+            base_model = [base_model]
         base_model = normalize_value(base_model)
 
         # If base model is the same as the model uri, set base model to None
@@ -1805,13 +1807,8 @@ class ModelService(SessionMixin):
             Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
         )
 
-        # For base model there won't be any base model value
-        base_model = db_model.base_model
-        if not base_model:
-            base_model = db_model.uri
-
         # Get base model relation count
-        model_tree_count = await ModelDataManager(self.session).get_model_tree_count(base_model)
+        model_tree_count = await ModelDataManager(self.session).get_model_tree_count(db_model.uri)
         base_model_relation_count = {row.base_model_relation.value: row.count for row in model_tree_count}
         model_tree = ModelTree(
             adapters_count=base_model_relation_count.get(BaseModelRelationEnum.ADAPTER.value, 0),
