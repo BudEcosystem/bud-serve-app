@@ -36,6 +36,7 @@ from ..cluster_ops.models import Cluster as ClusterModel
 from ..cluster_ops.services import ClusterService
 from ..commons.config import app_settings
 from ..commons.constants import (
+    APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
     BudServeWorkflowStepEventName,
     EndpointStatusEnum,
@@ -58,7 +59,7 @@ from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .crud import EndpointDataManager
 from .models import Endpoint as EndpointModel
-from .schemas import EndpointCreate, ModelClusterDetail, WorkerInfoFilter
+from .schemas import AddWorkerRequest, AddWorkerWorkflowStepData, EndpointCreate, ModelClusterDetail, WorkerInfoFilter
 
 
 logger = logging.get_logger(__name__)
@@ -310,6 +311,7 @@ class EndpointService(SessionMixin):
             "project_id",
             "cluster_id",  # bud_cluster_id
             "endpoint_name",
+            "deploy_config",
         ]
 
         # from workflow steps extract necessary information
@@ -361,6 +363,7 @@ class EndpointService(SessionMixin):
             credential_id=credential_id,
             number_of_nodes=number_of_nodes,
             total_replicas=total_replicas,
+            deployment_config=required_data["deploy_config"],
         )
 
         db_endpoint = await EndpointDataManager(self.session).insert_one(
@@ -577,7 +580,9 @@ class EndpointService(SessionMixin):
             status=db_endpoint.status,
             model=model_detail["model"],
             cluster=cluster_detail,
+            deployment_config=db_endpoint.deployment_config,
         )
+
 
     async def delete_worker_from_notification_event(self, payload: NotificationPayload) -> None:
         """Delete a worker in database.
@@ -758,3 +763,345 @@ class EndpointService(SessionMixin):
         )
 
         return db_workflow
+
+    async def add_worker_to_endpoint_workflow(self, current_user_id: UUID, request: AddWorkerRequest) -> WorkflowModel:
+        """Add worker to endpoint workflow."""
+        # Get request data
+        step_number = request.step_number
+        workflow_id = request.workflow_id
+        workflow_total_steps = request.workflow_total_steps
+        trigger_workflow = request.trigger_workflow
+        endpoint_id = request.endpoint_id
+        additional_concurrency = request.additional_concurrency
+        current_step_number = step_number
+
+        # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.ADD_WORKER_TO_ENDPOINT,
+            title="Add Worker to Deployment",
+            total_steps=workflow_total_steps,
+            icon=APP_ICONS["general"]["deployment_mono"],
+            tag="Deployment",
+        )
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id, workflow_create, current_user_id
+        )
+
+        # Validate endpoint id
+        if endpoint_id:
+            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel, {"id": endpoint_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+            )
+
+            # Get icon from provider or model
+            if db_endpoint.model.provider_type in [
+                ModelProviderTypeEnum.CLOUD_MODEL,
+                ModelProviderTypeEnum.HUGGING_FACE,
+            ]:
+                db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                    ProviderModel, {"id": db_endpoint.model.provider_id}
+                )
+                model_icon = db_provider.icon
+            else:
+                model_icon = db_endpoint.model.icon
+
+            # Update title, icon and tag on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": db_endpoint.name, "icon": model_icon, "tag": db_endpoint.project.name},
+            )
+
+        # Prepare workflow step data
+        workflow_step_data = AddWorkerWorkflowStepData(
+            endpoint_id=endpoint_id,
+            additional_concurrency=additional_concurrency,
+        ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+
+        # Get workflow steps
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": db_workflow.id}
+        )
+
+        # For avoiding another db call for record retrieval, storing db object while iterating over db_workflow_steps
+        db_current_workflow_step = None
+
+        if db_workflow_steps:
+            for db_step in db_workflow_steps:
+                # Get current workflow step
+                if db_step.step_number == current_step_number:
+                    db_current_workflow_step = db_step
+
+        if db_current_workflow_step:
+            logger.info(f"Workflow {db_workflow.id} step {current_step_number} already exists")
+
+            # Update workflow step data in db
+            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                db_current_workflow_step,
+                {"data": workflow_step_data},
+            )
+            logger.info(f"Workflow {db_workflow.id} step {current_step_number} updated")
+        else:
+            logger.info(f"Creating workflow step {current_step_number} for workflow {db_workflow.id}")
+
+            # Insert step details in db
+            db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+                WorkflowStepModel(
+                    workflow_id=db_workflow.id,
+                    step_number=current_step_number,
+                    data=workflow_step_data,
+                )
+            )
+
+        # Update workflow current step as the highest step_number
+        db_max_workflow_step_number = max(step.step_number for step in db_workflow_steps) if db_workflow_steps else 0
+        workflow_current_step = max(current_step_number, db_max_workflow_step_number)
+        logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
+
+        # This will ensure workflow step number is updated to the latest step number
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": workflow_current_step},
+        )
+
+        # Perform bud simulation
+        if additional_concurrency:
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": db_workflow.id}
+            )
+
+            # Define the keys required for model security scan
+            keys_of_interest = [
+                "endpoint_id",
+                "additional_concurrency",
+            ]
+
+            # from workflow steps extract necessary information
+            required_data = {}
+            for db_workflow_step in db_workflow_steps:
+                for key in keys_of_interest:
+                    if key in db_workflow_step.data:
+                        required_data[key] = db_workflow_step.data[key]
+
+            # Check if all required keys are present
+            required_keys = ["endpoint_id", "additional_concurrency"]
+            missing_keys = [key for key in required_keys if key not in required_data]
+            if missing_keys:
+                raise ClientException(f"Missing required data for bud simulation: {', '.join(missing_keys)}")
+
+            # Perform add worker bud simulation
+            try:
+                await self._perform_add_worker_simulation(
+                    current_step_number, required_data, db_workflow, current_user_id
+                )
+            except ClientException as e:
+                raise e
+
+        # Trigger workflow
+        if trigger_workflow:
+            # TODO: remove this dummy events ==============================================
+            dummy_events = {
+                "budserve_cluster_events": {
+                    "eta": 1800,
+                    "steps": [
+                        {
+                            "id": "verify_cluster_connection",
+                            "title": "Verifying cluster connection",
+                            "payload": {
+                                "type": "deploy_model",
+                                "event": "verify_cluster_connection",
+                                "source": "budcluster",
+                                "content": {
+                                    "title": "Cluster connection verification successful",
+                                    "result": None,
+                                    "status": "COMPLETED",
+                                    "message": "Cluster connection verified successfully",
+                                    "primary_action": None,
+                                    "secondary_action": None,
+                                },
+                                "category": "internal",
+                                "workflow_id": "530e948d-b97a-4f91-84d6-3f00a6783309",
+                            },
+                            "description": "Verify the cluster connection",
+                        },
+                        {
+                            "id": "deploy_to_engine",
+                            "title": "Deploying model to engine",
+                            "payload": {
+                                "type": "deploy_model",
+                                "event": "deploy_to_engine",
+                                "source": "budcluster",
+                                "content": {
+                                    "title": "Model deployment to engine successful",
+                                    "result": None,
+                                    "status": "COMPLETED",
+                                    "message": "Engine deployed successfully",
+                                    "primary_action": None,
+                                    "secondary_action": None,
+                                },
+                                "category": "internal",
+                                "workflow_id": "530e948d-b97a-4f91-84d6-3f00a6783309",
+                            },
+                            "description": "Deploy the model to the engine",
+                        },
+                        {
+                            "id": "verify_deployment_status",
+                            "title": "Verifying deployment status",
+                            "payload": {
+                                "type": "deploy_model",
+                                "event": "verify_deployment_status",
+                                "source": "budcluster",
+                                "content": {
+                                    "title": "Model deployment is healthy",
+                                    "result": None,
+                                    "status": "COMPLETED",
+                                    "message": "Engine health verified successfully",
+                                    "primary_action": None,
+                                    "secondary_action": None,
+                                },
+                                "category": "internal",
+                                "workflow_id": "530e948d-b97a-4f91-84d6-3f00a6783309",
+                            },
+                            "description": "Verify the deployment status",
+                        },
+                        {
+                            "id": "run_performance_benchmark",
+                            "title": "Running performance benchmark",
+                            "payload": {
+                                "type": "deploy_model",
+                                "event": "run_performance_benchmark",
+                                "source": "budcluster",
+                                "content": {
+                                    "title": "Performance benchmark successful",
+                                    "result": None,
+                                    "status": "COMPLETED",
+                                    "message": "Performance benchmark successful",
+                                    "primary_action": None,
+                                    "secondary_action": None,
+                                },
+                                "category": "internal",
+                                "workflow_id": "530e948d-b97a-4f91-84d6-3f00a6783309",
+                            },
+                            "description": "Run the performance benchmark",
+                        },
+                    ],
+                    "object": "workflow_metadata",
+                    "status": "PENDING",
+                    "workflow_id": "c1ad4cdc-7b67-4df1-9beb-ad1ef9c8643c",
+                    "workflow_name": "create_cloud_deployment",
+                }
+            }
+
+            # Increment current step number
+            current_step_number = current_step_number + 1
+            workflow_current_step = current_step_number
+
+            # Update or create next workflow step
+            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                db_workflow.id, current_step_number, dummy_events
+            )
+            logger.debug(f"Workflow step created with id {db_workflow_step.id}")
+
+            # Update progress in workflow
+            dummy_events["progress_type"] = BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value
+            await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"progress": dummy_events, "current_step": workflow_current_step}
+            )
+            # TODO: remove till here ==============================================
+
+        return db_workflow
+
+    async def _perform_add_worker_simulation(
+        self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID
+    ) -> None:
+        """Perform bud simulation."""
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel, {"id": data["endpoint_id"]}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+        )
+
+        # Create request payload
+        deployment_config = db_endpoint.deployment_config
+        payload = {
+            "pretrained_model_uri": db_endpoint.model.uri,
+            "input_tokens": deployment_config["avg_context_length"],
+            "output_tokens": deployment_config["avg_sequence_length"],
+            "concurrency": data["additional_concurrency"],
+            "cluster_id": str(db_endpoint.cluster.cluster_id),
+            "notification_metadata": {
+                "name": BUD_INTERNAL_WORKFLOW,
+                "subscriber_ids": str(current_user_id),
+                "workflow_id": str(db_workflow.id),
+            },
+            "source_topic": f"{app_settings.source_topic}",
+        }
+        if db_endpoint.model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            payload["target_ttft"] = 0
+            payload["target_throughput_per_user"] = 0
+            payload["target_e2e_latency"] = 0
+            payload["is_proprietary_model"] = True
+        else:
+            payload["target_ttft"] = deployment_config["ttft"][0] if deployment_config["ttft"] else None
+            payload["target_throughput_per_user"] = (
+                deployment_config["per_session_tokens_per_sec"][1]
+                if deployment_config["per_session_tokens_per_sec"]
+                else None
+            )
+            payload["target_e2e_latency"] = (
+                deployment_config["e2e_latency"][0] if deployment_config["e2e_latency"] else None
+            )
+            payload["is_proprietary_model"] = False
+
+        # Perform bud simulation request
+        bud_simulation_response = await self._perform_bud_simulation_request(payload)
+
+        # Add payload dict to response
+        for step in bud_simulation_response["steps"]:
+            step["payload"] = {}
+
+        simulator_id = bud_simulation_response.get("workflow_id")
+
+        # replace concurrent_requests with additional_concurrency
+        deployment_config["concurrent_requests"] = data["additional_concurrency"]
+        bud_simulation_events = {
+            "simulator_id": simulator_id,
+            BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value: bud_simulation_response,
+            "deploy_config": deployment_config,
+            "model_id": str(db_endpoint.model.id),
+        }
+
+        # Increment current step number
+        current_step_number = current_step_number + 1
+        workflow_current_step = current_step_number
+
+        # Update or create next workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, bud_simulation_events
+        )
+        logger.debug(f"Workflow step created with id {db_workflow_step.id}")
+
+        # Update progress in workflow
+        bud_simulation_response["progress_type"] = BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": bud_simulation_response, "current_step": workflow_current_step}
+        )
+
+    async def _perform_bud_simulation_request(self, payload: Dict) -> Dict:
+        """Perform model extraction request."""
+        bud_simulation_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/run"
+        )
+        logger.debug(f"payload for bud simulation on add worker to endpoint : {payload}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(bud_simulation_endpoint, json=payload) as response:
+                    response_data = await response.json()
+                    if response.status >= 400:
+                        raise ClientException("Unable to perform model extraction")
+
+                    return response_data
+        except ClientException as e:
+            raise e
+        except Exception as e:
+            logger.error(f"Failed to perform model extraction request: {e}")
+            raise ClientException("Unable to perform model extraction") from e
+

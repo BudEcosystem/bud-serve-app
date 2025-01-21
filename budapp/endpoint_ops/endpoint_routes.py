@@ -33,7 +33,17 @@ from budapp.commons.exceptions import ClientException
 from budapp.user_ops.schemas import User
 
 from ..commons.schemas import ErrorResponse, SuccessResponse
-from .schemas import EndpointFilter, EndpointPaginatedResponse, ModelClusterDetail, ModelClusterDetailResponse, WorkerDetailResponse, WorkerInfoFilter, WorkerInfoResponse
+from ..workflow_ops.schemas import RetrieveWorkflowDataResponse
+from ..workflow_ops.services import WorkflowService
+from .schemas import (
+    AddWorkerRequest,
+    EndpointFilter,
+    EndpointPaginatedResponse,
+    ModelClusterDetailResponse,
+    WorkerDetailResponse,
+    WorkerInfoFilter,
+    WorkerInfoResponse,
+)
 from .services import EndpointService
 
 
@@ -174,7 +184,9 @@ async def get_endpoint_workers(
 ) -> Union[WorkerInfoResponse, ErrorResponse]:
     """Get endpoint workers."""
     try:
-        workers = await EndpointService(session).get_endpoint_workers(endpoint_id, filters, refresh, page, limit, order_by, search)
+        workers = await EndpointService(session).get_endpoint_workers(
+            endpoint_id, filters, refresh, page, limit, order_by, search
+        )
         response = WorkerInfoResponse(**workers)
     except ClientException as e:
         logger.exception(f"Failed to get endpoint workers: {e}")
@@ -217,7 +229,9 @@ async def get_endpoint_worker_detail(
         response = ErrorResponse(message=e.message, code=e.status_code)
     except Exception as e:
         logger.exception(f"Failed to get endpoint worker detail: {e}")
-        response = ErrorResponse(message="Failed to get endpoint worker detail", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        response = ErrorResponse(
+            message="Failed to get endpoint worker detail", code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
     return response.to_http_response()
 
 
@@ -246,13 +260,19 @@ async def get_model_cluster_detail(
     """Get model cluster detail."""
     try:
         model_cluster_detail = await EndpointService(session).get_model_cluster_detail(endpoint_id)
-        response = ModelClusterDetailResponse(object="endpoint.detail", result=model_cluster_detail, message="Successfully fetched model cluster detail for the deployment.")
+        response = ModelClusterDetailResponse(
+            object="endpoint.detail",
+            result=model_cluster_detail,
+            message="Successfully fetched model cluster detail for the deployment.",
+        )
     except ClientException as e:
         logger.exception(f"Failed to get model cluster detail: {e}")
         response = ErrorResponse(message=e.message, code=e.status_code)
     except Exception as e:
         logger.exception(f"Failed to get model cluster detail: {e}")
-        response = ErrorResponse(message="Failed to get model cluster detail", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        response = ErrorResponse(
+            message="Failed to get model cluster detail", code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
     return response.to_http_response()
 
 
@@ -291,4 +311,45 @@ async def delete_endpoint_worker(
         logger.exception(f"Failed to get endpoint worker detail: {e}")
         response = ErrorResponse(message="Failed to get endpoint worker detail", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
     return response.to_http_response()
+
+
+@endpoint_router.post(
+    "/add-worker",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RetrieveWorkflowDataResponse,
+            "description": "Successfully add worker",
+        },
+    },
+    description="Add worker to endpoint",
+)
+async def add_worker_to_endpoint(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: AddWorkerRequest,
+) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
+    """Add worker to endpoint."""
+    try:
+        db_workflow = await EndpointService(session).add_worker_to_endpoint_workflow(
+            current_user_id=current_user.id,
+            request=request,
+        )
+
+        return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
+    except ClientException as e:
+        logger.exception(f"Failed to add worker to endpoint: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to add worker to endpoint: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add worker to endpoint"
+        ).to_http_response()
 
