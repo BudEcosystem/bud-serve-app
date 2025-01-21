@@ -301,8 +301,13 @@ async def delete_endpoint_worker(
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Delete a endpoint worker by its ID."""
     try:
-        worker_detail = await EndpointService(session).delete_endpoint_worker(request.endpoint_id, request.worker_id, request.worker_name, current_user.id)
-        response = WorkerDetailResponse(**worker_detail)
+        db_workflow = await EndpointService(session).delete_endpoint_worker(request.endpoint_id, request.worker_id, request.worker_name, current_user.id)
+        logger.debug(f"Endpoint deleting initiated with workflow id: {db_workflow.id}")
+        response = SuccessResponse(
+            message="Worker deleting initiated successfully",
+            code=status.HTTP_200_OK,
+            object="worker.delete",
+        )
     except ClientException as e:
         logger.exception(f"Failed to get endpoint worker detail: {e}")
         response = ErrorResponse(message=e.message, code=e.status_code)
