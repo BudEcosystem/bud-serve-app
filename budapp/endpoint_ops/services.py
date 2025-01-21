@@ -470,6 +470,8 @@ class EndpointService(SessionMixin):
         logger.debug(
             f"Retrieving endpoint with bud_cluster_id: {payload.content.result['cluster_id']} and namespace: {payload.content.result['deployment_name']}"
         )
+        total_replicas = len(payload.content.result['worker_data_list'])
+        logger.debug(f"Number of workers : {total_replicas}")
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
             EndpointModel,
             {
@@ -483,9 +485,9 @@ class EndpointService(SessionMixin):
         # Update cluster status
         endpoint_status = await self._get_endpoint_status(payload.content.result["status"])
         db_endpoint = await EndpointDataManager(self.session).update_by_fields(
-            db_endpoint, {"status": endpoint_status}
+            db_endpoint, {"status": endpoint_status, "total_replicas": total_replicas}
         )
-        logger.debug(f"Endpoint {db_endpoint.id} status updated to {endpoint_status}")
+        logger.debug(f"Endpoint {db_endpoint.id} status updated to {endpoint_status} and total replicas to {total_replicas}")
 
     @staticmethod
     async def _get_endpoint_status(status: str) -> EndpointStatusEnum:
