@@ -37,6 +37,7 @@ from ..workflow_ops.schemas import RetrieveWorkflowDataResponse
 from ..workflow_ops.services import WorkflowService
 from .schemas import (
     AddWorkerRequest,
+    DeleteWorkerRequest,
     EndpointFilter,
     EndpointPaginatedResponse,
     ModelClusterDetailResponse,
@@ -277,7 +278,7 @@ async def get_model_cluster_detail(
 
 
 @endpoint_router.post(
-    "/{endpoint_id}/delete-worker/{worker_id}",
+    "/delete-worker",
     responses={
         status.HTTP_200_OK: {
             "model": SuccessResponse,
@@ -294,15 +295,13 @@ async def get_model_cluster_detail(
     },
 )
 async def delete_endpoint_worker(
-    endpoint_id: UUID,
-    worker_id: UUID,
-    worker_name: str,
+    request: DeleteWorkerRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Delete a endpoint worker by its ID."""
     try:
-        worker_detail = await EndpointService(session).delete_endpoint_worker(endpoint_id, worker_id, worker_name, current_user.id)
+        worker_detail = await EndpointService(session).delete_endpoint_worker(request.endpoint_id, request.worker_id, request.worker_name, current_user.id)
         response = WorkerDetailResponse(**worker_detail)
     except ClientException as e:
         logger.exception(f"Failed to get endpoint worker detail: {e}")

@@ -197,3 +197,11 @@ class AddWorkerWorkflowStepData(BaseModel):
 
     endpoint_id: UUID4 | None = None
     additional_concurrency: int | None = None
+
+
+class DeleteWorkerRequest(BaseModel):
+    """Delete worker request."""
+
+    endpoint_id: UUID4
+    worker_id: UUID4
+    worker_name: str
