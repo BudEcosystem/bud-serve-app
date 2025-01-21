@@ -679,12 +679,15 @@ class EndpointService(SessionMixin):
                 response_data = await response.json()
                 if response.status != 200:
                     logger.error(f"Failed to delete worker: {response.status} {response_data}")
+                    error_message = response_data.get("message", "Failed to delete worker")
                     raise ClientException(
-                        "Failed to delete worker", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        error_message, status_code=response.status
                     )
 
                 logger.debug("Successfully deleted worker")
                 return response_data
+        except ClientException as e:
+            raise e
         except Exception as e:
             logger.exception(f"Failed to send delete worker request: {e}")
             raise ClientException(
