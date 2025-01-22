@@ -41,14 +41,13 @@ class BaseAnalyticsRequest(BaseModel):
 class CountAnalyticsRequest(BaseAnalyticsRequest):
     """Request count analytics request schema."""
 
-    metrics: Literal["overall", "concurrency", "queuing_time"] | None = None
-    filter_by: Literal["project", "model", "endpoint"] | None = None
+    metrics: Literal["global", "overall", "concurrency", "queuing_time"] | None = None
 
     @model_validator(mode="before")
     def validate_filter_by(cls, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate filter_by for concurrency metrics."""
-        if data.get("filter_by") is None and data.get("metrics") in ["concurrency", "queuing_time"]:
-            raise ValueError("filter_by should be either project, model or endpoint for concurrency metrics")
+        """Validate that global metrics don't have filter conditions."""
+        if data.get("metrics") == "global" and data.get("filter_conditions"):
+            raise ValueError("global metrics doesn't support filter_conditions, use overall metrics instead")
         return data
 
 
@@ -58,6 +57,7 @@ class CountAnalyticsResponse(SuccessResponse):
     overall_metrics: dict | None = None
     concurrency_metrics: dict | None = None
     queuing_time_metrics: dict | None = None
+    global_metrics: dict | None = None
 
 
 class PerformanceAnalyticsRequest(BaseAnalyticsRequest):
