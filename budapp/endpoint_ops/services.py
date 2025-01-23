@@ -1126,3 +1126,92 @@ class EndpointService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to perform add worker to deployment request: {e}")
             raise ClientException("Unable to perform add worker to deployment") from e
+
+    async def add_worker_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Add worker from notification event."""
+        # Get workflow and workflow steps
+        workflow_id = payload.workflow_id
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for endpoint creation
+        keys_of_interest = [
+            "endpoint_id",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        logger.debug("Collected required data from workflow steps")
+
+        # Get endpoint id
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            {"id": required_data["endpoint_id"]},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+            missing_ok=True,
+        )
+
+        if not db_endpoint:
+            logger.error(f"Endpoint with id {required_data['endpoint_id']} not found")
+            return
+
+        # Add concurrency to existing deployment config
+        deployment_config = db_endpoint.deployment_config
+        logger.debug(f"Existing deployment config: {deployment_config}")
+
+        existing_concurrency = deployment_config["concurrent_requests"]
+        additional_concurrency = payload.content.result.get("result", {}).get("concurrency", 0)
+        deployment_config["concurrent_requests"] = existing_concurrency + additional_concurrency
+
+        db_endpoint = await EndpointDataManager(self.session).update_by_fields(
+            db_endpoint, {"deployment_config": deployment_config}
+        )
+        logger.debug(f"Updated deployment config: {deployment_config}")
+
+        # Update current step number
+        current_step_number = db_workflow.current_step + 1
+        workflow_current_step = current_step_number
+
+        execution_status_data = {
+            "workflow_execution_status": {
+                "status": "success",
+                "message": "Deployment successfully updated with additional concurrency",
+            },
+        }
+        # Update or create next workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, execution_status_data
+        )
+        logger.debug(f"Upsert workflow step {db_workflow_step.id} for storing endpoint details")
+
+        # Mark workflow as completed
+        logger.debug(f"Marking workflow as completed: {workflow_id}")
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
+        )
+
+        # Send notification to workflow creator
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_endpoint.model)
+
+        notification_request = (
+            NotificationBuilder()
+            .set_content(
+                title=db_endpoint.name,
+                message="Worker Added",
+                icon=model_icon,
+                result=NotificationResult(target_id=db_endpoint.id, target_type="endpoint").model_dump(
+                    exclude_none=True, exclude_unset=True
+                ),
+            )
+            .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.DEPLOYMENT_SUCCESS.value)
+            .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)

@@ -224,6 +224,25 @@ class NotificationService(SessionMixin):
         if payload.event == "results":
             await EndpointService(self.session).update_endpoint_status_from_notification_event(payload)
 
+    async def update_add_worker_to_deployment_events(self, payload: NotificationPayload) -> None:
+        """Update the add worker to deployment events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        # Update workflow step data event
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value, payload)
+
+        # Update progress in workflow
+        await self._update_workflow_progress(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value, payload)
+
+        # Add worker to deployment
+        if payload.event == "results":
+            await EndpointService(self.session).delete_endpoint_from_notification_event(payload)
+
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
         """Update the workflow step events for a workflow step.
 
@@ -382,6 +401,7 @@ class SubscriberHandler:
             PayloadType.CLUSTER_STATUS_UPDATE: self._handle_cluster_status_update,
             PayloadType.DEPLOYMENT_STATUS_UPDATE: self._handle_endpoint_status_update,
             PayloadType.DELETE_WORKER: self._handle_delete_worker,
+            PayloadType.ADD_WORKER: self._handle_add_worker_to_deployment,
         }
 
         handler = handlers.get(payload.type)
@@ -471,6 +491,14 @@ class SubscriberHandler:
         return NotificationResponse(
             object="notification",
             message="Updated delete worker event in workflow step",
+        ).to_http_response()
+
+    async def _handle_add_worker_to_deployment(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the add worker to deployment event."""
+        await NotificationService(self.session).update_add_worker_to_deployment_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated add worker to deployment event in workflow step",
         ).to_http_response()
 
 
