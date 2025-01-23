@@ -1059,7 +1059,7 @@ class EndpointService(SessionMixin):
             deploy_model_uri = db_model.local_path
 
         add_worker_payload = {
-            "cluster_id": str(db_endpoint.cluster_id),
+            "cluster_id": str(db_endpoint.bud_cluster_id),
             "simulator_id": data["simulator_id"],
             "endpoint_name": db_endpoint.name,
             "model": deploy_model_uri,
