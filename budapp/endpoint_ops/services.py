@@ -1040,19 +1040,37 @@ class EndpointService(SessionMixin):
         self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID
     ) -> None:
         """Perform add worker to deployment."""
+        # Get endpoint
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
             EndpointModel, {"id": data["endpoint_id"]}, exclude_fields={"status": EndpointStatusEnum.DELETED}
         )
         deployment_config = db_endpoint.deployment_config
 
+        # Model URI selection as per lite-llm updates
+        db_model = db_endpoint.model
+        credential_id = db_endpoint.credential_id
+        if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            model_uri = db_model.uri
+            model_source = db_model.source
+            if model_uri.startswith(f"{model_source}/"):
+                model_uri = model_uri.removeprefix(f"{model_source}/")
+            deploy_model_uri = model_uri if not credential_id else f"{model_source}/{model_uri}"
+        else:
+            deploy_model_uri = db_model.local_path
+
         add_worker_payload = {
             "cluster_id": str(db_endpoint.cluster_id),
             "simulator_id": data["simulator_id"],
             "endpoint_name": db_endpoint.name,
-            "model": db_endpoint.model.uri,
+            "model": deploy_model_uri,
             "concurrency": data["additional_concurrency"],
             "input_tokens": deployment_config["avg_context_length"],
             "output_tokens": deployment_config["avg_sequence_length"],
+            "target_throughput_per_user": deployment_config["per_session_tokens_per_sec"][1]
+            if deployment_config["per_session_tokens_per_sec"]
+            else None,
+            "target_ttft": deployment_config["ttft"][0] if deployment_config["ttft"] else None,
+            "target_e2e_latency": deployment_config["e2e_latency"][0] if deployment_config["e2e_latency"] else None,
             "credential_id": str(db_endpoint.credential_id) if db_endpoint.credential_id else None,
             "existing_deployment_namespace": db_endpoint.namespace,
             "notification_metadata": {
