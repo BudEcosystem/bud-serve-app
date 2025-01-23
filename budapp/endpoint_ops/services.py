@@ -1172,9 +1172,13 @@ class EndpointService(SessionMixin):
         additional_concurrency = payload.content.result.get("result", {}).get("concurrency", 0)
         deployment_config["concurrent_requests"] = existing_concurrency + additional_concurrency
 
+        # Get total replicas
+        total_replicas = payload.content.result["deployment_status"]["replicas"]["total"]
+        logger.debug(f"Total replicas: {total_replicas}")
+
         self.session.refresh(db_endpoint)
         db_endpoint = await EndpointDataManager(self.session).update_by_fields(
-            db_endpoint, {"deployment_config": deployment_config}
+            db_endpoint, {"deployment_config": deployment_config, "total_replicas": total_replicas}
         )
         logger.debug(f"Updated deployment config: {deployment_config}")
 
