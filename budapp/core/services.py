@@ -241,7 +241,7 @@ class NotificationService(SessionMixin):
 
         # Add worker to deployment
         if payload.event == "results":
-            await EndpointService(self.session).delete_endpoint_from_notification_event(payload)
+            await EndpointService(self.session).add_worker_from_notification_event(payload)
 
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
         """Update the workflow step events for a workflow step.
