@@ -1067,10 +1067,12 @@ class EndpointService(SessionMixin):
             "input_tokens": deployment_config["avg_context_length"],
             "output_tokens": deployment_config["avg_sequence_length"],
             "target_throughput_per_user": deployment_config["per_session_tokens_per_sec"][1]
-            if deployment_config["per_session_tokens_per_sec"]
+            if deployment_config.get("per_session_tokens_per_sec")
             else None,
-            "target_ttft": deployment_config["ttft"][0] if deployment_config["ttft"] else None,
-            "target_e2e_latency": deployment_config["e2e_latency"][0] if deployment_config["e2e_latency"] else None,
+            "target_ttft": deployment_config["ttft"][0] if deployment_config.get("ttft") else None,
+            "target_e2e_latency": deployment_config["e2e_latency"][0]
+            if deployment_config.get("e2e_latency")
+            else None,
             "credential_id": str(db_endpoint.credential_id) if db_endpoint.credential_id else None,
             "existing_deployment_namespace": db_endpoint.namespace,
             "notification_metadata": {
