@@ -38,6 +38,7 @@ from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManage
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
+from ..endpoint_ops.schemas import WorkerInfoFilter
 
 from ..commons.constants import (
     APP_ICONS,
@@ -65,6 +66,7 @@ from .schemas import (
     ClusterResponse,
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
+    ClusterEndpointResponse,
 )
 
 
@@ -1021,3 +1023,58 @@ class ClusterService(SessionMixin):
             raise ClientException(
                 "Failed to update cluster node status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
+        
+    async def get_all_endpoints_in_cluster(
+        self,
+        cluster_id: UUID,
+        offset: int,
+        limit: int,
+        filters: Dict[str, Any],
+        order_by: List[str],
+        search: bool,
+    ) -> Tuple[List[ClusterEndpointResponse], int]:
+        """Get all endpoints in a cluster."""
+
+        from ..endpoint_ops.services import EndpointService
+
+        db_results, count = await EndpointDataManager(self.session).get_all_endpoints_in_cluster(
+            cluster_id, offset, limit, filters, order_by, search
+        )
+
+        result = []
+        for db_result in db_results:
+            db_endpoint = db_result[0]
+            project_name = db_result[1]
+            model_name = db_result[2]
+            total_workers = db_result[3]
+
+            # Fetch worker details for the endpoint
+            try:
+                workers_data = await EndpointService(self.session).get_endpoint_workers(
+                    endpoint_id=db_endpoint.id,
+                    filters=WorkerInfoFilter(status="Running"),
+                    refresh=False,
+                    page=1,
+                    limit=100,  # Adjust limit as needed
+                    order_by=None,
+                    search=False,
+                )
+                active_workers = len(workers_data.get("workers", []))
+            except Exception as e:
+                logger.error(f"Failed to fetch worker details for endpoint {db_endpoint.id}: {e}")
+                active_workers = 0  # Default to 0 active workers
+
+            result.append(
+                ClusterEndpointResponse(
+                    name=db_endpoint.name,
+                    status=db_endpoint.status,
+                    created_at=db_endpoint.created_at,
+                    project_name=project_name,
+                    model_name=model_name,
+                    active_workers=active_workers,
+                    total_workers=total_workers,
+                    ROI=12,  # Dummy value for ROI
+                )
+            )
+
+        return result, count

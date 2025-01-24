@@ -46,6 +46,8 @@ from .schemas import (
     CreateClusterWorkflowRequest,
     EditClusterRequest,
     SingleClusterResponse,
+    ClusterEndpointFilter,
+    ClusterEndpointPaginatedResponse
 )
 from .services import ClusterService
 
@@ -362,3 +364,61 @@ async def cancel_cluster_onboarding(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to cancel cluster onboarding"
         ).to_http_response()
+
+@cluster_router.get(
+    "/{cluster_id}/endpoints",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ClusterEndpointPaginatedResponse,
+            "description": "Successfully listed all endpoints in the cluster",
+        },
+    },
+    description="List all endpoints in a cluster.\n\nOrder by values are: name, status, created_at, project_name, model_name, active_workers, total_workers",
+)
+async def list_all_endpoints(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    cluster_id: UUID,
+    filters: Annotated[ClusterEndpointFilter, Depends()],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[ClusterEndpointPaginatedResponse, ErrorResponse]:
+    """List all endpoints in a cluster."""
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Construct filters
+    filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True)
+
+    try:
+        result, count = await ClusterService(session).get_all_endpoints_in_cluster(
+            cluster_id, offset, limit, filters_dict, order_by, search
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to get all endpoints: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get all endpoints: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all endpoints"
+        ).to_http_response()
+
+    return ClusterEndpointPaginatedResponse(
+        endpoints=result,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="cluster.endpoints.list",
+        code=status.HTTP_200_OK,
+        message="Successfully listed all endpoints in the cluster",
+    ).to_http_response()
