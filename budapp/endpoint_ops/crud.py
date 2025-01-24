@@ -19,7 +19,7 @@
 from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, distinct, asc, case, desc
 
 from budapp.cluster_ops.models import Cluster as ClusterModel
 from budapp.commons import logging
@@ -27,6 +27,7 @@ from budapp.commons.db_utils import DataManagerUtils
 from budapp.model_ops.models import Model as Model
 from budapp.commons.constants import EndpointStatusEnum
 from .models import Endpoint as EndpointModel
+from ..project_ops.models import Project as ProjectModel
 
 
 logger = logging.get_logger(__name__)
@@ -124,5 +125,87 @@ class EndpointDataManager(DataManagerUtils):
             stmt = stmt.order_by(*sort_conditions)
 
         result = self.scalars_all(stmt)
+
+        return result, count
+
+    async def get_all_endpoints_in_cluster(
+        self, cluster_id: UUID, offset: int, limit: int, filters: Dict[str, Any], order_by: List[str], search: bool
+    ) -> Tuple[List[EndpointModel], int, int, int]:
+        """Get all endpoints in a cluster."""
+        
+        await self.validate_fields(EndpointModel, filters)
+
+        # Base conditions
+        base_conditions = [
+            EndpointModel.cluster_id == cluster_id,
+            EndpointModel.status != EndpointStatusEnum.DELETED,
+        ]
+
+        if search:
+            search_conditions = await self.generate_search_stmt(EndpointModel, filters)
+
+            stmt = (
+                select(
+                    EndpointModel,
+                    ProjectModel.name.label("project_name"),
+                    Model.name.label("model_name"),
+                    func.sum(EndpointModel.total_replicas).label("total_workers")
+                )
+                .join(ProjectModel, ProjectModel.id == EndpointModel.project_id)
+                .join(Model, Model.id == EndpointModel.model_id)
+                .filter(*base_conditions)
+                .filter(and_(*search_conditions))
+                .group_by(EndpointModel.id, ProjectModel.name, Model.name)
+            )
+
+            count_stmt = (
+                select(func.count(distinct(EndpointModel.id)))
+                .select_from(EndpointModel)
+                .filter(*base_conditions)
+                .filter(and_(*search_conditions))
+            )
+        else:
+            filter_conditions = [getattr(EndpointModel, field) == value for field, value in filters.items()]
+            stmt = (
+                select(
+                    EndpointModel,
+                    ProjectModel.name.label("project_name"),
+                    Model.name.label("model_name"),
+                    func.sum(EndpointModel.total_replicas).label("total_workers")
+                )
+                .join(ProjectModel, ProjectModel.id == EndpointModel.project_id)
+                .join(Model, Model.id == EndpointModel.model_id)
+                .filter(*base_conditions)
+                .filter(*filter_conditions)
+                .group_by(EndpointModel.id, ProjectModel.name, Model.name)
+            )
+
+            count_stmt = (
+                select(func.count(distinct(EndpointModel.id)))
+                .select_from(EndpointModel)
+                .filter(*base_conditions)
+                .filter(*filter_conditions)
+            )
+
+        # Get count
+        count = self.execute_scalar(count_stmt)
+
+        # Apply sorting and limit/offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(EndpointModel, order_by)
+
+            # Handle sorting for project_name, model_name, and total_workers
+            for field, direction in order_by:
+                sort_func = asc if direction == "asc" else desc
+                if field == "project_name":
+                    stmt = stmt.order_by(sort_func("project_name"))
+                elif field == "model_name":
+                    stmt = stmt.order_by(sort_func("model_name"))
+
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.session.execute(stmt)
 
         return result, count
