@@ -625,6 +625,28 @@ class EndpointService(SessionMixin):
         )
         logger.debug(f"Endpoint retrieved successfully: {db_endpoint.id}")
 
+        # Calculate concurrent request per replica and reduce it
+        deployment_config = db_endpoint.deployment_config
+        concurrent_requests = deployment_config["concurrent_requests"]
+        total_replicas = db_endpoint.total_replicas
+        concurrent_request_per_replica = concurrent_requests / total_replicas
+        logger.debug(
+            f"Total replicas: {total_replicas}, concurrent requests: {concurrent_requests}, concurrent request per replica: {concurrent_request_per_replica}"
+        )
+
+        updated_concurrent_requests = concurrent_requests - concurrent_request_per_replica
+        updated_replica_count = total_replicas - 1
+        deployment_config["concurrent_requests"] = updated_concurrent_requests
+        logger.debug(
+            f"Updated replica count: {updated_replica_count}, Updated concurrent requests: {updated_concurrent_requests}"
+        )
+
+        self.session.refresh(db_endpoint)
+        # Update endpoint with deploy config and updated replica count
+        db_endpoint = await EndpointDataManager(self.session).update_by_fields(
+            db_endpoint, {"deployment_config": deployment_config, "total_replicas": updated_replica_count}
+        )
+
         # Mark workflow as completed
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
         logger.debug(f"Workflow {db_workflow.id} marked as completed")
