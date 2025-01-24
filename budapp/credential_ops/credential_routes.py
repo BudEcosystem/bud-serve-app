@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends, status
 from typing import Annotated
+
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
+
 from budapp.commons import logging
 from budapp.commons.dependencies import get_session
 from budapp.commons.exceptions import ClientException
@@ -10,6 +12,7 @@ from ..commons.schemas import ErrorResponse, SuccessResponse
 from .crud import CredentialDataManager
 from .models import Credential
 from .schemas import CredentialUpdateRequest
+
 
 logger = logging.get_logger(__name__)
 
@@ -22,9 +25,7 @@ async def update_credential(
     credential_update_request: CredentialUpdateRequest,
     session: Annotated[Session, Depends(get_session)],
 ):
-    """
-    Update the credential last used at time.
-    """
+    """Update the credential last used at time."""
     logger.debug("Received request to subscribe to bud-serve-app credential update")
     try:
         payload = credential_update_request.payload
