@@ -54,6 +54,7 @@ from ..commons.constants import (
     NotificationTypeEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
+    VisibilityEnum,
 )
 from ..commons.helpers import validate_huggingface_repo_format
 from ..core.schemas import NotificationPayload, NotificationResult
@@ -1887,7 +1888,7 @@ class ModelService(SessionMixin):
 
         return db_authors, count
 
-    async def edit_model(self, model_id: UUID, data: Dict[str, Any]) -> None:
+    async def edit_model(self, model_id: UUID, data: Dict[str, Any], current_user_id: UUID) -> None:
         """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
         logger.debug(f"edit recieved data: {data}")
         # Retrieve existing model
@@ -1918,14 +1919,14 @@ class ModelService(SessionMixin):
             # If a file is provided, save it locally and update the DB with the local path
             file = data.pop("license_file")
             file_path = await self._save_uploaded_file(file)
-            await self._create_or_update_license_entry(model_id, file.filename, file_path, None)
+            await self._create_or_update_license_entry(model_id, file.filename, file_path, None, current_user_id)
 
         elif data.get("license_url"):
             # If a license URL is provided, store the URL in the DB instead of the file path
             license_url = data.pop("license_url")
             filename = license_url.split("/")[-1]  # Extract filename from the URL
             await self._create_or_update_license_entry(
-                model_id, filename if filename else "sample license", None, str(license_url)
+                model_id, filename if filename else "sample license", None, str(license_url), current_user_id
             )  # TODO: modify filename arg when license service implemented
 
         # Add papers if provided
@@ -1946,7 +1947,7 @@ class ModelService(SessionMixin):
         return os.path.join(LICENSE_DIR, file.filename)
 
     async def _create_or_update_license_entry(
-        self, model_id: UUID, filename: str, file_path: str, license_url: str
+        self, model_id: UUID, filename: str, file_path: str, license_url: str, current_user_id: UUID
     ) -> None:
         """Create or update a license entry in the database."""
         # Check if a license entry with the given model_id exists
@@ -1973,6 +1974,7 @@ class ModelService(SessionMixin):
                 "url": license_url if license_url else None,
             }
             await ModelLicensesDataManager(self.session).update_by_fields(existing_license, update_license_data)
+            await self.fetch_license_faqs(model_id, existing_license.id, current_user_id, license_url)
         else:
             # Create a new license entry
             license_entry = ModelLicensesModel(
@@ -1985,6 +1987,7 @@ class ModelService(SessionMixin):
             await ModelLicensesDataManager(self.session).insert_one(
                 ModelLicenses(**license_entry.model_dump(exclude_unset=True))
             )
+            await self.fetch_license_faqs(model_id, license_entry.id, current_user_id, license_url)
 
     async def _update_papers(self, model_id: UUID, paper_urls: list[str]) -> None:
         """Update paper entries for the given model by adding new URLs and removing old ones."""
@@ -2117,6 +2120,116 @@ class ModelService(SessionMixin):
 
         return db_model
 
+    async def fetch_license_faqs(
+        self, model_id: UUID, license_id: UUID, current_user_id: UUID, license_source: str
+    ) -> WorkflowModel:
+        """fetch license faqs of a license by path or url.
+
+        Args:
+            model_id: The ID of the model corresponding to license source.
+            license_source: file path or web url of license file.
+        """
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, fields={"id": model_id}, exclude_fields={"status": ModelStatusEnum.DELETED}
+        )
+
+        current_step_number = 1
+
+        # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.LICENSE_FAQ_FETCH,
+            title="Model License FAQS",
+            total_steps=current_step_number,
+            icon=db_model.icon,
+            tag="Model License FAQS",
+            visibility=VisibilityEnum.INTERNAL,
+        )
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id=None, workflow_data=workflow_create, current_user_id=current_user_id
+        )
+        logger.debug(f"model license faq {db_workflow.id} created")
+
+        # Perform license faq fetch request to bud_model app
+        try:
+            bud_model_response = await self._perform_license_faq_fetch_request(
+                license_source, current_user_id, db_workflow.id
+            )
+        except ClientException as e:
+            await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"status": WorkflowStatusEnum.FAILED}
+            )
+            raise e
+
+        # Add payload dict to response
+        for step in bud_model_response["steps"]:
+            step["payload"] = {}
+
+        license_faq_events = {
+            BudServeWorkflowStepEventName.LICENSE_FAQ_EVENTS.value: bud_model_response,
+            "license_id": str(license_id),
+            "model_id": str(model_id),
+            "model_icon": db_model.icon,
+        }
+
+        # Insert step details in db
+        db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+            WorkflowStepModel(
+                workflow_id=db_workflow.id,
+                step_number=current_step_number,
+                data=license_faq_events,
+            )
+        )
+        logger.debug(f"Created workflow step {current_step_number} for workflow {db_workflow.id}")
+
+        # Update progress in workflow
+        bud_model_response["progress_type"] = BudServeWorkflowStepEventName.LICENSE_FAQ_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": bud_model_response, "current_step": current_step_number}
+        )
+
+        return db_workflow
+
+    async def _perform_license_faq_fetch_request(
+        self, license_source: str, current_user_id: UUID, workflow_id: UUID
+    ) -> Dict:
+        """Perform license faqs fetch request to bud_model app.
+
+        Args:
+            license_source: The source of license, can be file path or url.
+        """
+        license_faq_fetch_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/model-info/license-faq"
+        )
+
+        payload = {
+            "license_source": str(license_source),
+            "notification_metadata": {
+                "name": BUD_INTERNAL_WORKFLOW,
+                "subscriber_ids": str(current_user_id),
+                "workflow_id": str(workflow_id),
+            },
+            "source_topic": f"{app_settings.source_topic}",
+        }
+
+        logger.debug(f"Performing license faqs fetch request to budmodel {payload}")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(license_faq_fetch_endpoint, json=payload) as response:
+                    response_data = await response.json()
+                    if response.status != 200:
+                        logger.error(f"Failed to fetch license faqs: {response.status} {response_data}")
+                        raise ClientException(
+                            "Failed to fetch license faqs", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
+
+                    logger.debug(f"Successfully fetched license faqs from budmodel{response_data}")
+                    return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send license faqs fetch request: {e}")
+            raise ClientException(
+                "Failed to fetch license faqs", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
 
 class ModelServiceUtil(SessionMixin):
     """Model util service."""
@@ -2134,3 +2247,65 @@ class ModelServiceUtil(SessionMixin):
             return db_model.provider.icon
         else:
             return db_model.icon
+
+
+class ModelWorkflowService(SessionMixin):
+    """Model workflow service."""
+
+    async def update_license_faqs_from_notification_event(self, payload: NotificationPayload) -> None:
+        """update license faqs from notification event."""
+
+        logger.debug("Received event for fetching license faqs")
+
+        # Get workflow and steps
+        workflow_id = payload.workflow_id
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for updating faqs
+        keys_of_interest = ["model_id", "license_id"]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        logger.debug("Collected required data from workflow steps")
+
+        # Retrieve cluster from db
+        db_license = await ModelLicensesDataManager(self.session).retrieve_by_fields(
+            ModelLicenses,
+            {"id": required_data["license_id"]},
+            missing_ok=True,
+        )
+        logger.debug(f"license retrieved successfully: {db_license.id}")
+
+        # update faqs
+        faqs = payload.content.result["faqs"]
+        db_license = await ModelLicensesDataManager(self.session).update_by_fields(db_license, {"faqs": faqs})
+        logger.debug(f"updated FAQs for license {db_license.id}")
+
+        # Mark workflow as completed
+        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
+        logger.debug(f"Workflow {db_workflow.id} marked as completed")
+
+        # db_model = await ModelDataManager(self.session).retrieve_by_fields(
+        #     Model, fields={"id": required_data["model_id"]}, exclude_fields={"status": ModelStatusEnum.DELETED}
+        # )
+        # # Send notification to workflow creator
+        # notification_request = (
+        #     NotificationBuilder()
+        #     .set_content(
+        #         title=db_license.name,
+        #         message="FAQs fetched and updated",
+        #         icon=db_model.icon,
+        #     )
+        #     .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.LICENSE_FAQS_FETCH_SUCCESS.value)
+        #     .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+        #     .build()
+        # )
+        # await BudNotifyService().send_notification(notification_request)

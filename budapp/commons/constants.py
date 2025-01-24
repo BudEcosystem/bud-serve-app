@@ -418,6 +418,7 @@ class WorkflowTypeEnum(StrEnum):
     ENDPOINT_DELETION = auto()
     CLOUD_MODEL_ONBOARDING = auto()
     LOCAL_MODEL_ONBOARDING = auto()
+    LICENSE_FAQ_FETCH = auto()
 
 
 class NotificationType(Enum):
@@ -463,6 +464,7 @@ class PayloadType(str, Enum):
     PERFORM_MODEL_SECURITY_SCAN = "perform_model_security_scan"
     CLUSTER_STATUS_UPDATE = "cluster-status-update"
     DEPLOYMENT_STATUS_UPDATE = "deployment-status-update"
+    PERFORM_LICENSE_FAQS_FETCH = "perform_license_faqs_fetch"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -483,6 +485,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     MODEL_SECURITY_SCAN_EVENTS = "model_security_scan_events"
     DELETE_CLUSTER_EVENTS = "delete_cluster_events"
     DELETE_ENDPOINT_EVENTS = "delete_endpoint_events"
+    LICENSE_FAQ_EVENTS = "license_faq_events"
 
 
 class ClusterStatusEnum(StrEnum):
@@ -638,6 +641,18 @@ class NotificationStatus(Enum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     PENDING = "PENDING"
+
+
+class VisibilityEnum(Enum):
+    """Enumeration of visibility statuses in the system.
+
+    Attributes:
+        PUBLIC: Represents an publicly visible entity.
+        INERNAL: Represents an internal entity.
+    """
+
+    PUBLIC = "PUBLIC"
+    INTERNAL = "INTERNAL"
 
 
 APP_ICONS = {

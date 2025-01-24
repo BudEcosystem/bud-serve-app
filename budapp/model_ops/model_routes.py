@@ -363,7 +363,9 @@ async def edit_model(
 
         # Pass file and edit_model data to your service
         await ModelService(session).edit_model(
-            model_id=model_id, data=edit_model.model_dump(exclude_none=True, exclude_unset=True)
+            current_user_id=current_user.id,
+            model_id=model_id,
+            data=edit_model.model_dump(exclude_none=True, exclude_unset=True),
         )
 
         return SuccessResponse(message="Cloud model edited successfully", code=status.HTTP_200_OK).to_http_response()
