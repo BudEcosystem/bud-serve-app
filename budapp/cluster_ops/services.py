@@ -1073,7 +1073,7 @@ class ClusterService(SessionMixin):
                     model_name=model_name,
                     active_workers=active_workers,
                     total_workers=total_workers,
-                    ROI=12,  # Dummy value for ROI
+                    roi=12,  # Dummy value for ROI
                 )
             )
 
