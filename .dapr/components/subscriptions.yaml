@@ -5,6 +5,9 @@ metadata:
 spec:
   topic: budAppMessages
   routes:
+    rules:
+      - match: event.type == "credential_update"
+        path: /credentials/update
     default: /notifications
   pubsubname: pubsub-redis
   deadLetterTopic: poisonMessages

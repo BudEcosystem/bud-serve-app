@@ -19,7 +19,7 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Uuid
+from sqlalchemy import DateTime, Enum, ForeignKey, Float, String, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -50,3 +50,30 @@ class ProprietaryCredential(Base):
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
     endpoints: Mapped[list["Endpoint"]] = relationship("Endpoint", back_populates="credential")
+
+
+class Credential(Base):
+    """Project API Keys : Credential model"""
+
+    __tablename__ = "credential"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), nullable=True)
+    expiry: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    max_budget: Mapped[float] = mapped_column(Float, nullable=True)
+
+    # placeholder for per model budgets : {"model_id": "budget"}
+    model_budgets: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    
+    last_used_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    hashed_key: Mapped[str] = mapped_column(String, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship("Project", foreign_keys=[project_id])
+
+
