@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from budapp.commons import logging
 from budapp.commons.schemas import CloudEventBase
@@ -14,6 +14,10 @@ class CredentialUpdatePayload(BaseModel):
     last_used_at: datetime
 
 class CredentialUpdateRequest(CloudEventBase):
+    """Request to update the credential last used at time."""
+
+    model_config = ConfigDict(extra="allow")
+
     payload: CredentialUpdatePayload
 
     @model_validator(mode="before")
