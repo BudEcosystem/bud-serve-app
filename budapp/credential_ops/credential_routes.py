@@ -31,7 +31,9 @@ async def update_credential(
         payload = credential_update_request.payload
         logger.debug(f"Update CredentialReceived payload: {payload}")
         db_credential = await CredentialDataManager(session).retrieve_by_fields(Credential, {"hashed_key": payload.hashed_key})
-        await CredentialDataManager(session).update_by_fields(db_credential, {"last_used_at": payload.last_used_at})
+        db_last_used_at = db_credential.last_used_at
+        if db_last_used_at is None or db_last_used_at < payload.last_used_at:
+            await CredentialDataManager(session).update_by_fields(db_credential, {"last_used_at": payload.last_used_at})
         return SuccessResponse(message="Credential updated successfully").to_http_response()
     except ClientException as e:
         logger.exception(f"Failed to execute credential update: {e}")
