@@ -7,7 +7,7 @@ spec:
   routes:
     rules:
       - match: event.type == "credential_update"
-        path: /credential/update
+        path: /credentials/update
     default: /notifications
   pubsubname: pubsub-redis
   deadLetterTopic: poisonMessages
