@@ -203,7 +203,7 @@ class ClusterEndpointResponse(BaseModel):
     model_name: str
     active_workers: int
     total_workers: int
-    ROI: int
+    roi: int
 
 
 class ClusterEndpointPaginatedResponse(PaginatedSuccessResponse):

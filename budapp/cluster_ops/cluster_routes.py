@@ -381,7 +381,7 @@ async def cancel_cluster_onboarding(
             "description": "Successfully listed all endpoints in the cluster",
         },
     },
-    description="List all endpoints in a cluster.\n\nOrder by values are: name, status, created_at, project_name, model_name, active_workers, total_workers",
+    description="List all endpoints in a cluster.\n\nOrder by values are: name, status, created_at, project_name, model_name.",
 )
 async def list_all_endpoints(
     current_user: Annotated[User, Depends(get_current_active_user)],
