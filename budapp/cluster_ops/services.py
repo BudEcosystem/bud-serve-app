@@ -1023,7 +1023,7 @@ class ClusterService(SessionMixin):
             raise ClientException(
                 "Failed to update cluster node status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
-        
+
     async def get_all_endpoints_in_cluster(
         self,
         cluster_id: UUID,
@@ -1078,3 +1078,40 @@ class ClusterService(SessionMixin):
             )
 
         return result, count
+
+    async def get_cluster_metrics(self, cluster_id: UUID) -> Dict[str, Any]:
+        """Get cluster metrics from Prometheus."""
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+                    ClusterModel,
+                    {"id": cluster_id},
+                    exclude_fields={"status": ClusterStatusEnum.DELETED}
+                )
+        try:
+            # Initialize metrics fetcher
+            prometheus_url = app_settings.prometheus_url  # Add this to your config
+            metrics_fetcher = ClusterMetricsFetcher(prometheus_url)
+
+            # Get metrics for all clusters
+            all_metrics = metrics_fetcher.get_cluster_metrics()
+
+            if not all_metrics:
+                raise ClientException("Failed to fetch metrics from Prometheus")
+
+            # Get metrics for specific cluster
+            cluster_name = db_cluster.name  # assuming cluster name is used in Prometheus
+            if cluster_name not in all_metrics:
+                raise ClientException(f"No metrics found for cluster: {cluster_name}")
+
+            cluster_metrics = all_metrics[cluster_name]
+
+            return {
+                "nodes": cluster_metrics["nodes"],
+                "cluster_summary": cluster_metrics["cluster_summary"]
+            }
+
+        except Exception as e:
+            logger.exception(f"Failed to get cluster metrics: {e}")
+            raise ClientException(
+                "Failed to get cluster metrics",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
