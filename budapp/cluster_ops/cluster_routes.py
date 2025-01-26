@@ -47,7 +47,8 @@ from .schemas import (
     EditClusterRequest,
     SingleClusterResponse,
     ClusterEndpointFilter,
-    ClusterEndpointPaginatedResponse
+    ClusterEndpointPaginatedResponse,
+    ClusterMetricsResponse,
 )
 from .services import ClusterService
 
@@ -450,6 +451,7 @@ async def get_cluster_metrics(
     """Get detailed metrics for a specific cluster."""
     try:
         metrics = await ClusterService(session).get_cluster_metrics(cluster_id)
+
         return ClusterMetricsResponse(
             nodes=metrics["nodes"],
             cluster_summary=metrics["cluster_summary"],
