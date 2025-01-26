@@ -1,3 +1,4 @@
+# budapp/cluster_ops/cluster_routes.py
 #  -----------------------------------------------------------------------------
 #  Copyright (c) 2024 Bud Ecosystem Inc.
 #  #
@@ -450,7 +451,12 @@ async def get_cluster_metrics(
 ) -> Union[ClusterMetricsResponse, ErrorResponse]:
     """Get detailed metrics for a specific cluster."""
     try:
+
+        logger.debug(f"Getting cluster metrics for cluster_id: {cluster_id}")
+
         metrics = await ClusterService(session).get_cluster_metrics(cluster_id)
+
+        logger.debug(f"==== {metrics}\n\n")
 
         return ClusterMetricsResponse(
             nodes=metrics["nodes"],

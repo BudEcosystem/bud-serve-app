@@ -1,9 +1,15 @@
 import os
 import pytest
+import warnings
 from uuid import UUID
 from unittest.mock import AsyncMock, patch
 from fastapi import status
 from fastapi.testclient import TestClient
+from jose import jwt
+from datetime import datetime, timedelta, UTC  # Use UTC instead of utcnow
+
+# Suppress the crypt deprecation warning
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="passlib.utils")
 
 # Set up all required environment variables before importing any application code
 os.environ.update({
@@ -33,42 +39,99 @@ from budapp.cluster_ops.schemas import ClusterMetricsResponse
 from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
 from budapp.commons.db_utils import Session
+from budapp.commons.dependencies import get_current_active_user
+
+
+# Helper function to generate a valid JWT token for testing
+def create_test_token():
+    payload = {
+        "sub": "test_user",
+        "email": "test@example.com",
+        "exp": datetime.now(UTC) + timedelta(minutes=30)  # Use datetime.now(UTC)
+    }
+    secret_key = os.getenv("JWT_SECRET_KEY")
+    token = jwt.encode(payload, secret_key, algorithm="HS256")
+    return token
+
 
 @pytest.mark.asyncio
 async def test_get_cluster_metrics():
     # Create mock objects
     mock_user = AsyncMock(spec=User)
-    mock_session = AsyncMock(spec=Session)
+    mock_user.is_active = True  # Ensure the user is active
     test_cluster_id = UUID("12345678-1234-5678-1234-567812345678")
-    test_token = "test_jwt_token"
+    test_token = create_test_token()  # Use a valid token
 
-    # Patch the dependencies with the correct path to get_current_active_user
-    with patch("budapp.commons.dependencies.get_current_active_user", return_value=mock_user), \
-         patch("budapp.commons.dependencies.get_session", return_value=mock_session):
+    # Debug: Print the token and user
+    print(f"Test Token: {test_token}")
+    print(f"Mock User: {mock_user}")
 
-        # Use the TestClient to call the endpoint
-        client = TestClient(app)
-        response = client.get(f"/clusters/{test_cluster_id}/metrics", headers={"Authorization": f"Bearer {test_token}"})
+    # Mock the ClusterService.get_cluster_metrics method
+    mock_metrics = {
+        "nodes": [
+            {
+                "cpu_usage": 50,
+                "memory_usage": 60,
+                "disk_usage": 70,
+                "gpu_usage": 80,
+                "hpu_usage": 90,
+                "network_stats": {"in": 100, "out": 200},
+            }
+        ],
+        "cluster_summary": {
+            "total_cpu": 100,
+            "total_memory": 200,
+            "total_disk": 300,
+            "total_gpu": 400,
+            "total_hpu": 500,
+        },
+    }
 
-        # Verify the response
-        assert response.status_code in [
-            status.HTTP_200_OK,
-            status.HTTP_400_BAD_REQUEST,
-            status.HTTP_500_INTERNAL_SERVER_ERROR
-        ]
+    # Override the get_current_active_user dependency
+    def override_get_current_active_user():
+        print("get_current_active_user called")  # Debugging
+        return mock_user
 
-        if response.status_code == status.HTTP_200_OK:
-            response_data = response.json()
-            assert "cpu_usage" in response_data
-            assert "memory_usage" in response_data
-            assert "disk_usage" in response_data
-            assert "gpu_usage" in response_data
-            assert "hpu_usage" in response_data
-            assert "network_stats" in response_data
-        else:
-            response_data = response.json()
-            assert "detail" in response_data
-            assert "message" in response_data
+    app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+    # Mock the ClusterService.get_cluster_metrics method
+    with patch("budapp.cluster_ops.services.ClusterService.get_cluster_metrics", return_value=mock_metrics):
+        try:
+            # Use the TestClient to call the endpoint
+            client = TestClient(app)
+            response = client.get(
+                f"/clusters/{test_cluster_id}/metrics",
+                headers={"Authorization": f"Bearer {test_token}"}
+            )
+
+            print("\n=== Response ===")
+            print(f"Status Code: {response.status_code}")
+            print("Headers:")
+            for key, value in response.headers.items():
+                print(f"  {key}: {value}")
+            print("Body:")
+            print(response.json())  # Print the JSON response body
+
+            # Verify the response
+            assert response.status_code in [
+                status.HTTP_200_OK
+                # status.HTTP_400_BAD_REQUEST,
+                # status.HTTP_500_INTERNAL_SERVER_ERROR
+            ]
+
+            if response.status_code == status.HTTP_200_OK:
+                response_data = response.json()
+                assert "nodes" in response_data
+                assert "cluster_summary" in response_data
+                assert "message" in response_data
+                assert response_data["message"] == "Successfully retrieved cluster metrics"
+            else:
+                response_data = response.json()
+                assert "message" in response_data  # Check for the "message" field in ErrorResponse
+        finally:
+            # Clear the dependency overrides after the test
+            app.dependency_overrides.clear()
+
 
 if __name__ == "__main__":
     import asyncio
