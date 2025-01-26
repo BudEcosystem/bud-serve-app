@@ -40,6 +40,9 @@ from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
 from budapp.commons.db_utils import Session
 from budapp.commons.dependencies import get_current_active_user
+from budapp.cluster_ops.services import ClusterService
+from budapp.cluster_ops.models import  Cluster as ClusterModel  # Import the ClusterModel
+from budapp.cluster_ops.crud import ClusterDataManager  # Import the ClusterDataManager
 
 
 # Helper function to generate a valid JWT token for testing
@@ -87,6 +90,12 @@ async def test_get_cluster_metrics():
         },
     }
 
+    # Mock the db_cluster object
+    mock_db_cluster = AsyncMock(spec=ClusterModel)
+    mock_db_cluster.id = test_cluster_id
+    mock_db_cluster.name = "Test Cluster"
+    mock_db_cluster.status = "ACTIVE"  # Replace with the appropriate status enum
+
     # Override the get_current_active_user dependency
     def override_get_current_active_user():
         print("get_current_active_user called")  # Debugging
@@ -94,8 +103,9 @@ async def test_get_cluster_metrics():
 
     app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-    # Mock the ClusterService.get_cluster_metrics method
-    with patch("budapp.cluster_ops.services.ClusterService.get_cluster_metrics", return_value=mock_metrics):
+    # Mock the ClusterDataManager.retrieve_by_fields method
+    with patch("budapp.commons.db_utils.DataManagerUtils.retrieve_by_fields", return_value=mock_db_cluster):
+        # \patch("budapp.cluster_ops.services.ClusterService.get_cluster_metrics", return_value=mock_metrics)
         try:
             # Use the TestClient to call the endpoint
             client = TestClient(app)
@@ -104,6 +114,7 @@ async def test_get_cluster_metrics():
                 headers={"Authorization": f"Bearer {test_token}"}
             )
 
+            # Print the response for debugging
             print("\n=== Response ===")
             print(f"Status Code: {response.status_code}")
             print("Headers:")
