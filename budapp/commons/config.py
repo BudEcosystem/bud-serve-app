@@ -236,7 +236,7 @@ class AppConfig(BaseConfig):
     budserve_host: str = Field(alias="BUD_SERVE_HOST", default="https://api-dev.bud.studio")
 
     # Prometheus URL
-    prometheus_url: str = Field(alias="PROMETHEUS_URL", default="http://localhost:9090")
+    prometheus_url: str = Field(alias="PROMETHEUS_URL", default="https://metrics.fmops.in")
 
     @computed_field
     def static_dir(self) -> str:

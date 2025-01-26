@@ -1,7 +1,8 @@
 import requests
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 from budapp.commons import logging
+from uuid import UUID
 
 logger = logging.get_logger(__name__)
 
@@ -38,176 +39,285 @@ class ClusterMetricsFetcher:
             logger.error(f"Failed to execute Prometheus query: {e}")
             raise
 
-    def get_cluster_metrics(self) -> Optional[Dict[str, Any]]:
+    def get_cluster_metrics(self, cluster_id: UUID) -> Optional[Dict[str, Any]]:
         """Fetch comprehensive cluster metrics.
 
+        Args:
+            cluster_id: UUID of the cluster to fetch metrics for
+
         Returns:
-            Dict containing various cluster metrics:
-            - CPU usage and capacity
-            - Memory usage and capacity
-            - GPU metrics if available
-            - Node status
-            - Pod status
-
-        Returns None if metrics cannot be fetched.
+            Dict containing cluster metrics structured according to ClusterNodeMetrics
+            and ClusterSummaryMetrics models
         """
+        if not cluster_id:
+            logger.error("Cluster ID is required to fetch cluster metrics")
+            return None
+
+        cluster_name = cluster_id  # This should be dynamic based on cluster_id
+
+        # Define all Prometheus queries
+        queries = {
+            # Per-node memory metrics
+            'memory_total': f'node_memory_MemTotal_bytes{{cluster="{cluster_name}"}} / 1024 / 1024 / 1024',
+            'memory_available': f'node_memory_MemAvailable_bytes{{cluster="{cluster_name}"}} / 1024 / 1024 / 1024',
+
+            # Per-node CPU metrics
+            'cpu_usage': f'''100 * sum(rate(node_cpu_seconds_total{{cluster="{cluster_name}",mode!="idle"}}[5m])) by (instance) /
+                        count by (instance) (node_cpu_seconds_total{{cluster="{cluster_name}"}})''',
+
+            # Per-node disk metrics
+            'disk_total': f'sum by (instance, mountpoint) (node_filesystem_size_bytes{{cluster="{cluster_name}"}}) / 1024 / 1024 / 1024',
+            'disk_used': f'sum by (instance, mountpoint) ((node_filesystem_size_bytes{{cluster="{cluster_name}"}} - node_filesystem_free_bytes{{cluster="{cluster_name}"}})) / 1024 / 1024 / 1024',
+
+            # Per-node network metrics
+            'network_receive': f'sum by (instance, device) (rate(node_network_receive_bytes_total{{cluster="{cluster_name}"}}[5m]) * 8 / 1024 / 1024)',
+            'network_transmit': f'sum by (instance, device) (rate(node_network_transmit_bytes_total{{cluster="{cluster_name}"}}[5m]) * 8 / 1024 / 1024)',
+            'network_errors': f'sum by (instance) (node_network_transmit_errs_total{{cluster="{cluster_name}"}} + node_network_receive_errs_total{{cluster="{cluster_name}"}}) or vector(0)',
+
+            # GPU metrics
+            'gpu_memory_used': f'sum by (instance, gpu) (nvidia_gpu_memory_used_bytes{{cluster="{cluster_name}"}}) / 1024 / 1024 / 1024',
+            'gpu_memory_total': f'sum by (instance, gpu) (nvidia_gpu_memory_total_bytes{{cluster="{cluster_name}"}}) / 1024 / 1024 / 1024',
+            'gpu_utilization': f'avg by (instance, gpu) (nvidia_gpu_duty_cycle{{cluster="{cluster_name}"}}) or vector(0)',
+
+            # HPU metrics if available
+            'hpu_memory_used': f'sum by (instance, hpu) (habana_memory_used_bytes{{cluster="{cluster_name}"}}) / 1024 / 1024 / 1024',
+            'hpu_memory_total': f'sum by (instance, hpu) (habana_memory_total_bytes{{cluster="{cluster_name}"}}) / 1024 / 1024 / 1024',
+            'hpu_utilization': f'avg by (instance, hpu) (habana_duty_cycle{{cluster="{cluster_name}"}}) or vector(0)',
+
+            # Node count
+            'total_nodes': f'count(node_uname_info{{cluster="{cluster_name}"}})'
+        }
+
         try:
-            # CPU metrics
-            cpu_usage = self.query('sum(rate(node_cpu_seconds_total{mode!="idle"}[5m])) by (instance)')
-            cpu_capacity = self.query('sum(machine_cpu_cores) by (instance)')
+            results = {key: self.query(query) for key, query in queries.items()}
 
-            # Memory metrics
-            memory_usage = self.query('sum(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) by (instance)')
-            memory_capacity = self.query('sum(node_memory_MemTotal_bytes) by (instance)')
+            # Process per-node metrics
+            nodes = {}
+            instances = self._get_unique_instances(results)
 
-            # GPU metrics if available
-            gpu_metrics = {}
-            try:
-                gpu_usage = self.query('sum(nvidia_gpu_duty_cycle) by (gpu)')
-                gpu_memory = self.query('sum(nvidia_gpu_memory_used_bytes) by (gpu)')
-                gpu_metrics = {
-                    'gpu_utilization': self._process_gpu_metrics(gpu_usage),
-                    'gpu_memory': self._process_gpu_metrics(gpu_memory)
+            for instance in instances:
+                nodes[instance] = {
+                    'memory': {
+                        'total_gib': float(self._get_instance_value(results['memory_total'], instance)),
+                        'available_gib': float(self._get_instance_value(results['memory_available'], instance)),
+                        'used_gib': float(self._get_instance_value(results['memory_total'], instance)) -
+                                   float(self._get_instance_value(results['memory_available'], instance)),
+                        'usage_percent': (1 - float(self._get_instance_value(results['memory_available'], instance)) /
+                                        float(self._get_instance_value(results['memory_total'], instance))) * 100
+                    },
+                    'cpu': {
+                        'cpu_usage_percent': float(self._get_instance_value(results['cpu_usage'], instance))
+                    },
+                    'disk': self._process_disk_metrics(results, instance),
+                    'network': self._process_network_metrics(results, instance),
+                    'gpu': self._process_gpu_metrics(results, instance),
+                    'hpu': self._process_hpu_metrics(results, instance)
                 }
-            except Exception as e:
-                logger.warning(f"GPU metrics not available: {e}")
 
-            # Node status
-            nodes_ready = self.query('sum(kube_node_status_condition{condition="Ready",status="true"})')
-            nodes_not_ready = self.query('sum(kube_node_status_condition{condition="Ready",status="false"})')
-
-            # Pod status
-            pods_running = self.query('sum(kube_pod_status_phase{phase="Running"})')
-            pods_failed = self.query('sum(kube_pod_status_phase{phase="Failed"})')
-            pods_pending = self.query('sum(kube_pod_status_phase{phase="Pending"})')
-
-            # Network metrics
-            network_receive = self.query('sum(rate(node_network_receive_bytes_total[5m])) by (instance)')
-            network_transmit = self.query('sum(rate(node_network_transmit_bytes_total[5m])) by (instance)')
-
-            # Disk metrics
-            disk_usage = self.query('sum(node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_free_bytes{mountpoint="/"}) by (instance)')
-            disk_capacity = self.query('sum(node_filesystem_size_bytes{mountpoint="/"}) by (instance)')
+            # Process cluster summary metrics
+            summary = {
+                'total_nodes': int(results['total_nodes'][0]['value'][1]),
+                'memory': {
+                    'total_gib': sum(node['memory']['total_gib'] for node in nodes.values()),
+                    'used_gib': sum(node['memory']['used_gib'] for node in nodes.values()),
+                    'available_gib': sum(node['memory']['available_gib'] for node in nodes.values()),
+                    'usage_percent': sum(node['memory']['used_gib'] for node in nodes.values()) /
+                                   sum(node['memory']['total_gib'] for node in nodes.values()) * 100
+                },
+                'cpu': {
+                    'average_usage_percent': sum(node['cpu']['cpu_usage_percent'] for node in nodes.values()) / len(nodes)
+                },
+                'disk': self._aggregate_disk_metrics(nodes),
+                'network': self._aggregate_network_metrics(nodes),
+                'gpu': self._aggregate_gpu_metrics(nodes),
+                'hpu': self._aggregate_hpu_metrics(nodes)
+            }
 
             metrics = {
                 'timestamp': datetime.now(timezone.utc).isoformat(),
-                'cpu': {
-                    'usage': self._process_cpu_metrics(cpu_usage),
-                    'capacity': self._process_cpu_metrics(cpu_capacity),
-                    'utilization': self._calculate_utilization(cpu_usage, cpu_capacity)
-                },
-                'memory': {
-                    'usage': self._process_memory_metrics(memory_usage),
-                    'capacity': self._process_memory_metrics(memory_capacity),
-                    'utilization': self._calculate_utilization(memory_usage, memory_capacity)
-                },
-                'gpu': gpu_metrics if gpu_metrics else None,
-                'nodes': {
-                    'ready': self._process_scalar_metric(nodes_ready),
-                    'not_ready': self._process_scalar_metric(nodes_not_ready)
-                },
-                'pods': {
-                    'running': self._process_scalar_metric(pods_running),
-                    'failed': self._process_scalar_metric(pods_failed),
-                    'pending': self._process_scalar_metric(pods_pending)
-                },
-                'network': {
-                    'receive_bytes_per_second': self._process_network_metrics(network_receive),
-                    'transmit_bytes_per_second': self._process_network_metrics(network_transmit)
-                },
-                'disk': {
-                    'usage': self._process_disk_metrics(disk_usage),
-                    'capacity': self._process_disk_metrics(disk_capacity),
-                    'utilization': self._calculate_utilization(disk_usage, disk_capacity)
-                }
+                'nodes': nodes,
+                'summary': summary
             }
 
             logger.info("Successfully fetched cluster metrics")
-            logger.debug(f"XXX Cluster metrics: {metrics}")
+            logger.debug(metrics)
             return metrics
 
         except Exception as e:
             logger.error(f"Failed to fetch cluster metrics: {e}")
             return None
 
-    def _process_cpu_metrics(self, metric_data: list) -> float:
-        """Process CPU metrics from raw Prometheus data."""
-        try:
-            if not metric_data:
-                return 0.0
-            return float(metric_data[0]['value'][1])
-        except (IndexError, KeyError, ValueError) as e:
-            logger.error(f"Error processing CPU metrics: {e}")
-            return 0.0
+    def _get_unique_instances(self, results: Dict) -> List[str]:
+        """Extract unique instance names from results."""
+        instances = set()
+        for result in results.values():
+            for metric in result:
+                if 'instance' in metric['metric']:
+                    instances.add(metric['metric']['instance'])
+        return sorted(list(instances))
 
-    def _process_memory_metrics(self, metric_data: list) -> float:
-        """Process memory metrics from raw Prometheus data."""
-        try:
-            if not metric_data:
-                return 0.0
-            # Convert bytes to GB
-            return float(metric_data[0]['value'][1]) / (1024 * 1024 * 1024)
-        except (IndexError, KeyError, ValueError) as e:
-            logger.error(f"Error processing memory metrics: {e}")
-            return 0.0
+    def _get_instance_value(self, metrics: List, instance: str) -> float:
+        """Get metric value for a specific instance."""
+        for metric in metrics:
+            if metric['metric'].get('instance') == instance:
+                return metric['value'][1]
+        return 0.0
 
-    def _process_gpu_metrics(self, metric_data: list) -> Dict[str, float]:
-        """Process GPU metrics from raw Prometheus data."""
-        try:
-            if not metric_data:
-                return {}
-            return {
-                item['metric']['gpu']: float(item['value'][1])
-                for item in metric_data
+    def _process_disk_metrics(self, results: Dict, instance: str) -> Dict:
+        """Process disk metrics for a specific instance."""
+        disk_metrics = {}
+        mountpoints = set()
+
+        # Get unique mountpoints for this instance
+        for metric in results['disk_total']:
+            if metric['metric']['instance'] == instance:
+                mountpoints.add(metric['metric']['mountpoint'])
+
+        for mountpoint in mountpoints:
+            total = float(self._get_instance_mountpoint_value(results['disk_total'], instance, mountpoint))
+            used = float(self._get_instance_mountpoint_value(results['disk_used'], instance, mountpoint))
+            disk_metrics[mountpoint] = {
+                'total_gib': total,
+                'used_gib': used,
+                'available_gib': total - used,
+                'usage_percent': (used / total * 100) if total > 0 else 0
             }
-        except (KeyError, ValueError) as e:
-            logger.error(f"Error processing GPU metrics: {e}")
-            return {}
 
-    def _process_scalar_metric(self, metric_data: list) -> int:
-        """Process scalar metrics from raw Prometheus data."""
-        try:
-            if not metric_data:
-                return 0
-            return int(float(metric_data[0]['value'][1]))
-        except (IndexError, KeyError, ValueError) as e:
-            logger.error(f"Error processing scalar metric: {e}")
-            return 0
+        return disk_metrics
 
-    def _process_network_metrics(self, metric_data: list) -> Dict[str, float]:
-        """Process network metrics from raw Prometheus data."""
-        try:
-            if not metric_data:
-                return {}
-            return {
-                item['metric']['instance']: float(item['value'][1])
-                for item in metric_data
+    def _process_network_metrics(self, results: Dict, instance: str) -> Dict:
+        """Process network metrics for a specific instance."""
+        interfaces = {}
+        total_receive = 0
+        total_transmit = 0
+
+        # Process per-interface metrics
+        for metric in results['network_receive']:
+            if metric['metric']['instance'] == instance:
+                device = metric['metric']['device']
+                receive = float(metric['value'][1])
+                transmit = float(self._get_device_value(results['network_transmit'], instance, device))
+
+                interfaces[device] = {
+                    'receive_mbps': receive,
+                    'transmit_mbps': transmit,
+                    'bandwidth_mbps': receive + transmit
+                }
+                total_receive += receive
+                total_transmit += transmit
+
+        total_errors = float(self._get_instance_value(results['network_errors'], instance))
+
+        return {
+            'interfaces': interfaces,
+            'summary': {
+                'total_receive_mbps': total_receive,
+                'total_transmit_mbps': total_transmit,
+                'total_bandwidth_mbps': total_receive + total_transmit,
+                'total_errors': total_errors
             }
-        except (KeyError, ValueError) as e:
-            logger.error(f"Error processing network metrics: {e}")
-            return {}
+        }
 
-    def _process_disk_metrics(self, metric_data: list) -> float:
-        """Process disk metrics from raw Prometheus data."""
+    def _process_gpu_metrics(self, results: Dict, instance: str) -> Dict[str, float]:
+        """Process GPU metrics for a specific instance."""
         try:
-            if not metric_data:
-                return 0.0
-            # Convert bytes to GB
-            return float(metric_data[0]['value'][1]) / (1024 * 1024 * 1024)
-        except (IndexError, KeyError, ValueError) as e:
-            logger.error(f"Error processing disk metrics: {e}")
-            return 0.0
+            return {
+                'memory_used_gib': float(self._get_instance_value(results['gpu_memory_used'], instance)),
+                'memory_total_gib': float(self._get_instance_value(results['gpu_memory_total'], instance)),
+                'utilization_percent': float(self._get_instance_value(results['gpu_utilization'], instance))
+            }
+        except (KeyError, TypeError, ValueError):
+            return {
+                'memory_used_gib': 0.0,
+                'memory_total_gib': 0.0,
+                'utilization_percent': 0.0
+            }
 
-    def _calculate_utilization(self, usage_data: list, capacity_data: list) -> float:
-        """Calculate utilization percentage from usage and capacity metrics."""
+    def _process_hpu_metrics(self, results: Dict, instance: str) -> Dict[str, float]:
+        """Process HPU metrics for a specific instance."""
         try:
-            if not usage_data or not capacity_data:
-                return 0.0
-            usage = float(usage_data[0]['value'][1])
-            capacity = float(capacity_data[0]['value'][1])
-            if capacity == 0:
-                return 0.0
-            return (usage / capacity) * 100
-        except (IndexError, KeyError, ValueError, ZeroDivisionError) as e:
-            logger.error(f"Error calculating utilization: {e}")
-            return 0.0
+            return {
+                'memory_used_gib': float(self._get_instance_value(results['hpu_memory_used'], instance)),
+                'memory_total_gib': float(self._get_instance_value(results['hpu_memory_total'], instance)),
+                'utilization_percent': float(self._get_instance_value(results['hpu_utilization'], instance))
+            }
+        except (KeyError, TypeError, ValueError):
+            return {
+                'memory_used_gib': 0.0,
+                'memory_total_gib': 0.0,
+                'utilization_percent': 0.0
+            }
+
+    def _aggregate_disk_metrics(self, nodes: Dict) -> Dict[str, float]:
+        """Aggregate disk metrics across all nodes."""
+        total_size = 0.0
+        total_used = 0.0
+
+        for node in nodes.values():
+            for mount_metrics in node['disk'].values():
+                total_size += mount_metrics['total_gib']
+                total_used += mount_metrics['used_gib']
+
+        return {
+            'total_gib': total_size,
+            'used_gib': total_used,
+            'available_gib': total_size - total_used,
+            'usage_percent': (total_used / total_size * 100) if total_size > 0 else 0
+        }
+
+    def _aggregate_network_metrics(self, nodes: Dict) -> Dict[str, float]:
+        """Aggregate network metrics across all nodes."""
+        total_receive = sum(node['network']['summary']['total_receive_mbps'] for node in nodes.values())
+        total_transmit = sum(node['network']['summary']['total_transmit_mbps'] for node in nodes.values())
+        total_errors = sum(node['network']['summary']['total_errors'] for node in nodes.values())
+
+        return {
+            'total_receive_mbps': total_receive,
+            'total_transmit_mbps': total_transmit,
+            'total_bandwidth_mbps': total_receive + total_transmit,
+            'total_errors': total_errors
+        }
+
+    def _aggregate_gpu_metrics(self, nodes: Dict) -> Dict[str, float]:
+        """Aggregate GPU metrics across all nodes."""
+        total_memory = sum(node['gpu']['memory_total_gib'] for node in nodes.values())
+        used_memory = sum(node['gpu']['memory_used_gib'] for node in nodes.values())
+        avg_utilization = sum(node['gpu']['utilization_percent'] for node in nodes.values()) / len(nodes) if nodes else 0.0
+
+        return {
+            'memory_total_gib': total_memory,
+            'memory_used_gib': used_memory,
+            'memory_available_gib': total_memory - used_memory,
+            'utilization_percent': avg_utilization,
+            'memory_usage_percent': (used_memory / total_memory * 100) if total_memory > 0 else 0.0
+        }
+
+    def _aggregate_hpu_metrics(self, nodes: Dict) -> Dict[str, float]:
+        """Aggregate HPU metrics across all nodes."""
+        total_memory = sum(node['hpu']['memory_total_gib'] for node in nodes.values())
+        used_memory = sum(node['hpu']['memory_used_gib'] for node in nodes.values())
+        avg_utilization = sum(node['hpu']['utilization_percent'] for node in nodes.values()) / len(nodes) if nodes else 0.0
+
+        return {
+            'memory_total_gib': total_memory,
+            'memory_used_gib': used_memory,
+            'memory_available_gib': total_memory - used_memory,
+            'utilization_percent': avg_utilization,
+            'memory_usage_percent': (used_memory / total_memory * 100) if total_memory > 0 else 0.0
+        }
+
+    def _get_instance_mountpoint_value(self, metrics: List, instance: str, mountpoint: str) -> float:
+        """Get metric value for a specific instance and mountpoint."""
+        for metric in metrics:
+            if (metric['metric'].get('instance') == instance and
+                metric['metric'].get('mountpoint') == mountpoint):
+                return metric['value'][1]
+        return 0.0
+
+    def _get_device_value(self, metrics: List, instance: str, device: str) -> float:
+        """Get metric value for a specific instance and network device."""
+        for metric in metrics:
+            if (metric['metric'].get('instance') == instance and
+                metric['metric'].get('device') == device):
+                return metric['value'][1]
+        return 0.0

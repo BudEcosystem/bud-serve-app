@@ -40,6 +40,7 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 from ..endpoint_ops.schemas import WorkerInfoFilter
 from budapp.cluster_ops.utils import ClusterMetricsFetcher
+from budapp.cluster_ops.schemas import ClusterMetricsResponse
 
 from ..commons.constants import (
     APP_ICONS,
@@ -1080,41 +1081,45 @@ class ClusterService(SessionMixin):
 
         return result, count
 
-    async def get_cluster_metrics(self, cluster_id: UUID) -> Dict[str, Any]:
-        """Get cluster metrics from Prometheus."""
+    async def get_cluster_metrics(self, cluster_id: UUID) -> Dict[str,any]:
+        """Get cluster metrics from Prometheus.
 
-        logger.debug(f"Fetching metrics for cluster From Cluster Metrics: {cluster_id}")
+        Args:
+            cluster_id: UUID of the cluster
+
+        Returns:
+            ClusterMetricsResponse with node and summary metrics
+
+        Raises:
+            ClientException: If cluster not found or metrics fetch fails
+        """
+        logger.debug(f"Fetching metrics for cluster: {cluster_id}")
 
         db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-                    ClusterModel,
-                    {"id": cluster_id},
-                    exclude_fields={"status": ClusterStatusEnum.DELETED}
+            ClusterModel,
+            {"id": cluster_id},
+            exclude_fields={"status": ClusterStatusEnum.DELETED}
+        )
+
+        if not db_cluster:
+            raise ClientException(
+                "Cluster not found",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        try:
+            metrics_fetcher = ClusterMetricsFetcher(app_settings.prometheus_url)
+            metrics =  metrics_fetcher.get_cluster_metrics(cluster_id)
+
+            if not metrics:
+                raise ClientException(
+                    "Failed to fetch metrics from Prometheus",
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE
                 )
 
-        # If cluster is not found
-        if not db_cluster:
-            raise ClientException("Cluster not found", status_code=status.HTTP_404_NOT_FOUND)
-        try:
-            # Initialize metrics fetcher
-            prometheus_url = app_settings.prometheus_url  # Add this to your config
-            metrics_fetcher = ClusterMetricsFetcher(prometheus_url)
-
-            # Get metrics for all clusters
-            all_metrics = metrics_fetcher.get_cluster_metrics()
-
-            if not all_metrics:
-                raise ClientException("Failed to fetch metrics from Prometheus")
-
-            # Get metrics for specific cluster
-            cluster_name = db_cluster.id
-            if cluster_name not in all_metrics:
-                raise ClientException(f"No metrics found for cluster: {cluster_name}")
-
-            cluster_metrics = all_metrics[cluster_name]
-
             return {
-                "nodes": cluster_metrics["nodes"],
-                "cluster_summary": cluster_metrics["cluster_summary"]
+                "nodes":metrics["nodes"],
+                "cluster_summary": metrics["summary"]  # Note: changed from cluster_summary to summary
             }
 
         except Exception as e:
