@@ -125,7 +125,7 @@ async def test_get_cluster_metrics():
 
             # Verify the response
             assert response.status_code in [
-                status.HTTP_200_OK
+                status.HTTP_200_OK,
                 # status.HTTP_400_BAD_REQUEST,
                 # status.HTTP_500_INTERNAL_SERVER_ERROR
             ]
