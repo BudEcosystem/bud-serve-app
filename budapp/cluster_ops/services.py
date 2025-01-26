@@ -1047,22 +1047,23 @@ class ClusterService(SessionMixin):
             project_name = db_result[1]
             model_name = db_result[2]
             total_workers = db_result[3]
+            active_workers = db_result[4]
 
-            # Fetch worker details for the endpoint
-            try:
-                workers_data = await EndpointService(self.session).get_endpoint_workers(
-                    endpoint_id=db_endpoint.id,
-                    filters=WorkerInfoFilter(status="Running"),
-                    refresh=False,
-                    page=1,
-                    limit=100,  # Adjust limit as needed
-                    order_by=None,
-                    search=False,
-                )
-                active_workers = len(workers_data.get("workers", []))
-            except Exception as e:
-                logger.error(f"Failed to fetch worker details for endpoint {db_endpoint.id}: {e}")
-                active_workers = 0  # Default to 0 active workers
+            # # Fetch worker details for the endpoint
+            # try:
+            #     workers_data = await EndpointService(self.session).get_endpoint_workers(
+            #         endpoint_id=db_endpoint.id,
+            #         filters=WorkerInfoFilter(status="Running"),
+            #         refresh=False,
+            #         page=1,
+            #         limit=100,  # Adjust limit as needed
+            #         order_by=None,
+            #         search=False,
+            #     )
+            #     active_workers = len(workers_data.get("workers", []))
+            # except Exception as e:
+            #     logger.error(f"Failed to fetch worker details for endpoint {db_endpoint.id}: {e}")
+            #     active_workers = 0  # Default to 0 active workers
 
             result.append(
                 ClusterEndpointResponse(
