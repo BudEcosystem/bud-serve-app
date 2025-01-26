@@ -1098,7 +1098,7 @@ class ClusterService(SessionMixin):
                 raise ClientException("Failed to fetch metrics from Prometheus")
 
             # Get metrics for specific cluster
-            cluster_name = db_cluster.name  # assuming cluster name is used in Prometheus
+            cluster_name = cluster_id
             if cluster_name not in all_metrics:
                 raise ClientException(f"No metrics found for cluster: {cluster_name}")
 
