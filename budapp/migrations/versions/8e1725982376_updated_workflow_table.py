@@ -1,7 +1,7 @@
 """updated workflow table
 
 Revision ID: 8e1725982376
-Revises: 375eb22cb3af
+Revises: 5dc1d24e7b7e
 Create Date: 2025-01-23 19:05:03.880683
 
 """
@@ -15,7 +15,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "8e1725982376"
-down_revision: Union[str, None] = "375eb22cb3af"
+down_revision: Union[str, None] = "5dc1d24e7b7e"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -28,7 +28,7 @@ def upgrade() -> None:
         sa.Column(
             "visibility",
             postgresql.ENUM("PUBLIC", "INTERNAL", name="visibility_enum", create_type=False),
-            nullable=False,
+            nullable=True,
         ),
     )
     op.sync_enum_values(

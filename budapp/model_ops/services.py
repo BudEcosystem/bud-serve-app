@@ -2283,7 +2283,7 @@ class ModelWorkflowService(SessionMixin):
         )
 
         # Define the keys required for updating faqs
-        keys_of_interest = ["model_id", "license_id"]
+        keys_of_interest = ["model_id", "license_id", "model_icon"]
 
         # from workflow steps extract necessary information
         required_data = {}
@@ -2311,16 +2311,13 @@ class ModelWorkflowService(SessionMixin):
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
         logger.debug(f"Workflow {db_workflow.id} marked as completed")
 
-        # db_model = await ModelDataManager(self.session).retrieve_by_fields(
-        #     Model, fields={"id": required_data["model_id"]}, exclude_fields={"status": ModelStatusEnum.DELETED}
-        # )
         # # Send notification to workflow creator
         # notification_request = (
         #     NotificationBuilder()
         #     .set_content(
         #         title=db_license.name,
         #         message="FAQs fetched and updated",
-        #         icon=db_model.icon,
+        #         icon=required_data["model_icon"] ,
         #     )
         #     .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.LICENSE_FAQS_FETCH_SUCCESS.value)
         #     .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
