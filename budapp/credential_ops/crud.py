@@ -23,6 +23,12 @@ from budapp.commons.db_utils import DataManagerUtils
 logger = logging.get_logger(__name__)
 
 
+class CredentialDataManager(DataManagerUtils):
+    """Data manager for the Credential model."""
+
+    pass
+
+
 class ProprietaryCredentialDataManager(DataManagerUtils):
     """Data manager for the ProprietaryCredential model."""
 

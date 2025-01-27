@@ -372,3 +372,11 @@ class Task(Tag):
     """Task schema with name and description."""
 
     pass
+
+
+class BudNotificationMetadata(BaseModel):
+    """Recommended cluster notification metadata"""
+
+    workflow_id: str
+    subscriber_ids: str
+    name: str

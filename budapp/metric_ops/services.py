@@ -27,28 +27,29 @@ from budapp.commons.config import app_settings
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 
+from ..cluster_ops.crud import ClusterDataManager
+from ..cluster_ops.models import Cluster as ClusterModel
+from ..commons.constants import (
+    ClusterStatusEnum,
+    EndpointStatusEnum,
+    ModelProviderTypeEnum,
+    ModelStatusEnum,
+    ProjectStatusEnum,
+)
+from ..endpoint_ops.crud import EndpointDataManager
+from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..model_ops.crud import ModelDataManager
+from ..model_ops.models import Model
+from ..project_ops.crud import ProjectDataManager
+from ..project_ops.models import Project as ProjectModel
 from .schemas import (
     CountAnalyticsRequest,
     CountAnalyticsResponse,
+    DashboardStatsResponse,
     PerformanceAnalyticsRequest,
     PerformanceAnalyticsResponse,
-    DashboardStatsResponse,
 )
-from ..commons.constants import (
-    EndpointStatusEnum,
-    ModelStatusEnum,
-    ClusterStatusEnum,
-    ModelProviderTypeEnum,
-    ProjectStatusEnum,
-)
-from ..cluster_ops.crud import ClusterDataManager
-from ..model_ops.crud import ModelDataManager
-from ..endpoint_ops.crud import EndpointDataManager
-from ..project_ops.crud import ProjectDataManager
-from ..cluster_ops.models import Cluster as ClusterModel
-from ..model_ops.models import Model
-from ..endpoint_ops.models import Endpoint as EndpointModel
-from ..project_ops.models import Project as ProjectModel
+
 
 logger = logging.get_logger(__name__)
 
@@ -69,6 +70,8 @@ class MetricService(SessionMixin):
             message="Successfully fetched request count analytics",
             overall_metrics=bud_metric_response["overall_metrics"],
             concurrency_metrics=bud_metric_response["concurrency_metrics"],
+            queuing_time_metrics=bud_metric_response["queuing_time_metrics"],
+            global_metrics=bud_metric_response["global_metrics"],
         )
 
     async def get_request_performance_analytics(
@@ -151,18 +154,7 @@ class MetricService(SessionMixin):
             ) from e
 
     async def get_dashboard_stats(self, user_id: UUID) -> DashboardStatsResponse:
-        """
-        Fetches dashboard statistics for the given user, including counts of models, endpoints, clusters,
-        and projects the user is associated with.
-
-        Args:
-            user_id (UUID): The ID of the user.
-
-        Returns:
-            DashboardStatsResponse: Contains statistics like model counts, project counts, endpoint counts,
-            and cluster counts.
-        """
-
+        """Fetch dashboard statistics for the given user."""
         db_total_model_count = await ModelDataManager(self.session).get_count_by_fields(
             Model, fields={"status": ModelStatusEnum.ACTIVE}
         )
@@ -189,9 +181,7 @@ class MetricService(SessionMixin):
             ClusterModel, fields={}, exclude_fields={"status": ClusterStatusEnum.DELETED}
         )
 
-        db_inactive_clusters = await ClusterDataManager(self.session).get_count_by_fields(
-            ClusterModel, fields={"status": ClusterStatusEnum.NOT_AVAILABLE}
-        )
+        _, db_inactive_clusters = await ClusterDataManager(self.session).get_inactive_clusters()
 
         db_project_count = await ProjectDataManager(self.session).get_count_by_fields(
             ProjectModel, fields={"status": ProjectStatusEnum.ACTIVE}

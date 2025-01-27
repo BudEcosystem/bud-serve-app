@@ -27,6 +27,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .auth import auth_routes
 from .cluster_ops import cluster_routes
+from .credential_ops import credential_routes
 from .commons import logging
 from .commons.config import app_settings
 from .commons.constants import Environment
@@ -123,6 +124,7 @@ internal_router = APIRouter()
 internal_router.include_router(auth_routes.auth_router)
 internal_router.include_router(cluster_routes.cluster_router)
 internal_router.include_router(common_routes.common_router)
+internal_router.include_router(credential_routes.credential_router)
 internal_router.include_router(endpoint_routes.endpoint_router)
 internal_router.include_router(meta_routes.meta_router)
 internal_router.include_router(metric_routes.metric_router)

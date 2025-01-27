@@ -416,8 +416,10 @@ class WorkflowTypeEnum(StrEnum):
     CLUSTER_ONBOARDING = auto()
     CLUSTER_DELETION = auto()
     ENDPOINT_DELETION = auto()
+    ENDPOINT_WORKER_DELETION = auto()
     CLOUD_MODEL_ONBOARDING = auto()
     LOCAL_MODEL_ONBOARDING = auto()
+    ADD_WORKER_TO_ENDPOINT = auto()
     LICENSE_FAQ_FETCH = auto()
 
 
@@ -464,6 +466,8 @@ class PayloadType(str, Enum):
     PERFORM_MODEL_SECURITY_SCAN = "perform_model_security_scan"
     CLUSTER_STATUS_UPDATE = "cluster-status-update"
     DEPLOYMENT_STATUS_UPDATE = "deployment-status-update"
+    DELETE_WORKER = "delete_worker"
+    ADD_WORKER = "add_worker"
     PERFORM_LICENSE_FAQS_FETCH = "perform_license_faqs_fetch"
 
 
@@ -485,6 +489,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     MODEL_SECURITY_SCAN_EVENTS = "model_security_scan_events"
     DELETE_CLUSTER_EVENTS = "delete_cluster_events"
     DELETE_ENDPOINT_EVENTS = "delete_endpoint_events"
+    DELETE_WORKER_EVENTS = "delete_worker_events"
     LICENSE_FAQ_EVENTS = "license_faq_events"
 
 
@@ -500,7 +505,6 @@ class ClusterStatusEnum(StrEnum):
 
     AVAILABLE = auto()
     NOT_AVAILABLE = auto()
-    REGISTERING = auto()
     ERROR = auto()
     DELETING = auto()
     DELETED = auto()
@@ -656,7 +660,11 @@ class VisibilityEnum(Enum):
 
 
 APP_ICONS = {
-    "general": {"model_mono": "icons/general/model_mono.png", "cluster_mono": "icons/general/cluster_mono.png"}
+    "general": {
+        "model_mono": "icons/general/model_mono.png",
+        "cluster_mono": "icons/general/cluster_mono.png",
+        "deployment_mono": "icons/general/deployment_mono.png",
+    }
 }
 
 EMOJIS = [
@@ -2520,6 +2528,7 @@ WORKFLOW_DELETE_MESSAGES = {
     WorkflowTypeEnum.ENDPOINT_DELETION: "Successfully cancelled deployment deletion.",
     WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
     WorkflowTypeEnum.LOCAL_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
+    WorkflowTypeEnum.ADD_WORKER_TO_ENDPOINT: "Successfully cancelled worker to deployment.",
 }
 
 

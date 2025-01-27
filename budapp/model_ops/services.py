@@ -991,8 +991,10 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Sanitize base model
         base_model = model_tree.get("base_model", [])
-        if base_model is not None and len(base_model) > 0:
-            base_model = base_model[0]
+        if isinstance(base_model, list) and len(base_model) > 0:
+            base_model = base_model
+        elif isinstance(base_model, str):
+            base_model = [base_model]
         base_model = normalize_value(base_model)
 
         # If base model is the same as the model uri, set base model to None
@@ -1700,10 +1702,11 @@ class LocalModelWorkflowService(SessionMixin):
         for model_issue in model_issues:
             severity = model_issue["severity"].lower()
 
+            # NOTE: changed this formatting to budmodel
             # Clean up the source path by removing local_path prefix
-            source = model_issue["source"]
-            if source.startswith(local_path):
-                source = source[len(local_path) :].lstrip("/")
+            # source = model_issue["source"]
+            # if source.startswith(local_path):
+            #     source = source[len(local_path) :].lstrip("/")
 
             # Group issues by severity
             if severity not in grouped_issues:
@@ -1713,7 +1716,7 @@ class LocalModelWorkflowService(SessionMixin):
                     title=model_issue["title"],
                     severity=severity,
                     description=model_issue["description"],
-                    source=source,
+                    source=model_issue["source"],
                 ).model_dump()
             )
 
@@ -1805,13 +1808,8 @@ class ModelService(SessionMixin):
             Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
         )
 
-        # For base model there won't be any base model value
-        base_model = db_model.base_model
-        if not base_model:
-            base_model = db_model.uri
-
         # Get base model relation count
-        model_tree_count = await ModelDataManager(self.session).get_model_tree_count(base_model)
+        model_tree_count = await ModelDataManager(self.session).get_model_tree_count(db_model.uri)
         base_model_relation_count = {row.base_model_relation.value: row.count for row in model_tree_count}
         model_tree = ModelTree(
             adapters_count=base_model_relation_count.get(BaseModelRelationEnum.ADAPTER.value, 0),
@@ -2113,12 +2111,32 @@ class ModelService(SessionMixin):
             )
 
         else:
-            # TODO:service yet to be implemented for other provider types models to clear model space
-            pass
+            await self._perform_model_deletion_request(db_model.local_path)
+            logger.debug(f"Model deletion successful for {db_model.local_path}")
 
         db_model = await ModelDataManager(self.session).update_by_fields(db_model, {"status": ModelStatusEnum.DELETED})
 
         return db_model
+
+    async def _perform_model_deletion_request(self, local_path: str) -> None:
+        """Perform model deletion request."""
+        model_deletion_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/model-info/local-models"
+        )
+
+        params = {"path": local_path}
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.delete(model_deletion_endpoint, params=params) as response:
+                    if response.status >= 400:
+                        raise ClientException("Unable to perform model deletion")
+
+        except ClientException as e:
+            raise e
+        except Exception as e:
+            logger.error(f"Failed to perform model deletion request: {e}")
+            raise ClientException("Unable to perform local model deletion") from e
 
     async def fetch_license_faqs(
         self, model_id: UUID, license_id: UUID, current_user_id: UUID, license_source: str

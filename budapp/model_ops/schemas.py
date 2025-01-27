@@ -44,6 +44,7 @@ from budapp.commons.constants import (
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
 from budapp.user_ops.schemas import UserInfo
+
 from ..commons.helpers import validate_icon
 
 
@@ -203,7 +204,7 @@ class ModelCreate(ModelBase):
     use_cases: list[str] | None = None
     minimum_requirements: dict | None = None
     examples: list[dict] | None = None
-    base_model: str | None = None
+    base_model: list[str] | None = None
     base_model_relation: BaseModelRelationEnum | None = None
     model_type: str | None = None
     family: str | None = None
@@ -239,7 +240,7 @@ class ModelDetailResponse(BaseModel):
     use_cases: list[str] | None = None
     minimum_requirements: dict | None = None
     examples: list[dict] | None = None
-    base_model: str | None = None
+    base_model: list[str] | None = None
     model_type: str | None = None
     family: str | None = None
     model_weights_size: int | None = None
@@ -253,6 +254,7 @@ class ModelDetailResponse(BaseModel):
     paper_published: list[PaperPublishedModel] | None = None
     model_licenses: ModelLicensesModel | None = None
     provider: Provider | None = None
+    created_at: datetime
 
 
 class ModelTree(BaseModel):
@@ -533,6 +535,8 @@ class ModelFilter(BaseModel):
     model_size_max: int | None = Field(None, ge=0, le=500)
     provider_type: ModelProviderTypeEnum | None = None
     table_source: Literal["cloud_model", "model"] = "cloud_model"
+    base_model: str | None = None
+    base_model_relation: BaseModelRelationEnum | None = None
 
     @field_validator("source")
     @classmethod

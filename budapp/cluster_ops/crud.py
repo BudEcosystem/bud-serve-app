@@ -16,10 +16,10 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the cluster ops."""
 
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, asc, case, desc, distinct, func, select
 
 from budapp.cluster_ops.models import Cluster
 from budapp.commons import logging
@@ -109,16 +109,131 @@ class ClusterDataManager(DataManagerUtils):
 
         return result, count
 
-    async def get_active_clusters_by_cluster_ids(self, cluster_ids: List[UUID]) -> List[Cluster]:
+    async def get_available_clusters_by_cluster_ids(self, cluster_ids: List[UUID]) -> Tuple[List[Cluster], int]:
         """Get active clusters by cluster ids."""
-        stmt = select(Cluster).filter(Cluster.cluster_id.in_(cluster_ids), Cluster.status != ClusterStatusEnum.DELETED)
+        stmt = select(Cluster).filter(
+            Cluster.cluster_id.in_(cluster_ids), Cluster.status == ClusterStatusEnum.AVAILABLE
+        )
         count_stmt = (
             select(func.count())
             .select_from(Cluster)
-            .filter(Cluster.cluster_id.in_(cluster_ids), Cluster.status != ClusterStatusEnum.DELETED)
+            .filter(Cluster.cluster_id.in_(cluster_ids), Cluster.status == ClusterStatusEnum.AVAILABLE)
         )
 
         count = self.execute_scalar(count_stmt)
         result = self.scalars_all(stmt)
+
+        return result, count
+
+    async def get_inactive_clusters(self) -> Tuple[List[Cluster], int]:
+        """Retrieve a list of inactive clusters and count."""
+        stmt = select(Cluster).filter(
+            Cluster.status.in_([ClusterStatusEnum.NOT_AVAILABLE, ClusterStatusEnum.ERROR, ClusterStatusEnum.DELETING])
+        )
+        count_stmt = (
+            select(func.count())
+            .select_from(Cluster)
+            .filter(
+                Cluster.status.in_(
+                    [ClusterStatusEnum.NOT_AVAILABLE, ClusterStatusEnum.ERROR, ClusterStatusEnum.DELETING]
+                )
+            )
+        )
+
+        count = self.execute_scalar(count_stmt)
+        result = self.scalars_all(stmt)
+
+        return result, count
+
+    async def get_all_clusters_in_project(
+        self, project_id: UUID, offset: int, limit: int, filters: Dict[str, Any], order_by: List[str], search: bool
+    ) -> Tuple[List[Cluster], int, int, int]:
+        """Get all clusters in a project."""
+        await self.validate_fields(Cluster, filters)
+
+        # Generate statements based on search or filters
+        base_conditions = [
+            Endpoint.project_id == project_id,
+            Cluster.status != ClusterStatusEnum.DELETED,
+            Endpoint.status != EndpointStatusEnum.DELETED,
+        ]
+        if search:
+            search_conditions = await self.generate_search_stmt(Cluster, filters)
+
+            stmt = (
+                select(
+                    Cluster,
+                    func.count(Endpoint.id).label("endpoint_count"),
+                    func.coalesce(func.sum(Endpoint.number_of_nodes), 0).label("total_nodes"),
+                    func.coalesce(func.sum(Endpoint.total_replicas), 0).label("total_replicas"),
+                )
+                .join(Endpoint, Endpoint.cluster_id == Cluster.id)
+                .filter(*base_conditions)
+                .filter(and_(*search_conditions))
+                .group_by(Cluster.id)
+            )
+            count_stmt = (
+                select(func.count(distinct(Cluster.id)))
+                .select_from(Cluster)
+                .join(Endpoint, Endpoint.cluster_id == Cluster.id)
+                .filter(*base_conditions)
+                .filter(and_(*search_conditions))
+            )
+        else:
+            filter_conditions = [getattr(Cluster, field) == value for field, value in filters.items()]
+            stmt = (
+                select(
+                    Cluster,
+                    func.count(Endpoint.id).label("endpoint_count"),
+                    func.coalesce(func.sum(Endpoint.number_of_nodes), 0).label("total_nodes"),
+                    func.coalesce(func.sum(Endpoint.total_replicas), 0).label("total_replicas"),
+                )
+                .join(Endpoint, Endpoint.cluster_id == Cluster.id)
+                .filter(*base_conditions)
+                .filter(*filter_conditions)
+                .group_by(Cluster.id)
+            )
+            count_stmt = (
+                select(func.count(distinct(Cluster.id)))
+                .select_from(Cluster)
+                .join(Endpoint, Endpoint.cluster_id == Cluster.id)
+                .filter(*base_conditions)
+                .filter(*filter_conditions)
+            )
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(Cluster, order_by)
+
+            # Handle endpoint_count sorting
+            for field, direction in order_by:
+                if field == "endpoint_count":
+                    sort_func = asc if direction == "asc" else desc
+                    stmt = stmt.order_by(sort_func("endpoint_count"))
+                elif field == "node_count":
+                    sort_func = asc if direction == "asc" else desc
+                    stmt = stmt.order_by(sort_func("total_nodes"))
+                elif field == "worker_count":
+                    sort_func = asc if direction == "asc" else desc
+                    stmt = stmt.order_by(sort_func("total_replicas"))
+                elif field == "hardware_type":
+                    # Sorting by hardware type
+                    hardware_type_expr = (
+                        case((Cluster.cpu_count > 0, 1), else_=0)
+                        + case((Cluster.gpu_count > 0, 1), else_=0)
+                        + case((Cluster.hpu_count > 0, 1), else_=0)
+                    ).label("hardware_type")
+                    sort_func = asc if direction == "asc" else desc
+                    stmt = stmt.order_by(sort_func(hardware_type_expr))
+
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.session.execute(stmt)
 
         return result, count

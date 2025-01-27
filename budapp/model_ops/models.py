@@ -63,7 +63,7 @@ class Model(Base):
     use_cases: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
     minimum_requirements: Mapped[dict] = mapped_column(JSONB, nullable=True)
     examples: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
-    base_model: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    base_model: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
     base_model_relation: Mapped[str] = mapped_column(
         Enum(
             BaseModelRelationEnum,
