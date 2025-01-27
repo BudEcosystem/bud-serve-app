@@ -25,6 +25,7 @@ from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, Field, computed_f
 
 from budapp.commons.constants import ClusterStatusEnum, EndpointStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
+
 from ..commons.helpers import validate_icon
 
 
@@ -193,6 +194,7 @@ class CancelClusterOnboardingRequest(BaseModel):
 
     workflow_id: UUID4
 
+
 class ClusterEndpointResponse(BaseModel):
     """Cluster endpoint response schema."""
 
@@ -211,8 +213,19 @@ class ClusterEndpointPaginatedResponse(PaginatedSuccessResponse):
 
     endpoints: list[ClusterEndpointResponse] = []
 
+
 class ClusterEndpointFilter(BaseModel):
     """Filter schema for endpoints."""
 
     name: str | None = None
     status: EndpointStatusEnum | None = None
+
+
+class ClusterDeploymentStatsResponse(SuccessResponse):
+    """Cluster deployment stats response schema."""
+
+    total_worker_count: int
+    active_worker_count: int
+    total_endpoints_count: int
+    running_endpoints_count: int
+    hardware_type: list

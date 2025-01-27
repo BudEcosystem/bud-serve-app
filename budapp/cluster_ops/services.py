@@ -38,7 +38,6 @@ from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManage
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
-from ..endpoint_ops.schemas import WorkerInfoFilter
 
 from ..commons.constants import (
     APP_ICONS,
@@ -51,7 +50,9 @@ from ..commons.constants import (
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
+from ..commons.helpers import get_hardware_types
 from ..core.schemas import NotificationResult
+from ..endpoint_ops.schemas import WorkerInfoFilter
 from ..model_ops.crud import ModelDataManager
 from ..model_ops.models import Model
 from ..model_ops.services import ModelServiceUtil
@@ -61,12 +62,13 @@ from .crud import ClusterDataManager
 from .models import Cluster as ClusterModel
 from .schemas import (
     ClusterCreate,
+    ClusterDeploymentStatsResponse,
+    ClusterEndpointResponse,
     ClusterPaginatedResponse,
     ClusterResourcesInfo,
     ClusterResponse,
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
-    ClusterEndpointResponse,
 )
 
 
@@ -1023,7 +1025,7 @@ class ClusterService(SessionMixin):
             raise ClientException(
                 "Failed to update cluster node status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
-        
+
     async def get_all_endpoints_in_cluster(
         self,
         cluster_id: UUID,
@@ -1034,7 +1036,6 @@ class ClusterService(SessionMixin):
         search: bool,
     ) -> Tuple[List[ClusterEndpointResponse], int]:
         """Get all endpoints in a cluster."""
-
         from ..endpoint_ops.services import EndpointService
 
         db_results, count = await EndpointDataManager(self.session).get_all_endpoints_in_cluster(
@@ -1078,3 +1079,33 @@ class ClusterService(SessionMixin):
             )
 
         return result, count
+
+    async def get_cluster_deployment_stats(self, cluster_id: UUID) -> ClusterDeploymentStatsResponse:
+        """Fetch cluster deployment statistics for the given id."""
+        db_total_endpoints_count = await EndpointDataManager(self.session).get_count_by_fields(
+            EndpointModel, fields={"cluster_id": cluster_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+        )
+        db_running_endpoints_count = await EndpointDataManager(self.session).get_count_by_fields(
+            EndpointModel, fields={"cluster_id": cluster_id, "status": EndpointStatusEnum.RUNNING}
+        )
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(ClusterModel, fields={"id": cluster_id})
+
+        hardware_type = get_hardware_types(db_cluster.cpu_count, db_cluster.gpu_count, db_cluster.hpu_count)
+
+        # db_active_worker_count, db_total_worker_count = await EndpointDataManager(self.session).get_cluster_workers_count(cluster_id)
+        db_active_worker_count, db_total_worker_count = await EndpointDataManager(
+            self.session
+        ).get_cluster_workers_count(cluster_id)
+
+        db_deployment_stats = ClusterDeploymentStatsResponse(
+            code=status.HTTP_200_OK,
+            object="cluster.count",
+            message="Successfully fetched deployment statistics",
+            total_worker_count=db_active_worker_count,
+            active_worker_count=db_total_worker_count,
+            total_endpoints_count=db_total_endpoints_count,
+            running_endpoints_count=db_running_endpoints_count,
+            hardware_type=hardware_type,
+        )
+
+        return db_deployment_stats

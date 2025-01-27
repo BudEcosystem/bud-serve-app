@@ -16,7 +16,6 @@
 
 """The cluster ops package, containing essential business logic, services, and routing configurations for the cluster ops."""
 
-import os
 from typing import List, Optional, Union
 from uuid import UUID
 
@@ -27,7 +26,6 @@ from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
-from budapp.commons.config import app_settings
 from budapp.commons.dependencies import (
     get_current_active_user,
     get_session,
@@ -41,13 +39,14 @@ from budapp.workflow_ops.services import WorkflowService
 
 from .schemas import (
     CancelClusterOnboardingRequest,
+    ClusterDeploymentStatsResponse,
+    ClusterEndpointFilter,
+    ClusterEndpointPaginatedResponse,
     ClusterFilter,
     ClusterListResponse,
     CreateClusterWorkflowRequest,
     EditClusterRequest,
     SingleClusterResponse,
-    ClusterEndpointFilter,
-    ClusterEndpointPaginatedResponse
 )
 from .services import ClusterService
 
@@ -365,6 +364,7 @@ async def cancel_cluster_onboarding(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to cancel cluster onboarding"
         ).to_http_response()
 
+
 @cluster_router.get(
     "/{cluster_id}/endpoints",
     responses={
@@ -422,3 +422,53 @@ async def list_all_endpoints(
         code=status.HTTP_200_OK,
         message="Successfully listed all endpoints in the cluster",
     ).to_http_response()
+
+
+@cluster_router.get(
+    "/{cluster_id}/count",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to a server error.",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to a client error.",
+        },
+        status.HTTP_200_OK: {
+            "model": ClusterDeploymentStatsResponse,
+            "description": "Successfully retrieved cluster deployment statistics, including counts for nodes and replicas.",
+        },
+    },
+    description="Retrieve the cluster deployment statistics, including the total number of nodes and replicas for a specified cluster.",
+)
+async def get_cluster_deployment_stats(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    cluster_id: UUID,
+    session: Annotated[Session, Depends(get_session)],
+) -> ClusterDeploymentStatsResponse:
+    """Retrieve the cluster deployment statistics, including the total number of nodes and replicas for a specified cluster.
+
+    Args:
+        current_user (User): The current authenticated user making the request.
+        cluster_id (UUID): The ID of the cluster for which deployment statistics are to be retrieved.
+        session (Session): The database session used for querying data.
+
+    Returns:
+        ClusterDeploymentStatsResponse: An object containing the aggregated statistics for the specified cluster,
+        such as the total number of nodes and replicas.
+
+    Raises:
+        ClientException: If there is an error specific to the client request.
+        Exception: For any other server-side issues during the operation.
+    """
+    try:
+        return await ClusterService(session).get_cluster_deployment_stats(cluster_id)
+    except ClientException as e:
+        logger.exception(f"Failed to fetch cluster deployment statistics: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to fetch cluster deployment statistics: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to fetch cluster deployment statistics"
+        ).to_http_response()
