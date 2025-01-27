@@ -815,6 +815,7 @@ class EndpointService(SessionMixin):
         )
 
         # Validate endpoint id
+        project_id = None
         if endpoint_id:
             db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
                 EndpointModel, {"id": endpoint_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
@@ -838,11 +839,19 @@ class EndpointService(SessionMixin):
                 {"title": db_endpoint.name, "icon": model_icon, "tag": db_endpoint.project.name},
             )
 
+            # Assign project_id
+            project_id = db_endpoint.project_id
+
         # Prepare workflow step data
         workflow_step_data = AddWorkerWorkflowStepData(
             endpoint_id=endpoint_id,
             additional_concurrency=additional_concurrency,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+
+        # NOTE: If endpoint_id is provided, then need to add project_id to workflow step data
+        # Required for frontend integration
+        if endpoint_id:
+            workflow_step_data["project_id"] = str(project_id)
 
         # Get workflow steps
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -1038,7 +1047,7 @@ class EndpointService(SessionMixin):
         )
 
     async def _perform_bud_simulation_request(self, payload: Dict) -> Dict:
-        """Perform model extraction request."""
+        """Perform bud simulation request."""
         bud_simulation_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/run"
         )
@@ -1049,14 +1058,14 @@ class EndpointService(SessionMixin):
                 async with session.post(bud_simulation_endpoint, json=payload) as response:
                     response_data = await response.json()
                     if response.status >= 400:
-                        raise ClientException("Unable to perform model extraction")
+                        raise ClientException("Unable to perform bud simulation")
 
                     return response_data
         except ClientException as e:
             raise e
         except Exception as e:
-            logger.error(f"Failed to perform model extraction request: {e}")
-            raise ClientException("Unable to perform model extraction") from e
+            logger.error(f"Failed to perform bud simulation request: {e}")
+            raise ClientException("Unable to perform bud simulation") from e
 
     async def _perform_add_worker_to_deployment(
         self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID
