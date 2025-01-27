@@ -1081,11 +1081,12 @@ class ClusterService(SessionMixin):
 
         return result, count
 
-    async def get_cluster_metrics(self, cluster_id: UUID) -> Dict[str,any]:
+    async def get_cluster_metrics(self, cluster_id: UUID, time_range: str = 'today') -> Dict[str,any]:
         """Get cluster metrics from Prometheus.
 
         Args:
             cluster_id: UUID of the cluster
+            time_range: One of 'today', '7days', 'month'
 
         Returns:
             ClusterMetricsResponse with node and summary metrics
@@ -1093,7 +1094,7 @@ class ClusterService(SessionMixin):
         Raises:
             ClientException: If cluster not found or metrics fetch fails
         """
-        logger.debug(f"Fetching metrics for cluster: {cluster_id}")
+        logger.debug(f"Fetching metrics for cluster: {cluster_id}, time_range: {time_range}")
 
         db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
             ClusterModel,
@@ -1109,7 +1110,7 @@ class ClusterService(SessionMixin):
 
         try:
             metrics_fetcher = ClusterMetricsFetcher(app_settings.prometheus_url)
-            metrics =  metrics_fetcher.get_cluster_metrics(cluster_id)
+            metrics = metrics_fetcher.get_cluster_metrics(cluster_id, time_range=time_range)
 
             if not metrics:
                 raise ClientException(
@@ -1118,8 +1119,10 @@ class ClusterService(SessionMixin):
                 )
 
             return {
-                "nodes":metrics["nodes"],
-                "cluster_summary": metrics["summary"]  # Note: changed from cluster_summary to summary
+                "nodes": metrics["nodes"],
+                "cluster_summary": metrics["cluster_summary"],
+                "historical_data": metrics["historical_data"],
+                "time_range": metrics["time_range"]
             }
 
         except Exception as e:

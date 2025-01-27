@@ -248,3 +248,5 @@ class ClusterMetricsResponse(SuccessResponse):
     """Cluster metrics response schema."""
     nodes: Dict[str, ClusterNodeMetrics]
     cluster_summary: ClusterSummaryMetrics
+    historical_data: Dict[str, List[Dict[str, Union[int, float]]]]  # key -> list of {timestamp, value} pairs
+    time_range: str  # 'today', '7days', or 'month'

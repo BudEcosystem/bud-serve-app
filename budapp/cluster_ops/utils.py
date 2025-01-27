@@ -1,6 +1,6 @@
 import requests
 from typing import Dict, Any, Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from budapp.commons import logging
 from uuid import UUID
 
@@ -14,64 +14,98 @@ class ClusterMetricsFetcher:
         self.prometheus_url = prometheus_url
         self.api_url = f"{prometheus_url}/api/v1"
 
-    def query(self, query: str) -> list:
-        """Execute a Prometheus query.
+    def _get_time_range_params(self, time_range: str) -> dict:
+        """Get start and end timestamps based on time range.
+        
+        Args:
+            time_range: One of 'today', '7days', 'month'
+            
+        Returns:
+            Dict with start and end timestamps and step interval
+        """
+        now = datetime.now(timezone.utc)
+        
+        if time_range == 'today':
+            start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            step = '5m'  # 5-minute intervals for today
+        elif time_range == '7days':
+            start_time = now - timedelta(days=7)
+            step = '1h'  # 1-hour intervals for 7 days
+        elif time_range == 'month':
+            start_time = now - timedelta(days=30)
+            step = '6h'  # 6-hour intervals for monthly view
+        else:
+            # Default to today if invalid range
+            start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            step = '5m'
 
+        return {
+            'start': start_time.timestamp(),
+            'end': now.timestamp(),
+            'step': step
+        }
+
+    def query_range(self, query: str, time_range: str) -> list:
+        """Execute a Prometheus range query.
+        
         Args:
             query: The PromQL query string
-
+            time_range: One of 'today', '7days', 'month'
+            
         Returns:
             List of results from Prometheus
-
+            
         Raises:
             requests.exceptions.RequestException: If query fails
         """
+        time_params = self._get_time_range_params(time_range)
+        
         try:
             response = requests.get(
-                f"{self.api_url}/query",
-                params={'query': query},
+                f"{self.api_url}/query_range",
+                params={
+                    'query': query,
+                    'start': time_params['start'],
+                    'end': time_params['end'],
+                    'step': time_params['step']
+                },
                 verify=True,
                 timeout=10
             )
             response.raise_for_status()
             return response.json()['data']['result']
         except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to execute Prometheus query: {e}")
+            logger.error(f"Failed to execute Prometheus range query: {e}")
             raise
 
-    def get_cluster_metrics(self, cluster_id: UUID) -> Optional[Dict[str, Any]]:
-        """Fetch comprehensive cluster metrics.
-
-        Args:
-            cluster_id: UUID of the cluster to fetch metrics for
-
-        Returns:
-            Dict containing cluster metrics structured according to ClusterNodeMetrics
-            and ClusterSummaryMetrics models
-        """
+    def get_cluster_metrics(self, cluster_id: UUID, time_range: str = 'today') -> Optional[Dict[str, Any]]:
+        """Fetch comprehensive cluster metrics."""
         if not cluster_id:
             logger.error("Cluster ID is required to fetch cluster metrics")
             return None
 
-        cluster_name = cluster_id  # This should be dynamic based on cluster_id
+        # Use cluster_id directly as the cluster label value (verified from working query)
+        cluster_name = str(cluster_id)  # Convert UUID to string for query
 
-        # Define all Prometheus queries
+        # Define all Prometheus queries with rate intervals adjusted for time range
+        rate_interval = '5m' if time_range == 'today' else '1h' if time_range == '7days' else '6h'
+        
         queries = {
-            # Per-node memory metrics
+            # Per-node memory metrics - verified working
             'memory_total': f'node_memory_MemTotal_bytes{{cluster="{cluster_name}"}} / 1024 / 1024 / 1024',
             'memory_available': f'node_memory_MemAvailable_bytes{{cluster="{cluster_name}"}} / 1024 / 1024 / 1024',
 
-            # Per-node CPU metrics
-            'cpu_usage': f'''100 * sum(rate(node_cpu_seconds_total{{cluster="{cluster_name}",mode!="idle"}}[5m])) by (instance) /
+            # Per-node CPU metrics - verified working
+            'cpu_usage': f'''100 * sum(rate(node_cpu_seconds_total{{cluster="{cluster_name}",mode!="idle"}}[{rate_interval}])) by (instance) /
                         count by (instance) (node_cpu_seconds_total{{cluster="{cluster_name}"}})''',
 
             # Per-node disk metrics
             'disk_total': f'sum by (instance, mountpoint) (node_filesystem_size_bytes{{cluster="{cluster_name}"}}) / 1024 / 1024 / 1024',
             'disk_used': f'sum by (instance, mountpoint) ((node_filesystem_size_bytes{{cluster="{cluster_name}"}} - node_filesystem_free_bytes{{cluster="{cluster_name}"}})) / 1024 / 1024 / 1024',
 
-            # Per-node network metrics
-            'network_receive': f'sum by (instance, device) (rate(node_network_receive_bytes_total{{cluster="{cluster_name}"}}[5m]) * 8 / 1024 / 1024)',
-            'network_transmit': f'sum by (instance, device) (rate(node_network_transmit_bytes_total{{cluster="{cluster_name}"}}[5m]) * 8 / 1024 / 1024)',
+            # Per-node network metrics - adjusted rate interval
+            'network_receive': f'sum by (instance, device) (rate(node_network_receive_bytes_total{{cluster="{cluster_name}"}}[{rate_interval}]) * 8 / 1024 / 1024)',
+            'network_transmit': f'sum by (instance, device) (rate(node_network_transmit_bytes_total{{cluster="{cluster_name}"}}[{rate_interval}]) * 8 / 1024 / 1024)',
             'network_errors': f'sum by (instance) (node_network_transmit_errs_total{{cluster="{cluster_name}"}} + node_network_receive_errs_total{{cluster="{cluster_name}"}}) or vector(0)',
 
             # GPU metrics
@@ -89,58 +123,53 @@ class ClusterMetricsFetcher:
         }
 
         try:
-            results = {key: self.query(query) for key, query in queries.items()}
+            # Use query_range instead of query for time series data
+            results = {key: self.query_range(query, time_range) for key, query in queries.items()}
+            
+            # Add debug logging to check results
+            logger.debug(f"Raw Prometheus results: {results}")
+            
+            # Verify results have data before processing
+            if not any(result for result in results.values()):
+                logger.error("No data returned from Prometheus queries")
+                return None
 
-            # Process per-node metrics
-            nodes = {}
-            instances = self._get_unique_instances(results)
-
-            for instance in instances:
-                nodes[instance] = {
-                    'memory': {
-                        'total_gib': float(self._get_instance_value(results['memory_total'], instance)),
-                        'available_gib': float(self._get_instance_value(results['memory_available'], instance)),
-                        'used_gib': float(self._get_instance_value(results['memory_total'], instance)) -
-                                   float(self._get_instance_value(results['memory_available'], instance)),
-                        'usage_percent': (1 - float(self._get_instance_value(results['memory_available'], instance)) /
-                                        float(self._get_instance_value(results['memory_total'], instance))) * 100
-                    },
-                    'cpu': {
-                        'cpu_usage_percent': float(self._get_instance_value(results['cpu_usage'], instance))
-                    },
-                    'disk': self._process_disk_metrics(results, instance),
-                    'network': self._process_network_metrics(results, instance),
-                    'gpu': self._process_gpu_metrics(results, instance),
-                    'hpu': self._process_hpu_metrics(results, instance)
-                }
-
-            # Process cluster summary metrics
-            summary = {
-                'total_nodes': int(results['total_nodes'][0]['value'][1]),
-                'memory': {
-                    'total_gib': sum(node['memory']['total_gib'] for node in nodes.values()),
-                    'used_gib': sum(node['memory']['used_gib'] for node in nodes.values()),
-                    'available_gib': sum(node['memory']['available_gib'] for node in nodes.values()),
-                    'usage_percent': sum(node['memory']['used_gib'] for node in nodes.values()) /
-                                   sum(node['memory']['total_gib'] for node in nodes.values()) * 100
-                },
-                'cpu': {
-                    'average_usage_percent': sum(node['cpu']['cpu_usage_percent'] for node in nodes.values()) / len(nodes)
-                },
-                'disk': self._aggregate_disk_metrics(nodes),
-                'network': self._aggregate_network_metrics(nodes),
-                'gpu': self._aggregate_gpu_metrics(nodes),
-                'hpu': self._aggregate_hpu_metrics(nodes)
+            # Process the time series data to get current values
+            current_results = {
+                key: [{'metric': series['metric'], 'value': series['values'][-1]} 
+                     for series in result]
+                for key, result in results.items()
+                if result  # Only process if result exists
             }
 
+            # First process node metrics
+            nodes = self._process_node_metrics(current_results)
+            current_results['nodes'] = nodes
+
+            # Then process cluster summary using the processed node metrics
+            cluster_summary = self._process_cluster_summary(current_results)
+
+            # Add historical data to the metrics
             metrics = {
                 'timestamp': datetime.now(timezone.utc).isoformat(),
+                'time_range': time_range,
+                'historical_data': {
+                    key: [
+                        {
+                            'timestamp': value[0],
+                            'value': float(value[1])
+                        }
+                        for series in result
+                        for value in series['values']
+                    ]
+                    for key, result in results.items()
+                    if result  # Only process if result exists
+                },
                 'nodes': nodes,
-                'summary': summary
+                'cluster_summary': cluster_summary
             }
 
-            logger.info("Successfully fetched cluster metrics")
-            logger.debug(metrics)
+            logger.info(f"Successfully fetched cluster metrics for time range: {time_range}")
             return metrics
 
         except Exception as e:
@@ -321,3 +350,51 @@ class ClusterMetricsFetcher:
                 metric['metric'].get('device') == device):
                 return metric['value'][1]
         return 0.0
+
+    def _process_node_metrics(self, results: Dict) -> Dict:
+        """Process node metrics from results."""
+        nodes = {}
+        instances = self._get_unique_instances(results)
+
+        for instance in instances:
+            nodes[instance] = {
+                'memory': {
+                    'total_gib': float(self._get_instance_value(results['memory_total'], instance)),
+                    'available_gib': float(self._get_instance_value(results['memory_available'], instance)),
+                    'used_gib': float(self._get_instance_value(results['memory_total'], instance)) -
+                               float(self._get_instance_value(results['memory_available'], instance)),
+                    'usage_percent': (1 - float(self._get_instance_value(results['memory_available'], instance)) /
+                                    float(self._get_instance_value(results['memory_total'], instance))) * 100
+                },
+                'cpu': {
+                    'cpu_usage_percent': float(self._get_instance_value(results['cpu_usage'], instance))
+                },
+                'disk': self._process_disk_metrics(results, instance),
+                'network': self._process_network_metrics(results, instance),
+                'gpu': self._process_gpu_metrics(results, instance),
+                'hpu': self._process_hpu_metrics(results, instance)
+            }
+
+        return nodes
+
+    def _process_cluster_summary(self, results: Dict) -> Dict:
+        """Process cluster summary metrics from results."""
+        summary = {
+            'total_nodes': int(self._get_instance_value(results['total_nodes'], 'total_nodes')),
+            'memory': {
+                'total_gib': sum(node['memory']['total_gib'] for node in results['nodes'].values()),
+                'used_gib': sum(node['memory']['used_gib'] for node in results['nodes'].values()),
+                'available_gib': sum(node['memory']['available_gib'] for node in results['nodes'].values()),
+                'usage_percent': sum(node['memory']['used_gib'] for node in results['nodes'].values()) /
+                               sum(node['memory']['total_gib'] for node in results['nodes'].values()) * 100
+            },
+            'cpu': {
+                'average_usage_percent': sum(node['cpu']['cpu_usage_percent'] for node in results['nodes'].values()) / len(results['nodes'])
+            },
+            'disk': self._aggregate_disk_metrics(results['nodes']),
+            'network': self._aggregate_network_metrics(results['nodes']),
+            'gpu': self._aggregate_gpu_metrics(results['nodes']),
+            'hpu': self._aggregate_hpu_metrics(results['nodes'])
+        }
+
+        return summary

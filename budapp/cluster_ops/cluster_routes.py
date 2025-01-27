@@ -448,20 +448,23 @@ async def get_cluster_metrics(
     cluster_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    time_range: str = Query('today', enum=['today', '7days', 'month']),
 ) -> Union[ClusterMetricsResponse, ErrorResponse]:
     """Get detailed metrics for a specific cluster."""
     try:
-
-        logger.debug(f"Getting cluster metrics for cluster_id: {cluster_id}")
-
-        metrics = await ClusterService(session).get_cluster_metrics(cluster_id)
-
-        logger.debug(f"==== {metrics}\n\n")
+        logger.debug(f"Getting cluster metrics for cluster_id: {cluster_id}, time_range: {time_range}")
+        
+        metrics = await ClusterService(session).get_cluster_metrics(
+            cluster_id,
+            time_range=time_range
+        )
 
         return ClusterMetricsResponse(
             nodes=metrics["nodes"],
             cluster_summary=metrics["cluster_summary"],
-            message="Successfully retrieved cluster metrics",
+            historical_data=metrics["historical_data"],
+            time_range=metrics["time_range"],
+            message=f"Successfully retrieved cluster metrics for {time_range}",
             code=status.HTTP_200_OK,
             object="cluster.metrics"
         ).to_http_response()
