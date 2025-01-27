@@ -1110,7 +1110,7 @@ class ClusterService(SessionMixin):
 
         try:
             metrics_fetcher = ClusterMetricsFetcher(app_settings.prometheus_url)
-            metrics = metrics_fetcher.get_cluster_metrics(cluster_id, time_range=time_range)
+            metrics = await metrics_fetcher.get_cluster_metrics(cluster_id, time_range=time_range)
 
             if not metrics:
                 raise ClientException(

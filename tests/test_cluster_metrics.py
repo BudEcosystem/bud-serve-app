@@ -111,7 +111,7 @@ def override_dependencies(mock_user, mock_db_session):
     app.dependency_overrides.clear()
 
 
-@pytest.mark.parametrize("time_range", ["today"])
+@pytest.mark.parametrize("time_range", ["today","7days","month"])
 def test_get_cluster_metrics(
     test_client: TestClient,
     mock_user,
@@ -129,7 +129,7 @@ def test_get_cluster_metrics(
             params={"time_range": time_range}
         )
 
-        with open("cluster_metrics_response.json", "w") as file:
+        with open(f"cluster_metrics_response_{time_range}.json", "w") as file:
             file.write(response.text)
 
 

@@ -1,8 +1,14 @@
 import requests
+import asyncio
+import aiohttp
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone, timedelta
 from budapp.commons import logging
 from uuid import UUID
+from functools import lru_cache
+from concurrent.futures import ThreadPoolExecutor
+from cachetools import TTLCache, cached
+from contextlib import asynccontextmanager
 
 logger = logging.get_logger(__name__)
 
@@ -13,7 +19,18 @@ class ClusterMetricsFetcher:
         """Initialize with Prometheus server URL."""
         self.prometheus_url = prometheus_url
         self.api_url = f"{prometheus_url}/api/v1"
+        self._time_range_cache = TTLCache(maxsize=100, ttl=300)  # 5 minutes TTL
+        
+    @asynccontextmanager
+    async def _get_executor(self):
+        """Get a thread pool executor context manager."""
+        executor = ThreadPoolExecutor(max_workers=10)
+        try:
+            yield executor
+        finally:
+            executor.shutdown(wait=True)
 
+    @cached(cache=TTLCache(maxsize=100, ttl=300))  # Cache results for 5 minutes
     def _get_time_range_params(self, time_range: str) -> dict:
         """Get start and end timestamps based on time range.
         
@@ -45,23 +62,10 @@ class ClusterMetricsFetcher:
             'step': step
         }
 
-    def query_range(self, query: str, time_range: str) -> list:
-        """Execute a Prometheus range query.
-        
-        Args:
-            query: The PromQL query string
-            time_range: One of 'today', '7days', 'month'
-            
-        Returns:
-            List of results from Prometheus
-            
-        Raises:
-            requests.exceptions.RequestException: If query fails
-        """
-        time_params = self._get_time_range_params(time_range)
-        
+    async def _async_query_range(self, session: aiohttp.ClientSession, query: str, time_params: dict) -> dict:
+        """Execute a single Prometheus range query asynchronously."""
         try:
-            response = requests.get(
+            async with session.get(
                 f"{self.api_url}/query_range",
                 params={
                     'query': query,
@@ -69,25 +73,41 @@ class ClusterMetricsFetcher:
                     'end': time_params['end'],
                     'step': time_params['step']
                 },
-                verify=True,
                 timeout=10
-            )
-            response.raise_for_status()
-            return response.json()['data']['result']
-        except requests.exceptions.RequestException as e:
+            ) as response:
+                response.raise_for_status()
+                result = await response.json()
+                return result['data']['result']
+        except Exception as e:
             logger.error(f"Failed to execute Prometheus range query: {e}")
-            raise
+            return []
 
-    def get_cluster_metrics(self, cluster_id: UUID, time_range: str = 'today') -> Optional[Dict[str, Any]]:
+    async def _fetch_all_metrics(self, queries: Dict[str, str], time_range: str) -> Dict[str, List]:
+        """Fetch all metrics concurrently using asyncio."""
+        time_params = self._get_time_range_params(time_range)
+        async with aiohttp.ClientSession() as session:
+            tasks = []
+            for key, query in queries.items():
+                task = asyncio.create_task(self._async_query_range(session, query, time_params))
+                tasks.append((key, task))
+            
+            results = {}
+            for key, task in tasks:
+                try:
+                    results[key] = await task
+                except Exception as e:
+                    logger.error(f"Failed to fetch metrics for {key}: {e}")
+                    results[key] = []
+            
+            return results
+
+    async def get_cluster_metrics(self, cluster_id: UUID, time_range: str = 'today') -> Optional[Dict[str, Any]]:
         """Fetch comprehensive cluster metrics."""
         if not cluster_id:
             logger.error("Cluster ID is required to fetch cluster metrics")
             return None
 
-        # Use cluster_id directly as the cluster label value (verified from working query)
-        cluster_name = str(cluster_id)  # Convert UUID to string for query
-
-        # Define all Prometheus queries with rate intervals adjusted for time range
+        cluster_name = str(cluster_id)
         rate_interval = '5m' if time_range == 'today' else '1h' if time_range == '7days' else '6h'
         
         queries = {
@@ -123,51 +143,44 @@ class ClusterMetricsFetcher:
         }
 
         try:
-            # Use query_range instead of query for time series data
-            results = {key: self.query_range(query, time_range) for key, query in queries.items()}
+            # Fetch metrics asynchronously
+            results = await self._fetch_all_metrics(queries, time_range)
             
-            # Add debug logging to check results
-            logger.debug(f"Raw Prometheus results: {results}")
-            
-            # Verify results have data before processing
             if not any(result for result in results.values()):
                 logger.error("No data returned from Prometheus queries")
                 return None
 
-            # Process the time series data to get current values
-            current_results = {
-                key: [{'metric': series['metric'], 'value': series['values'][-1]} 
-                     for series in result]
-                for key, result in results.items()
-                if result  # Only process if result exists
-            }
-
-            # First process node metrics
-            nodes = self._process_node_metrics(current_results)
-            current_results['nodes'] = nodes
-
-            # Then process cluster summary using the processed node metrics
-            cluster_summary = self._process_cluster_summary(current_results)
-
-            # Add historical data to the metrics
-            metrics = {
-                'timestamp': datetime.now(timezone.utc).isoformat(),
-                'time_range': time_range,
-                'historical_data': {
-                    key: [
-                        {
-                            'timestamp': value[0],
-                            'value': float(value[1])
-                        }
-                        for series in result
-                        for value in series['values']
-                    ]
+            async with self._get_executor() as executor:
+                # Process current values in parallel
+                current_results = {
+                    key: executor.submit(self._process_current_values, result)
                     for key, result in results.items()
-                    if result  # Only process if result exists
-                },
-                'nodes': nodes,
-                'cluster_summary': cluster_summary
-            }
+                    if result
+                }
+                
+                # Wait for all processing to complete
+                current_results = {
+                    key: future.result()
+                    for key, future in current_results.items()
+                }
+
+                # Process node metrics
+                nodes = self._process_node_metrics(current_results)
+                current_results['nodes'] = nodes
+
+                # Process cluster summary
+                cluster_summary = self._process_cluster_summary(current_results)
+
+                # Process historical data in parallel
+                historical_data = self._process_historical_data(results, executor)
+
+                metrics = {
+                    'timestamp': datetime.now(timezone.utc).isoformat(),
+                    'time_range': time_range,
+                    'historical_data': historical_data,
+                    'nodes': nodes,
+                    'cluster_summary': cluster_summary
+                }
 
             logger.info(f"Successfully fetched cluster metrics for time range: {time_range}")
             return metrics
@@ -175,6 +188,35 @@ class ClusterMetricsFetcher:
         except Exception as e:
             logger.error(f"Failed to fetch cluster metrics: {e}")
             return None
+
+    def _process_current_values(self, result: List) -> List:
+        """Process current values from time series data."""
+        return [{'metric': series['metric'], 'value': series['values'][-1]} 
+                for series in result]
+
+    def _process_historical_data(self, results: Dict, executor: ThreadPoolExecutor) -> Dict:
+        """Process historical data in parallel."""
+        historical_futures = {
+            key: executor.submit(self._process_series_historical_data, result)
+            for key, result in results.items()
+            if result
+        }
+        
+        return {
+            key: future.result()
+            for key, future in historical_futures.items()
+        }
+
+    def _process_series_historical_data(self, result: List) -> List:
+        """Process historical data for a single series."""
+        return [
+            {
+                'timestamp': value[0],
+                'value': float(value[1])
+            }
+            for series in result
+            for value in series['values']
+        ]
 
     def _get_unique_instances(self, results: Dict) -> List[str]:
         """Extract unique instance names from results."""
