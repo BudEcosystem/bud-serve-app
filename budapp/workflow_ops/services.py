@@ -39,6 +39,8 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..project_ops.crud import ProjectDataManager
+from ..project_ops.models import Project as ProjectModel
 from .crud import WorkflowDataManager, WorkflowStepDataManager
 from .schemas import RetrieveWorkflowDataResponse, RetrieveWorkflowStepData, WorkflowUtilCreate
 
@@ -165,6 +167,14 @@ class WorkflowService(SessionMixin):
                 else None
             )
 
+            db_project = (
+                await ProjectDataManager(self.session).retrieve_by_fields(
+                    ProjectModel, {"id": UUID(required_data["project_id"])}, missing_ok=True
+                )
+                if "project_id" in required_data
+                else None
+            )
+
             workflow_steps = RetrieveWorkflowStepData(
                 provider_type=provider_type if provider_type else None,
                 provider=db_provider if db_provider else None,
@@ -193,6 +203,7 @@ class WorkflowService(SessionMixin):
                 endpoint=db_endpoint if db_endpoint else None,
                 additional_concurrency=additional_concurrency if additional_concurrency else None,
                 bud_simulator_events=bud_simulator_events if bud_simulator_events else None,
+                project=db_project if db_project else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -264,6 +275,7 @@ class WorkflowService(SessionMixin):
                 "endpoint_id",
                 "additional_concurrency",
                 "cluster_id",
+                "project_id",
             ],
         }
 
