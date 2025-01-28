@@ -54,6 +54,7 @@ from ..commons.constants import (
     WorkflowTypeEnum,
 )
 from ..core.schemas import NotificationResult
+from ..endpoint_ops.schemas import WorkerInfoFilter
 from ..model_ops.crud import ModelDataManager
 from ..model_ops.models import Model
 from ..model_ops.services import ModelServiceUtil
@@ -63,12 +64,12 @@ from .crud import ClusterDataManager
 from .models import Cluster as ClusterModel
 from .schemas import (
     ClusterCreate,
+    ClusterEndpointResponse,
     ClusterPaginatedResponse,
     ClusterResourcesInfo,
     ClusterResponse,
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
-    ClusterEndpointResponse,
 )
 
 
@@ -616,6 +617,11 @@ class ClusterService(SessionMixin):
         )
         logger.debug(f"Cluster retrieved successfully: {db_cluster.id}")
 
+        # Check if cluster is already in deleting state
+        if db_cluster.status == ClusterStatusEnum.DELETING:
+            logger.error("Cluster %s is already in deleting state", db_cluster.id)
+            raise ClientException("Cluster is already in deleting state")
+
         # Update data
         update_data = {"status": payload.content.result["status"]}
 
@@ -1036,7 +1042,6 @@ class ClusterService(SessionMixin):
         search: bool,
     ) -> Tuple[List[ClusterEndpointResponse], int]:
         """Get all endpoints in a cluster."""
-
         from ..endpoint_ops.services import EndpointService
 
         db_results, count = await EndpointDataManager(self.session).get_all_endpoints_in_cluster(

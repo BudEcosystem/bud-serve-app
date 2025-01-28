@@ -7,6 +7,7 @@ from budapp.model_ops.schemas import CloudModel, Model, ModelSecurityScanResult,
 
 from ..commons.constants import ModelProviderTypeEnum, WorkflowStatusEnum, WorkflowTypeEnum
 from ..endpoint_ops.schemas import EndpointResponse
+from ..project_ops.schemas import ProjectResponse
 
 
 class RetrieveWorkflowStepData(BaseModel):
@@ -41,6 +42,7 @@ class RetrieveWorkflowStepData(BaseModel):
     endpoint: EndpointResponse | None = None
     additional_concurrency: int | None = None
     bud_serve_cluster_events: dict | None = None
+    project: ProjectResponse | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
