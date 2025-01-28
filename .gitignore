@@ -67,3 +67,10 @@ secrets.json
 checkpoints/
 # pyenv
 .python-version
+.aider.chat.history.md
+.aider.conf.yml
+.aider.input.history
+.aider.tags.cache.v3/
+.aider*
+
+.gitpod.yml

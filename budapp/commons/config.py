@@ -235,6 +235,9 @@ class AppConfig(BaseConfig):
     # Budserve host
     budserve_host: str = Field(alias="BUD_SERVE_HOST", default="https://api-dev.bud.studio")
 
+    # Prometheus URL
+    prometheus_url: str = Field(alias="PROMETHEUS_URL", default="https://metrics.fmops.in")
+
     @computed_field
     def static_dir(self) -> str:
         """Get the static directory."""
