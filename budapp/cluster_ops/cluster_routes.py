@@ -1,3 +1,4 @@
+# budapp/cluster_ops/cluster_routes.py
 #  -----------------------------------------------------------------------------
 #  Copyright (c) 2024 Bud Ecosystem Inc.
 #  #
@@ -47,7 +48,8 @@ from .schemas import (
     CreateClusterWorkflowRequest,
     EditClusterRequest,
     SingleClusterResponse,
-    SingleClusterDetailResponse,
+    SingleClusterDetailResponse,,
+    ClusterMetricsResponse,
 )
 from .services import ClusterService
 
@@ -423,6 +425,62 @@ async def list_all_endpoints(
         code=status.HTTP_200_OK,
         message="Successfully listed all endpoints in the cluster",
     ).to_http_response()
+
+# Cluster Metrics Endpoint
+@cluster_router.get(
+    "/{cluster_id}/metrics",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ClusterMetricsResponse,
+            "description": "Successfully retrieved cluster metrics",
+        },
+    },
+    description="Get detailed metrics for a specific cluster including CPU, memory, disk, GPU, HPU, and network statistics"
+)
+async def get_cluster_metrics(
+    cluster_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    time_range: str = Query('today', enum=['today', '7days', 'month']),
+) -> Union[ClusterMetricsResponse, ErrorResponse]:
+    """Get detailed metrics for a specific cluster."""
+    try:
+        logger.debug(f"Getting cluster metrics for cluster_id: {cluster_id}, time_range: {time_range}")
+        
+        metrics = await ClusterService(session).get_cluster_metrics(
+            cluster_id,
+            time_range=time_range
+        )
+
+        return ClusterMetricsResponse(
+            nodes=metrics["nodes"],
+            cluster_summary=metrics["cluster_summary"],
+            historical_data=metrics["historical_data"],
+            time_range=metrics["time_range"],
+            message=f"Successfully retrieved cluster metrics for {time_range}",
+            code=status.HTTP_200_OK,
+            object="cluster.metrics"
+        ).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to get cluster metrics: {e}")
+        return ErrorResponse(
+            code=e.status_code,
+            message=e.message
+        ).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get cluster metrics: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to get cluster metrics"
+        ).to_http_response()
 
 
 @cluster_router.get(
