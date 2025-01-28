@@ -221,7 +221,7 @@ class EndpointDataManager(DataManagerUtils):
         """
         # Build the query
         query = self.session.query(
-            func.sum(EndpointModel.number_of_nodes).label("total_nodes"),
+            func.sum(EndpointModel.active_replicas).label("active_replicas"),
             func.sum(EndpointModel.total_replicas).label("total_replicas"),
         ).filter(EndpointModel.cluster_id == cluster_id, EndpointModel.status != EndpointStatusEnum.DELETED)
 

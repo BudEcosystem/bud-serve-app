@@ -185,8 +185,26 @@ class EditClusterRequest(BaseModel):
         return value
 
 
+class ClusterDetailResponse(ClusterResponse):
+    """Cluster detail response schema"""
+
+    total_workers_count: int
+    active_workers_count: int
+    total_endpoints_count: int
+    running_endpoints_count: int
+    hardware_type: list
+
+
 class SingleClusterResponse(SuccessResponse):
+    """Single cluster entity"""
+
     cluster: ClusterResponse
+
+
+class SingleClusterDetailResponse(SuccessResponse):
+    """Single cluster detail entity"""
+
+    cluster: ClusterDetailResponse
 
 
 class CancelClusterOnboardingRequest(BaseModel):

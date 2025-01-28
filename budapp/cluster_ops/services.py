@@ -69,6 +69,7 @@ from .schemas import (
     ClusterResponse,
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
+    ClusterDetailResponse,
 )
 
 
@@ -701,14 +702,44 @@ class ClusterService(SessionMixin):
 
         return db_cluster
 
-    async def get_cluster_details(self, cluster_id: UUID) -> ClusterModel:
-        """Retrieve model details by model ID."""
-        cluster_details = await ClusterDataManager(self.session).retrieve_by_fields(
+    async def get_cluster_details(self, cluster_id: UUID) -> ClusterDetailResponse:
+        """Retrieve cluster details."""
+        # Retrieve cluster details
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
             ClusterModel, {"id": cluster_id}, missing_ok=True
         )
-        cluster_details = ClusterResponse.model_validate(cluster_details)
+        if not db_cluster:
+            raise ClientException(status_code=status.HTTP_404_NOT_FOUND, message="Cluster not found")
 
-        return cluster_details
+        cluster_details = ClusterResponse.model_validate(db_cluster)
+
+        # Fetch deployment statistics
+        total_endpoints_count = await EndpointDataManager(self.session).get_count_by_fields(
+            EndpointModel, fields={"cluster_id": cluster_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+        )
+        running_endpoints_count = await EndpointDataManager(self.session).get_count_by_fields(
+            EndpointModel, fields={"cluster_id": cluster_id, "status": EndpointStatusEnum.RUNNING}
+        )
+        active_workers_count, total_workers_count = await EndpointDataManager(self.session).get_cluster_workers_count(
+            cluster_id
+        )
+
+        # Determine hardware types
+        hardware_type = get_hardware_types(db_cluster.cpu_count, db_cluster.gpu_count, db_cluster.hpu_count)
+
+        # Combine details and stats
+        cluster_details_response = ClusterDetailResponse.model_validate(
+            {
+                **cluster_details.model_dump(),
+                "total_endpoints_count": total_endpoints_count,
+                "running_endpoints_count": running_endpoints_count,
+                "active_workers_count": active_workers_count,
+                "total_workers_count": total_workers_count,
+                "hardware_type": hardware_type,
+            }
+        )
+
+        return cluster_details_response
 
     async def delete_cluster(self, cluster_id: UUID, current_user_id: UUID) -> WorkflowModel:
         """Delete a cluster by its ID.
@@ -1079,33 +1110,3 @@ class ClusterService(SessionMixin):
             )
 
         return result, count
-
-    async def get_cluster_deployment_stats(self, cluster_id: UUID) -> ClusterDeploymentStatsResponse:
-        """Fetch cluster deployment statistics for the given id."""
-        db_total_endpoints_count = await EndpointDataManager(self.session).get_count_by_fields(
-            EndpointModel, fields={"cluster_id": cluster_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
-        )
-        db_running_endpoints_count = await EndpointDataManager(self.session).get_count_by_fields(
-            EndpointModel, fields={"cluster_id": cluster_id, "status": EndpointStatusEnum.RUNNING}
-        )
-        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(ClusterModel, fields={"id": cluster_id})
-
-        hardware_type = get_hardware_types(db_cluster.cpu_count, db_cluster.gpu_count, db_cluster.hpu_count)
-
-        # db_active_worker_count, db_total_worker_count = await EndpointDataManager(self.session).get_cluster_workers_count(cluster_id)
-        db_active_worker_count, db_total_worker_count = await EndpointDataManager(
-            self.session
-        ).get_cluster_workers_count(cluster_id)
-
-        db_deployment_stats = ClusterDeploymentStatsResponse(
-            code=status.HTTP_200_OK,
-            object="cluster.count",
-            message="Successfully fetched deployment statistics",
-            total_worker_count=db_active_worker_count,
-            active_worker_count=db_total_worker_count,
-            total_endpoints_count=db_total_endpoints_count,
-            running_endpoints_count=db_running_endpoints_count,
-            hardware_type=hardware_type,
-        )
-
-        return db_deployment_stats
