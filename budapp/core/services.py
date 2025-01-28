@@ -34,7 +34,7 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
 from ..endpoint_ops.services import EndpointService
-from ..model_ops.services import LocalModelWorkflowService, ModelWorkflowService
+from ..model_ops.services import LocalModelWorkflowService, ModelService
 from .crud import IconDataManager
 from .models import Icon as IconModel
 from .schemas import NotificationPayload, NotificationResponse
@@ -215,7 +215,7 @@ class NotificationService(SessionMixin):
 
         # update faqs in database if node info fetched successfully
         if payload.event == "results":
-            await ModelWorkflowService(self.session).update_license_faqs_from_notification_event(payload)
+            await ModelService(self.session).update_license_faqs_from_notification_event(payload)
 
     async def update_cluster_status_update_events(self, payload: NotificationPayload) -> None:
         """Update the cluster status update events for a workflow step.
@@ -522,7 +522,7 @@ class SubscriberHandler:
         ).to_http_response()
 
     async def _handle_license_faqs_update(self, payload: NotificationPayload) -> NotificationResponse:
-        """Handle the endpoint status update event."""
+        """Handle the license faq update event."""
         await NotificationService(self.session).update_license_faqs_update_events(payload)
         return NotificationResponse(
             object="notification",
