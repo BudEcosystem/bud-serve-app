@@ -62,7 +62,6 @@ from .crud import ClusterDataManager
 from .models import Cluster as ClusterModel
 from .schemas import (
     ClusterCreate,
-    ClusterDeploymentStatsResponse,
     ClusterEndpointResponse,
     ClusterPaginatedResponse,
     ClusterResourcesInfo,

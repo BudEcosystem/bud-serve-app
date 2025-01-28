@@ -239,11 +239,4 @@ class ClusterEndpointFilter(BaseModel):
     status: EndpointStatusEnum | None = None
 
 
-class ClusterDeploymentStatsResponse(SuccessResponse):
-    """Cluster deployment stats response schema."""
 
-    total_worker_count: int
-    active_worker_count: int
-    total_endpoints_count: int
-    running_endpoints_count: int
-    hardware_type: list
