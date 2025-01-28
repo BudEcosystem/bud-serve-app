@@ -44,6 +44,7 @@ class EndpointCreate(BaseModel):
     created_by: UUID4
     status_sync_at: datetime
     credential_id: UUID4 | None
+    active_replicas: int
     total_replicas: int
     number_of_nodes: int
     deployment_config: dict | None
