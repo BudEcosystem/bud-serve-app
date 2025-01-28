@@ -39,6 +39,8 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 from ..endpoint_ops.schemas import WorkerInfoFilter
+from budapp.cluster_ops.utils import ClusterMetricsFetcher
+from budapp.cluster_ops.schemas import ClusterMetricsResponse
 
 from ..commons.constants import (
     APP_ICONS,
@@ -52,6 +54,7 @@ from ..commons.constants import (
     WorkflowTypeEnum,
 )
 from ..core.schemas import NotificationResult
+from ..endpoint_ops.schemas import WorkerInfoFilter
 from ..model_ops.crud import ModelDataManager
 from ..model_ops.models import Model
 from ..model_ops.services import ModelServiceUtil
@@ -61,12 +64,12 @@ from .crud import ClusterDataManager
 from .models import Cluster as ClusterModel
 from .schemas import (
     ClusterCreate,
+    ClusterEndpointResponse,
     ClusterPaginatedResponse,
     ClusterResourcesInfo,
     ClusterResponse,
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
-    ClusterEndpointResponse,
 )
 
 
@@ -614,6 +617,11 @@ class ClusterService(SessionMixin):
         )
         logger.debug(f"Cluster retrieved successfully: {db_cluster.id}")
 
+        # Check if cluster is already in deleting state
+        if db_cluster.status == ClusterStatusEnum.DELETING:
+            logger.error("Cluster %s is already in deleting state", db_cluster.id)
+            raise ClientException("Cluster is already in deleting state")
+
         # Update data
         update_data = {"status": payload.content.result["status"]}
 
@@ -1023,7 +1031,7 @@ class ClusterService(SessionMixin):
             raise ClientException(
                 "Failed to update cluster node status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
-        
+
     async def get_all_endpoints_in_cluster(
         self,
         cluster_id: UUID,
@@ -1034,7 +1042,6 @@ class ClusterService(SessionMixin):
         search: bool,
     ) -> Tuple[List[ClusterEndpointResponse], int]:
         """Get all endpoints in a cluster."""
-
         from ..endpoint_ops.services import EndpointService
 
         db_results, count = await EndpointDataManager(self.session).get_all_endpoints_in_cluster(
@@ -1078,3 +1085,48 @@ class ClusterService(SessionMixin):
             )
 
         return result, count
+
+    async def get_cluster_metrics(self, cluster_id: UUID, time_range: str = 'today') -> Dict[str,any]:
+        """Get cluster metrics from Prometheus.
+
+        Args:
+            cluster_id: UUID of the cluster
+            time_range: One of 'today', '7days', 'month'
+
+        Returns:
+            ClusterMetricsResponse with node and summary metrics
+
+        Raises:
+            ClientException: If cluster not found or metrics fetch fails
+        """
+        logger.debug(f"Fetching metrics for cluster: {cluster_id}, time_range: {time_range}")
+
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            ClusterModel,
+            {"id": cluster_id},
+            exclude_fields={"status": ClusterStatusEnum.DELETED}
+        )
+
+        try:
+            metrics_fetcher = ClusterMetricsFetcher(app_settings.prometheus_url)
+            metrics = await metrics_fetcher.get_cluster_metrics(db_cluster.cluster_id, time_range=time_range)
+
+            if not metrics:
+                raise ClientException(
+                    "Failed to fetch metrics from Prometheus",
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
+
+            return {
+                "nodes": metrics["nodes"],
+                "cluster_summary": metrics["cluster_summary"],
+                "historical_data": metrics["historical_data"],
+                "time_range": metrics["time_range"]
+            }
+
+        except Exception as e:
+            logger.exception(f"Failed to get cluster metrics: {e}")
+            raise ClientException(
+                "Failed to get cluster metrics",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e

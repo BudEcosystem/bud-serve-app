@@ -481,6 +481,11 @@ class EndpointService(SessionMixin):
         )
         logger.debug(f"Endpoint retrieved successfully: {db_endpoint.id}")
 
+        # Check if endpoint is already in deleting state
+        if db_endpoint.status == EndpointStatusEnum.DELETING:
+            logger.error("Endpoint %s is already in deleting state", db_endpoint.id)
+            raise ClientException("Endpoint is already in deleting state")
+
         # Update cluster status
         endpoint_status = await self._get_endpoint_status(payload.content.result["status"])
         db_endpoint = await EndpointDataManager(self.session).update_by_fields(
