@@ -1107,15 +1107,9 @@ class ClusterService(SessionMixin):
             exclude_fields={"status": ClusterStatusEnum.DELETED}
         )
 
-        if not db_cluster:
-            raise ClientException(
-                "Cluster not found",
-                status_code=status.HTTP_404_NOT_FOUND
-            )
-
         try:
             metrics_fetcher = ClusterMetricsFetcher(app_settings.prometheus_url)
-            metrics = await metrics_fetcher.get_cluster_metrics(cluster_id, time_range=time_range)
+            metrics = await metrics_fetcher.get_cluster_metrics(db_cluster.cluster_id, time_range=time_range)
 
             if not metrics:
                 raise ClientException(
