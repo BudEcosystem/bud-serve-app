@@ -706,7 +706,7 @@ class ClusterService(SessionMixin):
         """Retrieve cluster details."""
         # Retrieve cluster details
         db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel, {"id": cluster_id}, missing_ok=True
+            ClusterModel, fields={"id": cluster_id}, exclude_fields={"status": ClusterStatusEnum.DELETED}, missing_ok=True
         )
         if not db_cluster:
             raise ClientException(status_code=status.HTTP_404_NOT_FOUND, message="Cluster not found")
