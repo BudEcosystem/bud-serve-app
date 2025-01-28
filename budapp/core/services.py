@@ -421,7 +421,7 @@ class SubscriberHandler:
             PayloadType.DEPLOYMENT_STATUS_UPDATE: self._handle_endpoint_status_update,
             PayloadType.DELETE_WORKER: self._handle_delete_worker,
             PayloadType.ADD_WORKER: self._handle_add_worker_to_deployment,
-            PayloadType.PERFORM_LICENSE_FAQS_FETCH: self._handle_license_faqs_update,
+            PayloadType.FETCH_LICENSE_FAQS: self._handle_license_faqs_update,
         }
 
         handler = handlers.get(payload.type)

@@ -468,7 +468,7 @@ class PayloadType(str, Enum):
     DEPLOYMENT_STATUS_UPDATE = "deployment-status-update"
     DELETE_WORKER = "delete_worker"
     ADD_WORKER = "add_worker"
-    PERFORM_LICENSE_FAQS_FETCH = "perform_license_faqs_fetch"
+    FETCH_LICENSE_FAQS = "fetch_license_faqs"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
