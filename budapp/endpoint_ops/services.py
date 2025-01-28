@@ -495,6 +495,11 @@ class EndpointService(SessionMixin):
         )
         logger.debug(f"Endpoint retrieved successfully: {db_endpoint.id}")
 
+        # Check if endpoint is already in deleting state
+        if db_endpoint.status == EndpointStatusEnum.DELETING:
+            logger.error("Endpoint %s is already in deleting state", db_endpoint.id)
+            raise ClientException("Endpoint is already in deleting state")
+
         # Update cluster status
         endpoint_status = await self._get_endpoint_status(payload.content.result["status"])
         db_endpoint = await EndpointDataManager(self.session).update_by_fields(
@@ -643,6 +648,28 @@ class EndpointService(SessionMixin):
             EndpointModel, {"id": required_data["endpoint_id"]}, exclude_fields={"status": EndpointStatusEnum.DELETED}
         )
         logger.debug(f"Endpoint retrieved successfully: {db_endpoint.id}")
+
+        # Calculate concurrent request per replica and reduce it
+        deployment_config = db_endpoint.deployment_config
+        concurrent_requests = deployment_config["concurrent_requests"]
+        total_replicas = db_endpoint.total_replicas
+        concurrent_request_per_replica = concurrent_requests / total_replicas
+        logger.debug(
+            f"Total replicas: {total_replicas}, concurrent requests: {concurrent_requests}, concurrent request per replica: {concurrent_request_per_replica}"
+        )
+
+        updated_concurrent_requests = concurrent_requests - concurrent_request_per_replica
+        updated_replica_count = total_replicas - 1
+        deployment_config["concurrent_requests"] = updated_concurrent_requests
+        logger.debug(
+            f"Updated replica count: {updated_replica_count}, Updated concurrent requests: {updated_concurrent_requests}"
+        )
+
+        self.session.refresh(db_endpoint)
+        # Update endpoint with deploy config and updated replica count
+        db_endpoint = await EndpointDataManager(self.session).update_by_fields(
+            db_endpoint, {"deployment_config": deployment_config, "total_replicas": updated_replica_count}
+        )
 
         # Mark workflow as completed
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
@@ -812,6 +839,7 @@ class EndpointService(SessionMixin):
         )
 
         # Validate endpoint id
+        project_id = None
         if endpoint_id:
             db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
                 EndpointModel, {"id": endpoint_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
@@ -835,11 +863,19 @@ class EndpointService(SessionMixin):
                 {"title": db_endpoint.name, "icon": model_icon, "tag": db_endpoint.project.name},
             )
 
+            # Assign project_id
+            project_id = db_endpoint.project_id
+
         # Prepare workflow step data
         workflow_step_data = AddWorkerWorkflowStepData(
             endpoint_id=endpoint_id,
             additional_concurrency=additional_concurrency,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+
+        # NOTE: If endpoint_id is provided, then need to add project_id to workflow step data
+        # Required for frontend integration
+        if endpoint_id:
+            workflow_step_data["project_id"] = str(project_id)
 
         # Get workflow steps
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -1035,7 +1071,7 @@ class EndpointService(SessionMixin):
         )
 
     async def _perform_bud_simulation_request(self, payload: Dict) -> Dict:
-        """Perform model extraction request."""
+        """Perform bud simulation request."""
         bud_simulation_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/run"
         )
@@ -1046,14 +1082,14 @@ class EndpointService(SessionMixin):
                 async with session.post(bud_simulation_endpoint, json=payload) as response:
                     response_data = await response.json()
                     if response.status >= 400:
-                        raise ClientException("Unable to perform model extraction")
+                        raise ClientException("Unable to perform bud simulation")
 
                     return response_data
         except ClientException as e:
             raise e
         except Exception as e:
-            logger.error(f"Failed to perform model extraction request: {e}")
-            raise ClientException("Unable to perform model extraction") from e
+            logger.error(f"Failed to perform bud simulation request: {e}")
+            raise ClientException("Unable to perform bud simulation") from e
 
     async def _perform_add_worker_to_deployment(
         self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID

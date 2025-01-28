@@ -114,6 +114,7 @@ class WorkerData(BaseModel):
     name: str
     status: str
     node_name: str
+    device_name: str
     utilization: Optional[str] = None
     hardware: str
     uptime: str
@@ -124,6 +125,7 @@ class WorkerData(BaseModel):
     cores: int
     memory: str
     deployment_status: Optional[DeploymentStatusEnum] = None
+    concurrency: int
 
 
 class WorkerInfo(WorkerData):

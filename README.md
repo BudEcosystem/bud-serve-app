@@ -7,7 +7,7 @@ The project consists of several containers:
 
 - **Redis**: Used for pub/sub and state store.
 - **Dapr Containers**: Various services of the Dapr platform.
-  
+
 ### Prerequisites
 
 - Docker and Docker Compose installed.
@@ -23,8 +23,10 @@ The project consists of several containers:
     ```bash
     cp .env.sample .env
     ```
+
+
 3. **Start project**:
-    
+
     Use the following command to bring up all the services, including Dapr:
     ```bash
     cd bud-serve-app
