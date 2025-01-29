@@ -712,24 +712,14 @@ class ClusterService(SessionMixin):
         """Retrieve cluster details."""
         # Retrieve cluster details
         db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel, fields={"id": cluster_id}, exclude_fields={"status": ClusterStatusEnum.DELETED}, missing_ok=True
+            ClusterModel, fields={"id": cluster_id}, exclude_fields={"status": ClusterStatusEnum.DELETED}
         )
-        if not db_cluster:
-            raise ClientException(status_code=status.HTTP_404_NOT_FOUND, message="Cluster not found")
 
         cluster_details = ClusterResponse.model_validate(db_cluster)
 
-        # Fetch deployment statistics
-        total_endpoints_count = await EndpointDataManager(self.session).get_count_by_fields(
-            EndpointModel, fields={"cluster_id": cluster_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
-        )
-        running_endpoints_count = await EndpointDataManager(self.session).get_count_by_fields(
-            EndpointModel, fields={"cluster_id": cluster_id, "status": EndpointStatusEnum.RUNNING}
-        )
-        active_workers_count, total_workers_count = await EndpointDataManager(self.session).get_cluster_workers_count(
-            cluster_id
-        )
-
+        total_endpoints_count, running_endpoints_count, active_replicas, total_replicas = await EndpointDataManager(
+            self.session
+        ).get_cluster_count_details(cluster_id)
         # Determine hardware types
         hardware_type = get_hardware_types(db_cluster.cpu_count, db_cluster.gpu_count, db_cluster.hpu_count)
 
@@ -739,8 +729,8 @@ class ClusterService(SessionMixin):
                 **cluster_details.model_dump(),
                 "total_endpoints_count": total_endpoints_count,
                 "running_endpoints_count": running_endpoints_count,
-                "active_workers_count": active_workers_count,
-                "total_workers_count": total_workers_count,
+                "active_workers_count": active_replicas,
+                "total_workers_count": total_replicas,
                 "hardware_type": hardware_type,
             }
         )

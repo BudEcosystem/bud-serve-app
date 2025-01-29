@@ -210,25 +210,33 @@ class EndpointDataManager(DataManagerUtils):
 
         return result, count
 
-    async def get_cluster_workers_count(self, cluster_id: UUID) -> Tuple[int, int]:
-        """Calculate the sum of `number_of_nodes` and `total_replicas` for all records with the given cluster_id.
+    async def get_cluster_count_details(self, cluster_id: UUID) -> Tuple[int, int, int, int]:
+        """
+        Retrieve cluster statistics including:
+        - Total endpoints count (excluding deleted ones)
+        - Running endpoints count
+        - Sum of active replicas (workers)
+        - Sum of total replicas (workers)
 
         Args:
-            cluster_id (UUID): The ID of the cluster to filter records.
+            cluster_id (UUID): The ID of the cluster.
 
         Returns:
-            Tuple[int, int]: A tuple with the sum of `number_of_nodes` and `total_replicas`.
+            Tuple[int, int, int, int]:
+            (total_endpoints_count, running_endpoints_count, active_workers_count, total_workers_count)
         """
-        # Build the query
-        query = self.session.query(
-            func.sum(EndpointModel.active_replicas).label("active_replicas"),
-            func.sum(EndpointModel.total_replicas).label("total_replicas"),
-        ).filter(EndpointModel.cluster_id == cluster_id, EndpointModel.status != EndpointStatusEnum.DELETED)
+        query = select(
+            func.count().filter(EndpointModel.status != EndpointStatusEnum.DELETED).label("total_endpoints"),
+            func.count().filter(EndpointModel.status == EndpointStatusEnum.RUNNING).label("running_endpoints"),
+            func.coalesce(
+                func.sum(EndpointModel.active_replicas).filter(EndpointModel.status != EndpointStatusEnum.DELETED), 0
+            ).label("active_workers"),
+            func.coalesce(
+                func.sum(EndpointModel.total_replicas).filter(EndpointModel.status != EndpointStatusEnum.DELETED), 0
+            ).label("total_workers"),
+        ).where(EndpointModel.cluster_id == cluster_id)
 
-        # Execute the query
         result = self.session.execute(query)
+        total_endpoints, running_endpoints, active_replicas, total_replicas = result.fetchone()
 
-        result = result.fetchone()
-
-        # Return the result
-        return result
+        return total_endpoints, running_endpoints, active_replicas, total_replicas

@@ -47,7 +47,6 @@ from .schemas import (
     CreateClusterWorkflowRequest,
     EditClusterRequest,
     SingleClusterResponse,
-    SingleClusterDetailResponse,
     ClusterMetricsResponse,
 )
 from .services import ClusterService
@@ -251,7 +250,7 @@ async def edit_cluster(
             "description": "Invalid request parameters",
         },
         status.HTTP_200_OK: {
-            "model": SingleClusterDetailResponse,
+            "model": SingleClusterResponse,
             "description": "Successfully retrieved cluster details",
         },
     },
@@ -261,7 +260,7 @@ async def get_cluster_details(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     cluster_id: UUID,
-) -> Union[SingleClusterDetailResponse, ErrorResponse]:
+) -> Union[SingleClusterResponse, ErrorResponse]:
     """Retrieve details of a cluster by its ID."""
     try:
         cluster_details = await ClusterService(session).get_cluster_details(cluster_id)
@@ -275,7 +274,7 @@ async def get_cluster_details(
             message="Failed to retrieve cluster details",
         ).to_http_response()
 
-    return SingleClusterDetailResponse(
+    return SingleClusterResponse(
         cluster=cluster_details,
         message="Cluster details fetched successfully",
         code=status.HTTP_200_OK,

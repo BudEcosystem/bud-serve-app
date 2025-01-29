@@ -61,6 +61,7 @@ class Endpoint(Base):
     credential_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("proprietary_credential.id"), nullable=True)
     status_sync_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     model_configuration: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    active_replicas: Mapped[int] = mapped_column(Integer, nullable=False)
     total_replicas: Mapped[int] = mapped_column(Integer, nullable=False)
     number_of_nodes: Mapped[int] = mapped_column(Integer, nullable=False)
     deployment_config: Mapped[dict] = mapped_column(JSONB, nullable=True)

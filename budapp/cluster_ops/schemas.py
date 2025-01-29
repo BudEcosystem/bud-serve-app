@@ -198,7 +198,7 @@ class ClusterDetailResponse(ClusterResponse):
 class SingleClusterResponse(SuccessResponse):
     """Single cluster entity"""
 
-    cluster: ClusterResponse
+    cluster: Union[ClusterResponse, ClusterDetailResponse]
 
 
 class SingleClusterDetailResponse(SuccessResponse):
@@ -238,35 +238,43 @@ class ClusterEndpointFilter(BaseModel):
     name: str | None = None
     status: EndpointStatusEnum | None = None
 
+
 # Cluster Metrics Schema
 class ClusterNodeNetwork(BaseModel):
     """Network metrics for a cluster node."""
+
     total_receive_mbps: float
     total_transmit_mbps: float
     total_bandwidth_mbps: float
     total_errors: float
 
+
 class ClusterNodeMetrics(BaseModel):
     """Metrics for a single node in the cluster."""
+
     memory: Dict[str, float]  # total_gib, used_gib, available_gib, usage_percent
-    cpu: Dict[str, float]     # cpu_usage_percent
-    disk: Dict[str, Dict]     # paths with disk metrics
-    gpu: Dict[str, float]     # memory and utilization metrics
-    hpu: Dict[str, float]     # memory and utilization metrics
+    cpu: Dict[str, float]  # cpu_usage_percent
+    disk: Dict[str, Dict]  # paths with disk metrics
+    gpu: Dict[str, float]  # memory and utilization metrics
+    hpu: Dict[str, float]  # memory and utilization metrics
     network: Dict[str, Union[Dict[str, Dict], Dict[str, float]]]  # interfaces and summary
+
 
 class ClusterSummaryMetrics(BaseModel):
     """Summary metrics for the entire cluster."""
+
     total_nodes: int
     memory: Dict[str, float]  # total_gib, used_gib, available_gib, usage_percent
-    disk: Dict[str, float]    # total_gib, used_gib, available_gib, usage_percent
-    gpu: Dict[str, float]     # memory and utilization metrics
-    hpu: Dict[str, float]     # memory and utilization metrics
-    cpu: Dict[str, float]     # average_usage_percent
-    network: Dict[str, float] # network metrics
+    disk: Dict[str, float]  # total_gib, used_gib, available_gib, usage_percent
+    gpu: Dict[str, float]  # memory and utilization metrics
+    hpu: Dict[str, float]  # memory and utilization metrics
+    cpu: Dict[str, float]  # average_usage_percent
+    network: Dict[str, float]  # network metrics
+
 
 class ClusterMetricsResponse(SuccessResponse):
     """Cluster metrics response schema."""
+
     nodes: Dict[str, ClusterNodeMetrics]
     cluster_summary: ClusterSummaryMetrics
     historical_data: Dict[str, List[Dict[str, Union[int, float]]]]  # key -> list of {timestamp, value} pairs
