@@ -1,7 +1,7 @@
 """added active replicas to endpoint table
 
 Revision ID: 48acf0c963d2
-Revises: 5dc1d24e7b7e
+Revises: 8e1725982376
 Create Date: 2025-01-28 13:31:21.812798
 
 """
@@ -14,7 +14,7 @@ from alembic_postgresql_enum import TableReference
 
 # revision identifiers, used by Alembic.
 revision: str = "48acf0c963d2"
-down_revision: Union[str, None] = "5dc1d24e7b7e"
+down_revision: Union[str, None] = "8e1725982376"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
