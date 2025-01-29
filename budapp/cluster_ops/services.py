@@ -1063,7 +1063,12 @@ class ClusterService(SessionMixin):
         search: bool,
     ) -> Tuple[List[ClusterEndpointResponse], int]:
         """Get all endpoints in a cluster."""
-        from ..endpoint_ops.services import EndpointService
+        # verify cluster id
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            ClusterModel,
+            fields={"id": cluster_id},
+            exclude_fields={"status": ClusterStatusEnum.DELETED},
+        )
 
         db_results, count = await EndpointDataManager(self.session).get_all_endpoints_in_cluster(
             cluster_id, offset, limit, filters, order_by, search
@@ -1075,22 +1080,7 @@ class ClusterService(SessionMixin):
             project_name = db_result[1]
             model_name = db_result[2]
             total_workers = db_result[3]
-
-            # Fetch worker details for the endpoint
-            try:
-                workers_data = await EndpointService(self.session).get_endpoint_workers(
-                    endpoint_id=db_endpoint.id,
-                    filters=WorkerInfoFilter(status="Running"),
-                    refresh=False,
-                    page=1,
-                    limit=100,  # Adjust limit as needed
-                    order_by=None,
-                    search=False,
-                )
-                active_workers = len(workers_data.get("workers", []))
-            except Exception as e:
-                logger.error(f"Failed to fetch worker details for endpoint {db_endpoint.id}: {e}")
-                active_workers = 0  # Default to 0 active workers
+            active_workers = db_result[4]
 
             result.append(
                 ClusterEndpointResponse(

@@ -149,7 +149,8 @@ class EndpointDataManager(DataManagerUtils):
                     EndpointModel,
                     ProjectModel.name.label("project_name"),
                     Model.name.label("model_name"),
-                    func.sum(EndpointModel.total_replicas).label("total_workers"),
+                    EndpointModel.total_replicas.label("total_workers"),
+                    EndpointModel.active_replicas.label("active_workers"),
                 )
                 .join(ProjectModel, ProjectModel.id == EndpointModel.project_id)
                 .join(Model, Model.id == EndpointModel.model_id)
@@ -171,7 +172,8 @@ class EndpointDataManager(DataManagerUtils):
                     EndpointModel,
                     ProjectModel.name.label("project_name"),
                     Model.name.label("model_name"),
-                    func.sum(EndpointModel.total_replicas).label("total_workers"),
+                    EndpointModel.total_replicas.label("total_workers"),
+                    EndpointModel.active_replicas.label("active_workers"),
                 )
                 .join(ProjectModel, ProjectModel.id == EndpointModel.project_id)
                 .join(Model, Model.id == EndpointModel.model_id)
@@ -203,6 +205,10 @@ class EndpointDataManager(DataManagerUtils):
                     stmt = stmt.order_by(sort_func("project_name"))
                 elif field == "model_name":
                     stmt = stmt.order_by(sort_func("model_name"))
+                elif field == "total_workers":
+                    stmt = stmt.order_by(sort_func("total_workers"))
+                elif field == "active_workers":
+                    stmt = stmt.order_by(sort_func("active_workers"))
 
             stmt = stmt.order_by(*sort_conditions)
 
