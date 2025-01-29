@@ -201,11 +201,6 @@ class SingleClusterResponse(SuccessResponse):
     cluster: Union[ClusterResponse, ClusterDetailResponse]
 
 
-class SingleClusterDetailResponse(SuccessResponse):
-    """Single cluster detail entity"""
-
-    cluster: ClusterDetailResponse
-
 
 class CancelClusterOnboardingRequest(BaseModel):
     """Cancel cluster onboarding request schema."""
