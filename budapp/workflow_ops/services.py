@@ -22,7 +22,12 @@ from uuid import UUID
 from fastapi import status
 
 from budapp.commons import logging
-from budapp.commons.constants import WORKFLOW_DELETE_MESSAGES, BudServeWorkflowStepEventName, WorkflowStatusEnum
+from budapp.commons.constants import (
+    WORKFLOW_DELETE_MESSAGES,
+    BudServeWorkflowStepEventName,
+    WorkflowStatusEnum,
+    VisibilityEnum,
+)
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.model_ops.crud import (
@@ -358,6 +363,7 @@ class WorkflowService(SessionMixin):
 
         # Filter by in progress status
         filters_dict["status"] = WorkflowStatusEnum.IN_PROGRESS
+        filters_dict["visibility"] = VisibilityEnum.PUBLIC
 
         return await WorkflowDataManager(self.session).get_all_workflows(offset, limit, filters_dict, order_by, search)
 
