@@ -70,6 +70,7 @@ from .schemas import (
     ClusterResponse,
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
+    MetricTypeEnum,
 )
 
 
@@ -1086,47 +1087,31 @@ class ClusterService(SessionMixin):
 
         return result, count
 
-    async def get_cluster_metrics(self, cluster_id: UUID, time_range: str = 'today') -> Dict[str,any]:
-        """Get cluster metrics from Prometheus.
-
+    async def get_cluster_metrics(self, cluster_id: UUID, time_range: str = 'today', metric_type: MetricTypeEnum = MetricTypeEnum.ALL) -> Dict[str, Any]:
+        """Get cluster metrics.
+        
         Args:
-            cluster_id: UUID of the cluster
-            time_range: One of 'today', '7days', 'month'
-
+            cluster_id: The cluster ID to get metrics for
+            time_range: The time range to get metrics for ('today', '7days', 'month')
+            metric_type: The type of metrics to return (ALL, MEMORY, CPU, DISK, GPU, HPU, NETWORK)
+            
         Returns:
-            ClusterMetricsResponse with node and summary metrics
-
-        Raises:
-            ClientException: If cluster not found or metrics fetch fails
+            Dict containing the filtered metrics based on metric_type
         """
-        logger.debug(f"Fetching metrics for cluster: {cluster_id}, time_range: {time_range}")
-
-        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel,
-            {"id": cluster_id},
-            exclude_fields={"status": ClusterStatusEnum.DELETED}
+        # Get cluster details to verify it exists
+        db_cluster = await self.get_cluster_details(cluster_id)
+        
+        # Get metrics from Prometheus with filtering at query level
+        metrics_fetcher = ClusterMetricsFetcher(app_settings.prometheus_url)
+        metrics = await metrics_fetcher.get_cluster_metrics(
+            cluster_id=db_cluster.cluster_id,
+            time_range=time_range,
+            metric_type=metric_type.value.lower()
         )
-
-        try:
-            metrics_fetcher = ClusterMetricsFetcher(app_settings.prometheus_url)
-            metrics = await metrics_fetcher.get_cluster_metrics(db_cluster.cluster_id, time_range=time_range)
-
-            if not metrics:
-                raise ClientException(
-                    "Failed to fetch metrics from Prometheus",
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE
-                )
-
-            return {
-                "nodes": metrics["nodes"],
-                "cluster_summary": metrics["cluster_summary"],
-                "historical_data": metrics["historical_data"],
-                "time_range": metrics["time_range"]
-            }
-
-        except Exception as e:
-            logger.exception(f"Failed to get cluster metrics: {e}")
-            raise ClientException(
-                "Failed to get cluster metrics",
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-            ) from e
+        
+        if not metrics:
+            raise ClientException("Failed to fetch metrics from Prometheus")
+        
+        # Add metric type to response
+        metrics["metric_type"] = metric_type
+        return metrics

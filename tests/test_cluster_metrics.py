@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+from budapp.cluster_ops.schemas import MetricTypeEnum
+
 # Load test environment variables before any other imports
 env_path = Path(__file__).parent.parent / '.env.test'
 load_dotenv(env_path, override=True)
@@ -56,7 +58,10 @@ def mock_cluster():
     cluster = AsyncMock(spec=ClusterModel)
     cluster.id = TEST_CLUSTER_ID
     cluster.name = "Test Cluster"
-    cluster.status = "ACTIVE"
+    cluster.status = "available"  # Using valid enum value
+    cluster.icon = "test-icon"  # Actual string
+    cluster.ingress_url = "https://test-cluster.example.com"  # Actual string
+    cluster.cluster_id = str(TEST_CLUSTER_ID)  # String representation of UUID
     return cluster
 
 
@@ -126,7 +131,7 @@ def test_get_cluster_metrics(
     ):
         response = test_client.get(
             f"/clusters/{TEST_CLUSTER_ID}/metrics",
-            params={"time_range": time_range}
+            params={"time_range": time_range, "metric_type": "hpu"}
         )
 
         with open(f"cluster_metrics_response_{time_range}.json", "w") as file:
