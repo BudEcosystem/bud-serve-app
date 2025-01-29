@@ -202,7 +202,6 @@ class SingleClusterResponse(SuccessResponse):
     cluster: Union[ClusterResponse, ClusterDetailResponse]
 
 
-
 class CancelClusterOnboardingRequest(BaseModel):
     """Cancel cluster onboarding request schema."""
 
@@ -270,6 +269,7 @@ class ClusterSummaryMetrics(BaseModel):
 
 class MetricTypeEnum(Enum):
     """Enum for metric types."""
+
     ALL = "all"
     MEMORY = "memory"
     CPU = "cpu"
@@ -277,6 +277,7 @@ class MetricTypeEnum(Enum):
     GPU = "gpu"
     HPU = "hpu"
     NETWORK = "network"
+
 
 class ClusterMetricsResponse(SuccessResponse):
     """Cluster metrics response schema."""

@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from budapp.cluster_ops.schemas import MetricTypeEnum
 
 # Load test environment variables before any other imports
-env_path = Path(__file__).parent.parent / '.env.test'
+env_path = Path(__file__).parent.parent / ".env.test"
 load_dotenv(env_path, override=True)
 
 import pytest
@@ -22,7 +22,7 @@ from budapp.cluster_ops.models import Cluster as ClusterModel
 
 pytest_plugins = ("pytest_asyncio",)
 
-TEST_CLUSTER_ID = UUID('7b69d2f3-5524-484a-9a22-4ad3e4f67639')
+TEST_CLUSTER_ID = UUID("7b69d2f3-5524-484a-9a22-4ad3e4f67639")
 
 
 @pytest.fixture
@@ -31,17 +31,18 @@ def mock_user():
     user.is_active = True
     return user
 
+
 @pytest.fixture(autouse=True)
 def setup_test_env():
     """Fixture to set up test environment variables."""
     # Store original env vars
     original_env = dict(os.environ)
-    
+
     # Set up test environment
     load_dotenv(env_path, override=True)
-    
+
     yield
-    
+
     # Restore original env vars
     os.environ.clear()
     os.environ.update(original_env)
@@ -86,12 +87,9 @@ def mock_metrics():
             "total_hpu": 500,
         },
         "historical_data": {
-            "cpu_usage": [
-                {"timestamp": 1234567890, "value": 45.5},
-                {"timestamp": 1234567900, "value": 50.2}
-            ]
+            "cpu_usage": [{"timestamp": 1234567890, "value": 45.5}, {"timestamp": 1234567900, "value": 50.2}]
         },
-        "time_range": "today"
+        "time_range": "today",
     }
 
 
@@ -104,6 +102,7 @@ def mock_db_session():
 @pytest.fixture
 def override_dependencies(mock_user, mock_db_session):
     """Override FastAPI dependencies."""
+
     def override_get_current_active_user():
         return mock_user
 
@@ -116,7 +115,7 @@ def override_dependencies(mock_user, mock_db_session):
     app.dependency_overrides.clear()
 
 
-@pytest.mark.parametrize("time_range", ["today","7days","month"])
+@pytest.mark.parametrize("time_range", ["today", "7days", "month"])
 def test_get_cluster_metrics(
     test_client: TestClient,
     mock_user,
@@ -126,12 +125,9 @@ def test_get_cluster_metrics(
     time_range: str,
 ):
     """Test the GET /clusters/{cluster_id}/metrics endpoint with different time ranges."""
-    with patch(
-        "budapp.commons.db_utils.DataManagerUtils.retrieve_by_fields", return_value=mock_cluster
-    ):
+    with patch("budapp.commons.db_utils.DataManagerUtils.retrieve_by_fields", return_value=mock_cluster):
         response = test_client.get(
-            f"/clusters/{TEST_CLUSTER_ID}/metrics",
-            params={"time_range": time_range, "metric_type": "hpu"}
+            f"/clusters/{TEST_CLUSTER_ID}/metrics", params={"time_range": time_range, "metric_type": "hpu"}
         )
 
         with open(f"cluster_metrics_response_{time_range}.json", "w") as file:

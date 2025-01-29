@@ -1098,31 +1098,31 @@ class ClusterService(SessionMixin):
 
         return result, count
 
-    async def get_cluster_metrics(self, cluster_id: UUID, time_range: str = 'today', metric_type: MetricTypeEnum = MetricTypeEnum.ALL) -> Dict[str, Any]:
+    async def get_cluster_metrics(
+        self, cluster_id: UUID, time_range: str = "today", metric_type: MetricTypeEnum = MetricTypeEnum.ALL
+    ) -> Dict[str, Any]:
         """Get cluster metrics.
-        
+
         Args:
             cluster_id: The cluster ID to get metrics for
             time_range: The time range to get metrics for ('today', '7days', 'month')
             metric_type: The type of metrics to return (ALL, MEMORY, CPU, DISK, GPU, HPU, NETWORK)
-            
+
         Returns:
             Dict containing the filtered metrics based on metric_type
         """
         # Get cluster details to verify it exists
         db_cluster = await self.get_cluster_details(cluster_id)
-        
+
         # Get metrics from Prometheus with filtering at query level
         metrics_fetcher = ClusterMetricsFetcher(app_settings.prometheus_url)
         metrics = await metrics_fetcher.get_cluster_metrics(
-            cluster_id=db_cluster.cluster_id,
-            time_range=time_range,
-            metric_type=metric_type.value.lower()
+            cluster_id=db_cluster.cluster_id, time_range=time_range, metric_type=metric_type.value.lower()
         )
-        
+
         if not metrics:
             raise ClientException("Failed to fetch metrics from Prometheus")
-        
+
         # Add metric type to response
         metrics["metric_type"] = metric_type
         return metrics

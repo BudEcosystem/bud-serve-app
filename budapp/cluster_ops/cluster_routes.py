@@ -425,6 +425,7 @@ async def list_all_endpoints(
         message="Successfully listed all endpoints in the cluster",
     ).to_http_response()
 
+
 # Cluster Metrics Endpoint
 @cluster_router.get(
     "/{cluster_id}/metrics",
@@ -442,22 +443,20 @@ async def list_all_endpoints(
             "description": "Successfully retrieved cluster metrics",
         },
     },
-    description="Get detailed metrics for a specific cluster including CPU, memory, disk, GPU, HPU, and network statistics. Use metric_type to filter specific metrics."
+    description="Get detailed metrics for a specific cluster including CPU, memory, disk, GPU, HPU, and network statistics. Use metric_type to filter specific metrics.",
 )
 async def get_cluster_metrics(
     cluster_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    time_range: str = Query('today', enum=['today', '7days', 'month']),
+    time_range: str = Query("today", enum=["today", "7days", "month"]),
     metric_type: MetricTypeEnum = Query(MetricTypeEnum.ALL, description="Type of metrics to return"),
 ) -> Union[ClusterMetricsResponse, ErrorResponse]:
     """Get cluster metrics."""
     try:
         metrics = await ClusterService(session).get_cluster_metrics(cluster_id, time_range, metric_type)
         return ClusterMetricsResponse(
-            code=status.HTTP_200_OK,
-            message="Successfully retrieved cluster metrics",
-            **metrics
+            code=status.HTTP_200_OK, message="Successfully retrieved cluster metrics", **metrics
         )
     except ClientException as e:
         return ErrorResponse(
@@ -470,4 +469,3 @@ async def get_cluster_metrics(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Error retrieving cluster metrics",
         ).to_http_response()
-
