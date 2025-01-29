@@ -1047,11 +1047,7 @@ class ClusterService(SessionMixin):
             ClusterModel,
             fields={"id": cluster_id},
             exclude_fields={"status": ClusterStatusEnum.DELETED},
-            missing_ok=True,
         )
-
-        if db_cluster is None:
-            raise ClientException(status_code=status.HTTP_404_NOT_FOUND, message="Cluster not found")
 
         db_results, count = await EndpointDataManager(self.session).get_all_endpoints_in_cluster(
             cluster_id, offset, limit, filters, order_by, search
