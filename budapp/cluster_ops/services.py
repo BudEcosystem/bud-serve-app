@@ -38,7 +38,6 @@ from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManage
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
-from ..endpoint_ops.schemas import WorkerInfoFilter
 from budapp.cluster_ops.utils import ClusterMetricsFetcher
 from budapp.cluster_ops.schemas import ClusterMetricsResponse
 
@@ -53,6 +52,7 @@ from ..commons.constants import (
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
+from ..commons.helpers import get_hardware_types
 from ..core.schemas import NotificationResult
 from ..endpoint_ops.schemas import WorkerInfoFilter
 from ..model_ops.crud import ModelDataManager
@@ -70,6 +70,7 @@ from .schemas import (
     ClusterResponse,
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
+    ClusterDetailResponse,
 )
 
 
@@ -707,14 +708,34 @@ class ClusterService(SessionMixin):
 
         return db_cluster
 
-    async def get_cluster_details(self, cluster_id: UUID) -> ClusterModel:
-        """Retrieve model details by model ID."""
-        cluster_details = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel, {"id": cluster_id}, missing_ok=True
+    async def get_cluster_details(self, cluster_id: UUID) -> ClusterDetailResponse:
+        """Retrieve cluster details."""
+        # Retrieve cluster details
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            ClusterModel, fields={"id": cluster_id}, exclude_fields={"status": ClusterStatusEnum.DELETED}
         )
-        cluster_details = ClusterResponse.model_validate(cluster_details)
 
-        return cluster_details
+        cluster_details = ClusterResponse.model_validate(db_cluster)
+
+        total_endpoints_count, running_endpoints_count, active_replicas, total_replicas = await EndpointDataManager(
+            self.session
+        ).get_cluster_count_details(cluster_id)
+        # Determine hardware types
+        hardware_type = get_hardware_types(db_cluster.cpu_count, db_cluster.gpu_count, db_cluster.hpu_count)
+
+        # Combine details and stats
+        cluster_details_response = ClusterDetailResponse.model_validate(
+            {
+                **cluster_details.model_dump(),
+                "total_endpoints_count": total_endpoints_count,
+                "running_endpoints_count": running_endpoints_count,
+                "active_workers_count": active_replicas,
+                "total_workers_count": total_replicas,
+                "hardware_type": hardware_type,
+            }
+        )
+
+        return cluster_details_response
 
     async def delete_cluster(self, cluster_id: UUID, current_user_id: UUID) -> WorkflowModel:
         """Delete a cluster by its ID.

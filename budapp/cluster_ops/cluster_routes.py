@@ -17,7 +17,6 @@
 
 """The cluster ops package, containing essential business logic, services, and routing configurations for the cluster ops."""
 
-import os
 from typing import List, Optional, Union
 from uuid import UUID
 
@@ -28,7 +27,6 @@ from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
-from budapp.commons.config import app_settings
 from budapp.commons.dependencies import (
     get_current_active_user,
     get_session,
@@ -42,13 +40,13 @@ from budapp.workflow_ops.services import WorkflowService
 
 from .schemas import (
     CancelClusterOnboardingRequest,
+    ClusterEndpointFilter,
+    ClusterEndpointPaginatedResponse,
     ClusterFilter,
     ClusterListResponse,
     CreateClusterWorkflowRequest,
     EditClusterRequest,
     SingleClusterResponse,
-    ClusterEndpointFilter,
-    ClusterEndpointPaginatedResponse,
     ClusterMetricsResponse,
 )
 from .services import ClusterService
@@ -367,6 +365,7 @@ async def cancel_cluster_onboarding(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to cancel cluster onboarding"
         ).to_http_response()
 
+
 @cluster_router.get(
     "/{cluster_id}/endpoints",
     responses={
@@ -480,3 +479,4 @@ async def get_cluster_metrics(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to get cluster metrics"
         ).to_http_response()
+
