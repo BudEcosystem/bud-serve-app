@@ -218,12 +218,13 @@ async def get_endpoint_workers(
 async def get_endpoint_worker_detail(
     endpoint_id: UUID,
     worker_id: UUID,
+    reload: bool = Query(False),  # noqa: B008
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ) -> Union[WorkerDetailResponse, ErrorResponse]:
     """Get endpoint workers."""
     try:
-        worker_detail = await EndpointService(session).get_endpoint_worker_detail(endpoint_id, worker_id)
+        worker_detail = await EndpointService(session).get_endpoint_worker_detail(endpoint_id, worker_id, reload)
         response = WorkerDetailResponse(**worker_detail)
     except ClientException as e:
         logger.exception(f"Failed to get endpoint worker detail: {e}")
