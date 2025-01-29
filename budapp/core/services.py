@@ -34,7 +34,7 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
 from ..endpoint_ops.services import EndpointService
-from ..model_ops.services import LocalModelWorkflowService
+from ..model_ops.services import LocalModelWorkflowService, ModelService
 from .crud import IconDataManager
 from .models import Icon as IconModel
 from .schemas import NotificationPayload, NotificationResponse
@@ -197,6 +197,25 @@ class NotificationService(SessionMixin):
         # Create cluster in database if node info fetched successfully
         if payload.event == "results":
             await LocalModelWorkflowService(self.session).create_scan_result_from_notification_event(payload)
+
+    async def update_license_faqs_update_events(self, payload: NotificationPayload) -> None:
+        """Update the model license faqs events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        # Update workflow step data event
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.LICENSE_FAQ_EVENTS.value, payload)
+
+        # Update progress in workflow
+        await self._update_workflow_progress(BudServeWorkflowStepEventName.LICENSE_FAQ_EVENTS.value, payload)
+
+        # update faqs in database if node info fetched successfully
+        if payload.event == "results":
+            await ModelService(self.session).update_license_faqs_from_notification_event(payload)
 
     async def update_cluster_status_update_events(self, payload: NotificationPayload) -> None:
         """Update the cluster status update events for a workflow step.
@@ -402,6 +421,7 @@ class SubscriberHandler:
             PayloadType.DEPLOYMENT_STATUS_UPDATE: self._handle_endpoint_status_update,
             PayloadType.DELETE_WORKER: self._handle_delete_worker,
             PayloadType.ADD_WORKER: self._handle_add_worker_to_deployment,
+            PayloadType.FETCH_LICENSE_FAQS: self._handle_license_faqs_update,
         }
 
         handler = handlers.get(payload.type)
@@ -499,6 +519,14 @@ class SubscriberHandler:
         return NotificationResponse(
             object="notification",
             message="Updated add worker to deployment event in workflow step",
+        ).to_http_response()
+
+    async def _handle_license_faqs_update(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the license faq update event."""
+        await NotificationService(self.session).update_license_faqs_update_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Update license faqs in db",
         ).to_http_response()
 
 

@@ -26,7 +26,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.database import Base
 
-from ..commons.constants import WorkflowStatusEnum, WorkflowTypeEnum
+from ..commons.constants import WorkflowStatusEnum, WorkflowTypeEnum, VisibilityEnum
 
 
 class Workflow(Base):
@@ -59,6 +59,14 @@ class Workflow(Base):
     current_step: Mapped[int] = mapped_column(Integer, default=0)
     total_steps: Mapped[int] = mapped_column(Integer, nullable=False)
     reason: Mapped[str] = mapped_column(String, nullable=True)
+    visibility: Mapped[str] = mapped_column(
+        Enum(
+            VisibilityEnum,
+            name="visibility_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        default=VisibilityEnum.PUBLIC,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
