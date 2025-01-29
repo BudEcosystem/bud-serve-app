@@ -655,8 +655,8 @@ class VisibilityEnum(Enum):
         INERNAL: Represents an internal entity.
     """
 
-    PUBLIC = "PUBLIC"
-    INTERNAL = "INTERNAL"
+    PUBLIC = "public"
+    INTERNAL = "internal"
 
 
 APP_ICONS = {
