@@ -19,15 +19,16 @@
 from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, func, or_, select, distinct, asc, case, desc
+from sqlalchemy import and_, asc, desc, distinct, func, or_, select
 
 from budapp.cluster_ops.models import Cluster as ClusterModel
 from budapp.commons import logging
+from budapp.commons.constants import EndpointStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.model_ops.models import Model as Model
-from budapp.commons.constants import EndpointStatusEnum
-from .models import Endpoint as EndpointModel
+
 from ..project_ops.models import Project as ProjectModel
+from .models import Endpoint as EndpointModel
 
 
 logger = logging.get_logger(__name__)
@@ -132,7 +133,6 @@ class EndpointDataManager(DataManagerUtils):
         self, cluster_id: UUID, offset: int, limit: int, filters: Dict[str, Any], order_by: List[str], search: bool
     ) -> Tuple[List[EndpointModel], int, int, int]:
         """Get all endpoints in a cluster."""
-        
         await self.validate_fields(EndpointModel, filters)
 
         # Base conditions
@@ -149,7 +149,8 @@ class EndpointDataManager(DataManagerUtils):
                     EndpointModel,
                     ProjectModel.name.label("project_name"),
                     Model.name.label("model_name"),
-                    func.sum(EndpointModel.total_replicas).label("total_workers")
+                    EndpointModel.total_replicas.label("total_workers"),
+                    EndpointModel.active_replicas.label("active_workers"),
                 )
                 .join(ProjectModel, ProjectModel.id == EndpointModel.project_id)
                 .join(Model, Model.id == EndpointModel.model_id)
@@ -171,7 +172,8 @@ class EndpointDataManager(DataManagerUtils):
                     EndpointModel,
                     ProjectModel.name.label("project_name"),
                     Model.name.label("model_name"),
-                    func.sum(EndpointModel.total_replicas).label("total_workers")
+                    EndpointModel.total_replicas.label("total_workers"),
+                    EndpointModel.active_replicas.label("active_workers"),
                 )
                 .join(ProjectModel, ProjectModel.id == EndpointModel.project_id)
                 .join(Model, Model.id == EndpointModel.model_id)
@@ -203,6 +205,10 @@ class EndpointDataManager(DataManagerUtils):
                     stmt = stmt.order_by(sort_func("project_name"))
                 elif field == "model_name":
                     stmt = stmt.order_by(sort_func("model_name"))
+                elif field == "total_workers":
+                    stmt = stmt.order_by(sort_func("total_workers"))
+                elif field == "active_workers":
+                    stmt = stmt.order_by(sort_func("active_workers"))
 
             stmt = stmt.order_by(*sort_conditions)
 
