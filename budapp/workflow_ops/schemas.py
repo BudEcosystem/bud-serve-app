@@ -5,7 +5,7 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 from budapp.model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider
 
-from ..commons.constants import ModelProviderTypeEnum, WorkflowStatusEnum, WorkflowTypeEnum
+from ..commons.constants import ModelProviderTypeEnum, WorkflowStatusEnum, WorkflowTypeEnum, VisibilityEnum
 from ..endpoint_ops.schemas import EndpointResponse
 from ..project_ops.schemas import ProjectResponse
 
@@ -111,3 +111,4 @@ class WorkflowUtilCreate(BaseModel):
     icon: str | None = None
     total_steps: int | None = None
     tag: str | None = None
+    visibility: VisibilityEnum = VisibilityEnum.PUBLIC

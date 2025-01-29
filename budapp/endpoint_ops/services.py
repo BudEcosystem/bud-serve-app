@@ -294,6 +294,12 @@ class EndpointService(SessionMixin):
         number_of_nodes = payload.content.result.get("number_of_nodes")
         total_replicas = payload.content.result["deployment_status"]["replicas"]["total"]
 
+        # Calculate the active replicas with status "Running"
+        active_replicas = sum(
+            1
+            for worker in payload.content.result["deployment_status"]["worker_data_list"]
+            if worker["status"] == "Running"
+        )
         if not namespace or not deployment_url:
             logger.warning("Namespace or deployment URL is missing from event")
             return
@@ -361,6 +367,7 @@ class EndpointService(SessionMixin):
             status_sync_at=datetime.now(tz=timezone.utc),
             credential_id=credential_id,
             number_of_nodes=number_of_nodes,
+            active_replicas=active_replicas,
             total_replicas=total_replicas,
             deployment_config=required_data["deploy_config"],
         )
@@ -471,6 +478,13 @@ class EndpointService(SessionMixin):
         )
         total_replicas = len(payload.content.result["worker_data_list"])
         logger.debug(f"Number of workers : {total_replicas}")
+
+        # Calculate the active replicas with status "Running"
+        active_replicas = sum(
+            1 for worker in payload.content.result["worker_data_list"] if worker["status"] == "Running"
+        )
+        logger.debug(f"active replicas with status 'Running': {active_replicas}")
+
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
             EndpointModel,
             {
@@ -489,7 +503,12 @@ class EndpointService(SessionMixin):
         # Update cluster status
         endpoint_status = await self._get_endpoint_status(payload.content.result["status"])
         db_endpoint = await EndpointDataManager(self.session).update_by_fields(
-            db_endpoint, {"status": endpoint_status, "total_replicas": total_replicas}
+            db_endpoint,
+            {
+                "status": endpoint_status,
+                "total_replicas": total_replicas,
+                "active_replicas": active_replicas,
+            },
         )
         logger.debug(
             f"Endpoint {db_endpoint.id} status updated to {endpoint_status} and total replicas to {total_replicas}"

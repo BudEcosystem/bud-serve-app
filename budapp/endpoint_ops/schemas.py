@@ -44,6 +44,7 @@ class EndpointCreate(BaseModel):
     created_by: UUID4
     status_sync_at: datetime
     credential_id: UUID4 | None
+    active_replicas: int
     total_replicas: int
     number_of_nodes: int
     deployment_config: dict | None
@@ -113,6 +114,7 @@ class WorkerData(BaseModel):
     name: str
     status: str
     node_name: str
+    device_name: str
     utilization: Optional[str] = None
     hardware: str
     uptime: str
@@ -123,6 +125,7 @@ class WorkerData(BaseModel):
     cores: int
     memory: str
     deployment_status: Optional[DeploymentStatusEnum] = None
+    concurrency: int
 
 
 class WorkerInfo(WorkerData):

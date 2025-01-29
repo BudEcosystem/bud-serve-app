@@ -26,6 +26,7 @@ from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, Field, computed_f
 
 from budapp.commons.constants import ClusterStatusEnum, EndpointStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
+
 from ..commons.helpers import validate_icon
 
 
@@ -185,14 +186,28 @@ class EditClusterRequest(BaseModel):
         return value
 
 
+class ClusterDetailResponse(ClusterResponse):
+    """Cluster detail response schema"""
+
+    total_workers_count: int
+    active_workers_count: int
+    total_endpoints_count: int
+    running_endpoints_count: int
+    hardware_type: list
+
+
 class SingleClusterResponse(SuccessResponse):
-    cluster: ClusterResponse
+    """Single cluster entity"""
+
+    cluster: Union[ClusterResponse, ClusterDetailResponse]
+
 
 
 class CancelClusterOnboardingRequest(BaseModel):
     """Cancel cluster onboarding request schema."""
 
     workflow_id: UUID4
+
 
 class ClusterEndpointResponse(BaseModel):
     """Cluster endpoint response schema."""
@@ -212,38 +227,46 @@ class ClusterEndpointPaginatedResponse(PaginatedSuccessResponse):
 
     endpoints: list[ClusterEndpointResponse] = []
 
+
 class ClusterEndpointFilter(BaseModel):
     """Filter schema for endpoints."""
 
     name: str | None = None
     status: EndpointStatusEnum | None = None
 
+
 # Cluster Metrics Schema
 class ClusterNodeNetwork(BaseModel):
     """Network metrics for a cluster node."""
+
     total_receive_mbps: float
     total_transmit_mbps: float
     total_bandwidth_mbps: float
     total_errors: float
 
+
 class ClusterNodeMetrics(BaseModel):
     """Metrics for a single node in the cluster."""
+
     memory: Dict[str, float]  # total_gib, used_gib, available_gib, usage_percent
-    cpu: Dict[str, float]     # cpu_usage_percent
-    disk: Dict[str, Dict]     # paths with disk metrics
-    gpu: Dict[str, float]     # memory and utilization metrics
-    hpu: Dict[str, float]     # memory and utilization metrics
+    cpu: Dict[str, float]  # cpu_usage_percent
+    disk: Dict[str, Dict]  # paths with disk metrics
+    gpu: Dict[str, float]  # memory and utilization metrics
+    hpu: Dict[str, float]  # memory and utilization metrics
     network: Dict[str, Union[Dict[str, Dict], Dict[str, float]]]  # interfaces and summary
+
 
 class ClusterSummaryMetrics(BaseModel):
     """Summary metrics for the entire cluster."""
+
     total_nodes: int
     memory: Dict[str, float]  # total_gib, used_gib, available_gib, usage_percent
-    disk: Dict[str, float]    # total_gib, used_gib, available_gib, usage_percent
-    gpu: Dict[str, float]     # memory and utilization metrics
-    hpu: Dict[str, float]     # memory and utilization metrics
-    cpu: Dict[str, float]     # average_usage_percent
-    network: Dict[str, float] # network metrics
+    disk: Dict[str, float]  # total_gib, used_gib, available_gib, usage_percent
+    gpu: Dict[str, float]  # memory and utilization metrics
+    hpu: Dict[str, float]  # memory and utilization metrics
+    cpu: Dict[str, float]  # average_usage_percent
+    network: Dict[str, float]  # network metrics
+
 
 class MetricTypeEnum(Enum):
     """Enum for metric types."""
@@ -257,6 +280,7 @@ class MetricTypeEnum(Enum):
 
 class ClusterMetricsResponse(SuccessResponse):
     """Cluster metrics response schema."""
+
     nodes: Dict[str, ClusterNodeMetrics]
     cluster_summary: ClusterSummaryMetrics
     historical_data: Dict[str, List[Dict[str, Union[int, float]]]]  # key -> list of {timestamp, value} pairs

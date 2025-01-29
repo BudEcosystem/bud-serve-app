@@ -19,15 +19,16 @@
 from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, func, or_, select, distinct, asc, case, desc
+from sqlalchemy import and_, asc, desc, distinct, func, or_, select
 
 from budapp.cluster_ops.models import Cluster as ClusterModel
 from budapp.commons import logging
+from budapp.commons.constants import EndpointStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.model_ops.models import Model as Model
-from budapp.commons.constants import EndpointStatusEnum
-from .models import Endpoint as EndpointModel
+
 from ..project_ops.models import Project as ProjectModel
+from .models import Endpoint as EndpointModel
 
 
 logger = logging.get_logger(__name__)
@@ -132,7 +133,6 @@ class EndpointDataManager(DataManagerUtils):
         self, cluster_id: UUID, offset: int, limit: int, filters: Dict[str, Any], order_by: List[str], search: bool
     ) -> Tuple[List[EndpointModel], int, int, int]:
         """Get all endpoints in a cluster."""
-        
         await self.validate_fields(EndpointModel, filters)
 
         # Base conditions
@@ -149,7 +149,8 @@ class EndpointDataManager(DataManagerUtils):
                     EndpointModel,
                     ProjectModel.name.label("project_name"),
                     Model.name.label("model_name"),
-                    func.sum(EndpointModel.total_replicas).label("total_workers")
+                    EndpointModel.total_replicas.label("total_workers"),
+                    EndpointModel.active_replicas.label("active_workers"),
                 )
                 .join(ProjectModel, ProjectModel.id == EndpointModel.project_id)
                 .join(Model, Model.id == EndpointModel.model_id)
@@ -171,7 +172,8 @@ class EndpointDataManager(DataManagerUtils):
                     EndpointModel,
                     ProjectModel.name.label("project_name"),
                     Model.name.label("model_name"),
-                    func.sum(EndpointModel.total_replicas).label("total_workers")
+                    EndpointModel.total_replicas.label("total_workers"),
+                    EndpointModel.active_replicas.label("active_workers"),
                 )
                 .join(ProjectModel, ProjectModel.id == EndpointModel.project_id)
                 .join(Model, Model.id == EndpointModel.model_id)
@@ -203,9 +205,44 @@ class EndpointDataManager(DataManagerUtils):
                     stmt = stmt.order_by(sort_func("project_name"))
                 elif field == "model_name":
                     stmt = stmt.order_by(sort_func("model_name"))
+                elif field == "total_workers":
+                    stmt = stmt.order_by(sort_func("total_workers"))
+                elif field == "active_workers":
+                    stmt = stmt.order_by(sort_func("active_workers"))
 
             stmt = stmt.order_by(*sort_conditions)
 
         result = self.session.execute(stmt)
 
         return result, count
+
+    async def get_cluster_count_details(self, cluster_id: UUID) -> Tuple[int, int, int, int]:
+        """
+        Retrieve cluster statistics including:
+        - Total endpoints count (excluding deleted ones)
+        - Running endpoints count
+        - Sum of active replicas (workers)
+        - Sum of total replicas (workers)
+
+        Args:
+            cluster_id (UUID): The ID of the cluster.
+
+        Returns:
+            Tuple[int, int, int, int]:
+            (total_endpoints_count, running_endpoints_count, active_workers_count, total_workers_count)
+        """
+        query = select(
+            func.count().filter(EndpointModel.status != EndpointStatusEnum.DELETED).label("total_endpoints"),
+            func.count().filter(EndpointModel.status == EndpointStatusEnum.RUNNING).label("running_endpoints"),
+            func.coalesce(
+                func.sum(EndpointModel.active_replicas).filter(EndpointModel.status != EndpointStatusEnum.DELETED), 0
+            ).label("active_workers"),
+            func.coalesce(
+                func.sum(EndpointModel.total_replicas).filter(EndpointModel.status != EndpointStatusEnum.DELETED), 0
+            ).label("total_workers"),
+        ).where(EndpointModel.cluster_id == cluster_id)
+
+        result = self.session.execute(query)
+        total_endpoints, running_endpoints, active_replicas, total_replicas = result.fetchone()
+
+        return total_endpoints, running_endpoints, active_replicas, total_replicas
