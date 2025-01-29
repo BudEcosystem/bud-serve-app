@@ -583,7 +583,7 @@ class EndpointService(SessionMixin):
             "accept": "application/json",
         }
         async with aiohttp.ClientSession() as session:
-            async with session.get(get_worker_detail_endpoint, headers=headers, params={"reload": reload}) as response:
+            async with session.get(get_worker_detail_endpoint, headers=headers, params={"reload": str(reload).lower()}) as response:
                 response_data = await response.json()
                 if response.status != 200:
                     error_message = response_data.get("message", "Failed to get endpoint worker detail")
