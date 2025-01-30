@@ -255,6 +255,12 @@ class ClusterNodeMetrics(BaseModel):
     network: Dict[str, Union[Dict[str, Dict], Dict[str, float]]]  # interfaces and summary
 
 
+class ResourceChange(BaseModel):
+    """Schema for resource change metrics."""
+    change: float
+    change_percent: float
+
+
 class ClusterSummaryMetrics(BaseModel):
     """Summary metrics for the entire cluster."""
 
@@ -265,6 +271,7 @@ class ClusterSummaryMetrics(BaseModel):
     hpu: Dict[str, float]  # memory and utilization metrics
     cpu: Dict[str, float]  # average_usage_percent
     network: Dict[str, float]  # network metrics
+    changes: Dict[str, ResourceChange]  # Changes in resource utilization
 
 
 class MetricTypeEnum(Enum):
