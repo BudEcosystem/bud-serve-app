@@ -20,6 +20,7 @@
 from datetime import datetime
 from typing import List, Dict, Union
 from uuid import UUID
+from enum import Enum
 
 from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, Field, computed_field, field_validator
 
@@ -201,7 +202,6 @@ class SingleClusterResponse(SuccessResponse):
     cluster: Union[ClusterResponse, ClusterDetailResponse]
 
 
-
 class CancelClusterOnboardingRequest(BaseModel):
     """Cancel cluster onboarding request schema."""
 
@@ -267,6 +267,18 @@ class ClusterSummaryMetrics(BaseModel):
     network: Dict[str, float]  # network metrics
 
 
+class MetricTypeEnum(Enum):
+    """Enum for metric types."""
+
+    ALL = "all"
+    MEMORY = "memory"
+    CPU = "cpu"
+    DISK = "disk"
+    GPU = "gpu"
+    HPU = "hpu"
+    NETWORK = "network"
+
+
 class ClusterMetricsResponse(SuccessResponse):
     """Cluster metrics response schema."""
 
@@ -274,3 +286,5 @@ class ClusterMetricsResponse(SuccessResponse):
     cluster_summary: ClusterSummaryMetrics
     historical_data: Dict[str, List[Dict[str, Union[int, float]]]]  # key -> list of {timestamp, value} pairs
     time_range: str  # 'today', '7days', or 'month'
+    metric_type: MetricTypeEnum  # The type of metrics being returned
+    timestamp: datetime
