@@ -2107,10 +2107,16 @@ class ModelService(SessionMixin):
                     "provider_id": db_model.provider_id,
                     "is_present_in_model": True,
                 },
+                missing_ok=True,
             )
-            db_cloud_model = await CloudModelDataManager(self.session).update_by_fields(
-                db_cloud_model, fields={"is_present_in_model": False}
-            )
+
+            # If cloud model is added from seeded model, update is_present_in_model to False
+            if db_cloud_model:
+                db_cloud_model = await CloudModelDataManager(self.session).update_by_fields(
+                    db_cloud_model, fields={"is_present_in_model": False}
+                )
+            else:
+                logger.warning("This cloud model is not added from seeded cloud models")
 
         else:
             await self._perform_model_deletion_request(db_model.local_path)
