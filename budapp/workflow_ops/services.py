@@ -25,8 +25,8 @@ from budapp.commons import logging
 from budapp.commons.constants import (
     WORKFLOW_DELETE_MESSAGES,
     BudServeWorkflowStepEventName,
-    WorkflowStatusEnum,
     VisibilityEnum,
+    WorkflowStatusEnum,
 )
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
@@ -118,6 +118,7 @@ class WorkflowService(SessionMixin):
             create_cluster_events = required_data.get(BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value)
             delete_cluster_events = required_data.get(BudServeWorkflowStepEventName.DELETE_CLUSTER_EVENTS.value)
             delete_endpoint_events = required_data.get(BudServeWorkflowStepEventName.DELETE_ENDPOINT_EVENTS.value)
+            delete_worker_events = required_data.get(BudServeWorkflowStepEventName.DELETE_WORKER_EVENTS.value)
             model_extraction_events = required_data.get(BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value)
             bud_serve_cluster_events = required_data.get(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value)
             model_security_scan_events = required_data.get(
@@ -205,6 +206,7 @@ class WorkflowService(SessionMixin):
                 security_scan_result=db_model_security_scan_result if db_model_security_scan_result else None,
                 delete_cluster_events=delete_cluster_events if delete_cluster_events else None,
                 delete_endpoint_events=delete_endpoint_events if delete_endpoint_events else None,
+                delete_worker_events=delete_worker_events if delete_worker_events else None,
                 endpoint=db_endpoint if db_endpoint else None,
                 additional_concurrency=additional_concurrency if additional_concurrency else None,
                 bud_simulator_events=bud_simulator_events if bud_simulator_events else None,
@@ -273,6 +275,9 @@ class WorkflowService(SessionMixin):
             ],
             "delete_endpoint": [
                 BudServeWorkflowStepEventName.DELETE_ENDPOINT_EVENTS.value,
+            ],
+            "delete_worker": [
+                BudServeWorkflowStepEventName.DELETE_WORKER_EVENTS.value,
             ],
             "add_worker_to_endpoint": [
                 BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value,

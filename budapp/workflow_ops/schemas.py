@@ -5,7 +5,7 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 from budapp.model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider
 
-from ..commons.constants import ModelProviderTypeEnum, WorkflowStatusEnum, WorkflowTypeEnum, VisibilityEnum
+from ..commons.constants import ModelProviderTypeEnum, VisibilityEnum, WorkflowStatusEnum, WorkflowTypeEnum
 from ..endpoint_ops.schemas import EndpointResponse
 from ..project_ops.schemas import ProjectResponse
 
@@ -29,6 +29,7 @@ class RetrieveWorkflowStepData(BaseModel):
     create_cluster_events: dict | None = None
     delete_cluster_events: dict | None = None
     delete_endpoint_events: dict | None = None
+    delete_worker_events: dict | None = None
     model_security_scan_events: dict | None = None
     bud_simulator_events: dict | None = None
     icon: str | None = None
