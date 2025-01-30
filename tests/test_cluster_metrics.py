@@ -22,7 +22,7 @@ from budapp.cluster_ops.models import Cluster as ClusterModel
 
 pytest_plugins = ("pytest_asyncio",)
 
-TEST_CLUSTER_ID = UUID("7b69d2f3-5524-484a-9a22-4ad3e4f67639")
+TEST_CLUSTER_ID = UUID("dff4578f-039e-4be4-aa36-db7932e404fa")
 
 
 @pytest.fixture

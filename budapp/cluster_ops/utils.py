@@ -210,11 +210,11 @@ class ClusterMetricsFetcher:
                 current_results = {key: future.result() for key, future in current_results.items()}
 
                 # Process node metrics
-                nodes = self._process_node_metrics(current_results)
+                nodes = self._process_node_metrics(current_results, time_range)
                 current_results["nodes"] = nodes
 
                 # Process cluster summary
-                cluster_summary = self._process_cluster_summary(current_results)
+                cluster_summary = self._process_cluster_summary(current_results, time_range)
 
                 # Process historical data in parallel
                 historical_data = self._process_historical_data(results, executor)
@@ -268,16 +268,84 @@ class ClusterMetricsFetcher:
                 return metric["value"][1]
         return 0.0
 
-    def _process_disk_metrics(self, results: Dict, instance: str) -> Dict:
+    def _calculate_metric_change(self, current_value: float, historical_data: List, time_range: str) -> float:
+        """Calculate the change in a metric based on the time range.
+        
+        Args:
+            current_value: The current value of the metric
+            historical_data: List of historical values for the metric
+            time_range: One of 'today', '7days', 'month'
+            
+        Returns:
+            Float representing the change in the metric (in the same units as the input)
+        """
+        if not historical_data or not len(historical_data):
+            return 0.0
+        
+        try:
+            # Get the first series of values
+            first_series = historical_data[0]
+            if not first_series.get("values"):
+                return 0.0
+
+            values = first_series["values"]
+            # Get the first value (oldest) in the time series
+            previous_value = float(values[0][1])
+            return round(current_value - previous_value, 2)
+            
+        except (IndexError, ValueError, KeyError) as e:
+            logger.error(f"Error calculating metric change: {e}")
+            return 0.0
+
+    def _process_node_metrics(self, results: Dict, time_range: str) -> Dict:
+        """Process node metrics from results."""
+        nodes = {}
+        instances = self._get_unique_instances(results)
+
+        for instance in instances:
+            memory_total = float(self._get_instance_value(results.get("memory_total", []), instance))
+            memory_available = float(self._get_instance_value(results.get("memory_available", []), instance))
+            memory_used = memory_total - memory_available
+            memory_usage_percent = (memory_used / memory_total * 100) if memory_total > 0 else 0
+
+            current_cpu_usage = float(self._get_instance_value(results.get("cpu_usage", []), instance))
+
+            nodes[instance] = {
+                "memory": {
+                    "total_gib": memory_total,
+                    "available_gib": memory_available,
+                    "used_gib": memory_used,
+                    "usage_percent": memory_usage_percent,
+                    "change_percent": self._calculate_metric_change(
+                        memory_usage_percent,
+                        [m for m in results.get("memory_available", []) if m["metric"].get("instance") == instance],
+                        time_range
+                    )
+                },
+                "cpu": {
+                    "cpu_usage_percent": current_cpu_usage,
+                    "change_percent": self._calculate_metric_change(
+                        current_cpu_usage,
+                        [m for m in results.get("cpu_usage", []) if m["metric"].get("instance") == instance],
+                        time_range
+                    )
+                },
+                "disk": self._process_disk_metrics(results, instance, time_range),
+                "network": self._process_network_metrics(results, instance, time_range),
+                "gpu": self._process_gpu_metrics(results, instance, time_range),
+                "hpu": self._process_hpu_metrics(results, instance, time_range),
+            }
+
+        return nodes
+
+    def _process_disk_metrics(self, results: Dict, instance: str, time_range: str) -> Dict:
         """Process disk metrics for a specific instance."""
         disk_metrics = {}
         mountpoints = set()
 
-        # Safely get disk metrics
         disk_total = results.get("disk_total", [])
         disk_used = results.get("disk_used", [])
 
-        # Get unique mountpoints for this instance
         for metric in disk_total:
             if metric["metric"]["instance"] == instance:
                 mountpoints.add(metric["metric"]["mountpoint"])
@@ -285,16 +353,24 @@ class ClusterMetricsFetcher:
         for mountpoint in mountpoints:
             total = float(self._get_instance_mountpoint_value(disk_total, instance, mountpoint))
             used = float(self._get_instance_mountpoint_value(disk_used, instance, mountpoint))
+            usage_percent = (used / total * 100) if total > 0 else 0
+
             disk_metrics[mountpoint] = {
                 "total_gib": total,
                 "used_gib": used,
                 "available_gib": total - used,
-                "usage_percent": (used / total * 100) if total > 0 else 0,
+                "usage_percent": usage_percent,
+                "change_percent": self._calculate_metric_change(
+                    usage_percent,
+                    [m for m in disk_used if m["metric"].get("instance") == instance 
+                     and m["metric"].get("mountpoint") == mountpoint],
+                    time_range
+                )
             }
 
         return disk_metrics
 
-    def _process_network_metrics(self, results: Dict, instance: str) -> Dict:
+    def _process_network_metrics(self, results: Dict, instance: str, time_range: str) -> Dict:
         """Process network metrics for a specific instance."""
         interfaces = {}
         total_receive = 0
@@ -330,9 +406,14 @@ class ClusterMetricsFetcher:
                 "total_bandwidth_mbps": total_receive + total_transmit,
                 "total_errors": total_errors,
             },
+            "change_percent": self._calculate_metric_change(
+                total_errors,
+                [m for m in network_errors if m["metric"].get("instance") == instance],
+                time_range
+            )
         }
 
-    def _process_gpu_metrics(self, results: Dict, instance: str) -> Dict[str, float]:
+    def _process_gpu_metrics(self, results: Dict, instance: str, time_range: str) -> Dict[str, float]:
         """Process GPU metrics for a specific instance."""
         gpu_memory_used = results.get("gpu_memory_used", [])
         gpu_memory_total = results.get("gpu_memory_total", [])
@@ -343,11 +424,16 @@ class ClusterMetricsFetcher:
                 "memory_used_gib": float(self._get_instance_value(gpu_memory_used, instance)),
                 "memory_total_gib": float(self._get_instance_value(gpu_memory_total, instance)),
                 "utilization_percent": float(self._get_instance_value(gpu_utilization, instance)),
+                "change_percent": self._calculate_metric_change(
+                    float(self._get_instance_value(gpu_utilization, instance)),
+                    [m for m in gpu_utilization if m["metric"].get("instance") == instance],
+                    time_range
+                )
             }
         except (KeyError, TypeError, ValueError):
             return {"memory_used_gib": 0.0, "memory_total_gib": 0.0, "utilization_percent": 0.0}
 
-    def _process_hpu_metrics(self, results: Dict, instance: str) -> Dict[str, float]:
+    def _process_hpu_metrics(self, results: Dict, instance: str, time_range: str) -> Dict[str, float]:
         """Process HPU metrics for a specific instance."""
         hpu_memory_used = results.get("hpu_memory_used", [])
         hpu_memory_total = results.get("hpu_memory_total", [])
@@ -358,6 +444,11 @@ class ClusterMetricsFetcher:
                 "memory_used_gib": float(self._get_instance_value(hpu_memory_used, instance)),
                 "memory_total_gib": float(self._get_instance_value(hpu_memory_total, instance)),
                 "utilization_percent": float(self._get_instance_value(hpu_utilization, instance)),
+                "change_percent": self._calculate_metric_change(
+                    float(self._get_instance_value(hpu_utilization, instance)),
+                    [m for m in hpu_utilization if m["metric"].get("instance") == instance],
+                    time_range
+                )
             }
         except (KeyError, TypeError, ValueError):
             return {"memory_used_gib": 0.0, "memory_total_gib": 0.0, "utilization_percent": 0.0}
@@ -444,52 +535,21 @@ class ClusterMetricsFetcher:
             pass
         return 0.0
 
-    def _process_node_metrics(self, results: Dict) -> Dict:
-        """Process node metrics from results."""
-        nodes = {}
-        instances = self._get_unique_instances(results)
-
-        for instance in instances:
-            # Default values in case metrics are missing
-            memory_total = float(self._get_instance_value(results.get("memory_total", []), instance))
-            memory_available = float(self._get_instance_value(results.get("memory_available", []), instance))
-
-            # Avoid division by zero
-            memory_usage_percent = 0
-            if memory_total > 0:
-                memory_usage_percent = (1 - memory_available / memory_total) * 100
-
-            nodes[instance] = {
-                "memory": {
-                    "total_gib": memory_total,
-                    "available_gib": memory_available,
-                    "used_gib": memory_total - memory_available,
-                    "usage_percent": memory_usage_percent,
-                },
-                "cpu": {"cpu_usage_percent": float(self._get_instance_value(results.get("cpu_usage", []), instance))},
-                "disk": self._process_disk_metrics(results, instance),
-                "network": self._process_network_metrics(results, instance),
-                "gpu": self._process_gpu_metrics(results, instance),
-                "hpu": self._process_hpu_metrics(results, instance),
-            }
-
-        return nodes
-
-    def _process_cluster_summary(self, results: Dict) -> Dict:
+    def _process_cluster_summary(self, results: Dict, time_range: str) -> Dict:
         """Process cluster summary metrics from results."""
         nodes = results.get("nodes", {})
         if not nodes:
-            # Return default values if no node data is available
             return {
                 "total_nodes": 0,
-                "memory": {"total_gib": 0, "used_gib": 0, "available_gib": 0, "usage_percent": 0},
-                "cpu": {"average_usage_percent": 0},
-                "disk": {"total_gib": 0, "used_gib": 0, "available_gib": 0, "usage_percent": 0},
+                "memory": {"total_gib": 0, "used_gib": 0, "available_gib": 0, "usage_percent": 0, "change_percent": 0},
+                "cpu": {"average_usage_percent": 0, "change_percent": 0},
+                "disk": {"total_gib": 0, "used_gib": 0, "available_gib": 0, "usage_percent": 0, "change_percent": 0},
                 "network": {
                     "total_receive_mbps": 0,
                     "total_transmit_mbps": 0,
                     "total_bandwidth_mbps": 0,
                     "total_errors": 0,
+                    "change_percent": 0
                 },
                 "gpu": {
                     "memory_total_gib": 0,
@@ -497,6 +557,7 @@ class ClusterMetricsFetcher:
                     "memory_available_gib": 0,
                     "utilization_percent": 0,
                     "memory_usage_percent": 0,
+                    "change_percent": 0
                 },
                 "hpu": {
                     "memory_total_gib": 0,
@@ -504,11 +565,16 @@ class ClusterMetricsFetcher:
                     "memory_available_gib": 0,
                     "utilization_percent": 0,
                     "memory_usage_percent": 0,
+                    "change_percent": 0
                 },
             }
 
+        # Calculate current values
         total_memory = sum(node["memory"]["total_gib"] for node in nodes.values())
         used_memory = sum(node["memory"]["used_gib"] for node in nodes.values())
+        memory_usage_percent = (used_memory / total_memory * 100) if total_memory > 0 else 0
+        
+        current_cpu_usage = sum(node["cpu"]["cpu_usage_percent"] for node in nodes.values()) / len(nodes) if nodes else 0
 
         summary = {
             "total_nodes": int(self._get_instance_value(results.get("total_nodes", []), "total_nodes")),
@@ -516,12 +582,20 @@ class ClusterMetricsFetcher:
                 "total_gib": total_memory,
                 "used_gib": used_memory,
                 "available_gib": total_memory - used_memory,
-                "usage_percent": (used_memory / total_memory * 100) if total_memory > 0 else 0,
+                "usage_percent": memory_usage_percent,
+                "change_percent": self._calculate_metric_change(
+                    memory_usage_percent,
+                    results.get("memory_available", []),
+                    time_range
+                )
             },
             "cpu": {
-                "average_usage_percent": sum(node["cpu"]["cpu_usage_percent"] for node in nodes.values()) / len(nodes)
-                if nodes
-                else 0
+                "average_usage_percent": current_cpu_usage,
+                "change_percent": self._calculate_metric_change(
+                    current_cpu_usage,
+                    results.get("cpu_usage", []),
+                    time_range
+                )
             },
             "disk": self._aggregate_disk_metrics(nodes),
             "network": self._aggregate_network_metrics(nodes),
