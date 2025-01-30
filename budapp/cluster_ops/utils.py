@@ -1,3 +1,4 @@
+import json
 import requests
 import asyncio
 import aiohttp
@@ -36,14 +37,17 @@ class ClusterMetricsFetcher:
         """Get start and end timestamps based on time range.
 
         Args:
-            time_range: One of 'today', '7days', 'month'
+            time_range: One of '10min', 'today', '7days', 'month'
 
         Returns:
             Dict with start and end timestamps and step interval
         """
         now = datetime.now(timezone.utc)
 
-        if time_range == "today":
+        if time_range == "10min":
+            start_time = now - timedelta(minutes=10)
+            step = "30s"  # 30-second intervals for 10 minutes
+        elif time_range == "today":
             start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
             step = "5m"  # 5-minute intervals for today
         elif time_range == "7days":
@@ -53,9 +57,9 @@ class ClusterMetricsFetcher:
             start_time = now - timedelta(days=30)
             step = "6h"  # 6-hour intervals for monthly view
         else:
-            # Default to today if invalid range
-            start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            step = "5m"
+            # Default to 10min if invalid range
+            start_time = now - timedelta(minutes=10)
+            step = "30s"
 
         return {"start": start_time.timestamp(), "end": now.timestamp(), "step": step}
 
@@ -167,6 +171,89 @@ class ClusterMetricsFetcher:
 
         return queries
 
+    def _calculate_metric_changes(self, current_metrics: Dict, previous_metrics: Dict) -> Dict:
+        """Calculate changes between current and previous metrics.
+
+        Args:
+            current_metrics: Current period metrics
+            previous_metrics: Previous period metrics
+
+        Returns:
+            Dict containing the changes in metrics
+        """
+        changes = {}
+
+        try:
+            logger.debug(f"Current metrics: {current_metrics}")
+            logger.debug(f"Previous metrics: {previous_metrics}")
+            # CPU change
+            current_cpu = current_metrics.get("cpu", {}).get("average_usage_percent", 0)
+            previous_cpu = previous_metrics.get("cpu", {}).get("average_usage_percent", 0)
+
+            logger.debug(f"CPU values - Current: {current_cpu}, Previous: {previous_cpu}")
+            changes["cpu"] = {
+                "change": round(current_cpu - previous_cpu, 2),
+                "change_percent": round(
+                    ((current_cpu - previous_cpu) / previous_cpu * 100) if previous_cpu != 0 else 0, 2
+                ),
+            }
+
+            # Memory change
+            current_mem = current_metrics.get("memory", {}).get("usage_percent", 0)
+            previous_mem = previous_metrics.get("memory", {}).get("usage_percent", 0)
+            changes["memory"] = {
+                "change": round(current_mem - previous_mem, 2),
+                "change_percent": round(
+                    ((current_mem - previous_mem) / previous_mem * 100) if previous_mem != 0 else 0, 2
+                ),
+            }
+
+            # GPU utilization change
+            current_gpu = current_metrics.get("gpu", {}).get("utilization_percent", 0)
+            previous_gpu = previous_metrics.get("gpu", {}).get("utilization_percent", 0)
+            changes["gpu"] = {
+                "change": round(current_gpu - previous_gpu, 2),
+                "change_percent": round(
+                    ((current_gpu - previous_gpu) / previous_gpu * 100) if previous_gpu != 0 else 0, 2
+                ),
+            }
+
+            # HPU utilization change
+            current_hpu = current_metrics.get("hpu", {}).get("utilization_percent", 0)
+            previous_hpu = previous_metrics.get("hpu", {}).get("utilization_percent", 0)
+            changes["hpu"] = {
+                "change": round(current_hpu - previous_hpu, 2),
+                "change_percent": round(
+                    ((current_hpu - previous_hpu) / previous_hpu * 100) if previous_hpu != 0 else 0, 2
+                ),
+            }
+
+            # Network bandwidth change
+            current_net = current_metrics.get("network", {}).get("total_bandwidth_mbps", 0)
+            previous_net = previous_metrics.get("network", {}).get("total_bandwidth_mbps", 0)
+            changes["network"] = {
+                "change": round(current_net - previous_net, 2),
+                "change_percent": round(
+                    ((current_net - previous_net) / previous_net * 100) if previous_net != 0 else 0, 2
+                ),
+            }
+
+            # Disk usage change
+            current_disk = current_metrics.get("disk", {}).get("usage_percent", 0)
+            previous_disk = previous_metrics.get("disk", {}).get("usage_percent", 0)
+            changes["disk"] = {
+                "change": round(current_disk - previous_disk, 2),
+                "change_percent": round(
+                    ((current_disk - previous_disk) / previous_disk * 100) if previous_disk != 0 else 0, 2
+                ),
+            }
+
+        except Exception as e:
+            logger.error(f"Error calculating metric changes: {e}")
+            return {}
+
+        return changes
+
     async def get_cluster_metrics(
         self, cluster_id: UUID, time_range: str = "today", metric_type: str = "all"
     ) -> Optional[Dict[str, Any]]:
@@ -174,7 +261,7 @@ class ClusterMetricsFetcher:
 
         Args:
             cluster_id: The cluster ID to fetch metrics for
-            time_range: One of 'today', '7days', 'month'
+            time_range: One of '10min', 'today', '7days', 'month'
             metric_type: Type of metrics to fetch ('all', 'memory', 'cpu', 'disk', 'gpu', 'hpu', 'network')
 
         Returns:
@@ -185,18 +272,78 @@ class ClusterMetricsFetcher:
             return None
 
         cluster_name = str(cluster_id)
-        rate_interval = "5m" if time_range == "today" else "1h" if time_range == "7days" else "6h"
+        rate_interval = (
+            "1m"
+            if time_range == "10min"
+            else "5m"
+            if time_range == "today"
+            else "1h"
+            if time_range == "7days"
+            else "6h"
+        )
 
         # Get filtered queries based on metric type
         queries = self._get_metric_queries(cluster_name, rate_interval, metric_type)
 
         try:
-            # Fetch metrics asynchronously
+            # Fetch current period metrics
             results = await self._fetch_all_metrics(queries, time_range)
 
             if not any(result for result in results.values()):
                 logger.error("No data returned from Prometheus queries")
                 return None
+
+            # Calculate the previous time range and get previous metrics
+            now = datetime.now(timezone.utc)
+            if time_range == "10min":
+                previous_end = now - timedelta(minutes=10)  # End 10 minutes ago
+                previous_start = previous_end - timedelta(minutes=10)  # Start 20 minutes ago
+                previous_time_params = {
+                    "start": previous_start.timestamp(),
+                    "end": previous_end.timestamp(),
+                    "step": "30s",
+                }
+            elif time_range == "today":
+                previous_end = now - timedelta(days=1)  # End at yesterday
+                previous_start = previous_end.replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )  # Start at beginning of yesterday
+                previous_time_params = {
+                    "start": previous_start.timestamp(),
+                    "end": previous_end.timestamp(),
+                    "step": "5m",
+                }
+            elif time_range == "7days":
+                previous_end = now - timedelta(days=7)  # End 7 days ago
+                previous_start = previous_end - timedelta(days=7)  # Start 14 days ago
+                previous_time_params = {
+                    "start": previous_start.timestamp(),
+                    "end": previous_end.timestamp(),
+                    "step": "1h",
+                }
+            else:  # month
+                previous_end = now - timedelta(days=30)  # End 30 days ago
+                previous_start = previous_end - timedelta(days=30)  # Start 60 days ago
+                previous_time_params = {
+                    "start": previous_start.timestamp(),
+                    "end": previous_end.timestamp(),
+                    "step": "6h",
+                }
+
+            # Fetch previous period metrics with correct time range
+            async with aiohttp.ClientSession() as session:
+                previous_tasks = []
+                for key, query in queries.items():
+                    task = asyncio.create_task(self._async_query_range(session, query, previous_time_params))
+                    previous_tasks.append((key, task))
+
+                previous_results = {}
+                for key, task in previous_tasks:
+                    try:
+                        previous_results[key] = await task
+                    except Exception as e:
+                        logger.error(f"Failed to fetch previous metrics for {key}: {e}")
+                        previous_results[key] = []
 
             async with self._get_executor() as executor:
                 # Process current values in parallel
@@ -211,10 +358,27 @@ class ClusterMetricsFetcher:
 
                 # Process node metrics
                 nodes = self._process_node_metrics(current_results)
+
                 current_results["nodes"] = nodes
 
-                # Process cluster summary
-                cluster_summary = self._process_cluster_summary(current_results)
+                # Process cluster summary for both current and previous periods
+                current_summary = self._process_cluster_summary(current_results)
+
+                # Process previous period results
+                previous_processed = {
+                    key: executor.submit(self._process_current_values, result).result()
+                    for key, result in previous_results.items()
+                    if result
+                }
+
+                previous_nodes = self._process_node_metrics(previous_processed)
+                previous_processed["nodes"] = previous_nodes
+
+                previous_summary = self._process_cluster_summary(previous_processed)
+
+                # Calculate changes
+                changes = self._calculate_metric_changes(current_summary, previous_summary)
+                current_summary["changes"] = changes
 
                 # Process historical data in parallel
                 historical_data = self._process_historical_data(results, executor)
@@ -224,7 +388,7 @@ class ClusterMetricsFetcher:
                     "time_range": time_range,
                     "historical_data": historical_data,
                     "nodes": nodes,
-                    "cluster_summary": cluster_summary,
+                    "cluster_summary": current_summary,
                 }
 
             logger.info(f"Successfully fetched cluster metrics for time range: {time_range}")
@@ -478,6 +642,7 @@ class ClusterMetricsFetcher:
     def _process_cluster_summary(self, results: Dict) -> Dict:
         """Process cluster summary metrics from results."""
         nodes = results.get("nodes", {})
+
         if not nodes:
             # Return default values if no node data is available
             return {
