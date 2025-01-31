@@ -60,10 +60,20 @@ async def test_node_metrics_and_events():
             
             # Validate network format
             network = metrics_data['networkIO']
-            assert 'unit' in network and network['unit'] == 'KiB', "Network should be in KiB"
+            assert 'unit' in network and network['unit'] == 'KiB/s', "Network should be in KiB/s"
             assert 'trend' in network, "Network should have trend"
             assert network['trend'] in ['stable', 'fluctuating'], "Invalid network trend"
             assert isinstance(network['current'], float), "Network current should be float"
+            assert 'receive' in network and isinstance(network['receive'], float), "Network receive should be float"
+            assert 'transmit' in network and isinstance(network['transmit'], float), "Network transmit should be float"
+            
+            # Validate network history if present
+            if 'history' in network:
+                assert isinstance(network['history'], list), "Network history should be a list"
+                for data_point in network['history']:
+                    assert 'timestamp' in data_point, "History data point should have timestamp"
+                    assert 'value' in data_point, "History data point should have value"
+                    assert isinstance(data_point['value'], float), "History value should be float"
             
             # Validate events format
             events = metrics_data['events']

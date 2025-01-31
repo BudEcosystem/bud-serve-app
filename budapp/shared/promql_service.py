@@ -13,6 +13,53 @@ logger = logging.get_logger(__name__)
 
 class PromQLService:
     """Improved PromQL service class with async support and caching."""
+    def _parse_time_input(self, time_input: Union[str, datetime]) -> str:
+        """Convert various time inputs to Unix timestamp string.
+        
+        Args:
+            time_input: Can be:
+                - datetime object
+                - "now"
+                - relative time string (e.g., "1h", "5m", "2d")
+                - Unix timestamp string
+        
+        Returns:
+            Unix timestamp as string
+        """
+        if isinstance(time_input, datetime):
+            return str(int(time_input.timestamp()))
+        
+        if time_input == "now":
+            return str(int(datetime.now().timestamp()))
+        
+        # Handle relative time strings
+        if isinstance(time_input, str):
+            # Parse relative time strings like "1h", "5m", etc.
+            time_units = {
+                'h': 'hours',
+                'm': 'minutes',
+                'd': 'days',
+                'w': 'weeks'
+            }
+            
+            if any(time_input.endswith(unit) for unit in time_units.keys()):
+                try:
+                    value = int(time_input[:-1])
+                    unit = time_input[-1]
+                    if unit in time_units:
+                        delta = timedelta(**{time_units[unit]: value})
+                        return str(int((datetime.now() - delta).timestamp()))
+                except ValueError:
+                    pass
+            
+            # If it's already a timestamp string, return as is
+            try:
+                int(time_input)
+                return time_input
+            except ValueError:
+                pass
+                
+        raise ValueError(f"Invalid time format: {time_input}")
 
     def __init__(self, cluster_name: str):
         """Initialize the PromQL service.
@@ -132,7 +179,8 @@ class PromQLService:
             # Extract node names from result
             for result in nodes_result.get('data', {}).get('result', []):
                 node_name = result.get('metric', {}).get('node')
-                if not node_name:
+                internal_ip = result.get('metric', {}).get('internal_ip')
+                if not node_name or not internal_ip:
                     continue
                 
                 # Define metrics queries for this node
@@ -158,8 +206,14 @@ class PromQLService:
                     'memory_allocatable': self._add_cluster_filter(
                         f'kube_node_status_allocatable{{node="{node_name}",resource="memory"}} or vector(0)'
                     ),
-                    'network_io': self._add_cluster_filter(
-                        f'sum(rate(node_network_receive_bytes_total{{node="{node_name}"}}[5m]) + rate(node_network_transmit_bytes_total{{node="{node_name}"}}[5m])) or vector(0)'
+                    'network_receive': self._add_cluster_filter(
+                        f'sum(rate(node_network_receive_bytes_total{{instance="{internal_ip}:9100",device!="lo"}}[5m]))'
+                    ),
+                    'network_transmit': self._add_cluster_filter(
+                        f'sum(rate(node_network_transmit_bytes_total{{instance="{internal_ip}:9100",device!="lo"}}[5m]))'
+                    ),
+                    'network_io_history': self._add_cluster_filter(
+                        f'sum(rate(node_network_receive_bytes_total{{instance="{internal_ip}:9100",device!="lo"}}[5m]) + rate(node_network_transmit_bytes_total{{instance="{internal_ip}:9100",device!="lo"}}[5m]))'
                     ),
                     'events': self._add_cluster_filter(
                         f'sum(kube_event_count{{node="{node_name}"}}) or vector(0)'
@@ -171,10 +225,26 @@ class PromQLService:
 
                 # Execute all queries in parallel
                 results = {}
-                tasks = [self.query(query, timeout=timeout) for query in queries.values()]
+                tasks = []
+                
+                # Add instant queries
+                for metric_name, query in queries.items():
+                    if metric_name != 'network_io_history':  # Skip the network_io_history query
+                        tasks.append(self.query(query, timeout=timeout))
+                
+                # Add range query for network I/O history
+                tasks.append(self.query_range(
+                    queries['network_io_history'],
+                    start="1h",  # Use Prometheus time notation
+                    end="now",
+                    step="10m",
+                    timeout=timeout
+                ))
+                
                 query_results = await asyncio.gather(*tasks, return_exceptions=True)
                 
-                for metric_name, result in zip(queries.keys(), query_results):
+                # Process instant query results
+                for metric_name, result in zip([k for k in queries.keys() if k != 'network_io_history'], query_results[:-1]):
                     if isinstance(result, Exception):
                         logger.error(f"Error fetching {metric_name}: {str(result)}")
                         results[metric_name] = 0
@@ -184,15 +254,54 @@ class PromQLService:
                             if metric_name == 'node_version':
                                 results[metric_name] = result['data']['result'][0]['metric'].get('kernel_version', '')
                             else:
-                                value = float(result['data']['result'][0]['value'][1])
-                                results[metric_name] = value
-                                if metric_name in ['cpu_used', 'cpu_allocatable', 'memory_used', 'memory_allocatable']:
+                                logger.debug(f"Processing {metric_name} result: {json.dumps(result, indent=2)}")
+                                if len(result.get('data', {}).get('result', [])) > 0:
+                                    value = float(result['data']['result'][0]['value'][1])
+                                    results[metric_name] = value
                                     logger.debug(f"Node {node_name} {metric_name}: {value}")
+                                else:
+                                    logger.warning(f"No data found for {metric_name}")
+                                    results[metric_name] = 0
+                                
+                                if metric_name in ['cpu_used', 'cpu_allocatable', 'memory_used', 'memory_allocatable']:
                                     if metric_name.startswith('memory'):
                                         logger.debug(f"Node {node_name} {metric_name} in GiB: {value / (1024 * 1024 * 1024)}")
                         except (KeyError, IndexError, ValueError) as e:
                             logger.error(f"Error processing {metric_name} for node {node_name}: {str(e)}")
                             results[metric_name] = 0
+
+                # Process network I/O history result
+                network_history_result = query_results[-1]
+                network_history = []
+                if not isinstance(network_history_result, Exception):
+                    try:
+                        logger.debug(f"Raw network history result: {json.dumps(network_history_result, indent=2)}")
+                        if len(network_history_result.get('data', {}).get('result', [])) > 0:
+                            values = network_history_result['data']['result'][0]['values']
+                            logger.debug(f"Found {len(values)} data points")
+                            for data_point in values:
+                                timestamp, value = data_point
+                                network_history.append({
+                                    "timestamp": timestamp,
+                                    "value": round(float(value) / 1024, 2)  # Convert to KiB/s
+                                })
+                            logger.debug(f"Processed network history: {json.dumps(network_history, indent=2)}")
+                        else:
+                            logger.warning("No data points found in network history result")
+                    except Exception as e:
+                        logger.error(f"Error processing network history: {str(e)}", exc_info=True)
+                else:
+                    logger.error(f"Network history query failed: {str(network_history_result)}")
+
+                # Calculate total network I/O
+                network_receive = results.get('network_receive', 0)
+                network_transmit = results.get('network_transmit', 0)
+                total_network_io = network_receive + network_transmit
+                
+                logger.debug(f"Network metrics for node {node_name}:")
+                logger.debug(f"  Receive: {network_receive} bytes/s")
+                logger.debug(f"  Transmit: {network_transmit} bytes/s")
+                logger.debug(f"  Total: {total_network_io} bytes/s")
 
                 # Calculate memory used from total and available
                 results['memory_used'] = results.get('memory_used', 0)
@@ -225,9 +334,12 @@ class PromQLService:
                             "unit": "GiB"
                         },
                         "networkIO": {
-                            "current": round(results['network_io'] / 1024, 2),  # Convert to KiB
-                            "unit": "KiB",
-                            "trend": "fluctuating"  # Could be calculated based on historical data
+                            "current": round(total_network_io / 1024, 2),  # Convert to KiB/s
+                            "receive": round(network_receive / 1024, 2),  # Convert to KiB/s
+                            "transmit": round(network_transmit / 1024, 2),  # Convert to KiB/s
+                            "unit": "KiB/s",
+                            "trend": "fluctuating",
+                            "history": network_history
                         },
                         "events": {
                             "count": "99+" if results['events'] > 99 else str(int(results['events'])),
@@ -297,31 +409,38 @@ class PromQLService:
     async def query_range(
         self,
         query: str,
-        start: datetime,
-        end: datetime,
+        start: Union[str, datetime],
+        end: Union[str, datetime] = "now",
         step: str = "1m",
         timeout: float = 30.0
     ) -> Dict:
         """Execute a range query with caching and error handling."""
-        cache_key = self._build_cache_key(
-            query, 
-            start=start.isoformat(), 
-            end=end.isoformat(), 
-            step=step
-        )
-        
-        # Check cache first
-        if cache_key in self._range_cache:
-            return self._range_cache[cache_key]
-
         try:
+            # Convert time inputs to timestamps
+            start_ts = self._parse_time_input(start)
+            end_ts = self._parse_time_input(end)
+            
+            # Build cache key
+            cache_key = self._build_cache_key(
+                query, 
+                start=start_ts,
+                end=end_ts,
+                step=step
+            )
+            
+            # Check cache first
+            if cache_key in self._range_cache:
+                return self._range_cache[cache_key]
+
             filtered_query = self._add_cluster_filter(query)
             params = {
                 'query': filtered_query,
-                'start': str(int(start.timestamp())),
-                'end': str(int(end.timestamp())),
+                'start': start_ts,
+                'end': end_ts,
                 'step': step
             }
+            
+            logger.debug(f"Range query parameters: {params}")
             
             session = await self._get_session()
             async with session.get(
