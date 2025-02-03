@@ -28,7 +28,8 @@ from budapp.commons.constants import ClusterStatusEnum, EndpointStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 
 from ..commons.helpers import validate_icon
-
+from ..project_ops.schemas import Project
+from ..model_ops.schemas import Model
 
 class ClusterBase(BaseModel):
     """Cluster base schema."""
@@ -214,8 +215,8 @@ class ClusterEndpointResponse(BaseModel):
     name: str
     status: EndpointStatusEnum
     created_at: datetime
-    project_name: str
-    model_name: str
+    project: Project
+    model: Model
     active_workers: int
     total_workers: int
     roi: int
