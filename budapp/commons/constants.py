@@ -2555,3 +2555,25 @@ class NotificationTypeEnum(StrEnum):
     UPDATE_PASSWORD_SUCCESS = auto()
     CLUSTER_DELETION_SUCCESS = auto()
     DEPLOYMENT_DELETION_SUCCESS = auto()
+
+
+BENCHMARK_FIELDS_TYPE_MAPPER = {
+    "classification_average_12_datasets": "Classification",
+    "clustering_average_11_datasets": "Clustering",
+    "pair_classification_average_3_datasets": "Classification",
+    "reranking_average_4_datasets": "Reranking",
+    "retrieval_average_15_datasets": "Retrieval",
+    "sts_average_10_datasets": "Semantic",
+    "summarization_average_1_datasets": "Summarization",
+    "mmbench_v11": "Reasoning",
+    "mmstar": "Reasoning",
+    "mmmu_val": "Knowledge",
+    "mathvista": "Math",
+    "ocrbench": "OCR",
+    "ai2d": "Visual QA",
+    "hallusionbench": "Hallucination",
+    "mmvet": "Visual QA",
+    "arena_score": "Human Preference",
+    "overall_accuracy": "Tool Use",
+    "pass_1": "Code Generation",
+}

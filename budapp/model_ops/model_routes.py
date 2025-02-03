@@ -18,7 +18,7 @@
 
 import json
 from json.decoder import JSONDecodeError
-from typing import List, Optional, Union
+from typing import List, Literal, Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Query, UploadFile, status
@@ -46,6 +46,7 @@ from .schemas import (
     CreateCloudModelWorkflowResponse,
     CreateLocalModelWorkflowRequest,
     EditModel,
+    LeaderboardTableResponse,
     LocalModelScanRequest,
     ModelAuthorFilter,
     ModelAuthorResponse,
@@ -817,3 +818,48 @@ async def delete_model(
     logger.debug(f"Model deleted: {model_id}")
 
     return SuccessResponse(message="Model deleted successfully", code=status.HTTP_200_OK, object="model.delete")
+
+
+@model_router.get(
+    "/{model_id}/leaderboards",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Model not found",
+        },
+        status.HTTP_200_OK: {
+            "model": ModelDetailSuccessResponse,
+            "description": "Successfully retrieved model details",
+        },
+    },
+    description="List leaderboards of specific model by uri",
+)
+async def list_leaderboards(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    model_id: UUID,
+    table_source: Literal["cloud_model", "model"] = Query(default="model", description="The source of the model"),
+    k: int = Query(10, ge=0, description="The maximum number of leaderboards to return"),
+) -> Union[LeaderboardTableResponse, ErrorResponse]:
+    """List leaderboards of specific model by uri."""
+    try:
+        db_leaderboards = await ModelService(session).list_leaderboards(model_id, table_source, k)
+        return LeaderboardTableResponse(
+            leaderboards=db_leaderboards,
+            code=status.HTTP_200_OK,
+            object="leaderboard.list",
+            message="Successfully listed leaderboards",
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to list leaderboards: {e.message}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to list leaderboards: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to list leaderboards",
+        ).to_http_response()
