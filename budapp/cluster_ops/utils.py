@@ -616,15 +616,18 @@ class ClusterMetricsFetcher:
 
         return metrics
 
-    async def get_cluster_metrics(self, cluster_id: UUID, time_range: str = "today") -> Optional[Dict[str, Any]]:
-        """Fetch cluster memory metrics.
+    async def get_cluster_metrics(
+        self, cluster_id: UUID, time_range: str = "today", metric_type: str = "all"
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch cluster metrics.
 
         Args:
             cluster_id: The cluster ID to fetch metrics for
             time_range: One of '10min', 'today', '7days', 'month'
+            metric_type: Type of metric to fetch ('all', 'memory', 'cpu', 'disk', 'network_in', 'network_out', 'network_bandwidth')
 
         Returns:
-            Dict with node and summary metrics for memory
+            Dict with node and summary metrics for the requested metric type
         """
         if not cluster_id:
             logger.error("Cluster ID is required to fetch cluster metrics")
@@ -635,7 +638,34 @@ class ClusterMetricsFetcher:
         previous_time_params = (
             self._get_time_range_params(time_range, include_previous=True) if time_range == "today" else None
         )
-        queries = self._get_metric_queries(cluster_name)
+
+        # Get all available queries
+        all_queries = self._get_metric_queries(cluster_name)
+
+        # Filter queries based on metric_type
+        queries = {}
+        if metric_type == "all":
+            queries = all_queries
+        else:
+            # Map metric types to their required queries
+            metric_query_mapping = {
+                "memory": ["memory_total", "memory_available"],
+                "cpu": ["cpu_usage"],
+                "disk": ["storage_total", "storage_available"],
+                "network_in": ["network_in"],
+                "network_out": ["network_out"],
+                "network_bandwidth": ["network_bandwidth"],
+                "network": ["network_in", "network_out", "network_bandwidth"],
+            }
+
+            if metric_type in metric_query_mapping:
+                for query_name in metric_query_mapping[metric_type]:
+                    if query_name in all_queries:
+                        queries[query_name] = all_queries[query_name]
+
+        if not queries:
+            logger.error(f"Invalid metric type: {metric_type}")
+            return None
 
         try:
             # Fetch current metrics concurrently
@@ -680,10 +710,11 @@ class ClusterMetricsFetcher:
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "time_range": time_range,
                     "cluster_id": str(cluster_id),
+                    "metric_type": metric_type,
                 }
             )
 
-            logger.info(f"Successfully fetched metrics for cluster {cluster_id}")
+            logger.info(f"Successfully fetched {metric_type} metrics for cluster {cluster_id}")
             logger.info(f"Number of nodes found: {len(processed_metrics.get('nodes', {}))}")
             return processed_metrics
 

@@ -257,6 +257,7 @@ class ClusterNodeMetrics(BaseModel):
 
 class ResourceChange(BaseModel):
     """Schema for resource change metrics."""
+
     change: float
     change_percent: float
 
@@ -283,7 +284,9 @@ class MetricTypeEnum(Enum):
     DISK = "disk"
     GPU = "gpu"
     HPU = "hpu"
-    NETWORK = "network"
+    NETWORK_IN = "network_in"
+    NETWORK_OUT = "network_out"
+    NETWORK_BANDWIDTH = "network_bandwidth"
 
 
 class ClusterMetricsResponse(SuccessResponse):
