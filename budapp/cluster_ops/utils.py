@@ -128,6 +128,7 @@ class ClusterMetricsFetcher:
                 {
                     "cpu_usage": f"""100 * sum(rate(node_cpu_seconds_total{{cluster="{cluster_name}",mode!="idle"}}[{rate_interval}])) by (instance) /
                             count by (instance) (node_cpu_seconds_total{{cluster="{cluster_name}"}})""",
+                    "total_cpus": f'count(node_cpu_seconds_total{{cluster="{cluster_name}",mode="idle"}})'
                 }
             )
 
@@ -648,7 +649,12 @@ class ClusterMetricsFetcher:
             return {
                 "total_nodes": 0,
                 "memory": {"total_gib": 0, "used_gib": 0, "available_gib": 0, "usage_percent": 0},
-                "cpu": {"average_usage_percent": 0},
+                "cpu": {
+                    "total_cpus": 0,
+                    "used_cpus": 0,
+                    "available_cpus": 0,
+                    "average_usage_percent": 0
+                },
                 "disk": {"total_gib": 0, "used_gib": 0, "available_gib": 0, "usage_percent": 0},
                 "network": {
                     "total_receive_mbps": 0,
@@ -675,6 +681,11 @@ class ClusterMetricsFetcher:
         total_memory = sum(node["memory"]["total_gib"] for node in nodes.values())
         used_memory = sum(node["memory"]["used_gib"] for node in nodes.values())
 
+        # Calculate CPU metrics
+        total_cpus = float(self._get_instance_value(results.get("total_cpus", []), "total_cpus"))
+        avg_usage_percent = sum(node["cpu"]["cpu_usage_percent"] for node in nodes.values()) / len(nodes) if nodes else 0
+        used_cpus = total_cpus * (avg_usage_percent / 100)
+
         summary = {
             "total_nodes": int(self._get_instance_value(results.get("total_nodes", []), "total_nodes")),
             "memory": {
@@ -684,9 +695,10 @@ class ClusterMetricsFetcher:
                 "usage_percent": (used_memory / total_memory * 100) if total_memory > 0 else 0,
             },
             "cpu": {
-                "average_usage_percent": sum(node["cpu"]["cpu_usage_percent"] for node in nodes.values()) / len(nodes)
-                if nodes
-                else 0
+                "total_cpus": total_cpus,
+                "used_cpus": round(used_cpus, 2),
+                "available_cpus": round(total_cpus - used_cpus, 2),
+                "average_usage_percent": avg_usage_percent
             },
             "disk": self._aggregate_disk_metrics(nodes),
             "network": self._aggregate_network_metrics(nodes),
