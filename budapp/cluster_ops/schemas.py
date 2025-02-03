@@ -335,8 +335,9 @@ class MetricTypeEnum(Enum):
 
 class ClusterMetricsResponse(SuccessResponse):
     """Cluster metrics response schema."""
-    nodes: Dict[str, NodeMetrics]
-    cluster_summary: ClusterSummaryMetrics
+    nodes: Dict[str, any]
+    cluster_summary: any
     time_range: str
     metric_type: str
     timestamp: str
+    cluster_id: str
