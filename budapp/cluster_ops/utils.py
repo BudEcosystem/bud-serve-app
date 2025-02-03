@@ -29,7 +29,9 @@ class ClusterMetricsFetcher:
         elif time_range == "today":
             if include_previous:
                 # For yesterday's comparison, get data from 24 hours ago
-                start_time = now - timedelta(days=1, hours=now.hour, minutes=now.minute, seconds=now.second, microseconds=now.microsecond)
+                start_time = now - timedelta(
+                    days=1, hours=now.hour, minutes=now.minute, seconds=now.second, microseconds=now.microsecond
+                )
                 end_time = start_time + timedelta(days=1)
             else:
                 # For today, start from midnight and end at current time
@@ -49,11 +51,7 @@ class ClusterMetricsFetcher:
             end_time = now
             step = "30s"
 
-        return {
-            "start": start_time.timestamp(),
-            "end": end_time.timestamp(),
-            "step": step
-        }
+        return {"start": start_time.timestamp(), "end": end_time.timestamp(), "step": step}
 
     def _get_metric_queries(self, cluster_name: str) -> Dict[str, str]:
         """Get memory, CPU, storage, and network-related Prometheus queries."""
@@ -63,9 +61,38 @@ class ClusterMetricsFetcher:
             "cpu_usage": f'(1 - avg by (instance) (irate(node_cpu_seconds_total{{cluster="{cluster_name}",mode="idle",job="node-exporter"}}[5m]))) * 100',
             "storage_total": f'node_filesystem_size_bytes{{cluster="{cluster_name}",mountpoint="/",job="node-exporter"}}',
             "storage_available": f'node_filesystem_avail_bytes{{cluster="{cluster_name}",mountpoint="/",job="node-exporter"}}',
-            "network_in": f'rate(node_network_receive_bytes_total{{cluster="{cluster_name}",device!~"lo|veth.*|docker.*|br.*|cni.*",job="node-exporter"}}[5m]) * 8',  # Convert to bits
-            "network_out": f'rate(node_network_transmit_bytes_total{{cluster="{cluster_name}",device!~"lo|veth.*|docker.*|br.*|cni.*",job="node-exporter"}}[5m]) * 8',  # Convert to bits
-            "network_bandwidth": f'sum by (instance) (rate(node_network_receive_bytes_total{{cluster="{cluster_name}",device!~"lo|veth.*|docker.*|br.*|cni.*",job="node-exporter"}}[5m]) + rate(node_network_transmit_bytes_total{{cluster="{cluster_name}",device!~"lo|veth.*|docker.*|br.*|cni.*",job="node-exporter"}}[5m])) * 8'  # Total bandwidth in bits
+            "network_in": f"""
+            sum by (instance) (
+                rate(node_network_receive_bytes_total{{
+                    cluster="{cluster_name}",
+                    device!~"lo|veth.*|docker.*|br.*|cni.*",
+                    job="node-exporter"
+                }}[5m])
+            ) * 8
+        """,
+            "network_out": f"""
+            sum by (instance) (
+                rate(node_network_transmit_bytes_total{{
+                    cluster="{cluster_name}",
+                    device!~"lo|veth.*|docker.*|br.*|cni.*",
+                    job="node-exporter"
+                }}[5m])
+            ) * 8
+        """,
+            "network_bandwidth": f"""
+            sum by (instance) (
+                rate(node_network_receive_bytes_total{{
+                    cluster="{cluster_name}",
+                    device!~"lo|veth.*|docker.*|br.*|cni.*",
+                    job="node-exporter"
+                }}[5m]) +
+                rate(node_network_transmit_bytes_total{{
+                    cluster="{cluster_name}",
+                    device!~"lo|veth.*|docker.*|br.*|cni.*",
+                    job="node-exporter"
+                }}[5m])
+            ) * 8
+        """,
         }
 
     async def _fetch_metrics(self, session: aiohttp.ClientSession, query: str, time_params: dict) -> List[Dict]:
@@ -73,13 +100,13 @@ class ClusterMetricsFetcher:
         try:
             logger.info(f"Fetching metrics with query: {query}")
             logger.info(f"Time params: {time_params}")
-            
+
             # Add unit conversion to the query
             if "MemTotal" in query or "MemAvailable" in query or "filesystem" in query:
                 query = f"({query}) / 1024 / 1024 / 1024"  # Convert bytes to GiB
             elif "network" in query:
                 query = f"({query}) / 1024 / 1024"  # Convert to Mbps
-            
+
             async with session.get(
                 f"{self.api_url}/query_range",
                 params={
@@ -92,7 +119,9 @@ class ClusterMetricsFetcher:
             ) as response:
                 response.raise_for_status()
                 result = await response.json()
-                logger.info(f"Got response data: {result.get('data', {}).get('result', [])[:2]}")  # Log first 2 results as sample
+                logger.info(
+                    f"Got response data: {result.get('data', {}).get('result', [])[:2]}"
+                )  # Log first 2 results as sample
                 return result["data"]["result"]
         except Exception as e:
             logger.error(f"Failed to fetch metrics: {e}")
@@ -108,23 +137,17 @@ class ClusterMetricsFetcher:
             "cluster_summary": {
                 "memory": {"total_gib": 0, "used_gib": 0, "available_gib": 0, "usage_percent": 0, "change_percent": 0},
                 "cpu": {"usage_percent": 0, "change_percent": 0},
-                "storage": {"total_gib": 0, "used_gib": 0, "available_gib": 0, "usage_percent": 0, "change_percent": 0},
-                "network_in": {
-                    "inbound_mbps": 0,
+                "storage": {
+                    "total_gib": 0,
+                    "used_gib": 0,
+                    "available_gib": 0,
+                    "usage_percent": 0,
                     "change_percent": 0,
-                    "time_series": []
                 },
-                "network_out": {
-                    "outbound_mbps": 0,
-                    "change_percent": 0,
-                    "time_series": []
-                },
-                "network_bandwidth": {
-                    "total_mbps": 0,
-                    "change_percent": 0,
-                    "time_series": []
-                }
-            }
+                "network_in": {"inbound_mbps": 0, "change_percent": 0, "time_series": []},
+                "network_out": {"outbound_mbps": 0, "change_percent": 0, "time_series": []},
+                "network_bandwidth": {"total_mbps": 0, "change_percent": 0, "time_series": []},
+            },
         }
 
         # Get previous cluster usage if available
@@ -170,22 +193,16 @@ class ClusterMetricsFetcher:
                 metrics["nodes"][instance] = {
                     "memory": {},
                     "cpu": {"usage_percent": 0, "change_percent": 0},
-                    "storage": {"total_gib": 0, "used_gib": 0, "available_gib": 0, "usage_percent": 0, "change_percent": 0},
-                    "network_in": {
-                        "inbound_mbps": 0,
+                    "storage": {
+                        "total_gib": 0,
+                        "used_gib": 0,
+                        "available_gib": 0,
+                        "usage_percent": 0,
                         "change_percent": 0,
-                        "time_series": []
                     },
-                    "network_out": {
-                        "outbound_mbps": 0,
-                        "change_percent": 0,
-                        "time_series": []
-                    },
-                    "network_bandwidth": {
-                        "total_mbps": 0,
-                        "change_percent": 0,
-                        "time_series": []
-                    }
+                    "network_in": {"inbound_mbps": 0, "change_percent": 0, "time_series": []},
+                    "network_out": {"outbound_mbps": 0, "change_percent": 0, "time_series": []},
+                    "network_bandwidth": {"total_mbps": 0, "change_percent": 0, "time_series": []},
                 }
 
         # Process memory metrics
@@ -298,7 +315,11 @@ class ClusterMetricsFetcher:
 
                 # Find previous day storage values for this node
                 prev_storage_usage_percent = None
-                if previous_results and "storage_total" in previous_results and "storage_available" in previous_results:
+                if (
+                    previous_results
+                    and "storage_total" in previous_results
+                    and "storage_available" in previous_results
+                ):
                     for prev_node in previous_results["storage_total"]:
                         if prev_node["metric"]["instance"] == instance:
                             prev_total = float(prev_node["values"][-1][1])
@@ -306,7 +327,9 @@ class ClusterMetricsFetcher:
                                 if prev_avail["metric"]["instance"] == instance:
                                     prev_available = float(prev_avail["values"][-1][1])
                                     prev_used = prev_total - prev_available
-                                    prev_storage_usage_percent = round((prev_used / prev_total * 100), 2) if prev_total > 0 else 0
+                                    prev_storage_usage_percent = (
+                                        round((prev_used / prev_total * 100), 2) if prev_total > 0 else 0
+                                    )
                                     break
                             break
 
@@ -316,13 +339,15 @@ class ClusterMetricsFetcher:
                     storage_change_percent = round(storage_usage_percent - prev_storage_usage_percent, 2)
 
                 # Update node storage metrics
-                metrics["nodes"][instance]["storage"].update({
-                    "total_gib": total,
-                    "used_gib": used,
-                    "available_gib": available,
-                    "usage_percent": storage_usage_percent,
-                    "change_percent": storage_change_percent
-                })
+                metrics["nodes"][instance]["storage"].update(
+                    {
+                        "total_gib": total,
+                        "used_gib": used,
+                        "available_gib": available,
+                        "usage_percent": storage_usage_percent,
+                        "change_percent": storage_change_percent,
+                    }
+                )
 
                 # Update cluster storage summary
                 metrics["cluster_summary"]["storage"]["total_gib"] += total
@@ -333,7 +358,7 @@ class ClusterMetricsFetcher:
         if "network_in" in current_results:
             # Initialize time series data structure
             time_series_data = {}
-            
+
             for node_data in current_results["network_in"]:
                 instance = node_data["metric"]["instance"]
                 processed_nodes.add(instance)
@@ -348,7 +373,7 @@ class ClusterMetricsFetcher:
 
                 # Get current value for the node
                 current_value = round(float(node_data["values"][-1][1]), 2)
-                
+
                 # Find previous day value for this node
                 prev_value = None
                 if previous_results and "network_in" in previous_results:
@@ -363,24 +388,24 @@ class ClusterMetricsFetcher:
                     change_percent = round(((current_value - prev_value) / prev_value) * 100, 2)
 
                 # Update node network metrics
-                metrics["nodes"][instance]["network_in"].update({
-                    "inbound_mbps": current_value,
-                    "change_percent": change_percent,
-                    "time_series": [
-                        {"timestamp": int(ts), "value": round(float(val), 2)}
-                        for ts, val in node_data["values"]
-                    ]
-                })
+                metrics["nodes"][instance]["network_in"].update(
+                    {
+                        "inbound_mbps": current_value,
+                        "change_percent": change_percent,
+                        "time_series": [
+                            {"timestamp": int(ts), "value": round(float(val), 2)} for ts, val in node_data["values"]
+                        ],
+                    }
+                )
 
             # Update cluster network summary
             if time_series_data:
                 # Sort time series data by timestamp
                 sorted_times = sorted(time_series_data.items())
                 metrics["cluster_summary"]["network_in"]["time_series"] = [
-                    {"timestamp": ts, "value": round(val, 2)}
-                    for ts, val in sorted_times
+                    {"timestamp": ts, "value": round(val, 2)} for ts, val in sorted_times
                 ]
-                
+
                 # Current total inbound traffic
                 current_total = round(time_series_data[sorted_times[-1][0]], 2)
                 metrics["cluster_summary"]["network_in"]["inbound_mbps"] = current_total
@@ -394,7 +419,7 @@ class ClusterMetricsFetcher:
         if "network_out" in current_results:
             # Initialize time series data structure
             time_series_data = {}
-            
+
             for node_data in current_results["network_out"]:
                 instance = node_data["metric"]["instance"]
                 processed_nodes.add(instance)
@@ -409,7 +434,7 @@ class ClusterMetricsFetcher:
 
                 # Get current value for the node
                 current_value = round(float(node_data["values"][-1][1]), 2)
-                
+
                 # Find previous day value for this node
                 prev_value = None
                 if previous_results and "network_out" in previous_results:
@@ -424,24 +449,24 @@ class ClusterMetricsFetcher:
                     change_percent = round(((current_value - prev_value) / prev_value) * 100, 2)
 
                 # Update node network metrics
-                metrics["nodes"][instance]["network_out"].update({
-                    "outbound_mbps": current_value,
-                    "change_percent": change_percent,
-                    "time_series": [
-                        {"timestamp": int(ts), "value": round(float(val), 2)}
-                        for ts, val in node_data["values"]
-                    ]
-                })
+                metrics["nodes"][instance]["network_out"].update(
+                    {
+                        "outbound_mbps": current_value,
+                        "change_percent": change_percent,
+                        "time_series": [
+                            {"timestamp": int(ts), "value": round(float(val), 2)} for ts, val in node_data["values"]
+                        ],
+                    }
+                )
 
             # Update cluster network summary
             if time_series_data:
                 # Sort time series data by timestamp
                 sorted_times = sorted(time_series_data.items())
                 metrics["cluster_summary"]["network_out"]["time_series"] = [
-                    {"timestamp": ts, "value": round(val, 2)}
-                    for ts, val in sorted_times
+                    {"timestamp": ts, "value": round(val, 2)} for ts, val in sorted_times
                 ]
-                
+
                 # Current total outbound traffic
                 current_total = round(time_series_data[sorted_times[-1][0]], 2)
                 metrics["cluster_summary"]["network_out"]["outbound_mbps"] = current_total
@@ -455,7 +480,7 @@ class ClusterMetricsFetcher:
         if "network_bandwidth" in current_results:
             # Initialize time series data structure for total bandwidth
             bandwidth_time_series = {}
-            
+
             for node_data in current_results["network_bandwidth"]:
                 instance = node_data["metric"]["instance"]
                 processed_nodes.add(instance)
@@ -470,14 +495,13 @@ class ClusterMetricsFetcher:
                     bandwidth_time_series[ts] += val
 
                     # Update node time series
-                    metrics["nodes"][instance]["network_bandwidth"]["time_series"].append({
-                        "timestamp": ts,
-                        "value": round(val, 2)
-                    })
+                    metrics["nodes"][instance]["network_bandwidth"]["time_series"].append(
+                        {"timestamp": ts, "value": round(val, 2)}
+                    )
 
                 # Get current value for the node
                 current_value = round(float(node_data["values"][-1][1]), 2)
-                
+
                 # Find previous day value for this node
                 prev_value = None
                 if previous_results and "network_bandwidth" in previous_results:
@@ -492,20 +516,18 @@ class ClusterMetricsFetcher:
                     change_percent = round(((current_value - prev_value) / prev_value) * 100, 2)
 
                 # Update node bandwidth metrics
-                metrics["nodes"][instance]["network_bandwidth"].update({
-                    "total_mbps": current_value,
-                    "change_percent": change_percent
-                })
+                metrics["nodes"][instance]["network_bandwidth"].update(
+                    {"total_mbps": current_value, "change_percent": change_percent}
+                )
 
             # Update cluster bandwidth summary
             if bandwidth_time_series:
                 # Sort time series data by timestamp
                 sorted_times = sorted(bandwidth_time_series.items())
                 metrics["cluster_summary"]["network_bandwidth"]["time_series"] = [
-                    {"timestamp": ts, "value": round(val, 2)}
-                    for ts, val in sorted_times
+                    {"timestamp": ts, "value": round(val, 2)} for ts, val in sorted_times
                 ]
-                
+
                 # Current total bandwidth
                 current_total = round(bandwidth_time_series[sorted_times[-1][0]], 2)
                 metrics["cluster_summary"]["network_bandwidth"]["total_mbps"] = current_total
