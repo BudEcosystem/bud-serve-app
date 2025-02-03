@@ -147,8 +147,8 @@ class EndpointDataManager(DataManagerUtils):
             stmt = (
                 select(
                     EndpointModel,
-                    ProjectModel.name.label("project_name"),
-                    Model.name.label("model_name"),
+                    ProjectModel,
+                    Model,
                     EndpointModel.total_replicas.label("total_workers"),
                     EndpointModel.active_replicas.label("active_workers"),
                 )
@@ -156,7 +156,7 @@ class EndpointDataManager(DataManagerUtils):
                 .join(Model, Model.id == EndpointModel.model_id)
                 .filter(*base_conditions)
                 .filter(and_(*search_conditions))
-                .group_by(EndpointModel.id, ProjectModel.name, Model.name)
+                .group_by(EndpointModel.id, ProjectModel.id, Model.id)
             )
 
             count_stmt = (
@@ -170,8 +170,8 @@ class EndpointDataManager(DataManagerUtils):
             stmt = (
                 select(
                     EndpointModel,
-                    ProjectModel.name.label("project_name"),
-                    Model.name.label("model_name"),
+                    ProjectModel,
+                    Model,
                     EndpointModel.total_replicas.label("total_workers"),
                     EndpointModel.active_replicas.label("active_workers"),
                 )
@@ -179,7 +179,7 @@ class EndpointDataManager(DataManagerUtils):
                 .join(Model, Model.id == EndpointModel.model_id)
                 .filter(*base_conditions)
                 .filter(*filter_conditions)
-                .group_by(EndpointModel.id, ProjectModel.name, Model.name)
+                .group_by(EndpointModel.id, ProjectModel.id, Model.id)
             )
 
             count_stmt = (
@@ -202,9 +202,9 @@ class EndpointDataManager(DataManagerUtils):
             for field, direction in order_by:
                 sort_func = asc if direction == "asc" else desc
                 if field == "project_name":
-                    stmt = stmt.order_by(sort_func("project_name"))
+                    stmt = stmt.order_by(sort_func(ProjectModel.name))
                 elif field == "model_name":
-                    stmt = stmt.order_by(sort_func("model_name"))
+                    stmt = stmt.order_by(sort_func(Model.name))
                 elif field == "total_workers":
                     stmt = stmt.order_by(sort_func("total_workers"))
                 elif field == "active_workers":

@@ -73,6 +73,8 @@ from .schemas import (
     MetricTypeEnum,
     ClusterDetailResponse,
 )
+from ..project_ops.schemas import Project as ProjectSchema
+from ..model_ops.schemas import Model as ModelSchema
 
 
 logger = logging.get_logger(__name__)
@@ -1078,8 +1080,8 @@ class ClusterService(SessionMixin):
         result = []
         for db_result in db_results:
             db_endpoint = db_result[0]
-            project_name = db_result[1]
-            model_name = db_result[2]
+            db_project = db_result[1]
+            db_model = db_result[2]
             total_workers = db_result[3]
             active_workers = db_result[4]
 
@@ -1088,8 +1090,8 @@ class ClusterService(SessionMixin):
                     name=db_endpoint.name,
                     status=db_endpoint.status,
                     created_at=db_endpoint.created_at,
-                    project_name=project_name,
-                    model_name=model_name,
+                    project=ProjectSchema.model_validate(db_project),
+                    model=ModelSchema.model_validate(db_model),
                     active_workers=active_workers,
                     total_workers=total_workers,
                     roi=12,  # Dummy value for ROI
