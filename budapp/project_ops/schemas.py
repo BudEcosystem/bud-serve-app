@@ -103,3 +103,13 @@ class ProjectClusterFilter(BaseModel):
 
     name: str | None = None
     status: ClusterStatusEnum | None = None
+
+class Project(ProjectBase):
+    """Project response to client schema"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    created_by: UUID4 | None = None
+    created_at: datetime
+    modified_at: datetime
