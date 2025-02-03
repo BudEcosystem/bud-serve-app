@@ -18,7 +18,7 @@
 """Contains core Pydantic schemas used for data validation and serialization within the cluster ops services."""
 
 from datetime import datetime
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Optional
 from uuid import UUID
 from enum import Enum
 
@@ -30,6 +30,7 @@ from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from ..commons.helpers import validate_icon
 from ..project_ops.schemas import Project
 from ..model_ops.schemas import Model
+
 
 class ClusterBase(BaseModel):
     """Cluster base schema."""
@@ -236,30 +237,37 @@ class ClusterEndpointFilter(BaseModel):
 
 
 # Cluster Metrics Schema
-class ClusterNodeNetwork(BaseModel):
-    """Network metrics for a cluster node."""
+class TimeSeriesPoint(BaseModel):
+    """A single point in a time series."""
 
-    total_receive_mbps: float
-    total_transmit_mbps: float
-    total_bandwidth_mbps: float
-    total_errors: float
+    timestamp: int
+    value: float
 
 
-class ClusterNodeMetrics(BaseModel):
-    """Metrics for a single node in the cluster."""
+class NetworkMetrics(BaseModel):
+    """Network metrics with time series data."""
 
-    memory: Dict[str, float]  # total_gib, used_gib, available_gib, usage_percent
-    cpu: Dict[str, float]  # cpu_usage_percent
-    disk: Dict[str, Dict]  # paths with disk metrics
-    gpu: Dict[str, float]  # memory and utilization metrics
-    hpu: Dict[str, float]  # memory and utilization metrics
-    network: Dict[str, Union[Dict[str, Dict], Dict[str, float]]]  # interfaces and summary
+    inbound_mbps: float
+    outbound_mbps: float
+    total_mbps: float
+    change_percent: float
+    time_series: Optional[List[TimeSeriesPoint]]
 
 
-class ResourceChange(BaseModel):
-    """Schema for resource change metrics."""
+class ResourceMetrics(BaseModel):
+    """Base metrics for resources."""
 
-    change: float
+    total_gib: float
+    used_gib: float
+    available_gib: float
+    usage_percent: float
+    change_percent: float
+
+
+class CPUMetrics(BaseModel):
+    """CPU metrics."""
+
+    usage_percent: float
     change_percent: float
 
 
@@ -267,13 +275,43 @@ class ClusterSummaryMetrics(BaseModel):
     """Summary metrics for the entire cluster."""
 
     total_nodes: int
-    memory: Dict[str, float]  # total_gib, used_gib, available_gib, usage_percent
-    disk: Dict[str, float]  # total_gib, used_gib, available_gib, usage_percent
-    gpu: Dict[str, float]  # memory and utilization metrics
-    hpu: Dict[str, float]  # memory and utilization metrics
-    cpu: Dict[str, float]  # average_usage_percent
-    network: Dict[str, float]  # network metrics
-    changes: Dict[str, ResourceChange]  # Changes in resource utilization
+    memory: ResourceMetrics
+    storage: ResourceMetrics
+    cpu: CPUMetrics
+    gpu: Optional[Dict[str, float]]  # memory and utilization metrics
+    hpu: Optional[Dict[str, float]]  # memory and utilization metrics
+
+    # Updated network metrics
+    network_in: NetworkMetrics
+    network_out: NetworkMetrics
+    network_bandwidth: NetworkMetrics
+
+    timestamp: str
+    time_range: str
+    cluster_id: str
+    metric_type: str
+
+
+class NodeMetrics(BaseModel):
+    """Metrics for a single node."""
+
+    memory: ResourceMetrics
+    storage: ResourceMetrics
+    cpu: CPUMetrics
+    network_in: NetworkMetrics
+    network_out: NetworkMetrics
+    network_bandwidth: NetworkMetrics
+
+
+class ClusterMetrics(BaseModel):
+    """Complete cluster metrics."""
+
+    nodes: Dict[str, NodeMetrics]
+    cluster_summary: ClusterSummaryMetrics
+    timestamp: str
+    time_range: str
+    cluster_id: str
+    metric_type: str
 
 
 class MetricTypeEnum(Enum):
@@ -293,9 +331,8 @@ class MetricTypeEnum(Enum):
 class ClusterMetricsResponse(SuccessResponse):
     """Cluster metrics response schema."""
 
-    nodes: Dict[str, ClusterNodeMetrics]
+    nodes: Dict[str, NodeMetrics]
     cluster_summary: ClusterSummaryMetrics
-    historical_data: Dict[str, List[Dict[str, Union[int, float]]]]  # key -> list of {timestamp, value} pairs
     time_range: str  # 'today', '7days', or 'month'
-    metric_type: MetricTypeEnum  # The type of metrics being returned
-    timestamp: datetime
+    metric_type: str
+    timestamp: str
