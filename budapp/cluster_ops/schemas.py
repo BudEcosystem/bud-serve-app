@@ -238,80 +238,197 @@ class ClusterEndpointFilter(BaseModel):
 
 # Cluster Metrics Schema
 class TimeSeriesPoint(BaseModel):
-    """A single point in a time series."""
-
+    """Time series data point."""
     timestamp: int
     value: float
 
 
 class NetworkMetrics(BaseModel):
-    """Network metrics with time series data."""
-
-    inbound_mbps: float
-    outbound_mbps: float
-    total_mbps: float
-    change_percent: float
-    time_series: Optional[List[TimeSeriesPoint]]
+    """Network metrics schema."""
+    inbound_mbps: float = Field(default=0.0)
+    change_percent: float = Field(default=0.0)
+    time_series: List[TimeSeriesPoint] = Field(default_factory=list)
 
 
-class ResourceMetrics(BaseModel):
-    """Base metrics for resources."""
-
-    total_gib: float
-    used_gib: float
-    available_gib: float
-    usage_percent: float
-    change_percent: float
+class NetworkOutMetrics(BaseModel):
+    """Network outbound metrics schema."""
+    outbound_mbps: float = Field(default=0.0)
+    change_percent: float = Field(default=0.0)
+    time_series: List[TimeSeriesPoint] = Field(default_factory=list)
 
 
-class CPUMetrics(BaseModel):
-    """CPU metrics."""
+class NetworkBandwidthMetrics(BaseModel):
+    """Network bandwidth metrics schema."""
+    total_mbps: float = Field(default=0.0)
+    change_percent: float = Field(default=0.0)
+    time_series: List[TimeSeriesPoint] = Field(default_factory=list)
 
-    usage_percent: float
-    change_percent: float
+
+class MemoryMetrics(BaseModel):
+    """Memory metrics schema."""
+    total_gib: float = Field(default=0.0)
+    used_gib: float = Field(default=0.0)
+    available_gib: float = Field(default=0.0)
+    usage_percent: float = Field(default=0.0)
+    change_percent: float = Field(default=0.0)
 
 
-class ClusterSummaryMetrics(BaseModel):
-    """Summary metrics for the entire cluster."""
+class CpuMetrics(BaseModel):
+    """CPU metrics schema."""
+    usage_percent: float = Field(default=0.0)
+    change_percent: float = Field(default=0.0)
 
-    total_nodes: int
-    memory: ResourceMetrics
-    storage: ResourceMetrics
-    cpu: CPUMetrics
-    gpu: Optional[Dict[str, float]]  # memory and utilization metrics
-    hpu: Optional[Dict[str, float]]  # memory and utilization metrics
 
-    # Updated network metrics
-    network_in: NetworkMetrics
-    network_out: NetworkMetrics
-    network_bandwidth: NetworkMetrics
-
-    timestamp: str
-    time_range: str
-    cluster_id: str
-    metric_type: str
+class StorageMetrics(BaseModel):
+    """Storage metrics schema."""
+    total_gib: float = Field(default=0.0)
+    used_gib: float = Field(default=0.0)
+    available_gib: float = Field(default=0.0)
+    usage_percent: float = Field(default=0.0)
+    change_percent: float = Field(default=0.0)
 
 
 class NodeMetrics(BaseModel):
-    """Metrics for a single node."""
+    """Node level metrics schema."""
+    memory: Optional[MemoryMetrics] = Field(default_factory=MemoryMetrics)
+    cpu: Optional[CpuMetrics] = Field(default_factory=CpuMetrics)
+    storage: Optional[StorageMetrics] = Field(default_factory=StorageMetrics)
+    network_in: Optional[NetworkMetrics] = Field(default_factory=NetworkMetrics)
+    network_out: Optional[NetworkOutMetrics] = Field(default_factory=NetworkOutMetrics)
+    network_bandwidth: Optional[NetworkBandwidthMetrics] = Field(default_factory=NetworkBandwidthMetrics)
 
-    memory: ResourceMetrics
-    storage: ResourceMetrics
-    cpu: CPUMetrics
-    network_in: NetworkMetrics
-    network_out: NetworkMetrics
-    network_bandwidth: NetworkMetrics
+
+class ClusterSummaryMetrics(BaseModel):
+    """Cluster summary metrics schema."""
+    memory: Optional[MemoryMetrics] = Field(default_factory=MemoryMetrics)
+    cpu: Optional[CpuMetrics] = Field(default_factory=CpuMetrics)
+    storage: Optional[StorageMetrics] = Field(default_factory=StorageMetrics)
+    network_in: Optional[NetworkMetrics] = Field(default_factory=NetworkMetrics)
+    network_out: Optional[NetworkOutMetrics] = Field(default_factory=NetworkOutMetrics)
+    network_bandwidth: Optional[NetworkBandwidthMetrics] = Field(default_factory=NetworkBandwidthMetrics)
 
 
-class ClusterMetrics(BaseModel):
-    """Complete cluster metrics."""
-
-    nodes: Dict[str, NodeMetrics]
-    cluster_summary: ClusterSummaryMetrics
-    timestamp: str
+class ClusterMetricsResponse(SuccessResponse):
+    """Cluster metrics response schema."""
+    nodes: Dict[str, NodeMetrics] = Field(default_factory=dict)
+    cluster_summary: ClusterSummaryMetrics = Field(default_factory=ClusterSummaryMetrics)
     time_range: str
-    cluster_id: str
     metric_type: str
+    timestamp: str
+    cluster_id: str
+
+    class Config:
+        """Pydantic model config."""
+        json_schema_extra = {
+            "example": {
+                "nodes": {
+                    "10.25.30.22:9100": {
+                        "memory": {
+                            "total_gib": 503.42,
+                            "used_gib": 15.83,
+                            "available_gib": 487.59,
+                            "usage_percent": 3.14,
+                            "change_percent": -0.52
+                        },
+                        "cpu": {
+                            "usage_percent": 25.45,
+                            "change_percent": 5.23
+                        },
+                        "storage": {
+                            "total_gib": 876.14,
+                            "used_gib": 111.03,
+                            "available_gib": 765.11,
+                            "usage_percent": 12.67,
+                            "change_percent": 0.34
+                        },
+                        "network_in": {
+                            "inbound_mbps": 45.67,
+                            "change_percent": 12.34,
+                            "time_series": [
+                                {
+                                    "timestamp": 1738567200,
+                                    "value": 45.67
+                                }
+                            ]
+                        },
+                        "network_out": {
+                            "outbound_mbps": 32.45,
+                            "change_percent": -5.67,
+                            "time_series": [
+                                {
+                                    "timestamp": 1738567200,
+                                    "value": 32.45
+                                }
+                            ]
+                        },
+                        "network_bandwidth": {
+                            "total_mbps": 78.12,
+                            "change_percent": 6.67,
+                            "time_series": [
+                                {
+                                    "timestamp": 1738567200,
+                                    "value": 78.12
+                                }
+                            ]
+                        }
+                    }
+                },
+                "cluster_summary": {
+                    "memory": {
+                        "total_gib": 1006.84,
+                        "used_gib": 31.66,
+                        "available_gib": 975.18,
+                        "usage_percent": 3.14,
+                        "change_percent": -0.52
+                    },
+                    "cpu": {
+                        "usage_percent": 25.45,
+                        "change_percent": 5.23
+                    },
+                    "storage": {
+                        "total_gib": 1752.28,
+                        "used_gib": 222.06,
+                        "available_gib": 1530.22,
+                        "usage_percent": 12.67,
+                        "change_percent": 0.34
+                    },
+                    "network_in": {
+                        "inbound_mbps": 91.34,
+                        "change_percent": 12.34,
+                        "time_series": [
+                            {
+                                "timestamp": 1738567200,
+                                "value": 91.34
+                            }
+                        ]
+                    },
+                    "network_out": {
+                        "outbound_mbps": 64.90,
+                        "change_percent": -5.67,
+                        "time_series": [
+                            {
+                                "timestamp": 1738567200,
+                                "value": 64.90
+                            }
+                        ]
+                    },
+                    "network_bandwidth": {
+                        "total_mbps": 156.24,
+                        "change_percent": 6.67,
+                        "time_series": [
+                            {
+                                "timestamp": 1738567200,
+                                "value": 156.24
+                            }
+                        ]
+                    }
+                },
+                "time_range": "today",
+                "metric_type": "all",
+                "timestamp": "2025-02-03T08:58:18.368278+00:00",
+                "cluster_id": "12345678-1234-5678-1234-567812345678"
+            }
+        }
 
 
 class MetricTypeEnum(Enum):
@@ -326,13 +443,3 @@ class MetricTypeEnum(Enum):
     NETWORK_IN = "network_in"
     NETWORK_OUT = "network_out"
     NETWORK_BANDWIDTH = "network_bandwidth"
-
-
-class ClusterMetricsResponse(SuccessResponse):
-    """Cluster metrics response schema."""
-
-    nodes: Dict[str, NodeMetrics]
-    cluster_summary: ClusterSummaryMetrics
-    time_range: str  # 'today', '7days', or 'month'
-    metric_type: str
-    timestamp: str
