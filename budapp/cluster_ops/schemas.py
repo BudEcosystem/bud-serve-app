@@ -244,11 +244,22 @@ class TimeSeriesPoint(BaseModel):
     value: float
 
 
-class NetworkMetrics(BaseModel):
-    """Network metrics with time series data."""
-
+class NetworkInMetrics(BaseModel):
+    """Network inbound metrics."""
     inbound_mbps: float
+    change_percent: float
+    time_series: Optional[List[TimeSeriesPoint]]
+
+
+class NetworkOutMetrics(BaseModel):
+    """Network outbound metrics."""
     outbound_mbps: float
+    change_percent: float
+    time_series: Optional[List[TimeSeriesPoint]]
+
+
+class NetworkBandwidthMetrics(BaseModel):
+    """Network total bandwidth metrics."""
     total_mbps: float
     change_percent: float
     time_series: Optional[List[TimeSeriesPoint]]
@@ -271,41 +282,35 @@ class CPUMetrics(BaseModel):
     change_percent: float
 
 
-class ClusterSummaryMetrics(BaseModel):
-    """Summary metrics for the entire cluster."""
-
-    total_nodes: int
+class NodeMetrics(BaseModel):
+    """Metrics for a single node."""
     memory: ResourceMetrics
     storage: ResourceMetrics
     cpu: CPUMetrics
-    gpu: Optional[Dict[str, float]]  # memory and utilization metrics
-    hpu: Optional[Dict[str, float]]  # memory and utilization metrics
+    network_in: NetworkInMetrics
+    network_out: NetworkOutMetrics
+    network_bandwidth: NetworkBandwidthMetrics
 
-    # Updated network metrics
-    network_in: NetworkMetrics
-    network_out: NetworkMetrics
-    network_bandwidth: NetworkMetrics
 
+class ClusterSummaryMetrics(BaseModel):
+    """Summary metrics for the entire cluster."""
+    total_nodes: int = 0  # Added default value
+    memory: ResourceMetrics
+    storage: ResourceMetrics
+    cpu: CPUMetrics
+    gpu: Optional[Dict[str, float]] = None  # Added default None
+    hpu: Optional[Dict[str, float]] = None  # Added default None
+    network_in: NetworkInMetrics
+    network_out: NetworkOutMetrics
+    network_bandwidth: NetworkBandwidthMetrics
     timestamp: str
     time_range: str
     cluster_id: str
     metric_type: str
 
 
-class NodeMetrics(BaseModel):
-    """Metrics for a single node."""
-
-    memory: ResourceMetrics
-    storage: ResourceMetrics
-    cpu: CPUMetrics
-    network_in: NetworkMetrics
-    network_out: NetworkMetrics
-    network_bandwidth: NetworkMetrics
-
-
 class ClusterMetrics(BaseModel):
     """Complete cluster metrics."""
-
     nodes: Dict[str, NodeMetrics]
     cluster_summary: ClusterSummaryMetrics
     timestamp: str
@@ -330,9 +335,8 @@ class MetricTypeEnum(Enum):
 
 class ClusterMetricsResponse(SuccessResponse):
     """Cluster metrics response schema."""
-
     nodes: Dict[str, NodeMetrics]
     cluster_summary: ClusterSummaryMetrics
-    time_range: str  # 'today', '7days', or 'month'
+    time_range: str
     metric_type: str
     timestamp: str
