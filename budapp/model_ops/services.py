@@ -2391,7 +2391,7 @@ class ModelService(SessionMixin):
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/leaderboard/models"
         )
 
-        query_params = {"uri": uri, "k": k}
+        query_params = {"model_uri": uri, "k": k}
 
         logger.debug(f"Performing leaderboard fetch request to budmodel {query_params}")
         try:
