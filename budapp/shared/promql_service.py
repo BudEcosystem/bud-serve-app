@@ -357,8 +357,8 @@ class PrometheusMetricsClient:
                 memory_capacity_bytes = 0
 
             bandwidth_metrics = self.get_network_bandwidth(node_ip)
-            network_stats = self.get_network_stats(node_ip)
-            events_count = self.get_node_events_count(node_ip)
+            # network_stats = self.get_network_stats(node_ip)
+            # events_count = self.get_node_events_count(node_ip)
 
             nodes_json["nodes"][node_ip] = {
                 "hostname": node_name,
@@ -375,7 +375,7 @@ class PrometheusMetricsClient:
                     "capacity": round(memory_capacity_bytes / (1024 * 1024 * 1024), 2),
                 },
                 "network": {"bandwidth": bandwidth_metrics},
-                "events_count": events_count,
+                "events_count": 0,
                 "capacity": description.get("capacity", {}),
             }
 
