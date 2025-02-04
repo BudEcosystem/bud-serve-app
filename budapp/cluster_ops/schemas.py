@@ -429,7 +429,7 @@ class PrometheusConfig(BaseModel):
     """
 
     base_url: HttpUrl = Field(default="https://metric.bud.studio")
-    cluster_id: str = Field(default="")
+    cluster_id: UUID = Field()
 
 class NodeMetricsResponse(SuccessResponse):
     """Node metrics response schema."""
