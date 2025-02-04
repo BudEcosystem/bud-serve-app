@@ -499,7 +499,7 @@ async def get_node_wise_metrics(
     try:
         metrics = await ClusterService(session).get_node_wise_metrics(cluster_id)
         
-        return ClusterMetricsResponse(
+        return NodeMetricsResponse(
             code=status.HTTP_200_OK, message="Successfully retrieved node metrics", **metrics
         )
     except ClientException as e:
