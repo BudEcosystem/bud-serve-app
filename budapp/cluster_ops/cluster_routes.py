@@ -46,6 +46,7 @@ from .schemas import (
     ClusterListResponse,
     CreateClusterWorkflowRequest,
     EditClusterRequest,
+    NodeMetricsResponse,
     SingleClusterResponse,
     ClusterMetricsResponse,
     MetricTypeEnum,
@@ -483,7 +484,7 @@ async def get_cluster_metrics(
             "description": "Service is unavailable due to client error",
         },
         status.HTTP_200_OK: {
-            "model": any,
+            "model": NodeMetricsResponse,
             "description": "Successfully retrieved node-wise metrics",
         },
     },
@@ -493,7 +494,7 @@ async def get_node_wise_metrics(
     cluster_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> Union[any, ErrorResponse]:
+) -> Union[NodeMetricsResponse, ErrorResponse]:
     """Get node-wise metrics for a cluster."""
     try:
         metrics = await ClusterService(session).get_node_wise_metrics(cluster_id)
