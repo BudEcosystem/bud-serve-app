@@ -3,6 +3,8 @@ import json
 import time
 from typing import Dict, List, Tuple, Any
 from budapp.cluster_ops.schemas import PrometheusConfig
+from fastapi import HTTPException
+from http import HTTPStatus
 
 
 class PrometheusMetricsClient:
@@ -22,7 +24,10 @@ class PrometheusMetricsClient:
         response = requests.get(f"{self.config.base_url}/api/v1/query", params={"query": full_query})
 
         if response.status_code != 200:
-            raise Exception(f"Query failed with status code {response.status_code}: {response.text}")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Prometheus query failed: {response.text}"
+            )
 
         data = response.json()
         return data["data"]["result"]
@@ -43,27 +48,40 @@ class PrometheusMetricsClient:
         )
 
         if response.status_code != 200:
-            raise Exception(f"Range query failed with status code {response.status_code}: {response.text}")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Prometheus range query failed: {response.text}"
+            )
 
         data = response.json()
         return data["data"]["result"]
 
     def get_node_status(self) -> Dict[str, str]:
         """Get the status (Ready/NotReady) for each node."""
-        status_metrics = self.query_prometheus('kube_node_status_condition{condition="Ready",status="true"}')
+        try:
+            status_metrics = self.query_prometheus('kube_node_status_condition{condition="Ready",status="true"}')
+            
+            node_status = {}
+            for metric in status_metrics:
+                node_name = metric["metric"].get("node", "unknown")
+                node_status[node_name] = "Ready"
 
-        node_status = {}
-        for metric in status_metrics:
-            node_name = metric["metric"].get("node", "unknown")
-            node_status[node_name] = "Ready"
+            all_nodes = self.query_prometheus("node_uname_info")
+            for node in all_nodes:
+                node_name = node["metric"].get("nodename", "unknown")
+                if node_name not in node_status:
+                    node_status[node_name] = "NotReady"
 
-        all_nodes = self.query_prometheus("node_uname_info")
-        for node in all_nodes:
-            node_name = node["metric"].get("nodename", "unknown")
-            if node_name not in node_status:
-                node_status[node_name] = "NotReady"
-
-        return node_status
+            return node_status
+        except HTTPException as e:
+            # Re-raise the HTTPException to maintain the status code
+            raise
+        except Exception as e:
+            # Convert any other exceptions to HTTPException
+            raise HTTPException(
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                detail=f"Failed to get node status: {str(e)}"
+            )
 
     def get_pod_status(self) -> Dict[str, Dict]:
         """Get pod status (Available vs Desired) for each node."""
