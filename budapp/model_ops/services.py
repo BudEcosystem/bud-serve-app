@@ -18,7 +18,7 @@
 
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 from uuid import UUID, uuid4
 
 import aiohttp
@@ -40,6 +40,8 @@ from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 from ..commons.constants import (
     APP_ICONS,
+    BENCHMARK_FIELDS_LABEL_MAPPER,
+    BENCHMARK_FIELDS_TYPE_MAPPER,
     BUD_INTERNAL_WORKFLOW,
     LICENSE_DIR,
     BaseModelRelationEnum,
@@ -80,6 +82,10 @@ from .schemas import (
     CreateCloudModelWorkflowSteps,
     CreateLocalModelWorkflowRequest,
     CreateLocalModelWorkflowSteps,
+    Leaderboard,
+    LeaderboardBenchmark,
+    LeaderboardModelInfo,
+    LeaderboardTable,
     LocalModelScanRequest,
     LocalModelScanWorkflowStepData,
     ModelArchitectureLLMConfig,
@@ -2294,6 +2300,113 @@ class ModelService(SessionMixin):
         # Mark workflow as completed
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
         logger.debug(f"Workflow {db_workflow.id} marked as completed")
+
+    async def list_leaderboards(
+        self, model_id: UUID, table_source: Literal["cloud_model", "model"], k: int
+    ) -> List[LeaderboardTable]:
+        """List leaderboards of specific model by uri.
+
+        Args:
+            model_id: The ID of the model.
+            table_source: The source of the model.
+            k: The maximum number of leaderboards to return.
+
+        Returns:
+            The leaderboards of the model.
+        """
+        if table_source == "cloud_model":
+            db_model = await CloudModelDataManager(self.session).retrieve_by_fields(
+                CloudModel, fields={"id": model_id, "status": CloudModelStatusEnum.ACTIVE}
+            )
+        elif table_source == "model":
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, fields={"id": model_id, "status": ModelStatusEnum.ACTIVE}
+            )
+        else:
+            raise ClientException("Invalid table source", status_code=status.HTTP_400_BAD_REQUEST)
+
+        model_uri = db_model.uri
+
+        # Fetch leaderboards from bud_model app
+        bud_model_response = await self._perform_bud_model_leaderboard_fetch_request(model_uri, k)
+
+        return await self._parse_leaderboard_response(bud_model_response, model_uri)
+
+    async def _parse_leaderboard_response(
+        self, bud_model_response: Dict, selected_model_uri: str
+    ) -> List[LeaderboardTable]:
+        """Parse leaderboard response from bud_model app."""
+        # Validate response
+        bud_model_leaderboards = bud_model_response.get("leaderboards", [])
+        if not bud_model_leaderboards:
+            logger.debug("No leaderboard found for model %s", selected_model_uri)
+            return []
+
+        # Find the leaderboard for the selected model
+        selected_model_leaderboard = None
+        for leaderboard in bud_model_leaderboards:
+            if leaderboard.get("model_info", {}).get("uri") == selected_model_uri:
+                selected_model_leaderboard = Leaderboard(**leaderboard)
+                break
+        if not selected_model_leaderboard:
+            logger.debug("No leaderboard found for selected model %s", selected_model_uri)
+            return []
+
+        # Ignore fields with None values
+        valid_fields = selected_model_leaderboard.model_dump(exclude_none=True).keys()
+        logger.debug("Valid fields: %s", valid_fields)
+
+        leaderboard_tables: List[LeaderboardTable] = []
+
+        for leaderboard in bud_model_leaderboards:
+            model_info = leaderboard.get("model_info", {})
+
+            # Create model info
+            model = LeaderboardModelInfo(
+                uri=model_info.get("uri"),
+                model_size=model_info.get("num_params"),
+                is_selected=model_info.get("uri") == selected_model_uri,
+            )
+
+            # Create benchmark entries for each valid field
+            benchmarks = {}
+            for field in valid_fields:
+                value = leaderboard.get(field)
+                benchmarks[field] = LeaderboardBenchmark(
+                    type=BENCHMARK_FIELDS_TYPE_MAPPER[field], value=value, label=BENCHMARK_FIELDS_LABEL_MAPPER[field]
+                )
+
+            leaderboard_tables.append(LeaderboardTable(model=model, benchmarks=benchmarks))
+
+        return leaderboard_tables
+
+    async def _perform_bud_model_leaderboard_fetch_request(self, uri: str, k: int) -> Dict:
+        """Perform leaderboard fetch request to bud_model app.
+
+        Args:
+            uri: The uri of the model.
+            k: The maximum number of leaderboards to return.
+        """
+        leaderboard_fetch_url = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/leaderboard/models"
+        )
+
+        query_params = {"uri": uri, "k": k}
+
+        logger.debug(f"Performing leaderboard fetch request to budmodel {query_params}")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(leaderboard_fetch_url, params=query_params) as response:
+                    response_data = await response.json()
+                    if response.status != 200:
+                        logger.error(f"Failed to fetch leaderboards: {response.status} {response_data}")
+                        raise ClientException("Failed to fetch leaderboards")
+
+                    logger.debug("Successfully fetched leaderboards from budmodel")
+                    return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send leaderboard fetch request: {e}")
+            raise ClientException("Failed to fetch leaderboards") from e
 
 
 class ModelServiceUtil(SessionMixin):

@@ -553,6 +553,67 @@ class ModelFilter(BaseModel):
         return v
 
 
+class Leaderboard(BaseModel):
+    """Leaderboard schema."""
+
+    # Berkeley Leaderboard fields
+    bcfl: float | None = None
+
+    # LiveCodeBench Leaderboard fields
+    live_code_bench: float | None = None
+
+    # MTEB Leaderboard fields
+    classification: float | None = None
+    clustering: float | None = None
+    pair_classification: float | None = None
+    reranking: float | None = None
+    retrieval: float | None = None
+    semantic: float | None = None
+    summarization: float | None = None
+
+    # VLLM Leaderboard fields
+    mmbench: float | None = None
+    mmstar: float | None = None
+    mmmu: float | None = None
+    math_vista: float | None = None
+    ocr_bench: float | None = None
+    ai2d: int | None = None
+    hallucination_bench: float | None = None
+    mmvet: float | None = None
+
+    # Chatbot Arena Leaderboard fields
+    lmsys_areana: int | None = None
+
+
+class LeaderboardModelInfo(BaseModel):
+    """Leaderboard model info schema."""
+
+    uri: str
+    model_size: int
+    is_selected: bool = False
+
+
+class LeaderboardBenchmark(BaseModel):
+    """Leaderboard benchmark schema."""
+
+    type: str
+    label: str
+    value: int | float | None = None
+
+
+class LeaderboardTable(BaseModel):
+    """Leaderboard table schema."""
+
+    model: LeaderboardModelInfo
+    benchmarks: dict[str, LeaderboardBenchmark]
+
+
+class LeaderboardTableResponse(SuccessResponse):
+    """Leaderboard response schema."""
+
+    leaderboards: list[LeaderboardTable] = []
+
+
 # Cloud model related schemas
 
 
