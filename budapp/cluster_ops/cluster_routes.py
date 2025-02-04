@@ -498,7 +498,10 @@ async def get_node_wise_metrics(
     """Get node-wise metrics for a cluster."""
     try:
         metrics = await ClusterService(session).get_node_wise_metrics(cluster_id)
-        return metrics
+        
+        return ClusterMetricsResponse(
+            code=status.HTTP_200_OK, message="Successfully retrieved node metrics", **metrics
+        )
     except ClientException as e:
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
