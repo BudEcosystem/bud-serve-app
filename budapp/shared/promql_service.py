@@ -12,14 +12,17 @@ class PrometheusMetricsClient:
     def query_prometheus(self, query: str) -> List[Dict]:
         """Query Prometheus for metrics in the specified cluster."""
         if self.config.cluster_id:
-            full_query = f'{query}{{cluster="{self.config.cluster_id}"}}'
+            if "{" in query:
+                full_query = query.replace("}", f',cluster="{self.config.cluster_id}"}}')
+            else:
+                full_query = f'{query}{{cluster="{self.config.cluster_id}"}}'
         else:
             full_query = query
 
         response = requests.get(f"{self.config.base_url}/api/v1/query", params={"query": full_query})
 
         if response.status_code != 200:
-            raise Exception(f"Query failed with status code {response.status_code}")
+            raise Exception(f"Query failed with status code {response.status_code}: {response.text}")
 
         data = response.json()
         return data["data"]["result"]
@@ -27,7 +30,10 @@ class PrometheusMetricsClient:
     def query_prometheus_range(self, query: str, start_time: int, end_time: int, step: str = "1h") -> List[Dict]:
         """Query Prometheus for range metrics."""
         if self.config.cluster_id:
-            full_query = f'{query}{{cluster="{self.config.cluster_id}"}}'
+            if "{" in query:
+                full_query = query.replace("}", f',cluster="{self.config.cluster_id}"}}')
+            else:
+                full_query = f'{query}{{cluster="{self.config.cluster_id}"}}'
         else:
             full_query = query
 
@@ -37,7 +43,7 @@ class PrometheusMetricsClient:
         )
 
         if response.status_code != 200:
-            raise Exception(f"Range query failed with status code {response.status_code}")
+            raise Exception(f"Range query failed with status code {response.status_code}: {response.text}")
 
         data = response.json()
         return data["data"]["result"]
