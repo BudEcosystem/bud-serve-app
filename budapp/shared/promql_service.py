@@ -13,24 +13,40 @@ class PrometheusMetricsClient:
 
     def query_prometheus(self, query: str) -> List[Dict]:
         """Query Prometheus for metrics in the specified cluster."""
-        if self.config.cluster_id:
-            if "{" in query:
-                full_query = query.replace("}", f',cluster="{self.config.cluster_id}"}}')
+        try:
+            if self.config.cluster_id:
+                if "{" in query:
+                    full_query = query.replace("}", f',cluster="{self.config.cluster_id}"}}')
+                else:
+                    full_query = f'{query}{{cluster="{self.config.cluster_id}"}}'
             else:
-                full_query = f'{query}{{cluster="{self.config.cluster_id}"}}'
-        else:
-            full_query = query
+                full_query = query
 
-        response = requests.get(f"{self.config.base_url}/api/v1/query", params={"query": full_query})
+            response = requests.get(f"{self.config.base_url}/api/v1/query", params={"query": full_query})
 
-        if response.status_code != 200:
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail={
+                        "code": response.status_code,
+                        "type": "PrometheusQueryError",
+                        "message": f"Prometheus query failed: {response.text}"
+                    }
+                )
+
+            data = response.json()
+            return data["data"]["result"]
+        except HTTPException:
+            raise
+        except Exception as e:
             raise HTTPException(
-                status_code=response.status_code,
-                detail=f"Prometheus query failed: {response.text}"
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                detail={
+                    "code": HTTPStatus.INTERNAL_SERVER_ERROR,
+                    "type": "PrometheusQueryError",
+                    "message": f"Unexpected error during Prometheus query: {str(e)}"
+                }
             )
-
-        data = response.json()
-        return data["data"]["result"]
 
     def query_prometheus_range(self, query: str, start_time: int, end_time: int, step: str = "1h") -> List[Dict]:
         """Query Prometheus for range metrics."""
@@ -271,8 +287,25 @@ class PrometheusMetricsClient:
 
             return 0
 
-        except Exception:
-            return 0
+        except HTTPException as e:
+            # Properly format the error response
+            raise HTTPException(
+                status_code=e.status_code,
+                detail={
+                    "code": e.status_code,
+                    "type": "PrometheusQueryError",
+                    "message": str(e.detail)
+                }
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                detail={
+                    "code": HTTPStatus.INTERNAL_SERVER_ERROR,
+                    "type": "PrometheusQueryError",
+                    "message": f"Failed to get node events: {str(e)}"
+                }
+            )
 
     def get_nodes_status(self) -> Dict:
         """Get comprehensive node status information in JSON format."""
