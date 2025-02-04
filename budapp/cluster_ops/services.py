@@ -1144,7 +1144,7 @@ class ClusterService(SessionMixin):
         # Get cluster details to verify it exists
         db_cluster = await self.get_cluster_details(cluster_id)
 
-        config = PrometheusConfig(base_url=app_settings.prometheus_url, cluster_id=db_cluster.cluster_id)
+        config = PrometheusConfig(base_url=app_settings.prometheus_url, cluster_id=str(db_cluster.cluster_id))
 
         try:
             client = PrometheusMetricsClient(config)
