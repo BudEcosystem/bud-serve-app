@@ -40,6 +40,7 @@ from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 from ..commons.constants import (
     APP_ICONS,
+    BENCHMARK_FIELDS_LABEL_MAPPER,
     BENCHMARK_FIELDS_TYPE_MAPPER,
     BUD_INTERNAL_WORKFLOW,
     LICENSE_DIR,
@@ -2371,7 +2372,9 @@ class ModelService(SessionMixin):
             benchmarks = {}
             for field in valid_fields:
                 value = leaderboard.get(field)
-                benchmarks[field] = LeaderboardBenchmark(type=BENCHMARK_FIELDS_TYPE_MAPPER[field], value=value)
+                benchmarks[field] = LeaderboardBenchmark(
+                    type=BENCHMARK_FIELDS_TYPE_MAPPER[field], value=value, label=BENCHMARK_FIELDS_LABEL_MAPPER[field]
+                )
 
             leaderboard_tables.append(LeaderboardTable(model=model, benchmarks=benchmarks))
 
