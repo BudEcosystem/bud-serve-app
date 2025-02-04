@@ -24,6 +24,7 @@ from uuid import UUID
 
 import aiohttp
 import yaml
+from budapp.shared.promql_service import PrometheusMetricsClient
 from fastapi import UploadFile, status
 
 from budapp.commons import logging
@@ -72,6 +73,7 @@ from .schemas import (
     CreateClusterWorkflowSteps,
     MetricTypeEnum,
     ClusterDetailResponse,
+    PrometheusConfig,
 )
 from ..project_ops.schemas import Project as ProjectSchema
 from ..model_ops.schemas import Model as ModelSchema
@@ -1128,3 +1130,26 @@ class ClusterService(SessionMixin):
         # Add metric type to response
         metrics["metric_type"] = metric_type
         return metrics
+
+    async def get_node_wise_metrics(self, cluster_id: UUID) -> Dict[str, Dict[str, Any]]:
+        """Get node-wise metrics for a cluster.
+
+        Args:
+            cluster_id: The ID of the cluster to get metrics for
+
+        Returns:
+            Dict containing the node-wise metrics
+        """
+
+        # Get cluster details to verify it exists
+        db_cluster = await self.get_cluster_details(cluster_id)
+
+        config = PrometheusConfig(base_url=app_settings.prometheus_url, cluster_id=str(db_cluster.cluster_id))
+
+        try:
+            client = PrometheusMetricsClient(config)
+            nodes_status = client.get_nodes_status()
+        except Exception as e:
+            raise ClientException(f"Failed to get node metrics: {str(e)}")
+
+        return nodes_status

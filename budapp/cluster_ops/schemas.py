@@ -22,7 +22,7 @@ from typing import List, Dict, Union, Optional
 from uuid import UUID
 from enum import Enum
 
-from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, Field, computed_field, field_validator
+from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, Field, computed_field, field_validator, HttpUrl
 
 from budapp.commons.constants import ClusterStatusEnum, EndpointStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
@@ -239,12 +239,14 @@ class ClusterEndpointFilter(BaseModel):
 # Cluster Metrics Schema
 class TimeSeriesPoint(BaseModel):
     """Time series data point."""
+
     timestamp: int
     value: float
 
 
 class NetworkMetrics(BaseModel):
     """Network metrics schema."""
+
     inbound_mbps: float = Field(default=0.0)
     change_percent: float = Field(default=0.0)
     time_series: List[TimeSeriesPoint] = Field(default_factory=list)
@@ -252,6 +254,7 @@ class NetworkMetrics(BaseModel):
 
 class NetworkOutMetrics(BaseModel):
     """Network outbound metrics schema."""
+
     outbound_mbps: float = Field(default=0.0)
     change_percent: float = Field(default=0.0)
     time_series: List[TimeSeriesPoint] = Field(default_factory=list)
@@ -259,6 +262,7 @@ class NetworkOutMetrics(BaseModel):
 
 class NetworkBandwidthMetrics(BaseModel):
     """Network bandwidth metrics schema."""
+
     total_mbps: float = Field(default=0.0)
     change_percent: float = Field(default=0.0)
     time_series: List[TimeSeriesPoint] = Field(default_factory=list)
@@ -266,6 +270,7 @@ class NetworkBandwidthMetrics(BaseModel):
 
 class MemoryMetrics(BaseModel):
     """Memory metrics schema."""
+
     total_gib: float = Field(default=0.0)
     used_gib: float = Field(default=0.0)
     available_gib: float = Field(default=0.0)
@@ -275,12 +280,14 @@ class MemoryMetrics(BaseModel):
 
 class CpuMetrics(BaseModel):
     """CPU metrics schema."""
+
     usage_percent: float = Field(default=0.0)
     change_percent: float = Field(default=0.0)
 
 
 class StorageMetrics(BaseModel):
     """Storage metrics schema."""
+
     total_gib: float = Field(default=0.0)
     used_gib: float = Field(default=0.0)
     available_gib: float = Field(default=0.0)
@@ -290,6 +297,7 @@ class StorageMetrics(BaseModel):
 
 class NodeMetrics(BaseModel):
     """Node level metrics schema."""
+
     memory: Optional[MemoryMetrics] = Field(default_factory=MemoryMetrics)
     cpu: Optional[CpuMetrics] = Field(default_factory=CpuMetrics)
     storage: Optional[StorageMetrics] = Field(default_factory=StorageMetrics)
@@ -300,6 +308,7 @@ class NodeMetrics(BaseModel):
 
 class ClusterSummaryMetrics(BaseModel):
     """Cluster summary metrics schema."""
+
     memory: Optional[MemoryMetrics] = Field(default_factory=MemoryMetrics)
     cpu: Optional[CpuMetrics] = Field(default_factory=CpuMetrics)
     storage: Optional[StorageMetrics] = Field(default_factory=StorageMetrics)
@@ -310,6 +319,7 @@ class ClusterSummaryMetrics(BaseModel):
 
 class ClusterMetricsResponse(SuccessResponse):
     """Cluster metrics response schema."""
+
     nodes: Dict[str, NodeMetrics] = Field(default_factory=dict)
     cluster_summary: ClusterSummaryMetrics = Field(default_factory=ClusterSummaryMetrics)
     time_range: str
@@ -319,6 +329,7 @@ class ClusterMetricsResponse(SuccessResponse):
 
     class Config:
         """Pydantic model config."""
+
         json_schema_extra = {
             "example": {
                 "nodes": {
@@ -328,49 +339,31 @@ class ClusterMetricsResponse(SuccessResponse):
                             "used_gib": 15.83,
                             "available_gib": 487.59,
                             "usage_percent": 3.14,
-                            "change_percent": -0.52
+                            "change_percent": -0.52,
                         },
-                        "cpu": {
-                            "usage_percent": 25.45,
-                            "change_percent": 5.23
-                        },
+                        "cpu": {"usage_percent": 25.45, "change_percent": 5.23},
                         "storage": {
                             "total_gib": 876.14,
                             "used_gib": 111.03,
                             "available_gib": 765.11,
                             "usage_percent": 12.67,
-                            "change_percent": 0.34
+                            "change_percent": 0.34,
                         },
                         "network_in": {
                             "inbound_mbps": 45.67,
                             "change_percent": 12.34,
-                            "time_series": [
-                                {
-                                    "timestamp": 1738567200,
-                                    "value": 45.67
-                                }
-                            ]
+                            "time_series": [{"timestamp": 1738567200, "value": 45.67}],
                         },
                         "network_out": {
                             "outbound_mbps": 32.45,
                             "change_percent": -5.67,
-                            "time_series": [
-                                {
-                                    "timestamp": 1738567200,
-                                    "value": 32.45
-                                }
-                            ]
+                            "time_series": [{"timestamp": 1738567200, "value": 32.45}],
                         },
                         "network_bandwidth": {
                             "total_mbps": 78.12,
                             "change_percent": 6.67,
-                            "time_series": [
-                                {
-                                    "timestamp": 1738567200,
-                                    "value": 78.12
-                                }
-                            ]
-                        }
+                            "time_series": [{"timestamp": 1738567200, "value": 78.12}],
+                        },
                     }
                 },
                 "cluster_summary": {
@@ -379,54 +372,36 @@ class ClusterMetricsResponse(SuccessResponse):
                         "used_gib": 31.66,
                         "available_gib": 975.18,
                         "usage_percent": 3.14,
-                        "change_percent": -0.52
+                        "change_percent": -0.52,
                     },
-                    "cpu": {
-                        "usage_percent": 25.45,
-                        "change_percent": 5.23
-                    },
+                    "cpu": {"usage_percent": 25.45, "change_percent": 5.23},
                     "storage": {
                         "total_gib": 1752.28,
                         "used_gib": 222.06,
                         "available_gib": 1530.22,
                         "usage_percent": 12.67,
-                        "change_percent": 0.34
+                        "change_percent": 0.34,
                     },
                     "network_in": {
                         "inbound_mbps": 91.34,
                         "change_percent": 12.34,
-                        "time_series": [
-                            {
-                                "timestamp": 1738567200,
-                                "value": 91.34
-                            }
-                        ]
+                        "time_series": [{"timestamp": 1738567200, "value": 91.34}],
                     },
                     "network_out": {
                         "outbound_mbps": 64.90,
                         "change_percent": -5.67,
-                        "time_series": [
-                            {
-                                "timestamp": 1738567200,
-                                "value": 64.90
-                            }
-                        ]
+                        "time_series": [{"timestamp": 1738567200, "value": 64.90}],
                     },
                     "network_bandwidth": {
                         "total_mbps": 156.24,
                         "change_percent": 6.67,
-                        "time_series": [
-                            {
-                                "timestamp": 1738567200,
-                                "value": 156.24
-                            }
-                        ]
-                    }
+                        "time_series": [{"timestamp": 1738567200, "value": 156.24}],
+                    },
                 },
                 "time_range": "today",
                 "metric_type": "all",
                 "timestamp": "2025-02-03T08:58:18.368278+00:00",
-                "cluster_id": "12345678-1234-5678-1234-567812345678"
+                "cluster_id": "12345678-1234-5678-1234-567812345678",
             }
         }
 
@@ -443,3 +418,21 @@ class MetricTypeEnum(Enum):
     NETWORK_IN = "network_in"
     NETWORK_OUT = "network_out"
     NETWORK_BANDWIDTH = "network_bandwidth"
+
+
+class PrometheusConfig(BaseModel):
+    """Configuration for connecting to Prometheus metrics server.
+
+    Attributes:
+        base_url: The base URL of the Prometheus server, defaults to https://metric.bud.studio
+        cluster_id: The ID of the cluster to query metrics for, empty string means query all clusters
+    """
+
+    base_url: HttpUrl = Field(default="https://metric.bud.studio")
+    cluster_id: str = Field()
+
+class NodeMetricsResponse(SuccessResponse):
+    """Node metrics response schema."""
+    
+    nodes: Dict[str, Dict[str, object]]
+

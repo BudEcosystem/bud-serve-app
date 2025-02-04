@@ -46,6 +46,7 @@ from .schemas import (
     ClusterListResponse,
     CreateClusterWorkflowRequest,
     EditClusterRequest,
+    NodeMetricsResponse,
     SingleClusterResponse,
     ClusterMetricsResponse,
     MetricTypeEnum,
@@ -468,4 +469,44 @@ async def get_cluster_metrics(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Error retrieving cluster metrics",
+        ).to_http_response()
+
+
+@cluster_router.get(
+    "/{cluster_id}/node-metrics",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": NodeMetricsResponse,
+            "description": "Successfully retrieved node-wise metrics",
+        },
+    },
+    description="Get node-wise metrics for a cluster",
+)
+async def get_node_wise_metrics(
+    cluster_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[NodeMetricsResponse, ErrorResponse]:
+    """Get node-wise metrics for a cluster."""
+    try:
+        metrics = await ClusterService(session).get_node_wise_metrics(cluster_id)
+        
+        return NodeMetricsResponse(
+            code=status.HTTP_200_OK, message="Successfully retrieved node metrics", **metrics
+        )
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Error retrieving node-wise metrics: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Error retrieving node-wise metrics",
         ).to_http_response()
