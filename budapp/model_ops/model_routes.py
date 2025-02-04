@@ -832,8 +832,8 @@ async def delete_model(
             "description": "Model not found",
         },
         status.HTTP_200_OK: {
-            "model": ModelDetailSuccessResponse,
-            "description": "Successfully retrieved model details",
+            "model": LeaderboardTableResponse,
+            "description": "Successfully listed leaderboards",
         },
     },
     description="List leaderboards of specific model by uri",
