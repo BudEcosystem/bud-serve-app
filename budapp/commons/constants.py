@@ -2555,3 +2555,46 @@ class NotificationTypeEnum(StrEnum):
     UPDATE_PASSWORD_SUCCESS = auto()
     CLUSTER_DELETION_SUCCESS = auto()
     DEPLOYMENT_DELETION_SUCCESS = auto()
+
+
+BENCHMARK_FIELDS_TYPE_MAPPER = {
+    "classification": "Classification",
+    "clustering": "Clustering",
+    "pair_classification": "Classification",
+    "reranking": "Reranking",
+    "retrieval": "Retrieval",
+    "semantic": "Semantic",
+    "summarization": "Summarization",
+    "mmbench": "Reasoning",
+    "mmstar": "Reasoning",
+    "mmmu": "Knowledge",
+    "math_vista": "Math",
+    "ocr_bench": "OCR",
+    "ai2d": "Visual QA",
+    "hallucination_bench": "Hallucination",
+    "mmvet": "Visual QA",
+    "lmsys_areana": "Human Preference",
+    "bcfl": "Tool Use",
+    "live_code_bench": "Code Generation",
+}
+
+BENCHMARK_FIELDS_LABEL_MAPPER = {
+    "classification": "Classification",
+    "clustering": "Clustering",
+    "pair_classification": "Pair Classification",
+    "reranking": "Reranking",
+    "retrieval": "Retrieval",
+    "semantic": "Semantic",
+    "summarization": "Summarization",
+    "mmbench": "MMBench",
+    "mmstar": "MMStar",
+    "mmmu": "MMMU",
+    "math_vista": "Math Vista",
+    "ocr_bench": "OCRBench",
+    "ai2d": "AI2D",
+    "hallucination_bench": "HallucinationBench",
+    "mmvet": "MMVet",
+    "lmsys_areana": "LMSYS Areana",
+    "bcfl": "BCFL",
+    "live_code_bench": "Live Code Bench",
+}
