@@ -583,7 +583,9 @@ class EndpointService(SessionMixin):
             "accept": "application/json",
         }
         async with aiohttp.ClientSession() as session:
-            async with session.get(get_worker_detail_endpoint, headers=headers, params={"reload": str(reload).lower()}) as response:
+            async with session.get(
+                get_worker_detail_endpoint, headers=headers, params={"reload": str(reload).lower()}
+            ) as response:
                 response_data = await response.json()
                 if response.status != 200:
                     error_message = response_data.get("message", "Failed to get endpoint worker detail")
@@ -654,6 +656,7 @@ class EndpointService(SessionMixin):
         concurrent_requests = deployment_config["concurrent_requests"]
         total_replicas = db_endpoint.total_replicas
         concurrent_request_per_replica = concurrent_requests / total_replicas
+        concurrent_request_per_replica = round(concurrent_request_per_replica)
         logger.debug(
             f"Total replicas: {total_replicas}, concurrent requests: {concurrent_requests}, concurrent request per replica: {concurrent_request_per_replica}"
         )
