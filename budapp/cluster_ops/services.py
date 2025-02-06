@@ -24,9 +24,9 @@ from uuid import UUID
 
 import aiohttp
 import yaml
-from budapp.shared.promql_service import PrometheusMetricsClient
 from fastapi import UploadFile, status
 
+from budapp.cluster_ops.utils import ClusterMetricsFetcher
 from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension
 from budapp.commons.config import app_settings
@@ -35,12 +35,11 @@ from budapp.commons.exceptions import ClientException
 from budapp.core.schemas import NotificationPayload
 from budapp.endpoint_ops.crud import EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
+from budapp.shared.promql_service import PrometheusMetricsClient
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
-from budapp.cluster_ops.utils import ClusterMetricsFetcher
-from budapp.cluster_ops.schemas import ClusterMetricsResponse
 
 from ..commons.constants import (
     APP_ICONS,
@@ -55,16 +54,18 @@ from ..commons.constants import (
 )
 from ..commons.helpers import get_hardware_types
 from ..core.schemas import NotificationResult
-from ..endpoint_ops.schemas import WorkerInfoFilter
 from ..model_ops.crud import ModelDataManager
 from ..model_ops.models import Model
+from ..model_ops.schemas import Model as ModelSchema
 from ..model_ops.services import ModelServiceUtil
+from ..project_ops.schemas import Project as ProjectSchema
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import ClusterDataManager
 from .models import Cluster as ClusterModel
 from .schemas import (
     ClusterCreate,
+    ClusterDetailResponse,
     ClusterEndpointResponse,
     ClusterPaginatedResponse,
     ClusterResourcesInfo,
@@ -72,11 +73,8 @@ from .schemas import (
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
     MetricTypeEnum,
-    ClusterDetailResponse,
     PrometheusConfig,
 )
-from ..project_ops.schemas import Project as ProjectSchema
-from ..model_ops.schemas import Model as ModelSchema
 
 
 logger = logging.get_logger(__name__)
@@ -501,7 +499,10 @@ class ClusterService(SessionMixin):
         else:
             workflow_data = {"status": WorkflowStatusEnum.COMPLETED}
         finally:
-            execution_status_data = {"workflow_execution_status": execution_status}
+            if db_cluster:
+                workflow_step_data = {"workflow_execution_status": execution_status, "cluster_id": str(db_cluster.id)}
+            else:
+                workflow_step_data = {"workflow_execution_status": execution_status}
 
             # Update current step number
             current_step_number = db_workflow.current_step + 1
@@ -509,7 +510,7 @@ class ClusterService(SessionMixin):
 
             # Update or create next workflow step
             db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                db_workflow.id, current_step_number, execution_status_data
+                db_workflow.id, current_step_number, workflow_step_data
             )
             logger.debug(f"Upsert workflow step {db_workflow_step.id} for storing create cluster status")
 
@@ -1140,7 +1141,6 @@ class ClusterService(SessionMixin):
         Returns:
             Dict containing the node-wise metrics
         """
-
         # Get cluster details to verify it exists
         db_cluster = await self.get_cluster_details(cluster_id)
 

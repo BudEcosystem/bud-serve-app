@@ -42,6 +42,8 @@ from budapp.model_ops.models import Provider as ProviderModel
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
+from ..cluster_ops.crud import ClusterDataManager
+from ..cluster_ops.models import Cluster as ClusterModel
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..project_ops.crud import ProjectDataManager
@@ -181,6 +183,14 @@ class WorkflowService(SessionMixin):
                 else None
             )
 
+            db_cluster = (
+                await ClusterDataManager(self.session).retrieve_by_fields(
+                    ClusterModel, {"id": UUID(required_data["cluster_id"])}, missing_ok=True
+                )
+                if "cluster_id" in required_data
+                else None
+            )
+
             workflow_steps = RetrieveWorkflowStepData(
                 provider_type=provider_type if provider_type else None,
                 provider=db_provider if db_provider else None,
@@ -211,6 +221,7 @@ class WorkflowService(SessionMixin):
                 additional_concurrency=additional_concurrency if additional_concurrency else None,
                 bud_simulator_events=bud_simulator_events if bud_simulator_events else None,
                 project=db_project if db_project else None,
+                cluster=db_cluster if db_cluster else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -251,6 +262,7 @@ class WorkflowService(SessionMixin):
                 "icon",
                 "ingress_url",
                 BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS.value,
+                "cluster_id",
             ],
             "add_local_model": [
                 "name",
