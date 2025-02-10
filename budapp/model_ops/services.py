@@ -2388,7 +2388,7 @@ class ModelService(SessionMixin):
             k: The maximum number of leaderboards to return.
         """
         leaderboard_fetch_url = (
-            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/leaderboard/models"
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/leaderboard/model-params"
         )
 
         query_params = {"model_uri": uri, "k": k}
