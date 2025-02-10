@@ -2069,7 +2069,7 @@ class ModelService(SessionMixin):
         try:
             async with aiohttp.ClientSession() as session, session.post(cancel_model_deployment_endpoint) as response:
                 response_data = await response.json()
-                if response.status != 200:
+                if response.status != 200 or response_data.get("object") == "error":
                     logger.error(f"Failed to cancel model deployment: {response.status} {response_data}")
                     raise ClientException(
                         "Failed to cancel model deployment", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
