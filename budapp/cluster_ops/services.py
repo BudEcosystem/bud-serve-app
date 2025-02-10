@@ -383,7 +383,7 @@ class ClusterService(SessionMixin):
                                 response_data = await response.json()
                                 logger.debug(f"Response from budcluster service: {response_data}")
 
-                                if response.status != 200:
+                                if response.status != 200 or response_data.get("object") == "error":
                                     error_message = response_data.get("message", "Failed to create cluster")
                                     logger.error(f"Failed to create cluster with external service: {error_message}")
                                     raise ClientException(error_message)
@@ -853,7 +853,7 @@ class ClusterService(SessionMixin):
             async with aiohttp.ClientSession() as session:
                 async with session.post(delete_cluster_endpoint, json=payload) as response:
                     response_data = await response.json()
-                    if response.status != 200:
+                    if response.status != 200 or response_data.get("object") == "error":
                         logger.error(f"Failed to delete cluster: {response.status} {response_data}")
                         raise ClientException(
                             "Failed to delete cluster", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -1013,7 +1013,7 @@ class ClusterService(SessionMixin):
         try:
             async with aiohttp.ClientSession() as session, session.post(cancel_cluster_endpoint) as response:
                 response_data = await response.json()
-                if response.status != 200:
+                if response.status != 200 or response_data.get("object") == "error":
                     logger.error(f"Failed to cancel cluster onboarding: {response.status} {response_data}")
                     raise ClientException(
                         "Failed to cancel cluster onboarding", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -1045,7 +1045,7 @@ class ClusterService(SessionMixin):
                 update_cluster_endpoint, json=payload
             ) as response:
                 response_data = await response.json()
-                if response.status != 200:
+                if response.status != 200 or response_data.get("object") == "error":
                     logger.error(f"Failed to update cluster node status: {response.status} {response_data}")
                     raise ClientException(
                         "Failed to update cluster node status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
