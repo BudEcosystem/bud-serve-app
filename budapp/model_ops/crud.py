@@ -440,7 +440,7 @@ class ModelDataManager(DataManagerUtils):
 
     async def get_models_by_uris(self, uris: List[str]) -> List[Model]:
         """Get models by uris."""
-        stmt = select(Model).filter(Model.uri.in_(uris))
+        stmt = select(Model).filter(Model.uri.in_(uris), Model.status == ModelStatusEnum.ACTIVE)
         return self.scalars_all(stmt)
 
 
