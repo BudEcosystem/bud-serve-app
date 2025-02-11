@@ -194,7 +194,7 @@ class EndpointService(SessionMixin):
             async with aiohttp.ClientSession() as session:
                 async with session.post(delete_endpoint_url, json=payload) as response:
                     response_data = await response.json()
-                    if response.status != 200:
+                    if response.status != 200 or response_data.get("object") == "error":
                         logger.error(f"Failed to delete endpoint: {response.status} {response_data}")
                         raise ClientException("Failed to delete endpoint")
 
@@ -447,7 +447,7 @@ class EndpointService(SessionMixin):
                 update_cluster_endpoint, json=payload
             ) as response:
                 response_data = await response.json()
-                if response.status != 200:
+                if response.status != 200 or response_data.get("object") == "error":
                     logger.error(f"Failed to update endpoint status: {response.status} {response_data}")
                     raise ClientException(
                         "Failed to update endpoint status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -567,7 +567,7 @@ class EndpointService(SessionMixin):
         async with aiohttp.ClientSession() as session:
             async with session.get(get_workers_endpoint, params=payload, headers=headers) as response:
                 response_data = await response.json()
-                if response.status != 200:
+                if response.status != 200 or response_data.get("object") == "error":
                     error_message = response_data.get("message", "Failed to get endpoint workers")
                     logger.error(f"Failed to get endpoint workers: {error_message}")
                     raise ClientException(error_message)
@@ -583,9 +583,11 @@ class EndpointService(SessionMixin):
             "accept": "application/json",
         }
         async with aiohttp.ClientSession() as session:
-            async with session.get(get_worker_detail_endpoint, headers=headers, params={"reload": str(reload).lower()}) as response:
+            async with session.get(
+                get_worker_detail_endpoint, headers=headers, params={"reload": str(reload).lower()}
+            ) as response:
                 response_data = await response.json()
-                if response.status != 200:
+                if response.status != 200 or response_data.get("object") == "error":
                     error_message = response_data.get("message", "Failed to get endpoint worker detail")
                     logger.error(f"Failed to get endpoint worker detail: {error_message}")
                     raise ClientException(error_message)
@@ -654,6 +656,7 @@ class EndpointService(SessionMixin):
         concurrent_requests = deployment_config["concurrent_requests"]
         total_replicas = db_endpoint.total_replicas
         concurrent_request_per_replica = concurrent_requests / total_replicas
+        concurrent_request_per_replica = round(concurrent_request_per_replica)
         logger.debug(
             f"Total replicas: {total_replicas}, concurrent requests: {concurrent_requests}, concurrent request per replica: {concurrent_request_per_replica}"
         )
@@ -725,7 +728,7 @@ class EndpointService(SessionMixin):
                 delete_worker_endpoint, json=payload
             ) as response:
                 response_data = await response.json()
-                if response.status != 200:
+                if response.status != 200 or response_data.get("object") == "error":
                     logger.error(f"Failed to delete worker: {response.status} {response_data}")
                     error_message = response_data.get("message", "Failed to delete worker")
                     raise ClientException(error_message, status_code=response.status)
@@ -1174,7 +1177,7 @@ class EndpointService(SessionMixin):
             async with aiohttp.ClientSession() as session:
                 async with session.post(add_worker_endpoint, json=payload) as response:
                     response_data = await response.json()
-                    if response.status >= 400:
+                    if response.status >= 400 or response_data.get("object") == "error":
                         raise ClientException("Unable to perform add worker to deployment")
 
                     return response_data
