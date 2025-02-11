@@ -614,6 +614,29 @@ class LeaderboardTableResponse(SuccessResponse):
     leaderboards: list[LeaderboardTable] = []
 
 
+class TopLeaderboardBenchmark(BaseModel):
+    """Top leaderboard benchmark schema."""
+
+    field: str
+    value: int | float | None = None
+    type: str
+    label: str
+
+
+class TopLeaderboard(BaseModel):
+    """Top leaderboard response schema."""
+
+    benchmarks: list[dict]
+    name: str
+    provider_type: str
+
+
+class TopLeaderboardResponse(SuccessResponse):
+    """Top leaderboard response schema."""
+
+    leaderboards: list[TopLeaderboard] = []
+
+
 # Cloud model related schemas
 
 

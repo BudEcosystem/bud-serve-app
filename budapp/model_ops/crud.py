@@ -16,7 +16,7 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the model ops."""
 
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import and_, desc, func, or_, select
@@ -24,13 +24,12 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
 
 from budapp.commons import logging
+from budapp.commons.constants import CloudModelStatusEnum, EndpointStatusEnum, ModelStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
-from budapp.commons.constants import ModelStatusEnum, CloudModelStatusEnum
 from budapp.commons.exceptions import DatabaseException
 from budapp.endpoint_ops.models import Endpoint
 from budapp.model_ops.models import CloudModel, Model, PaperPublished
 from budapp.model_ops.models import Provider as ProviderModel
-from budapp.commons.constants import EndpointStatusEnum
 
 
 logger = logging.get_logger(__name__)
@@ -84,9 +83,7 @@ class PaperPublishedDataManager(DataManagerUtils):
     """Data manager for the PaperPublished model."""
 
     async def delete_paper_by_urls(self, model_id: UUID, paper_urls: Optional[Dict[str, List[Any]]] = None) -> None:
-        """
-        Delete multiple model instances based on the model id and paper urls.
-        """
+        """Delete multiple model instances based on the model id and paper urls."""
         try:
             # Build the query with filters
             query = self.session.query(PaperPublished).filter_by(**{"model_id": model_id})
@@ -440,6 +437,11 @@ class ModelDataManager(DataManagerUtils):
         )
 
         return self.execute_all(stmt)
+
+    async def get_models_by_uris(self, uris: List[str]) -> List[Model]:
+        """Get models by uris."""
+        stmt = select(Model).filter(Model.uri.in_(uris), Model.status == ModelStatusEnum.ACTIVE)
+        return self.scalars_all(stmt)
 
 
 class CloudModelDataManager(DataManagerUtils):

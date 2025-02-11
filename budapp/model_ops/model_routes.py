@@ -58,6 +58,7 @@ from .schemas import (
     RecommendedTagsResponse,
     TagsListResponse,
     TasksListResponse,
+    TopLeaderboardResponse,
 )
 from .services import (
     CloudModelService,
@@ -160,6 +161,71 @@ async def list_all_models(
         object="models.list",
         code=status.HTTP_200_OK,
     ).to_http_response()
+
+
+@model_router.get(
+    "/top-leaderboards",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": TopLeaderboardResponse,
+            "description": "Successfully listed top leaderboards",
+        },
+    },
+    description="List top leaderboards",
+)
+async def list_top_leaderboards(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    benchmarks: List[
+        Literal[
+            "bcfl",
+            "live_code_bench",
+            "classification",
+            "clustering",
+            "pair_classification",
+            "reranking",
+            "retrieval",
+            "semantic",
+            "summarization",
+            "mmbench",
+            "mmstar",
+            "mmmu",
+            "math_vista",
+            "ocr_bench",
+            "ai2d",
+            "hallucination_bench",
+            "mmvet",
+            "lmsys_areana",
+        ]
+    ] = Query(..., description="The benchmarks to list"),
+    k: int = Query(5, ge=1, description="Maximum number of leaderboards"),
+) -> Union[TopLeaderboardResponse, ErrorResponse]:
+    """List top leaderboards."""
+    try:
+        leaderboards = await ModelService(session).get_top_leaderboards(benchmarks, k)
+        return TopLeaderboardResponse(
+            leaderboards=leaderboards,
+            code=status.HTTP_200_OK,
+            object="leaderboard.top",
+            message="Successfully listed top leaderboards",
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to list top leaderboards: {e.message}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to list top leaderboards: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to list top leaderboards",
+        ).to_http_response()
 
 
 @model_router.get(
