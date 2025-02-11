@@ -206,7 +206,7 @@ async def list_top_leaderboards(
             "lmsys_areana",
         ]
     ] = Query(..., description="The benchmarks to list"),
-    k: int = Query(5, ge=0, description="Maximum number of leaderboards"),
+    k: int = Query(5, ge=1, description="Maximum number of leaderboards"),
 ) -> Union[TopLeaderboardResponse, ErrorResponse]:
     """List top leaderboards."""
     try:
