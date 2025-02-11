@@ -1011,7 +1011,8 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Dummy Values
         # TODO: remove this after implementing actual service
-        examples = [
+        # NOTE: Commented out as it is not required for now, but keeping it here because this structure is integrated in the frontend
+        examples = [  # noqa: F841
             {
                 "prompt": "Explain the concept of machine learning in simple terms.",
                 "prompt_type": "string",
@@ -1025,6 +1026,7 @@ class LocalModelWorkflowService(SessionMixin):
                 "response_type": "string",
             },
         ]
+        examples = None  # NOTE: Temporary value, remove after integrating actual examples from model info
         minimum_requirements = {"device_name": "Xenon Dev", "core": 3, "memory": "32 GB", "RAM": "32 GB"}
 
         # Set provider id and icon
