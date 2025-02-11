@@ -2422,7 +2422,7 @@ class ModelService(SessionMixin):
         db_model_uris = [model.uri for model in db_models]
 
         # Fetch top leaderboards from bud_model app
-        bud_model_response = await self._perform_top_leaderboard_by_uri_request(db_model_uris, limit)
+        bud_model_response = await self._perform_top_leaderboard_by_uri_request(db_model_uris, benchmarks, limit)
         bud_model_leaderboards = bud_model_response.get("leaderboards", [])
 
         if len(bud_model_leaderboards) == 0:
@@ -2488,16 +2488,19 @@ class ModelService(SessionMixin):
 
         return model_info
 
-    async def _perform_top_leaderboard_by_uri_request(self, uris: List[str], k: int) -> Dict:
+    async def _perform_top_leaderboard_by_uri_request(
+        self, uris: List[str], benchmark_fields: List[str], k: int
+    ) -> Dict:
         """Perform top leaderboard fetch request to bud_model app.
 
         Args:
             uris: The uris of the models.
+            benchmark_fields: The benchmarks to return.
             k: The maximum number of leaderboards to return.
         """
         bud_model_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/leaderboard/models/compare"
 
-        query_params = {"model_uris": uris, "k": k}
+        query_params = {"model_uris": uris, "benchmark_fields": benchmark_fields, "k": k}
 
         logger.debug(f"Performing top leaderboard by uris request to budmodel {query_params}")
         try:
