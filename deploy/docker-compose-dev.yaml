@@ -35,7 +35,7 @@ services:
       "--app-port", "$APP_PORT",
       "--dapr-http-port", "$DAPR_HTTP_PORT",
       "--dapr-grpc-port", "$DAPR_GRPC_PORT",
-      "--placement-host-address", "placement:50006", # Dapr's placement service can be reach via the docker DNS entry
+      "--placement-host-address", "$DAPR_PLACEMENT_HOST:$DAPR_PLACEMENT_PORT", # Dapr's placement service can be reach via the docker DNS entry
       "--resources-path", "/components",
       "--config", "/config/appconfig.yaml",
       "--log-as-json"

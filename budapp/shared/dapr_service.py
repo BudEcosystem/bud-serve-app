@@ -230,34 +230,44 @@ class DaprService(DaprClient):
         store_name = store_name or app_settings.configstore_name
         assert store_name, "configstore is not configured."
         config: Dict[str, Any] = {}
-        if store_name:
-            keys = [keys] if isinstance(keys, str) else keys
-            try:
-                configuration = self.get_configuration(store_name=store_name, keys=keys, config_metadata={})
-                logger.info("Found %d/%d configurations, syncing...", len(configuration.items), len(keys))
-                config = {key: configuration.items[key].value for key in configuration.items}
-            except Exception as e:
-                logger.exception("Failed to get configurations: %s", str(e))
+        keys = [keys] if isinstance(keys, str) else keys
+        try:
+            configuration = self.get_configuration(store_name=store_name, keys=keys, config_metadata={})
+            logger.info(
+                "Found %d/%d configurations, syncing...",
+                len(configuration.items),
+                len(keys),
+            )
+            config = {key: configuration.items[key].value for key in configuration.items}
+        except Exception as e:
+            logger.exception("Failed to get configurations: %s", str(e))
 
         sub_id: Optional[str] = None
-        if store_name and subscription_callback is not None:
+        if subscription_callback is not None:
             try:
                 # FIXME: subscription gets stopped with the following message when the app receives a request
                 #  configstore configuration watcher for keys ['fastapi_soa.debug'] stopped.
                 sub_id = self.subscribe_configuration(
-                    store_name=store_name, keys=keys, handler=subscription_callback, config_metadata={}
+                    store_name=store_name,
+                    keys=keys,
+                    handler=subscription_callback,
+                    config_metadata={},
                 )
-                logger.debug("Successfully subscribed to config store with subscription id: %s", sub_id)
+                logger.info(
+                    "Successfully subscribed to config store with subscription id: %s",
+                    sub_id,
+                )
             except Exception as e:
                 logger.exception("Failed to subscribe to config store: %s", str(e))
 
         return config, sub_id
 
     @SuppressAndLog(Exception, _logger=logger, default_return={})
-    async def sync_secrets(
+    def sync_secrets(
         self,
         keys: Union[str, List[str]],
         store_name: Optional[str] = None,
+        secret_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Sync secrets from the specified secret store.
 
@@ -269,15 +279,18 @@ class DaprService(DaprClient):
             Dict[str, Any]: A dictionary of secrets where each key maps to its corresponding secret value.
         """
         store_name = store_name or app_settings.secretstore_name
+        secret_name = secret_name or app_settings.secretstore_secret_name
         assert store_name, "secretstore is not configured."
+
         secrets: Dict[str, Any] = {}
-        if store_name:
-            keys = [keys] if isinstance(keys, str) else keys
-            for key in keys:
-                try:
-                    secrets[key] = self.get_secret(store_name=store_name, key=key).secret.get(key)
-                except Exception as e:
-                    logger.error("Failed to get secret: %s", str(e))
+        keys = [keys] if isinstance(keys, str) else keys
+        for key in keys:
+            try:
+                value = self.get_secret(store_name=store_name, key=secret_name or key).secret.get(key)
+                if value is not None:
+                    secrets[key] = value
+            except Exception as e:
+                logger.error("Failed to get secret: %s", str(e))
 
             logger.info("Found %d/%d secrets, syncing...", len(secrets), len(keys))
 

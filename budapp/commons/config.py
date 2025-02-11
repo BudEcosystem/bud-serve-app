@@ -89,12 +89,11 @@ class BaseConfig(BaseSettings):
             ```
         """
         fields_to_sync = []
-        app_name = __version__.split("@")[0]
         for name, info in self.__fields__.items():
             extra = info.json_schema_extra or {}
             if extra.get("sync") is True:
                 fields_to_sync.append(
-                    f"{app_name}." if extra.get("is_global", False) is True else "" + (info.alias or name)
+                    (f"{self.name}_" if extra.get("is_global", False) is False else "") + (info.alias or name)
                 )
 
         return fields_to_sync
@@ -187,6 +186,7 @@ class AppConfig(BaseConfig):
 
     # Secret store
     secretstore_name: Optional[str] = None
+    secretstore_secret_name: Optional[str] = Field(None, alias="SECRETSTORE_SECRET_NAME")
 
     # State store
     statestore_name: Optional[str] = None
@@ -362,9 +362,11 @@ class SecretsConfig(BaseConfig):
     password_salt: str = Field("bud_password_salt", alias="PASSWORD_SALT")
     jwt_secret_key: str = Field(alias="JWT_SECRET_KEY")
     redis_password: str = Field(
-        alias="REDIS_PASSWORD", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
+        alias="SECRETS_REDIS_PASSWORD", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
     )
-    redis_uri: str = Field(alias="REDIS_URI", json_schema_extra=enable_periodic_sync_from_store(is_global=True))
+    redis_uri: str = Field(
+        alias="SECRETS_REDIS_URI", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
+    )
 
     @computed_field
     def redis_url(self) -> str:
