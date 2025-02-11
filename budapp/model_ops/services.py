@@ -100,6 +100,8 @@ from .schemas import (
     ModelSecurityScanResultCreate,
     ModelTree,
     PaperPublishedCreate,
+    TopLeaderboard,
+    TopLeaderboardBenchmark,
 )
 
 
@@ -2407,6 +2409,112 @@ class ModelService(SessionMixin):
         except Exception as e:
             logger.exception(f"Failed to send leaderboard fetch request: {e}")
             raise ClientException("Failed to fetch leaderboards") from e
+
+    async def get_top_leaderboards(self, benchmarks: List[str], limit: int) -> TopLeaderboard:
+        """Get top leaderboards of a model by uri.
+
+        Args:
+            benchmarks: The benchmarks to return.
+            limit: The maximum number of leaderboards to return.
+        """
+        # Get all active model uris
+        db_models = await ModelDataManager(self.session).get_all_by_fields(Model, {"status": ModelStatusEnum.ACTIVE})
+        db_model_uris = [model.uri for model in db_models]
+
+        # Fetch top leaderboards from bud_model app
+        bud_model_response = await self._perform_top_leaderboard_by_uri_request(db_model_uris, limit)
+        bud_model_leaderboards = bud_model_response.get("leaderboards", [])
+
+        if len(bud_model_leaderboards) == 0:
+            return []
+
+        # Get model info by uris
+        leaderboard_uris = [leaderboard.get("model_info", {}).get("uri") for leaderboard in bud_model_leaderboards]
+        db_models = await ModelDataManager(self.session).get_models_by_uris(leaderboard_uris)
+
+        # If no models found, return empty list
+        if len(db_models) == 0:
+            return []
+
+        db_model_info = await self._get_model_info_by_uris(db_models)
+
+        # Parse top leaderboard response
+        return await self._parse_top_leaderboard_response(bud_model_leaderboards, db_model_info, benchmarks)
+
+    async def _parse_top_leaderboard_response(
+        self, bud_model_leaderboards: List[Dict], db_model_info: Dict, fields: List[str]
+    ) -> List[TopLeaderboard]:
+        """Parse top leaderboard response from bud_model app."""
+        result = []
+
+        # Iterate over leaderboards
+        for leaderboard in bud_model_leaderboards:
+            leaderboard_model_uri = leaderboard.get("model_info", {}).get("uri")
+
+            # If model not found, skip
+            if leaderboard_model_uri not in db_model_info:
+                continue
+
+            benchmarks = []
+            for field in fields:
+                benchmarks.append(
+                    TopLeaderboardBenchmark(
+                        field=field,
+                        value=leaderboard.get(field),
+                        type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, ""),
+                        label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, ""),
+                    ).model_dump()
+                )
+            result.append(
+                TopLeaderboard(
+                    benchmarks=benchmarks,
+                    name=db_model_info.get(leaderboard_model_uri, {}).get("name"),
+                    provider_type=db_model_info.get(leaderboard_model_uri, {}).get("provider_type"),
+                )
+            )
+
+        return result
+
+    async def _get_model_info_by_uris(self, db_models: List[Model]) -> Dict:
+        """Get model info by uris."""
+        model_info = {}
+
+        # Collect name and provider type for each model
+        for db_model in db_models:
+            model_info[db_model.uri] = {
+                "name": db_model.name,
+                "provider_type": db_model.provider_type,
+            }
+
+        return model_info
+
+    async def _perform_top_leaderboard_by_uri_request(self, uris: List[str], k: int) -> Dict:
+        """Perform top leaderboard fetch request to bud_model app.
+
+        Args:
+            uris: The uris of the models.
+            k: The maximum number of leaderboards to return.
+        """
+        bud_model_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/leaderboard/models/compare"
+
+        query_params = {"model_uris": uris, "k": k}
+
+        logger.debug(f"Performing top leaderboard by uris request to budmodel {query_params}")
+        try:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(bud_model_endpoint, params=query_params) as response,
+            ):
+                response_data = await response.json()
+                if response.status != 200:
+                    logger.error(f"Failed to fetch top leaderboards: {response.status} {response_data}")
+                    raise ClientException("Failed to fetch top leaderboards")
+
+                logger.debug("Successfully fetched top leaderboards from budmodel")
+                return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send top leaderboard by uris request: {e}")
+            raise ClientException("Failed to fetch top leaderboards") from e
 
 
 class ModelServiceUtil(SessionMixin):
