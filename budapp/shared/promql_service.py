@@ -270,7 +270,7 @@ class PrometheusMetricsClient:
         except Exception:
             return {}
 
-    def get_node_events_count(self, node_ip: str) -> int:
+    def get_node_events_count(self, node_name: str) -> int:
         """Get the count of events for a specific node in the last 24 hours.
 
         Args:
@@ -304,7 +304,10 @@ class PrometheusMetricsClient:
             events_data = response.json()
             # Extract the events count for the specific node from the response
             # Assuming the response contains a mapping of node IPs to event counts
-            return events_data.get(node_ip, 0)
+            
+            # Fetch the node details 
+            
+            return events_data.get(node_name, 0)
 
         except HTTPException as e:
             # Properly format the error response
@@ -374,7 +377,7 @@ class PrometheusMetricsClient:
 
             bandwidth_metrics = self.get_network_bandwidth(node_ip)
             # network_stats = self.get_network_stats(node_ip)
-            events_count = self.get_node_events_count(node_ip)
+            events_count = self.get_node_events_count(node_name)
 
             nodes_json["nodes"][node_ip] = {
                 "hostname": node_name,
