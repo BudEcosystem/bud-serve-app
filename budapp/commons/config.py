@@ -89,11 +89,12 @@ class BaseConfig(BaseSettings):
             ```
         """
         fields_to_sync = []
+        app_name = __version__.split("@")[0]
         for name, info in self.__fields__.items():
             extra = info.json_schema_extra or {}
             if extra.get("sync") is True:
                 fields_to_sync.append(
-                    (f"{self.name}_" if extra.get("is_global", False) is False else "") + (info.alias or name)
+                    f"{app_name}." if extra.get("is_global", False) is True else "" + (info.alias or name)
                 )
 
         return fields_to_sync
