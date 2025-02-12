@@ -307,7 +307,7 @@ class PrometheusMetricsClient:
             
             # Fetch the node details 
             
-            return events_data.get(node_name, 0)
+            return events_data.get("data", {}).get(node_name, 0)
 
         except HTTPException as e:
             # Properly format the error response
