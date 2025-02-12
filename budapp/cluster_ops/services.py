@@ -1153,3 +1153,42 @@ class ClusterService(SessionMixin):
             raise ClientException(f"Failed to get node metrics: {str(e)}")
 
         return nodes_status
+
+    async def get_node_wise_events_by_hostname(self, cluster_id: UUID, node_hostname: str, page: int = 1, size: int = 10) -> Dict[str, Any]:
+        """Get node-wise events for a cluster by hostname.
+
+        Args:
+            cluster_id: The ID of the cluster to get events for
+            node_hostname: The hostname of the node to get events for
+            page: The page number to get
+            size: The number of events to get
+
+        Returns:
+            Dict containing the node-wise events
+        """
+        db_cluster = await self.get_cluster_details(cluster_id)
+        
+        try:
+            events_cluster_endpoint = (
+                f"{app_settings.dapr_base_url}v1.0/invoke"
+                f"/{app_settings.bud_cluster_app_id}/method"
+                f"/cluster/{db_cluster.cluster_id}/node-wise-events/{node_hostname}"
+                f"?page={page}&size={size}"
+            )
+            
+            async with aiohttp.ClientSession() as session, session.get(events_cluster_endpoint) as response:
+                response_data = await response.json()
+                
+                logger.debug(f"Node-wise events response: {response_data}")
+                
+                if response.status != 200 or response_data.get("object") == "error":
+                    logger.error(f"Failed to get node-wise events: {response.status} {response_data}")
+                    raise ClientException("Failed to get node-wise events")
+                
+                return response_data.get("data", {})
+
+        except Exception as e:
+            raise ClientException(f"Failed to get node-wise events: {str(e)}")
+        
+        
+
