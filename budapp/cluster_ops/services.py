@@ -1185,7 +1185,7 @@ class ClusterService(SessionMixin):
                     logger.error(f"Failed to get node-wise events: {response.status} {response_data}")
                     raise ClientException("Failed to get node-wise events")
                 
-                return response_data.get("data", [])
+                return response_data.get("data", {})
 
         except Exception as e:
             raise ClientException(f"Failed to get node-wise events: {str(e)}")

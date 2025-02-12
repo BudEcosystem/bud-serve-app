@@ -542,12 +542,13 @@ async def get_node_wise_events_by_hostname(
     try:
         events_raw = await ClusterService(session).get_node_wise_events_by_hostname(cluster_id, node_hostname, page, limit)
 
-        # total_count = events_raw.get("total_record", 0)
-        # events = events_raw.get("events", [])
+        total = events_raw.get("total", 0)
+        events = events_raw.get("events", [])
+        total_pages =  events_raw.get("total_pages", 0)
         
         return ClusterNodeWiseEventsPaginatedResponse(
             code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname",     
-            events=events_raw, total_record=0, page=page, limit=limit
+            events=events, total_record=total, page=page, limit=limit, total_pages=total_pages,
         )
     except ClientException as e:
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
