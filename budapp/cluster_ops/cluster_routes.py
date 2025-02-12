@@ -548,7 +548,7 @@ async def get_node_wise_events_by_hostname(
         
         return ClusterNodeWiseEventsPaginatedResponse(
             code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname",     
-            events=events, total_record=total, page=page, limit=limit, total_pages=total_pages,
+            events=events, total_record=total, page=page, limit=limit
         )
     except ClientException as e:
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
