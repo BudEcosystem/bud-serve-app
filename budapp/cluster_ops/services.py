@@ -1170,7 +1170,7 @@ class ClusterService(SessionMixin):
         
         try:
             events_cluster_endpoint = (
-                f"{app_settings.dapr_base_url}/v1.0/invoke"
+                f"{app_settings.dapr_base_url}v1.0/invoke"
                 f"/{app_settings.bud_cluster_app_id}/method"
                 f"/cluster/{db_cluster.cluster_id}/node-wise-events/{node_hostname}"
                 f"?page={page}&size={size}"

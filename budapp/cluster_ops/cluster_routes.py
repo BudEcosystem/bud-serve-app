@@ -536,18 +536,18 @@ async def get_node_wise_events_by_hostname(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     page: int = 1,
-    size: int = 10,
+    limit: int = 10,
 ) -> Union[ClusterNodeWiseEventsPaginatedResponse, ErrorResponse]: # TODO: Change to Proper Pagination
     """Get node-wise metrics by hostname with pagination."""
     try:
-        events_raw = await ClusterService(session).get_node_wise_events_by_hostname(cluster_id, node_hostname, page, size)
+        events_raw = await ClusterService(session).get_node_wise_events_by_hostname(cluster_id, node_hostname, page, limit)
 
         total_count = events_raw.get("total_record", 0)
         events = events_raw.get("events", [])
         
         return ClusterNodeWiseEventsPaginatedResponse(
             code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname",     
-            data=events, total_count=total_count, page=page, size=size
+            events=events, total_record=total_count, page=page, limit=limit
         )
     except ClientException as e:
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
