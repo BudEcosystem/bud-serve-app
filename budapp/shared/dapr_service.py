@@ -292,7 +292,7 @@ class DaprService(DaprClient):
             except Exception as e:
                 logger.error("Failed to get secret: %s", str(e))
 
-            logger.info("Found %d/%d secrets, syncing...", len(secrets), len(keys))
+        logger.info("Found %d/%d secrets, syncing...", len(secrets), len(keys))
 
         return secrets
 

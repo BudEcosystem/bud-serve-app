@@ -94,7 +94,7 @@ class BaseConfig(BaseSettings):
             extra = info.json_schema_extra or {}
             if extra.get("sync") is True:
                 fields_to_sync.append(
-                    f"{app_name}." if extra.get("is_global", False) is True else "" + (info.alias or name)
+                    f"{app_name}." if extra.get("is_global", False) is False else "" + (info.alias or name)
                 )
 
         return fields_to_sync
@@ -362,11 +362,11 @@ class SecretsConfig(BaseConfig):
     dapr_api_token: Optional[str] = Field(None, alias="DAPR_API_TOKEN")
     password_salt: str = Field("bud_password_salt", alias="PASSWORD_SALT")
     jwt_secret_key: str = Field(alias="JWT_SECRET_KEY")
-    redis_password: str = Field(
-        alias="SECRETS_REDIS_PASSWORD", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
+    redis_password: Optional[str] = Field(
+        None, alias="REDIS_PASSWORD", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
     )
-    redis_uri: str = Field(
-        alias="SECRETS_REDIS_URI", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
+    redis_uri: Optional[str] = Field(
+        None, alias="REDIS_URI", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
     )
 
     @computed_field
