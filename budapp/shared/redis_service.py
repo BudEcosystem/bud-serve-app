@@ -79,8 +79,12 @@ class RedisService:
                 logger.exception(f"Error getting Redis keys: {e}")
                 raise RedisException("Error getting Redis keys") from e
 
-    async def delete(self, *names: KeyT) -> ResponseT:
+    async def delete(self, *names: Optional[KeyT]) -> ResponseT:
         """Delete a key from Redis."""
+        if not names:
+            logger.warning("No keys to delete")
+            return 0
+
         async with self.redis_singleton as redis:
             try:
                 return await redis.delete(*names)
