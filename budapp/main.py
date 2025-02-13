@@ -27,11 +27,11 @@ from fastapi.staticfiles import StaticFiles
 
 from .auth import auth_routes
 from .cluster_ops import cluster_routes
-from .credential_ops import credential_routes
 from .commons import logging
 from .commons.config import app_settings
 from .commons.constants import Environment
 from .core import common_routes, meta_routes, notify_routes
+from .credential_ops import credential_routes
 from .endpoint_ops import endpoint_routes
 from .initializers.seeder import seeders
 from .metric_ops import metric_routes
@@ -64,8 +64,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from random import randint
 
         await asyncio.sleep(3)
-
         await meta_routes.register_service()
+        await asyncio.sleep(1.5)
+
         while True:
             await meta_routes.sync_configurations()
             await meta_routes.sync_secrets()
@@ -77,10 +78,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 )
             )
 
-    if app_settings.configstore_name or app_settings.secretstore_name:
-        task = asyncio.create_task(schedule_secrets_and_config_sync())
-    else:
-        task = None
+    task = asyncio.create_task(schedule_secrets_and_config_sync())
 
     for seeder_name, seeder in seeders.items():
         try:
@@ -91,11 +89,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
-    if task is not None:
-        try:
-            task.cancel()
-        except asyncio.CancelledError:
-            logger.exception("Failed to cleanup config & store sync.")
+    try:
+        task.cancel()
+    except asyncio.CancelledError:
+        logger.exception("Failed to cleanup config & store sync.")
 
 
 app = FastAPI(

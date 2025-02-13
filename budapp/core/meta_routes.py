@@ -139,6 +139,12 @@ async def sync_configurations() -> Response:
             "message": "5/10 configuration(s) synced."
         }
     """
+    if app_settings is None:
+        return ErrorResponse(
+            message="Application is not configured properly, some settings are missing.",
+            code=500,
+        ).to_http_response()
+
     if app_settings.configstore_name:
         fields_to_sync = app_settings.get_fields_to_sync()
 
@@ -195,11 +201,17 @@ async def sync_secrets() -> Response:
             "message": "7/10 secret(s) synced."
         }
     """
+    if app_settings is None or secrets_settings is None:
+        return ErrorResponse(
+            message="Application is not configured properly, some settings are missing.",
+            code=500,
+        ).to_http_response()
+
     if app_settings.secretstore_name:
         fields_to_sync = secrets_settings.get_fields_to_sync()
 
         with DaprService() as dapr_service:
-            values = await dapr_service.sync_secrets(fields_to_sync)
+            values = dapr_service.sync_secrets(fields_to_sync)
 
         secrets_settings.update_fields(values)
 
