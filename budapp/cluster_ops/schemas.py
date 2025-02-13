@@ -235,6 +235,10 @@ class ClusterEndpointFilter(BaseModel):
     name: str | None = None
     status: EndpointStatusEnum | None = None
 
+# Cluster Events Schema Paginated Response
+class ClusterNodeWiseEventsPaginatedResponse(PaginatedSuccessResponse):
+    """Cluster node-wise events paginated response schema."""
+    events: Optional[list] = []
 
 # Cluster Metrics Schema
 class TimeSeriesPoint(BaseModel):

@@ -17,8 +17,6 @@ class ClusterMetricsFetcher:
         """Initialize with Prometheus server URL."""
         self.prometheus_url = prometheus_url
         self.api_url = f"{prometheus_url}/api/v1"
-        self._time_range_cache = TTLCache(maxsize=100, ttl=300)  # 5 minutes TTL
-
     def _get_time_range_params(self, time_range: str, include_previous: bool = False) -> dict:
         """Get start and end timestamps based on time range."""
         now = datetime.now(timezone.utc)

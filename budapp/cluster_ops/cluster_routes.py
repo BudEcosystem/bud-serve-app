@@ -44,6 +44,7 @@ from .schemas import (
     ClusterEndpointPaginatedResponse,
     ClusterFilter,
     ClusterListResponse,
+    ClusterNodeWiseEventsPaginatedResponse,
     CreateClusterWorkflowRequest,
     EditClusterRequest,
     NodeMetricsResponse,
@@ -509,4 +510,51 @@ async def get_node_wise_metrics(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Error retrieving node-wise metrics",
+        ).to_http_response()
+
+@cluster_router.get(
+    "/{cluster_id}/node-events/{node_hostname}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ClusterNodeWiseEventsPaginatedResponse,
+            "description": "Successfully retrieved node-wise metrics by hostname with pagination",
+        },
+    },
+    description="Get node-wise Events by hostname with pagination",
+)
+async def get_node_wise_events_by_hostname(
+    cluster_id: UUID,
+    node_hostname: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    page: int = 1,
+    limit: int = 10,
+) -> Union[ClusterNodeWiseEventsPaginatedResponse, ErrorResponse]: # TODO: Change to Proper Pagination
+    """Get node-wise metrics by hostname with pagination."""
+    try:
+        events_raw = await ClusterService(session).get_node_wise_events_by_hostname(cluster_id, node_hostname, page, limit)
+
+        total = events_raw.get("total", 0)
+        events = events_raw.get("events", [])
+        total_pages =  events_raw.get("total_pages", 0)
+        
+        return ClusterNodeWiseEventsPaginatedResponse(
+            code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname",     
+            events=events, total_record=total, page=page, limit=limit
+        )
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Error retrieving node-wise metrics by hostname: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Error retrieving node-wise metrics by hostname",
         ).to_http_response()
