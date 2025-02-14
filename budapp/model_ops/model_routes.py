@@ -58,6 +58,7 @@ from .schemas import (
     RecommendedTagsResponse,
     TagsListResponse,
     TasksListResponse,
+    TopLeaderboardRequest,
     TopLeaderboardResponse,
 )
 from .services import (
@@ -163,7 +164,7 @@ async def list_all_models(
     ).to_http_response()
 
 
-@model_router.get(
+@model_router.post(
     "/top-leaderboards",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
@@ -184,33 +185,11 @@ async def list_all_models(
 async def list_top_leaderboards(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    benchmarks: List[
-        Literal[
-            "bcfl",
-            "live_code_bench",
-            "classification",
-            "clustering",
-            "pair_classification",
-            "reranking",
-            "retrieval",
-            "semantic",
-            "summarization",
-            "mmbench",
-            "mmstar",
-            "mmmu",
-            "math_vista",
-            "ocr_bench",
-            "ai2d",
-            "hallucination_bench",
-            "mmvet",
-            "lmsys_areana",
-        ]
-    ] = Query(..., description="The benchmarks to list"),
-    k: int = Query(5, ge=1, description="Maximum number of leaderboards"),
+    request: TopLeaderboardRequest,
 ) -> Union[TopLeaderboardResponse, ErrorResponse]:
     """List top leaderboards."""
     try:
-        leaderboards = await ModelService(session).get_top_leaderboards(benchmarks, k)
+        leaderboards = await ModelService(session).get_top_leaderboards(request.benchmarks, request.k)
         return TopLeaderboardResponse(
             leaderboards=leaderboards,
             code=status.HTTP_200_OK,
