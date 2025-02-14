@@ -695,7 +695,7 @@ class ClusterMetricsFetcher:
         Args:
             cluster_id: The cluster ID to fetch metrics for
             time_range: One of '10min', 'today', '7days', 'month'
-            metric_type: Type of metric to fetch ('all', 'memory', 'cpu', 'disk', 'network_in', 'network_out', 'network_bandwidth')
+            metric_type: Type of metric to fetch ('all', 'memory', 'cpu', 'disk', 'network_in', 'network_out', 'network_bandwidth', 'power')
 
         Returns:
             Dict with node and summary metrics for the requested metric type
@@ -734,7 +734,7 @@ class ClusterMetricsFetcher:
                     if query_name in all_queries:
                         queries[query_name] = all_queries[query_name]
 
-        if not queries:
+        if not queries and metric_type != "power":
             logger.error(f"Invalid metric type: {metric_type}")
             return None
 
@@ -848,20 +848,22 @@ class ClusterMetricsFetcher:
                 for metric_name, query in queries.items():
                     task = self._fetch_metrics(session, query, current_time_params)
                     tasks.append((metric_name, task))
-
-                # Fetch Power Metrics
-                power_task = self._fetch_power_metrics(session, power_query, current_time_params)
-                tasks.append(("power", power_task))
+                    
+                # Condition to check if power query is present
+                if metric_type == "all" or metric_type == "power":
+                    # Fetch Power Metrics
+                    power_task = self._fetch_power_metrics(session, power_query, current_time_params)
+                    tasks.append(("power", power_task))
 
                 # If it's "today", also fetch previous day metrics
                 if previous_time_params:
                     for metric_name, query in queries.items():
                         task = self._fetch_metrics(session, query, previous_time_params)
                         tasks.append((f"prev_{metric_name}", task))
-
-                # Previous Power Query
-                power_task_pr = self._fetch_power_metrics(session, power_query_pre, current_time_params)
-                tasks.append(("pre_power", power_task_pr))
+                if metric_type == "all" or metric_type == "power":
+                    # Previous Power Query
+                    power_task_pr = self._fetch_power_metrics(session, power_query_pre, current_time_params)
+                    tasks.append(("pre_power", power_task_pr))
 
                 # Gather results
                 current_results = {}

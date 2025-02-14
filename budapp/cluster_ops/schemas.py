@@ -298,6 +298,12 @@ class StorageMetrics(BaseModel):
     usage_percent: float = Field(default=0.0)
     change_percent: float = Field(default=0.0)
 
+class PowerMetrics(BaseModel):
+    """Power metrics schema."""
+
+    total_kwh: float = Field(default=0.0)
+    unit: str = Field(default="kWh")
+    change_percent: float = Field(default=0.0)
 
 class NodeMetrics(BaseModel):
     """Node level metrics schema."""
@@ -308,6 +314,9 @@ class NodeMetrics(BaseModel):
     network_in: Optional[NetworkMetrics] = Field(default_factory=NetworkMetrics)
     network_out: Optional[NetworkOutMetrics] = Field(default_factory=NetworkOutMetrics)
     network_bandwidth: Optional[NetworkBandwidthMetrics] = Field(default_factory=NetworkBandwidthMetrics)
+    power: Optional[PowerMetrics] = Field(default_factory=PowerMetrics)
+
+
 
 
 class ClusterSummaryMetrics(BaseModel):
@@ -319,6 +328,7 @@ class ClusterSummaryMetrics(BaseModel):
     network_in: Optional[NetworkMetrics] = Field(default_factory=NetworkMetrics)
     network_out: Optional[NetworkOutMetrics] = Field(default_factory=NetworkOutMetrics)
     network_bandwidth: Optional[NetworkBandwidthMetrics] = Field(default_factory=NetworkBandwidthMetrics)
+    power: Optional[PowerMetrics] = Field(default_factory=PowerMetrics)
 
 
 class ClusterMetricsResponse(SuccessResponse):
@@ -422,6 +432,7 @@ class MetricTypeEnum(Enum):
     NETWORK_IN = "network_in"
     NETWORK_OUT = "network_out"
     NETWORK_BANDWIDTH = "network_bandwidth"
+    POWER = "power"
 
 
 class PrometheusConfig(BaseModel):
