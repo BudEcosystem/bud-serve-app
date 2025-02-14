@@ -40,6 +40,7 @@ from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
+from ..commons.constants import BENCHMARK_FIELDS_TYPE_MAPPER
 from .schemas import (
     CancelDeploymentWorkflowRequest,
     CreateCloudModelWorkflowRequest,
@@ -184,31 +185,22 @@ async def list_all_models(
 async def list_top_leaderboards(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    benchmarks: List[
-        Literal[
-            "bcfl",
-            "live_code_bench",
-            "classification",
-            "clustering",
-            "pair_classification",
-            "reranking",
-            "retrieval",
-            "semantic",
-            "summarization",
-            "mmbench",
-            "mmstar",
-            "mmmu",
-            "math_vista",
-            "ocr_bench",
-            "ai2d",
-            "hallucination_bench",
-            "mmvet",
-            "lmsys_areana",
-        ]
-    ] = Query(..., description="The benchmarks to list"),
+    benchmarks: List[str] = Query(
+        ...,
+        description="The benchmarks to list: bcfl, live_code_bench, classification, clustering, pair_classification, reranking, retrieval, semantic, summarization, mmbench, mmstar, mmmu, math_vista, ocr_bench, ai2d, hallucination_bench, mmvet, lmsys_areana,",
+    ),
     k: int = Query(5, ge=1, description="Maximum number of leaderboards"),
 ) -> Union[TopLeaderboardResponse, ErrorResponse]:
     """List top leaderboards."""
+    valid_benchmarks = set(BENCHMARK_FIELDS_TYPE_MAPPER.keys())
+
+    # Check if all benchmarks are valid
+    if not all(benchmark in valid_benchmarks for benchmark in benchmarks):
+        invalid_benchmarks = [b for b in benchmarks if b not in valid_benchmarks]
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            message=f"Invalid benchmarks: {', '.join(invalid_benchmarks)}",
+        ).to_http_response()
     try:
         leaderboards = await ModelService(session).get_top_leaderboards(benchmarks, k)
         return TopLeaderboardResponse(
