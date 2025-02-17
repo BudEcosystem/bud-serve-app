@@ -820,3 +820,38 @@ class CancelDeploymentWorkflowRequest(BaseModel):
     """Cancel deployment workflow request schema."""
 
     workflow_id: UUID4
+
+
+class TopLeaderboardRequest(BaseModel):
+    """Top leaderboard request schema."""
+
+    benchmarks: list[
+        Literal[
+            "bcfl",
+            "live_code_bench",
+            "classification",
+            "clustering",
+            "pair_classification",
+            "reranking",
+            "retrieval",
+            "semantic",
+            "summarization",
+            "mmbench",
+            "mmstar",
+            "mmmu",
+            "math_vista",
+            "ocr_bench",
+            "ai2d",
+            "hallucination_bench",
+            "mmvet",
+            "lmsys_areana",
+        ]
+    ] = Field(..., description="The benchmarks to list")
+    k: int = Field(5, description="Maximum number of leaderboards", ge=1)
+
+    @model_validator(mode="after")
+    def validate_benchmarks(self) -> "TopLeaderboardRequest":
+        """Validate the benchmarks."""
+        if not self.benchmarks:
+            raise ValueError("Benchmarks are required")
+        return self

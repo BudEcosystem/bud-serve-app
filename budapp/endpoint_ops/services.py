@@ -252,6 +252,7 @@ class EndpointService(SessionMixin):
         try:
             redis_service = RedisService()
             endpoint_redis_keys = await redis_service.keys(f"router_config:*:{db_endpoint.name}")
+            logger.debug(f"Endpoint redis keys: {endpoint_redis_keys}")
             endpoint_redis_keys_count = await redis_service.delete(*endpoint_redis_keys)
             logger.debug(f"Deleted endpoint data from redis: {endpoint_redis_keys_count} keys")
         except (RedisException, Exception) as e:
