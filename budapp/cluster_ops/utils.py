@@ -907,6 +907,8 @@ class ClusterMetricsFetcher:
             processed_metrics = self._process_metrics(
                 current_results, previous_results if previous_time_params else None
             )
+            
+            logger.debug(f"Processed Metrics: {processed_metrics}")
 
             # Add metadata
             processed_metrics.update(
