@@ -56,6 +56,7 @@ class ClusterMetricsFetcher:
     def _get_metric_queries(self, cluster_name: str) -> Dict[str, str]:
         """Get memory, CPU, storage, and network-related Prometheus queries."""
         return {
+            "node_uname_info": f'node_uname_info{{cluster="{cluster_name}",job="node-exporter"}}',
             "memory_total": f'node_memory_MemTotal_bytes{{cluster="{cluster_name}",job="node-exporter"}}',
             "memory_available": f'node_memory_MemAvailable_bytes{{cluster="{cluster_name}",job="node-exporter"}}',
             "cpu_usage": f'(1 - avg by (instance) (irate(node_cpu_seconds_total{{cluster="{cluster_name}",mode="idle",job="node-exporter"}}[5m]))) * 100',
@@ -150,6 +151,18 @@ class ClusterMetricsFetcher:
                 "network_bandwidth": {"total_mbps": 0, "change_percent": 0, "time_series": []},
             },
         }
+        
+        nodename_to_instance = {}
+        try:
+            for node_data in current_results.get('node_uname_info', []):
+                if 'metric' in node_data:
+                    nodename = node_data['metric'].get('nodename')
+                    instance = node_data['metric'].get('instance')
+                    if nodename and instance:
+                        nodename_to_instance[nodename] = instance
+            logger.debug(f"Nodename to instance mapping: {nodename_to_instance}")
+        except Exception as e:
+            logger.error(f"Error creating nodename to instance mapping: {e}")
 
         # Get previous cluster usage if available
         previous_memory_usage = None
@@ -216,8 +229,13 @@ class ClusterMetricsFetcher:
         # Process Power Metrics
         if "power" in current_results:
             logger.debug(f"Power Metrics: {current_results['power']}")
+            
+            #[{'metric': {'instance': 'fl4u42'}, 'value': [1739776921.221, '1.0290890332632034']}, {'metric': {'instance': 'fl4u44'}, 'value': [1739776921.221, '1.0421553174477174']}]"
             for node_data in current_results["power"]:
-                instance = node_data["metric"]["instance"]
+                
+                 
+                nodename = node_data["metric"]["instance"]
+                instance = nodename_to_instance.get(nodename)
                 processed_nodes.add(instance)
                 init_node_metrics(instance)
                 total_values = round(float(node_data["value"][1]), 2)
@@ -720,13 +738,13 @@ class ClusterMetricsFetcher:
         else:
             # Map metric types to their required queries
             metric_query_mapping = {
-                "memory": ["memory_total", "memory_available"],
-                "cpu": ["cpu_usage"],
-                "disk": ["storage_total", "storage_available"],
-                "network_in": ["network_in"],
-                "network_out": ["network_out"],
-                "network_bandwidth": ["network_bandwidth"],
-                "network": ["network_in", "network_out", "network_bandwidth"],
+                "memory": ["memory_total", "memory_available","node_uname_info"],
+                "cpu": ["cpu_usage","node_uname_info"],
+                "disk": ["storage_total", "storage_available","node_uname_info"],
+                "network_in": ["network_in","node_uname_info"],
+                "network_out": ["network_out","node_uname_info"],
+                "network_bandwidth": ["network_bandwidth","node_uname_info"],
+                "network": ["network_in", "network_out", "network_bandwidth","node_uname_info"],
             }
 
             if metric_type in metric_query_mapping:

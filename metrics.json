@@ -1,0 +1,152 @@
+{
+    "nodes": {
+        "10.25.30.22:9100": {
+            "memory": {},
+            "cpu": {
+                "usage_percent": 0,
+                "change_percent": 0
+            },
+            "storage": {
+                "total_gib": 0,
+                "used_gib": 0,
+                "available_gib": 0,
+                "usage_percent": 0,
+                "change_percent": 0
+            },
+            "network_in": {
+                "inbound_mbps": 0,
+                "change_percent": 0,
+                "time_series": []
+            },
+            "network_out": {
+                "outbound_mbps": 0,
+                "change_percent": 0,
+                "time_series": []
+            },
+            "network_bandwidth": {
+                "total_mbps": 4.96,
+                "change_percent": 0,
+                "time_series": [
+                    {
+                        "timestamp": 1738577700,
+                        "value": 53.79
+                    },
+                    {
+                        "timestamp": 1738578000,
+                        "value": 239.61
+                    },
+                    {
+                        "timestamp": 1738578300,
+                        "value": 63.87
+                    },
+                    {
+                        "timestamp": 1738578600,
+                        "value": 4.96
+                    }
+                ]
+            }
+        },
+        "10.25.30.26:9100": {
+            "memory": {},
+            "cpu": {
+                "usage_percent": 0,
+                "change_percent": 0
+            },
+            "storage": {
+                "total_gib": 0,
+                "used_gib": 0,
+                "available_gib": 0,
+                "usage_percent": 0,
+                "change_percent": 0
+            },
+            "network_in": {
+                "inbound_mbps": 0,
+                "change_percent": 0,
+                "time_series": []
+            },
+            "network_out": {
+                "outbound_mbps": 0,
+                "change_percent": 0,
+                "time_series": []
+            },
+            "network_bandwidth": {
+                "total_mbps": 0.63,
+                "change_percent": 0,
+                "time_series": [
+                    {
+                        "timestamp": 1738577700,
+                        "value": 279.18
+                    },
+                    {
+                        "timestamp": 1738578000,
+                        "value": 49.96
+                    },
+                    {
+                        "timestamp": 1738578300,
+                        "value": 0.65
+                    },
+                    {
+                        "timestamp": 1738578600,
+                        "value": 0.63
+                    }
+                ]
+            }
+        }
+    },
+    "cluster_summary": {
+        "memory": {
+            "total_gib": 0,
+            "used_gib": 0,
+            "available_gib": 0,
+            "usage_percent": 0,
+            "change_percent": 0
+        },
+        "cpu": {
+            "usage_percent": 0,
+            "change_percent": 0
+        },
+        "storage": {
+            "total_gib": 0,
+            "used_gib": 0,
+            "available_gib": 0,
+            "usage_percent": 0,
+            "change_percent": 0
+        },
+        "network_in": {
+            "inbound_mbps": 0,
+            "change_percent": 0,
+            "time_series": []
+        },
+        "network_out": {
+            "outbound_mbps": 0,
+            "change_percent": 0,
+            "time_series": []
+        },
+        "network_bandwidth": {
+            "total_mbps": 5.59,
+            "change_percent": 0,
+            "time_series": [
+                {
+                    "timestamp": 1738577700,
+                    "value": 332.97
+                },
+                {
+                    "timestamp": 1738578000,
+                    "value": 289.58
+                },
+                {
+                    "timestamp": 1738578300,
+                    "value": 64.52
+                },
+                {
+                    "timestamp": 1738578600,
+                    "value": 5.59
+                }
+            ]
+        }
+    },
+    "timestamp": "2025-02-03T10:32:34.038042+00:00",
+    "time_range": "today",
+    "cluster_id": "1185ae68-6c60-42d0-b3f0-0d67d7a0f279",
+    "metric_type": "network_bandwidth"
+}

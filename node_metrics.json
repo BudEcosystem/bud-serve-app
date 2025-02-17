@@ -1,0 +1,173 @@
+{
+  "nodes": [
+    {
+      "name": "fl4u42",
+      "metrics": {
+        "nodeReadyStatus": {
+          "status": "Ready",
+          "percentage": 100
+        },
+        "podsAvailable": {
+          "current": 8,
+          "desired": 110,
+          "percentage": 7
+        },
+        "cpuRequests": {
+          "current": 0.12,
+          "allocatable": 223,
+          "percentage": 0.06
+        },
+        "memoryRequests": {
+          "current": 38,
+          "allocatable": 501,
+          "percentage": 8,
+          "unit": "GiB"
+        },
+        "networkIO": {
+          "current": 119.38,
+          "receive": 28.83,
+          "transmit": 90.55,
+          "unit": "KiB/s",
+          "trend": "fluctuating",
+          "history": [
+            {
+              "timestamp": 1738310984,
+              "value": 119.0
+            },
+            {
+              "timestamp": 1738311584,
+              "value": 119.02
+            },
+            {
+              "timestamp": 1738312184,
+              "value": 119.39
+            },
+            {
+              "timestamp": 1738312784,
+              "value": 119.53
+            },
+            {
+              "timestamp": 1738313384,
+              "value": 119.22
+            },
+            {
+              "timestamp": 1738313984,
+              "value": 119.55
+            },
+            {
+              "timestamp": 1738314584,
+              "value": 119.38
+            }
+          ]
+        },
+        "events": {
+          "count": "0",
+          "status": "normal"
+        }
+      }
+    },
+    {
+      "name": "fl4u44",
+      "metrics": {
+        "nodeReadyStatus": {
+          "status": "Ready",
+          "percentage": 100
+        },
+        "podsAvailable": {
+          "current": 5,
+          "desired": 110,
+          "percentage": 5
+        },
+        "cpuRequests": {
+          "current": 0.52,
+          "allocatable": 223,
+          "percentage": 0.23
+        },
+        "memoryRequests": {
+          "current": 1,
+          "allocatable": 501,
+          "percentage": 0,
+          "unit": "GiB"
+        },
+        "networkIO": {
+          "current": 1381.85,
+          "receive": 822.83,
+          "transmit": 559.03,
+          "unit": "KiB/s",
+          "trend": "fluctuating",
+          "history": [
+            {
+              "timestamp": 1738310985,
+              "value": 1379.84
+            },
+            {
+              "timestamp": 1738311585,
+              "value": 1381.44
+            },
+            {
+              "timestamp": 1738312185,
+              "value": 1380.68
+            },
+            {
+              "timestamp": 1738312785,
+              "value": 1380.06
+            },
+            {
+              "timestamp": 1738313385,
+              "value": 1380.05
+            },
+            {
+              "timestamp": 1738313985,
+              "value": 1380.3
+            },
+            {
+              "timestamp": 1738314585,
+              "value": 1381.85
+            }
+          ]
+        },
+        "events": {
+          "count": "0",
+          "status": "normal"
+        }
+      }
+    },
+    {
+      "name": "fl4u46",
+      "metrics": {
+        "nodeReadyStatus": {
+          "status": "NotReady",
+          "percentage": 0
+        },
+        "podsAvailable": {
+          "current": 0,
+          "desired": 110,
+          "percentage": 0
+        },
+        "cpuRequests": {
+          "current": 0.0,
+          "allocatable": 223,
+          "percentage": 0.0
+        },
+        "memoryRequests": {
+          "current": 0,
+          "allocatable": 501,
+          "percentage": 0,
+          "unit": "GiB"
+        },
+        "networkIO": {
+          "current": 0.0,
+          "receive": 0.0,
+          "transmit": 0.0,
+          "unit": "KiB/s",
+          "trend": "fluctuating",
+          "history": []
+        },
+        "events": {
+          "count": "0",
+          "status": "normal"
+        }
+      }
+    }
+  ]
+}
