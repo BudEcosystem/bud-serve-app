@@ -328,7 +328,7 @@ class ClusterSummaryMetrics(BaseModel):
     network_in: Optional[NetworkMetrics] = Field(default_factory=NetworkMetrics)
     network_out: Optional[NetworkOutMetrics] = Field(default_factory=NetworkOutMetrics)
     network_bandwidth: Optional[NetworkBandwidthMetrics] = Field(default_factory=NetworkBandwidthMetrics)
-    power: Optional[PowerMetrics] = Field(default_factory=PowerMetrics)
+    power: Optional[Any] = Field(default=None)
 
 
 class ClusterMetricsResponse(SuccessResponse):
