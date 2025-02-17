@@ -17,17 +17,16 @@
 
 """Implements auth models. Use sqlalchemy to define models."""
 
-from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, Enum, String, Uuid
+from sqlalchemy import Boolean, Enum, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from budapp.commons.constants import TokenTypeEnum
-from budapp.commons.database import Base
+from budapp.commons.database import Base, TimestampMixin
 
 
-class Token(Base):
+class Token(Base, TimestampMixin):
     """Token model."""
 
     __tablename__ = "token"
@@ -45,5 +44,3 @@ class Token(Base):
         nullable=False,
     )
     blacklisted: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

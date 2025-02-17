@@ -24,13 +24,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.cluster_ops.models import Cluster
 from budapp.commons.constants import UserRoleEnum, UserStatusEnum
-from budapp.commons.database import Base
+from budapp.commons.database import Base, TimestampMixin
 from budapp.endpoint_ops.models import Endpoint
 from budapp.model_ops.models import Model
 from budapp.project_ops.models import Project, project_user_association
 
 
-class User(Base):
+class User(Base, TimestampMixin):
     """User model."""
 
     __tablename__ = "user"
@@ -59,8 +59,6 @@ class User(Base):
     is_reset_password: Mapped[bool] = mapped_column(Boolean, default=True)
     color: Mapped[str] = mapped_column(String, nullable=False)
     first_login: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_subscriber: Mapped[bool] = mapped_column(Boolean, default=False)
     reset_password_attempt: Mapped[int] = mapped_column(Integer, default=0)
 

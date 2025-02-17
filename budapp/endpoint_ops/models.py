@@ -28,12 +28,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.cluster_ops.models import Cluster
 from budapp.commons.constants import EndpointStatusEnum
-from budapp.commons.database import Base
+from budapp.commons.database import Base, TimestampMixin
 from budapp.model_ops.models import Model
 from budapp.project_ops.models import Project
 
 
-class Endpoint(Base):
+class Endpoint(Base, TimestampMixin):
     """Endpoint model."""
 
     __tablename__ = "endpoint"
@@ -48,8 +48,6 @@ class Endpoint(Base):
     url: Mapped[str] = mapped_column(String, nullable=False)
     namespace: Mapped[str] = mapped_column(String, nullable=False)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     status: Mapped[str] = mapped_column(
         Enum(
             EndpointStatusEnum,

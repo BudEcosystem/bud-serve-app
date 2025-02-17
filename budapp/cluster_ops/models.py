@@ -25,10 +25,10 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.constants import ClusterStatusEnum
-from budapp.commons.database import Base
+from budapp.commons.database import Base, TimestampMixin
 
 
-class Cluster(Base):
+class Cluster(Base, TimestampMixin):
     """Cluster model."""
 
     __tablename__ = "cluster"
@@ -56,8 +56,6 @@ class Cluster(Base):
     reason: Mapped[str] = mapped_column(String, nullable=True)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
     cluster_id: Mapped[UUID] = mapped_column(Uuid, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     status_sync_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
     endpoints: Mapped[list["Endpoint"]] = relationship(

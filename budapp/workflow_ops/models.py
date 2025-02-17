@@ -16,20 +16,19 @@
 
 """The workflow ops package, containing essential business logic, services, and routing configurations for the workflow ops."""
 
-from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy import Enum, ForeignKey, Integer, String, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from budapp.commons.database import Base
+from budapp.commons.database import Base, TimestampMixin
 
-from ..commons.constants import WorkflowStatusEnum, WorkflowTypeEnum, VisibilityEnum
+from ..commons.constants import VisibilityEnum, WorkflowStatusEnum, WorkflowTypeEnum
 
 
-class Workflow(Base):
+class Workflow(Base, TimestampMixin):
     """Workflow model."""
 
     __tablename__ = "workflow"
@@ -67,8 +66,6 @@ class Workflow(Base):
         ),
         default=VisibilityEnum.PUBLIC,
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     steps: Mapped[list["WorkflowStep"]] = relationship(
         "WorkflowStep",
@@ -77,7 +74,7 @@ class Workflow(Base):
     )
 
 
-class WorkflowStep(Base):
+class WorkflowStep(Base, TimestampMixin):
     """Workflow step model."""
 
     __tablename__ = "workflow_step"
@@ -86,7 +83,5 @@ class WorkflowStep(Base):
     workflow_id: Mapped[UUID] = mapped_column(ForeignKey("workflow.id"), nullable=False, index=True)
     step_number: Mapped[int] = mapped_column(Integer, nullable=False)
     data: Mapped[dict] = mapped_column(JSONB, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     workflow: Mapped[Workflow] = relationship("Workflow", back_populates="steps")

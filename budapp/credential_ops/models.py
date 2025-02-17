@@ -24,10 +24,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.constants import CredentialTypeEnum
-from budapp.commons.database import Base
+from budapp.commons.database import Base, TimestampMixin
 
 
-class ProprietaryCredential(Base):
+class ProprietaryCredential(Base, TimestampMixin):
     """Proprietary model creds at global level : Credential model."""
 
     __tablename__ = "proprietary_credential"
@@ -46,13 +46,10 @@ class ProprietaryCredential(Base):
     # placeholder for api base, project, organization, etc.
     other_provider_creds: Mapped[dict] = mapped_column(JSONB, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC))
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
-
     endpoints: Mapped[list["Endpoint"]] = relationship("Endpoint", back_populates="credential")
 
 
-class Credential(Base):
+class Credential(Base, TimestampMixin):
     """Project API Keys : Credential model"""
 
     __tablename__ = "credential"
@@ -65,14 +62,11 @@ class Credential(Base):
 
     # placeholder for per model budgets : {"model_id": "budget"}
     model_budgets: Mapped[dict] = mapped_column(JSONB, nullable=True)
-    
+
     last_used_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-    
+
     name: Mapped[str] = mapped_column(String, nullable=False)
     hashed_key: Mapped[str] = mapped_column(String, nullable=True)
-
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     project: Mapped["Project"] = relationship("Project", foreign_keys=[project_id])
 

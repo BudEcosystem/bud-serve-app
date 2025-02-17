@@ -36,10 +36,10 @@ from budapp.commons.constants import (
     ModelSecurityScanStatusEnum,
     ModelStatusEnum,
 )
-from budapp.commons.database import Base
+from budapp.commons.database import Base, TimestampMixin
 
 
-class Model(Base):
+class Model(Base, TimestampMixin):
     """Model for a AI model."""
 
     __tablename__ = "model"
@@ -109,8 +109,6 @@ class Model(Base):
     local_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     provider_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("provider.id"), nullable=True)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     endpoints: Mapped[list["Endpoint"]] = relationship(back_populates="model")
     # benchmarks: Mapped[list["Benchmark"]] = relationship(back_populates="model")
@@ -123,7 +121,7 @@ class Model(Base):
     )
 
 
-class PaperPublished(Base):
+class PaperPublished(Base, TimestampMixin):
     """Model for Paper Published."""
 
     __tablename__ = "paper_published"
@@ -133,13 +131,11 @@ class PaperPublished(Base):
     authors: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
     url: Mapped[str] = mapped_column(String, nullable=True)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     model: Mapped["Model"] = relationship("Model", back_populates="paper_published")
 
 
-class ModelLicenses(Base):
+class ModelLicenses(Base, TimestampMixin):
     """Model for a AI model licenses."""
 
     __tablename__ = "model_licenses"
@@ -150,8 +146,6 @@ class ModelLicenses(Base):
     path: Mapped[str] = mapped_column(String, nullable=True)
     faqs: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     model: Mapped["Model"] = relationship("Model", back_populates="model_licenses")
 
@@ -178,7 +172,7 @@ class Provider(Base):
     cloud_models: Mapped[list["CloudModel"]] = relationship("CloudModel", back_populates="provider")
 
 
-class CloudModel(Base):
+class CloudModel(Base, TimestampMixin):
     """Model for a AI cloud model."""
 
     __tablename__ = "cloud_model"
@@ -223,14 +217,12 @@ class CloudModel(Base):
     )
     uri: Mapped[str] = mapped_column(String, nullable=False)
     provider_id: Mapped[UUID] = mapped_column(ForeignKey("provider.id"), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_present_in_model: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     provider: Mapped[Optional["Provider"]] = relationship("Provider", back_populates="cloud_models")
 
 
-class ModelSecurityScanResult(Base):
+class ModelSecurityScanResult(Base, TimestampMixin):
     """Model for a AI model security scan result."""
 
     __tablename__ = "model_security_scan_result"
@@ -255,7 +247,5 @@ class ModelSecurityScanResult(Base):
     high_severity_count: Mapped[int] = mapped_column(Integer, nullable=False)
     critical_severity_count: Mapped[int] = mapped_column(Integer, nullable=False)
     model_issues: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     model: Mapped["Model"] = relationship("Model", back_populates="model_security_scan_result")

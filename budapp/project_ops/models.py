@@ -16,15 +16,16 @@
 
 """The project ops package, containing essential business logic, services, and routing configurations for the project ops."""
 
-from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Table, Uuid, Enum
+from sqlalchemy import Boolean, Column, Enum, ForeignKey, String, Table, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from budapp.commons.database import Base
+from budapp.commons.database import Base, TimestampMixin
+
 from ..commons.constants import ProjectStatusEnum
+
 
 project_user_association = Table(
     "project_user_association",
@@ -34,7 +35,7 @@ project_user_association = Table(
 )
 
 
-class Project(Base):
+class Project(Base, TimestampMixin):
     """Project model."""
 
     __tablename__ = "project"
@@ -55,8 +56,6 @@ class Project(Base):
     )
     benchmark: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     users: Mapped[list["User"]] = relationship("User", secondary=project_user_association, back_populates="projects")
     endpoints: Mapped[list["Endpoint"]] = relationship(

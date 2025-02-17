@@ -25,7 +25,7 @@ from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.orm import Mapped, mapped_column
 
 from budapp.commons.constants import ModelTemplateTypeEnum
-from budapp.commons.database import Base
+from budapp.commons.database import Base, TimestampMixin
 
 
 class Icon(Base):
@@ -39,7 +39,7 @@ class Icon(Base):
     category: Mapped[str] = mapped_column(String, index=True, nullable=False)
 
 
-class ModelTemplate(Base):
+class ModelTemplate(Base, TimestampMixin):
     """Model template model."""
 
     __tablename__ = "model_template"
@@ -61,5 +61,3 @@ class ModelTemplate(Base):
     per_session_tokens_per_sec: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=True)
     ttft: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=True)
     e2e_latency: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    modified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
