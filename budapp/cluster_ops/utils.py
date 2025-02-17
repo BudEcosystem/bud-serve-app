@@ -17,6 +17,7 @@ class ClusterMetricsFetcher:
         """Initialize with Prometheus server URL."""
         self.prometheus_url = prometheus_url
         self.api_url = f"{prometheus_url}/api/v1"
+
     def _get_time_range_params(self, time_range: str, include_previous: bool = False) -> dict:
         """Get start and end timestamps based on time range."""
         now = datetime.now(timezone.utc)
@@ -24,6 +25,7 @@ class ClusterMetricsFetcher:
         if time_range == "10min":
             start_time = now - timedelta(minutes=10)
             step = "30s"
+            end_time = now
         elif time_range == "today":
             if include_previous:
                 # For yesterday's comparison, get data from 24 hours ago
@@ -96,8 +98,8 @@ class ClusterMetricsFetcher:
     async def _fetch_metrics(self, session: aiohttp.ClientSession, query: str, time_params: dict) -> List[Dict]:
         """Fetch metrics from Prometheus."""
         try:
-            logger.info(f"Fetching metrics with query: {query}")
-            logger.info(f"Time params: {time_params}")
+            logger.debug(f"Fetching metrics with query: {query}")
+            logger.debug(f"Time params: {time_params}")
 
             # Add unit conversion to the query
             if "MemTotal" in query or "MemAvailable" in query or "filesystem" in query:
@@ -117,7 +119,7 @@ class ClusterMetricsFetcher:
             ) as response:
                 response.raise_for_status()
                 result = await response.json()
-                logger.info(
+                logger.debug(
                     f"Got response data: {result.get('data', {}).get('result', [])[:2]}"
                 )  # Log first 2 results as sample
                 return result["data"]["result"]
@@ -142,6 +144,7 @@ class ClusterMetricsFetcher:
                     "usage_percent": 0,
                     "change_percent": 0,
                 },
+                "power": {"total_watt": 0, "change_percent": 0},
                 "network_in": {"inbound_mbps": 0, "change_percent": 0, "time_series": []},
                 "network_out": {"outbound_mbps": 0, "change_percent": 0, "time_series": []},
                 "network_bandwidth": {"total_mbps": 0, "change_percent": 0, "time_series": []},
@@ -154,7 +157,13 @@ class ClusterMetricsFetcher:
         previous_storage_usage = None
         previous_network_in = None
         previous_network_out = None
+        previous_power_usage = None
         if previous_results:
+            if "power" in previous_results:
+                previous_power = sum(float(node["values"][-1][1]) for node in previous_results["power"])
+                if previous_power > 0:
+                    previous_power_usage = round(((previous_power - previous_power) / previous_power) * 100, 2)
+
             if "memory_total" in previous_results and "memory_available" in previous_results:
                 prev_total = sum(float(node["values"][-1][1]) for node in previous_results["memory_total"])
                 prev_available = sum(float(node["values"][-1][1]) for node in previous_results["memory_available"])
@@ -198,10 +207,46 @@ class ClusterMetricsFetcher:
                         "usage_percent": 0,
                         "change_percent": 0,
                     },
+                    "power": {"total_watt": 0, "change_percent": 0},
                     "network_in": {"inbound_mbps": 0, "change_percent": 0, "time_series": []},
                     "network_out": {"outbound_mbps": 0, "change_percent": 0, "time_series": []},
                     "network_bandwidth": {"total_mbps": 0, "change_percent": 0, "time_series": []},
                 }
+
+        # Process Power Metrics
+        if "power" in current_results:
+            logger.debug(f"Power Metrics: {current_results['power']}")
+            for node_data in current_results["power"]:
+                instance = node_data["metric"]["instance"]
+                processed_nodes.add(instance)
+                init_node_metrics(instance)
+                total_values = round(float(node_data["value"][1]), 2)
+
+                # Find previous power values for this node
+                prev_power_values = None
+                if previous_results and "power" in previous_results:
+                    for prev_node in previous_results["power"]:
+                        if prev_node["metric"]["instance"] == instance:
+                            prev_power_values = round(float(prev_node["values"][-1][1]), 2)
+                            break
+
+                # Calculate power change percentage
+                power_change_percent = 0
+                if prev_power_values is not None:
+                    power_change_percent = round(((total_values - prev_power_values) / prev_power_values) * 100, 2)
+                else:
+                    power_change_percent = 0
+
+                metrics["nodes"][instance]["power"].update(
+                    {
+                        "total_watt": total_values,
+                        "unit": "kWh",
+                        "change_percent": power_change_percent,
+                    }
+                )
+
+                metrics["cluster_summary"]["power"]["total_watt"] += total_values
+                metrics["cluster_summary"]["power"]["unit"] = "kWh"
 
         # Process memory metrics
         if "memory_total" in current_results and "memory_available" in current_results:
@@ -571,6 +616,20 @@ class ClusterMetricsFetcher:
                         current_memory_usage - previous_memory_usage, 2
                     )
 
+            # Calculate power summary
+            if "power" in current_results:
+                current_power_values = [
+                    metrics["nodes"][instance]["power"]["total_watt"] for instance in processed_nodes
+                ]
+                if current_power_values:
+                    avg_power_usage = round(sum(current_power_values) / len(current_power_values), 2)
+                    metrics["cluster_summary"]["power"]["total_watt"] = avg_power_usage
+
+                    if previous_power_usage is not None:
+                        metrics["cluster_summary"]["power"]["change_percent"] = round(
+                            avg_power_usage - previous_power_usage, 2
+                        )
+
             # Calculate CPU summary
             if "cpu_usage" in current_results:
                 current_cpu_values = [
@@ -614,6 +673,20 @@ class ClusterMetricsFetcher:
 
         return metrics
 
+    async def _fetch_power_metrics(self, session: aiohttp.ClientSession, query: str, time_params: dict) -> List[Dict]:
+        params = {"query": query}
+
+        try:
+            async with session.get(
+                f"{self.prometheus_url}/api/v1/query", ssl=False, params=params, headers={"Accept": "application/json"}
+            ) as response:
+                response_data = await response.json()
+                logger.debug(f"Power Metrics: {response_data}")
+                return response_data.get("data", []).get("result", [])
+        except Exception as e:
+            logger.error(f"Failed to fetch power metrics: {e}")
+            return []
+
     async def get_cluster_metrics(
         self, cluster_id: UUID, time_range: str = "today", metric_type: str = "all"
     ) -> Optional[Dict[str, Any]]:
@@ -622,14 +695,14 @@ class ClusterMetricsFetcher:
         Args:
             cluster_id: The cluster ID to fetch metrics for
             time_range: One of '10min', 'today', '7days', 'month'
-            metric_type: Type of metric to fetch ('all', 'memory', 'cpu', 'disk', 'network_in', 'network_out', 'network_bandwidth')
+            metric_type: Type of metric to fetch ('all', 'memory', 'cpu', 'disk', 'network_in', 'network_out', 'network_bandwidth', 'power')
 
         Returns:
             Dict with node and summary metrics for the requested metric type
         """
-        if not cluster_id:
-            logger.error("Cluster ID is required to fetch cluster metrics")
-            return None
+        # if not cluster_id:
+        #     logger.error("Cluster ID is required to fetch cluster metrics")
+        #     return None
 
         cluster_name = str(cluster_id)
         current_time_params = self._get_time_range_params(time_range)
@@ -661,23 +734,136 @@ class ClusterMetricsFetcher:
                     if query_name in all_queries:
                         queries[query_name] = all_queries[query_name]
 
-        if not queries:
+        if not queries and metric_type != "power":
             logger.error(f"Invalid metric type: {metric_type}")
             return None
 
         try:
+            # Get Power Metrics
+            if time_range == "today":
+                power_query = f"""
+                sum by (instance) (
+                    (
+                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[24h]) +
+                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[24h]) +
+                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[24h]) +
+                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[24h]) +
+                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[24h])
+                    ) * on(node) group_left(instance)
+                    (node_uname_info{{job="node-exporter"}})
+                ) / 3600000
+                """
+                power_query_pre = f"""
+                sum by (instance) (
+                    (
+                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[24h] offset 24h) +
+                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[24h] offset 24h) +
+                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[24h] offset 24h) +
+                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[24h] offset 24h) +
+                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[24h] offset 24h)
+                    ) * on(node) group_left(instance)
+                    (node_uname_info{{job="node-exporter"}})
+                ) / 3600000
+                """
+            elif time_range == "10min":
+                power_query = f"""
+                sum by (instance) (
+                    (
+                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[10m]) +
+                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[10m]) +
+                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[10m]) +
+                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[10m]) +
+                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[10m])
+                    ) * on(node) group_left(instance)
+                    (node_uname_info{{job="node-exporter"}})
+                ) / 3600000
+                """
+                power_query_pre = f"""
+                sum by (instance) (
+                    (
+                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[10m] offset 10m) +
+                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[10m] offset 10m) +
+                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[10m] offset 10m) +
+                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[10m] offset 10m) +
+                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[10m] offset 10m)
+                    ) * on(node) group_left(instance)
+                    (node_uname_info{{job="node-exporter"}})
+                ) / 3600000
+                """
+
+            elif time_range == "7days":
+                power_query = f"""
+                sum by (instance) (
+                    (
+                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[7d]) +
+                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[7d]) +
+                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[7d]) +
+                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[7d]) +
+                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[7d])
+                    ) * on(node) group_left(instance)
+                    (node_uname_info{{job="node-exporter"}})
+                ) / 3600000
+                """
+                power_query_pre = f"""
+                sum by (instance) (
+                    (
+                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[7d] offset 7d) +
+                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[7d] offset 7d) +
+                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[7d] offset 7d) +
+                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[7d] offset 7d) +
+                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[7d] offset 7d)
+                    ) * on(node) group_left(instance)
+                    (node_uname_info{{job="node-exporter"}})
+                ) / 3600000
+                """
+            else:
+                power_query = f"""
+                sum by (instance) (
+                    (
+                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[30d]) +
+                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[30d]) +
+                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[30d]) +
+                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[30d]) +
+                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[30d])
+                    ) * on(node) group_left(instance)
+                    (node_uname_info{{job="node-exporter"}})
+                ) / 3600000
+                """
+                power_query_pre = f"""
+                sum by (instance) (
+                    (
+                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[30d] offset 30d) +
+                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[30d] offset 30d) +
+                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[30d] offset 30d) +
+                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[30d] offset 30d) +
+                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[30d] offset 30d)
+                    ) * on(node) group_left(instance)
+                    (node_uname_info{{job="node-exporter"}})
+                ) / 3600000
+                """
+
             # Fetch current metrics concurrently
             async with aiohttp.ClientSession() as session:
                 tasks = []
                 for metric_name, query in queries.items():
                     task = self._fetch_metrics(session, query, current_time_params)
                     tasks.append((metric_name, task))
+                    
+                # Condition to check if power query is present
+                if metric_type == "all" or metric_type == "power":
+                    # Fetch Power Metrics
+                    power_task = self._fetch_power_metrics(session, power_query, current_time_params)
+                    tasks.append(("power", power_task))
 
                 # If it's "today", also fetch previous day metrics
                 if previous_time_params:
                     for metric_name, query in queries.items():
                         task = self._fetch_metrics(session, query, previous_time_params)
                         tasks.append((f"prev_{metric_name}", task))
+                if metric_type == "all" or metric_type == "power":
+                    # Previous Power Query
+                    power_task_pr = self._fetch_power_metrics(session, power_query_pre, current_time_params)
+                    tasks.append(("pre_power", power_task_pr))
 
                 # Gather results
                 current_results = {}
@@ -685,11 +871,12 @@ class ClusterMetricsFetcher:
                 for metric_name, task in tasks:
                     try:
                         result = await task
+
                         if metric_name.startswith("prev_"):
                             previous_results[metric_name[5:]] = result  # Remove 'prev_' prefix
                         else:
                             current_results[metric_name] = result
-                        logger.info(f"Gathered results for {metric_name}: {len(result) if result else 0} data points")
+                        logger.debug(f"Gathered results for {metric_name}: {len(result) if result else 0} data points")
                     except Exception as e:
                         logger.error(f"Failed to fetch {metric_name}: {e}")
                         if metric_name.startswith("prev_"):
@@ -712,8 +899,8 @@ class ClusterMetricsFetcher:
                 }
             )
 
-            logger.info(f"Successfully fetched {metric_type} metrics for cluster {cluster_id}")
-            logger.info(f"Number of nodes found: {len(processed_metrics.get('nodes', {}))}")
+            logger.debug(f"Successfully fetched {metric_type} metrics for cluster {cluster_id}")
+            logger.debug(f"Number of nodes found: {len(processed_metrics.get('nodes', {}))}")
             return processed_metrics
 
         except Exception as e:

@@ -1154,7 +1154,7 @@ class ClusterService(SessionMixin):
 
         return nodes_status
 
-    async def get_node_wise_events_by_hostname(self, cluster_id: UUID, node_hostname: str, page: int = 1, size: int = 10) -> Dict[str, Any]:
+    async def get_node_wise_events_by_hostname(self, cluster_id: UUID, node_hostname: str) -> Dict[str, Any]:
         """Get node-wise events for a cluster by hostname.
 
         Args:
@@ -1173,7 +1173,6 @@ class ClusterService(SessionMixin):
                 f"{app_settings.dapr_base_url}v1.0/invoke"
                 f"/{app_settings.bud_cluster_app_id}/method"
                 f"/cluster/{db_cluster.cluster_id}/node-wise-events/{node_hostname}"
-                f"?page={page}&size={size}"
             )
             
             async with aiohttp.ClientSession() as session, session.get(events_cluster_endpoint) as response:
