@@ -741,104 +741,103 @@ class ClusterMetricsFetcher:
         try:
             # Get Power Metrics
             if time_range == "today":
-                power_query = f"""
+                power_query = f"""                 
                 sum by (instance) (
+                    increase(kepler_container_joules_total{{cluster="{cluster_id}"}}[24h])
+                    * on(node) group_left()
                     (
-                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[24h]) +
-                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[24h]) +
-                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[24h]) +
-                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[24h]) +
-                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[24h])
-                    ) * on(node) group_left(instance)
-                    (node_uname_info{{job="node-exporter"}})
+                        count by (node) (node_uname_info{{
+                            cluster="{cluster_id}",
+                            job="node-exporter"
+                        }})
+                    )
                 ) / 3600000
                 """
                 power_query_pre = f"""
                 sum by (instance) (
+                    increase(kepler_container_joules_total{{cluster="{cluster_name}"}}[24h] offset 24h)
+                    * on(node) group_left()
                     (
-                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[24h] offset 24h) +
-                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[24h] offset 24h) +
-                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[24h] offset 24h) +
-                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[24h] offset 24h) +
-                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[24h] offset 24h)
-                    ) * on(node) group_left(instance)
-                    (node_uname_info{{job="node-exporter"}})
+                        count by (node) (node_uname_info{{
+                            cluster="{cluster_name}",
+                            job="node-exporter"
+                        }})
+                    )
                 ) / 3600000
                 """
             elif time_range == "10min":
                 power_query = f"""
                 sum by (instance) (
+                    increase(kepler_container_joules_total{{cluster="{cluster_name}"}}[10m])
+                    * on(node) group_left()
                     (
-                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[10m]) +
-                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[10m]) +
-                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[10m]) +
-                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[10m]) +
-                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[10m])
-                    ) * on(node) group_left(instance)
-                    (node_uname_info{{job="node-exporter"}})
+                        count by (node) (node_uname_info{{
+                            cluster="{cluster_name}",
+                            job="node-exporter"
+                        }})
+                    )
                 ) / 3600000
                 """
                 power_query_pre = f"""
                 sum by (instance) (
+                    increase(kepler_container_joules_total{{cluster="{cluster_name}"}}[10m] offset 10m)
+                    * on(node) group_left()
                     (
-                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[10m] offset 10m) +
-                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[10m] offset 10m) +
-                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[10m] offset 10m) +
-                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[10m] offset 10m) +
-                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[10m] offset 10m)
-                    ) * on(node) group_left(instance)
-                    (node_uname_info{{job="node-exporter"}})
+                        count by (node) (node_uname_info{{
+                            cluster="{cluster_name}",
+                            job="node-exporter"
+                        }})
+                    )
                 ) / 3600000
                 """
-
             elif time_range == "7days":
                 power_query = f"""
                 sum by (instance) (
+                    increase(kepler_container_joules_total{{cluster="{cluster_name}"}}[7d])
+                    * on(node) group_left()
                     (
-                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[7d]) +
-                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[7d]) +
-                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[7d]) +
-                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[7d]) +
-                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[7d])
-                    ) * on(node) group_left(instance)
-                    (node_uname_info{{job="node-exporter"}})
+                        count by (node) (node_uname_info{{
+                            cluster="{cluster_name}",
+                            job="node-exporter"
+                        }})
+                    )
                 ) / 3600000
                 """
                 power_query_pre = f"""
                 sum by (instance) (
+                    increase(kepler_container_joules_total{{cluster="{cluster_name}"}}[7d] offset 7d)
+                    * on(node) group_left()
                     (
-                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[7d] offset 7d) +
-                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[7d] offset 7d) +
-                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[7d] offset 7d) +
-                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[7d] offset 7d) +
-                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[7d] offset 7d)
-                    ) * on(node) group_left(instance)
-                    (node_uname_info{{job="node-exporter"}})
+                        count by (node) (node_uname_info{{
+                            cluster="{cluster_name}",
+                            job="node-exporter"
+                        }})
+                    )
                 ) / 3600000
                 """
             else:
                 power_query = f"""
                 sum by (instance) (
+                    increase(kepler_container_joules_total{{cluster="{cluster_name}"}}[30d])
+                    * on(node) group_left()
                     (
-                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[30d]) +
-                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[30d]) +
-                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[30d]) +
-                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[30d]) +
-                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[30d])
-                    ) * on(node) group_left(instance)
-                    (node_uname_info{{job="node-exporter"}})
+                        count by (node) (node_uname_info{{
+                            cluster="{cluster_name}",
+                            job="node-exporter"
+                        }})
+                    )
                 ) / 3600000
                 """
                 power_query_pre = f"""
                 sum by (instance) (
+                    increase(kepler_container_joules_total{{cluster="{cluster_name}"}}[30d] offset 30d)
+                    * on(node) group_left()
                     (
-                        increase(kepler_container_core_joules_total{{cluster="{cluster_name}"}}[30d] offset 30d) +
-                        increase(kepler_container_dram_joules_total{{cluster="{cluster_name}"}}[30d] offset 30d) +
-                        increase(kepler_container_platform_joules_total{{cluster="{cluster_name}"}}[30d] offset 30d) +
-                        increase(kepler_container_package_joules_total{{cluster="{cluster_name}"}}[30d] offset 30d) +
-                        increase(kepler_container_other_joules_total{{cluster="{cluster_name}"}}[30d] offset 30d)
-                    ) * on(node) group_left(instance)
-                    (node_uname_info{{job="node-exporter"}})
+                        count by (node) (node_uname_info{{
+                            cluster="{cluster_name}",
+                            job="node-exporter"
+                        }})
+                    )
                 ) / 3600000
                 """
 
