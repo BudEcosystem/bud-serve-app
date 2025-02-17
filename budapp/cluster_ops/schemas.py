@@ -236,8 +236,8 @@ class ClusterEndpointFilter(BaseModel):
     status: EndpointStatusEnum | None = None
 
 # Cluster Events Schema Paginated Response
-class ClusterNodeWiseEventsPaginatedResponse(PaginatedSuccessResponse):
-    """Cluster node-wise events paginated response schema."""
+class ClusterNodeWiseEventsResponse(SuccessResponse):
+    """Cluster node-wise events response schema."""
     events: Optional[list] = []
 
 # Cluster Metrics Schema

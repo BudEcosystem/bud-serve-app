@@ -44,7 +44,7 @@ from .schemas import (
     ClusterEndpointPaginatedResponse,
     ClusterFilter,
     ClusterListResponse,
-    ClusterNodeWiseEventsPaginatedResponse,
+    ClusterNodeWiseEventsResponse,
     CreateClusterWorkflowRequest,
     EditClusterRequest,
     NodeMetricsResponse,
@@ -524,7 +524,7 @@ async def get_node_wise_metrics(
             "description": "Service is unavailable due to client error",
         },
         status.HTTP_200_OK: {
-            "model": ClusterNodeWiseEventsPaginatedResponse,
+            "model": ClusterNodeWiseEventsResponse,
             "description": "Successfully retrieved node-wise metrics by hostname with pagination",
         },
     },
@@ -535,20 +535,16 @@ async def get_node_wise_events_by_hostname(
     node_hostname: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    page: int = 1,
-    limit: int = 10,
-) -> Union[ClusterNodeWiseEventsPaginatedResponse, ErrorResponse]: # TODO: Change to Proper Pagination
+) -> Union[ClusterNodeWiseEventsResponse, ErrorResponse]:
     """Get node-wise metrics by hostname with pagination."""
     try:
-        events_raw = await ClusterService(session).get_node_wise_events_by_hostname(cluster_id, node_hostname, page, limit)
+        events_raw = await ClusterService(session).get_node_wise_events_by_hostname(cluster_id, node_hostname)
 
-        total = events_raw.get("total", 0)
         events = events_raw.get("events", [])
-        total_pages =  events_raw.get("total_pages", 0)
         
-        return ClusterNodeWiseEventsPaginatedResponse(
+        return ClusterNodeWiseEventsResponse(
             code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname",     
-            events=events, total_record=total, page=page, limit=limit
+            events=events
         )
     except ClientException as e:
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
