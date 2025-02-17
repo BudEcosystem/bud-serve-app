@@ -18,7 +18,7 @@
 """Contains core Pydantic schemas used for data validation and serialization within the cluster ops services."""
 
 from datetime import datetime
-from typing import List, Dict, Union, Optional
+from typing import Any, List, Dict, Union, Optional
 from uuid import UUID
 from enum import Enum
 
@@ -314,7 +314,7 @@ class NodeMetrics(BaseModel):
     network_in: Optional[NetworkMetrics] = Field(default_factory=NetworkMetrics)
     network_out: Optional[NetworkOutMetrics] = Field(default_factory=NetworkOutMetrics)
     network_bandwidth: Optional[NetworkBandwidthMetrics] = Field(default_factory=NetworkBandwidthMetrics)
-    power: Optional[PowerMetrics] = Field(default_factory=PowerMetrics)
+    power: Optional[Any] = Field(default=None)
 
 
 
