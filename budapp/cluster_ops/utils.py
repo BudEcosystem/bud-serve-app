@@ -239,6 +239,8 @@ class ClusterMetricsFetcher:
                 processed_nodes.add(instance)
                 init_node_metrics(instance)
                 total_values = round(float(node_data["value"][1]), 2)
+                
+                logger.debug(f"Nodename: {nodename}, Instance: {instance}, Total Values: {total_values}")
 
                 # Find previous power values for this node
                 prev_power_values = None
