@@ -58,6 +58,7 @@ class CountAnalyticsResponse(SuccessResponse):
     concurrency_metrics: dict | None = None
     queuing_time_metrics: dict | None = None
     global_metrics: dict | None = None
+    input_output_tokens_metrics: dict | None = None
 
 
 class PerformanceAnalyticsRequest(BaseAnalyticsRequest):
