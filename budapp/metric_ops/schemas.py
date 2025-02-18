@@ -41,7 +41,7 @@ class BaseAnalyticsRequest(BaseModel):
 class CountAnalyticsRequest(BaseAnalyticsRequest):
     """Request count analytics request schema."""
 
-    metrics: Literal["global", "overall", "concurrency", "queuing_time"] | None = None
+    metrics: Literal["global", "overall", "concurrency", "queuing_time", "input_output_tokens"] | None = None
 
     @model_validator(mode="before")
     def validate_filter_by(cls, data: Dict[str, Any]) -> Dict[str, Any]:
