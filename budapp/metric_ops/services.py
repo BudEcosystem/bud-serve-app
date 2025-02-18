@@ -72,6 +72,7 @@ class MetricService(SessionMixin):
             concurrency_metrics=bud_metric_response["concurrency_metrics"],
             queuing_time_metrics=bud_metric_response["queuing_time_metrics"],
             global_metrics=bud_metric_response["global_metrics"],
+            input_output_tokens_metrics=bud_metric_response["input_output_tokens_metrics"],
         )
 
     async def get_request_performance_analytics(
