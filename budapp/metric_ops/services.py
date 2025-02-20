@@ -43,6 +43,7 @@ from ..model_ops.models import Model
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
 from .schemas import (
+    CacheMetricsResponse,
     CountAnalyticsRequest,
     CountAnalyticsResponse,
     DashboardStatsResponse,
@@ -210,3 +211,43 @@ class MetricService(SessionMixin):
         )
 
         return db_dashboard_stats
+
+    @staticmethod
+    async def _perform_deployment_cache_metric(endpoint_id: UUID) -> Dict:
+        """Get deployment cache metrics."""
+        deployment_cache_metric_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/analytics/cache-metrics/{endpoint_id}"
+
+        logger.debug(
+            f"Performing request deployment cache-metrics request to bud_metric for endpoint id : {endpoint_id}"
+        )
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(deployment_cache_metric_endpoint) as response:
+                    response_data = await response.json()
+                    if response.status != status.HTTP_200_OK:
+                        logger.error(f"Failed to get deployment cache metrics: {response.status} {response_data}")
+                        raise ClientException(
+                            "Failed to get deployment cache metrics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
+
+                    logger.debug("Successfully get deployment cache metrics from budmetric")
+                    return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send deployment cache metrics request: {e}")
+            raise ClientException(
+                "Failed to get deployment cache metrics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+
+    async def get_deployment_cache_metric(self, endpoint_id: UUID) -> CacheMetricsResponse:
+        """Get deployment cache metrics."""
+        bud_metric_response = await self._perform_deployment_cache_metric(endpoint_id)
+
+        return CacheMetricsResponse(
+            code=status.HTTP_200_OK,
+            object="deployment.cache.metrics",
+            message="Successfully fetched deployment cache metrics",
+            latency=bud_metric_response["latency"],
+            hit_ratio=bud_metric_response["hit_ratio"],
+            most_reused_prompts=bud_metric_response["most_reused_prompts"],
+        )

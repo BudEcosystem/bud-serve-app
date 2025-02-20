@@ -17,6 +17,7 @@
 """The metric ops package, containing essential business logic, services, and routing configurations for the metric ops."""
 
 from typing import Union
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
@@ -32,11 +33,12 @@ from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
 
 from .schemas import (
+    CacheMetricsResponse,
     CountAnalyticsRequest,
     CountAnalyticsResponse,
+    DashboardStatsResponse,
     PerformanceAnalyticsRequest,
     PerformanceAnalyticsResponse,
-    DashboardStatsResponse,
 )
 from .services import MetricService
 
@@ -161,3 +163,39 @@ async def get_dashboard_stats(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to fetch dashboard statistics"
         ).to_http_response()
+
+@metric_router.post(
+    "/analytics/cache-metrics/{endpoint_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": CacheMetricsResponse,
+            "description": "Successfully get request performance analytics",
+        },
+    },
+    description="Get deployment cache metrics",
+)
+async def get_deployment_cache_metric(
+    endpoint_id: UUID,
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[CacheMetricsResponse, ErrorResponse]:
+    """Get deployment cache metrics."""
+    try:
+        response = await MetricService(session).get_deployment_cache_metric(endpoint_id)
+    except ClientException as e:
+        logger.exception(f"Failed to get deployment cache metrics: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message)
+    except Exception as e:
+        logger.exception(f"Failed to get deployment cache metrics: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get deployment cache metrics"
+        )
+    return response.to_http_response()

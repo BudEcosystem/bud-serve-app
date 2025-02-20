@@ -18,7 +18,7 @@
 """Contains core Pydantic schemas used for data validation and serialization within the metric ops services."""
 
 from datetime import datetime
-from typing import Any, Dict, Literal
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import UUID4, BaseModel, model_validator
 
@@ -87,3 +87,10 @@ class DashboardStatsResponse(SuccessResponse):
     running_endpoints_count: int
     total_clusters: int
     inactive_clusters: int
+
+
+class CacheMetricsResponse(SuccessResponse):
+    object: str = "cache_metrics"
+    latency: Optional[float] = None
+    hit_ratio: float = 0.0
+    most_reused_prompts: Optional[List[str]] = None
