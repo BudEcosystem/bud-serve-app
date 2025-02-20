@@ -212,7 +212,7 @@ class CancelClusterOnboardingRequest(BaseModel):
 
 class ClusterEndpointResponse(BaseModel):
     """Cluster endpoint response schema."""
-
+    id: UUID4
     name: str
     status: EndpointStatusEnum
     created_at: datetime
