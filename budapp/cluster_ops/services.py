@@ -1090,6 +1090,7 @@ class ClusterService(SessionMixin):
 
             result.append(
                 ClusterEndpointResponse(
+                    id=db_endpoint.id,
                     name=db_endpoint.name,
                     status=db_endpoint.status,
                     created_at=db_endpoint.created_at,
