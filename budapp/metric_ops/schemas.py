@@ -93,4 +93,4 @@ class CacheMetricsResponse(SuccessResponse):
     object: str = "cache_metrics"
     latency: Optional[float] = None
     hit_ratio: float = 0.0
-    most_reused_prompts: Optional[List[str]] = None
+    most_reused_prompts: Optional[List[tuple[str, int]]] = None
