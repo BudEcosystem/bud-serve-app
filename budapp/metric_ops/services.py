@@ -222,7 +222,7 @@ class MetricService(SessionMixin):
         )
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(deployment_cache_metric_endpoint) as response:
+                async with session.post(deployment_cache_metric_endpoint) as response:
                     response_data = await response.json()
                     if response.status != status.HTTP_200_OK:
                         logger.error(f"Failed to get deployment cache metrics: {response.status} {response_data}")
