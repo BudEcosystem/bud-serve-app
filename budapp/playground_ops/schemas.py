@@ -17,7 +17,10 @@
 
 """Contains core Pydantic schemas used for data validation and serialization within the model ops services."""
 
-from pydantic import BaseModel, ConfigDict
+import re
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from ..commons.schemas import PaginatedSuccessResponse
 from ..endpoint_ops.schemas import EndpointListResponse
@@ -25,8 +28,6 @@ from ..endpoint_ops.schemas import EndpointListResponse
 
 class PlaygroundDeploymentListResponse(PaginatedSuccessResponse):
     """Playground deployment list response schema."""
-
-    model_config = ConfigDict(extra="ignore")
 
     endpoints: list[EndpointListResponse] = []
 
@@ -37,3 +38,20 @@ class PlaygroundDeploymentFilter(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     name: str | None = None
+    model_name: str | None = None
+    model_size: str | None = None
+
+    @field_validator("model_size")
+    def parse_model_size(cls, v: Optional[str]) -> Optional[int]:
+        """Convert the model size string to a number in billions."""
+        if not v:
+            return None
+
+        try:
+            # Match only if string starts with digits and contains only digits
+            match = re.match(r"^\d+$", v.strip())
+            if match:
+                return int(match.group())
+            return None
+        except Exception:
+            return None
