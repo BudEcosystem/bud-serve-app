@@ -1,8 +1,8 @@
 """added chat session table
 
-Revision ID: 13e294eeb666
+Revision ID: a2a60a1fdbd3
 Revises: de50a729b972
-Create Date: 2025-02-24 07:24:08.399799
+Create Date: 2025-02-24 10:18:27.368952
 
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = "13e294eeb666"
+revision: str = "a2a60a1fdbd3"
 down_revision: Union[str, None] = "de50a729b972"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -26,7 +26,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("user_id", sa.Uuid(), nullable=False),
         sa.Column("name", sa.String(), nullable=False),
-        sa.Column("chat_settings_id", sa.Uuid(), nullable=True),
+        sa.Column("chat_setting_id", sa.Uuid(), nullable=True),
         sa.Column("note", postgresql.ARRAY(sa.String()), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("modified_at", sa.DateTime(), nullable=False),
