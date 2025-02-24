@@ -21,10 +21,10 @@ import re
 from datetime import datetime
 from typing import Optional
 
-from pydantic import UUID4, BaseModel, ConfigDict, field_validator
+from pydantic import UUID4, BaseModel, ConfigDict, field_validator, Field
 
 from ..commons.constants import EndpointStatusEnum
-from ..commons.schemas import PaginatedSuccessResponse
+from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from ..model_ops.schemas import ModelResponse
 from ..project_ops.schemas import ProjectResponse
 
@@ -73,3 +73,46 @@ class PlaygroundDeploymentFilter(BaseModel):
             return None
         except Exception:
             return None
+
+
+class ChatSessionCreate(BaseModel):
+    # deployment_id: UUID4
+    name: str = Field(default="unnamed chat")
+    chat_settings_id: UUID4 | None = None
+    note: list[str] | None = None
+
+
+class ChatSessionResponse(BaseModel):
+    id: UUID4
+    user_id: UUID4
+    # deployment_id: UUID4
+    name: str
+    chat_settings_id: UUID4 | None = None
+    note: list[str] | None = None
+    created_at: datetime
+    modified_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+class ChatSessionSuccessResponse(SuccessResponse):
+    session: ChatSessionResponse
+
+
+class ChatSessionListResponse(BaseModel):
+    id: UUID4
+    name: str
+    total_tokens: int | None = None  # Aggregated token count for the session
+    created_at: datetime
+    modified_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+class ChatSessionPaginatedResponse(PaginatedSuccessResponse):
+    chat_sessions: list[ChatSessionListResponse] = []
+
+
+class ChatSessionFilter(BaseModel):
+    # user_id: UUID4  #check if req
+    name: str | None = None
