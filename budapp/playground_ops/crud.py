@@ -24,7 +24,7 @@ from sqlalchemy import and_, func, select
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 
-from .models import ChatSession
+from .models import ChatSession, Message
 
 
 logger = logging.get_logger(__name__)
@@ -45,36 +45,49 @@ class ChatSessionDataManager(DataManagerUtils):
         """List all workflows from the database."""
         await self.validate_fields(ChatSession, filters)
 
-        # Generate statements based on search or filters
+        # Generate base query for chat sessions
+        base_stmt = (
+            select(ChatSession, func.coalesce(func.sum(Message.total_tokens), 0).label("total_tokens"))
+            .join(Message, ChatSession.id == Message.chat_session_id, isouter=True)
+            .where(ChatSession.user_id == user_id)
+            .group_by(ChatSession.id)
+        )
+
+        # Apply filters
         if search:
             search_conditions = await self.generate_search_stmt(ChatSession, filters)
-            stmt = select(ChatSession).where(ChatSession.user_id == user_id).filter(and_(*search_conditions))
-            count_stmt = (
-                select(func.count())
-                .select_from(ChatSession)
-                .where(ChatSession.user_id == user_id)
-                .filter(and_(*search_conditions))
-            )
+            stmt = base_stmt.filter(and_(*search_conditions))
         else:
-            stmt = select(ChatSession).where(ChatSession.user_id == user_id).filter_by(**filters)
-            count_stmt = (
-                select(func.count())
-                .select_from(ChatSession)
-                .where(ChatSession.user_id == user_id)
-                .filter_by(**filters)
-            )
+            stmt = base_stmt.filter_by(**filters)
 
-        # Calculate count before applying limit and offset
+        # Count query
+        count_stmt = (
+            select(func.count()).select_from(ChatSession).where(ChatSession.user_id == user_id).filter_by(**filters)
+        )
         count = self.execute_scalar(count_stmt)
-
-        # Apply limit and offset
-        stmt = stmt.limit(limit).offset(offset)
 
         # Apply sorting
         if order_by:
             sort_conditions = await self.generate_sorting_stmt(ChatSession, order_by)
             stmt = stmt.order_by(*sort_conditions)
 
-        result = self.scalars_all(stmt)
+        # Apply pagination
+        stmt = stmt.limit(limit).offset(offset)
+
+        result = self.session.execute(stmt)
 
         return result, count
+
+
+class MessageDataManager(DataManagerUtils):
+    """Data manager for the Messaage model."""
+
+    async def get_last_message(self, chat_session_id: UUID) -> Message | None:
+        """Fetch the last inserted message for a given chat session."""
+
+        return self.scalar_one_or_none(
+            select(Message)
+            .where(Message.chat_session_id == chat_session_id)
+            .order_by(Message.created_at.desc())
+            .limit(1)
+        )

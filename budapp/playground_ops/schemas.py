@@ -21,7 +21,7 @@ import re
 from datetime import datetime
 from typing import Optional, Any
 
-from pydantic import UUID4, BaseModel, ConfigDict, field_validator, Field
+from pydantic import UUID4, BaseModel, ConfigDict, field_validator, Json
 
 from ..commons.constants import EndpointStatusEnum
 from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse
@@ -80,7 +80,6 @@ class ChatSessionCreate(BaseModel):
 
     name: str | None = None
     chat_setting_id: UUID4 | None = None
-    note: list[str] | None = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -94,7 +93,7 @@ class ChatSessionResponse(BaseModel):
     id: UUID4
     name: str
     chat_setting: Any | None = None  # update to ChatSettingResponse when relationship is created with chat setting
-    note: list[str] | None = None
+    # note: list[str] | None = None
     created_at: datetime
     modified_at: datetime
 
@@ -112,7 +111,7 @@ class ChatSessionListResponse(BaseModel):
 
     id: UUID4
     name: str
-    total_tokens: int | None = None
+    total_tokens: int  # not optional
     created_at: datetime
     modified_at: datetime
 
@@ -129,3 +128,64 @@ class ChatSessionFilter(BaseModel):
     """Chat session filter schema"""
 
     name: str | None = None
+
+
+class ChatSessionEdit(BaseModel):
+    """Chat session edit schema"""
+
+    name: str | None = None
+    chat_setting_id: UUID4 | None = None
+
+
+class MessageBase(BaseModel):
+    """Base schema for Message model containing shared attributes"""
+
+    prompt: str
+    response: list[dict]
+    deployment_id: UUID4
+
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+    token_per_sec: float | None = None
+    ttft: float | None = None
+    tpot: float | None = None
+    e2e_latency: float | None = None
+    is_cache: bool = False
+    harmfullness: float | None = None
+    faithfulness: float | None = None
+
+    upvotes: int | None = None
+    downvotes: int | None = None
+
+    @field_validator("prompt", mode="before")
+    @classmethod
+    def validate_prompt(cls, value: str | None) -> str:
+        """Ensure prompt is not empty"""
+        if not value:
+            raise ValueError("Prompt cannot be empty")
+        return value
+
+
+class MessageCreateRequest(MessageBase):
+    """Schema for creating a message"""
+
+    chat_session_id: UUID4 | None = None
+
+
+class MessageResponse(MessageBase):
+    """Schema for returning a message response"""
+
+    id: UUID4
+    chat_session_id: UUID4
+    parent_message_id: UUID4 | None = None
+    created_at: datetime
+    modified_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+class MessageSuccessResponse(SuccessResponse):
+    """Chat session success response schema"""
+
+    chat_message: MessageResponse

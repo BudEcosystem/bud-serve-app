@@ -30,9 +30,9 @@ from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..project_ops.crud import ProjectDataManager
 
-from .crud import ChatSessionDataManager
-from .models import ChatSession
-from .schemas import ChatSessionListResponse
+from .crud import ChatSessionDataManager, MessageDataManager
+from .models import ChatSession, Message
+from .schemas import ChatSessionListResponse, ChatSessionCreate
 
 logger = logging.get_logger(__name__)
 
@@ -107,8 +107,6 @@ class ChatSessionService(SessionMixin):
 
         chat_session_data["user_id"] = user_id
 
-        await ChatSessionDataManager(self.session).validate_fields(ChatSession, chat_session_data)
-
         chat_session = ChatSession(**chat_session_data)
 
         db_chat_session = await ChatSessionDataManager(self.session).insert_one(chat_session)
@@ -125,15 +123,16 @@ class ChatSessionService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[ChatSessionListResponse], int]:
         """List all chat sessions for a given user."""
-        db_chat_sessions, count = await ChatSessionDataManager(self.session).get_all_chat_sessions(
+        db_results, count = await ChatSessionDataManager(self.session).get_all_chat_sessions(
             user_id, offset, limit, filters, order_by, search
         )
         chat_sessions = []
-        for db_chat_session in db_chat_sessions:
+        for db_result in db_results:
+            db_chat_session = db_result[0]
             chat_session = ChatSessionListResponse(
                 id=db_chat_session.id,
                 name=db_chat_session.name,
-                total_tokens=None,  # TODO: query and update total tokens
+                total_tokens=db_result[1],
                 created_at=db_chat_session.created_at,
                 modified_at=db_chat_session.modified_at,
             )
@@ -159,3 +158,29 @@ class ChatSessionService(SessionMixin):
         await ChatSessionDataManager(self.session).delete_one(db_chat_session)
 
         return
+
+
+class MessageService(SessionMixin):
+    """Message Service"""
+
+    async def create_message(self, user_id: UUID, message_data: dict) -> Message:
+        """Create a new message and insert it into the database."""
+
+        # If chat_session_id is not provided, create a new chat session first
+        if not message_data.get("chat_session_id"):
+            chat_session_data = ChatSessionCreate(name=None).model_dump(exclude_unset=True)
+            chat_session_data["user_id"] = user_id
+            chat_session = ChatSession(**chat_session_data)
+            db_chat_session = await ChatSessionDataManager(self.session).insert_one(chat_session)
+            message_data["chat_session_id"] = db_chat_session.id  # Assign the new session ID
+            message_data["parent_message_id"] = None
+        else:
+            # Fetch the last message in the session to determine parent_id
+            last_message = await MessageDataManager(self.session).get_last_message(message_data["chat_session_id"])
+            message_data["parent_message_id"] = last_message.id if last_message else None
+
+        # Create a new message
+        message = Message(**message_data)
+        db_message = await MessageDataManager(self.session).insert_one(message)
+
+        return db_message
