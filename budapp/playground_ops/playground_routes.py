@@ -40,10 +40,10 @@ from .schemas import (
     ChatSessionCreate,
     ChatSessionFilter,
     ChatSessionPaginatedResponse,
-    ChatSessionResponse,
     ChatSessionSuccessResponse,
     MessageCreateRequest,
     MessageSuccessResponse,
+    ChatSessionEditRequest,
 )
 from .services import PlaygroundService, ChatSessionService, MessageService
 
@@ -260,7 +260,7 @@ async def get_chat_session_details(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     chat_session_id: UUID,
-) -> Union[ChatSessionResponse, ErrorResponse]:
+) -> Union[ChatSessionSuccessResponse, ErrorResponse]:
     """Retrieve details of a specific chat session."""
     try:
         db_chat_session = await ChatSessionService(session).get_chat_session_details(chat_session_id)
@@ -322,6 +322,51 @@ async def delete_chat_session(
         message="Chat session deleted successfully",
         object="chat_session.delete",
     )
+
+
+@playground_router.patch(
+    "/chat-sessions/{chat_session_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ChatSessionSuccessResponse,
+            "description": "Successfully edited chat session",
+        },
+    },
+    description="Edit chat session",
+)
+async def edit_chat_session(
+    chat_session_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: ChatSessionEditRequest,
+) -> Union[ChatSessionSuccessResponse, ErrorResponse]:
+    """Edit chat session"""
+    try:
+        db_chat_session = await ChatSessionService(session).edit_chat_session(
+            chat_session_id=chat_session_id, data=request.model_dump(exclude_unset=True, exclude_none=True)
+        )
+        return ChatSessionSuccessResponse(
+            chat_session=db_chat_session,
+            message="Chat session details updated successfully",
+            code=status.HTTP_200_OK,
+            object="chat_session.edit",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to edit chat session: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to edit chat session: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit chat session"
+        ).to_http_response()
 
 
 @playground_router.post(

@@ -16,7 +16,7 @@
 
 """The playground ops services. Contains business logic for playground ops."""
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from uuid import UUID
 
 from fastapi import status
@@ -158,6 +158,18 @@ class ChatSessionService(SessionMixin):
         await ChatSessionDataManager(self.session).delete_one(db_chat_session)
 
         return
+
+    async def edit_chat_session(self, chat_session_id: UUID, data: Dict[str, Any]) -> ChatSession:
+        """Edit chat session by validating and updating specific fields."""
+        # Retrieve existing chat session
+        db_chat_session = await ChatSessionDataManager(self.session).retrieve_by_fields(
+            ChatSession,
+            fields={"id": chat_session_id},
+        )
+
+        db_chat_session = await ChatSessionDataManager(self.session).update_by_fields(db_chat_session, data)
+
+        return db_chat_session
 
 
 class MessageService(SessionMixin):

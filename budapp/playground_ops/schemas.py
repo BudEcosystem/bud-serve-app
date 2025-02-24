@@ -130,7 +130,7 @@ class ChatSessionFilter(BaseModel):
     name: str | None = None
 
 
-class ChatSessionEdit(BaseModel):
+class ChatSessionEditRequest(BaseModel):
     """Chat session edit schema"""
 
     name: str | None = None
