@@ -38,7 +38,7 @@ class ChatSessionDataManager(DataManagerUtils):
         user_id: UUID,
         offset: int,
         limit: int,
-        filters: Dict = {},  # endpoint count need to consider in future
+        filters: Dict = {},
         order_by: List = [],
         search: bool = False,
     ) -> Tuple[List[ChatSession], int]:
