@@ -16,15 +16,18 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the project ops."""
 
+from typing import List
 from uuid import UUID
-from typing import Tuple
-from sqlalchemy import func, distinct, select
+
+from sqlalchemy import distinct, func, select
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
-from .models import project_user_association, Project
+
 from ..commons.constants import ProjectStatusEnum, UserStatusEnum
 from ..user_ops.models import User
+from .models import Project, project_user_association
+
 
 logger = logging.get_logger(__name__)
 
@@ -33,8 +36,7 @@ class ProjectDataManager(DataManagerUtils):
     """Data manager for the Project model."""
 
     def get_unique_user_count_in_all_projects(self) -> int:
-        """
-        Get the count of unique users across all active projects.
+        """Get the count of unique users across all active projects.
 
         Returns:
             int: Count of unique users in all active projects.
@@ -49,3 +51,12 @@ class ProjectDataManager(DataManagerUtils):
             )
         )
         return self.scalar_one_or_none(unique_users_stmt) or 0
+
+    async def get_all_active_project_ids(self) -> List[UUID]:
+        """Get all active project ids.
+
+        Returns:
+            List[UUID]: List of active project ids.
+        """
+        stmt = select(Project.id).where(Project.status == ProjectStatusEnum.ACTIVE)
+        return self.scalars_all(stmt)

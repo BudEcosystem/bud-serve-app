@@ -16,10 +16,11 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the endpoint ops."""
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import and_, asc, desc, distinct, func, or_, select
+from sqlalchemy.dialects.postgresql import JSONB
 
 from budapp.cluster_ops.models import Cluster as ClusterModel
 from budapp.commons import logging
@@ -27,6 +28,7 @@ from budapp.commons.constants import EndpointStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.model_ops.models import Model as Model
 
+from ..commons.helpers import get_param_range
 from ..project_ops.models import Project as ProjectModel
 from .models import Endpoint as EndpointModel
 
@@ -217,8 +219,7 @@ class EndpointDataManager(DataManagerUtils):
         return result, count
 
     async def get_cluster_count_details(self, cluster_id: UUID) -> Tuple[int, int, int, int]:
-        """
-        Retrieve cluster statistics including:
+        """Retrieve cluster statistics including:
         - Total endpoints count (excluding deleted ones)
         - Running endpoints count
         - Sum of active replicas (workers)
@@ -246,3 +247,112 @@ class EndpointDataManager(DataManagerUtils):
         total_endpoints, running_endpoints, active_replicas, total_replicas = result.fetchone()
 
         return total_endpoints, running_endpoints, active_replicas, total_replicas
+
+    async def get_all_playground_deployments(
+        self,
+        project_ids: List[UUID],
+        offset: int,
+        limit: int,
+        filters: Optional[Dict[str, Any]] = None,
+        order_by: Optional[List[Tuple[str, str]]] = None,
+        search: bool = False,
+    ) -> Tuple[List[EndpointModel], int]:
+        """Get all playground deployments."""
+        filters = filters or {}
+        order_by = order_by or []
+
+        # Define explicit conditions
+        explicit_conditions = []
+        json_filters = {"tags": filters.pop("tags", []), "tasks": filters.pop("tasks", [])}
+        explicit_filters = {
+            "modality": filters.pop("modality", []),
+            "model_size": filters.pop("model_size", None),
+            "model_name": filters.pop("model_name", None),
+        }
+
+        # Validate the remaining filters
+        await self.validate_fields(EndpointModel, filters)
+
+        if json_filters["tags"]:
+            # Either TagA or TagB exist in tag field
+            tag_conditions = or_(
+                *[Model.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]]
+            )
+            explicit_conditions.append(tag_conditions)
+
+        if json_filters["tasks"]:
+            # Either TaskA or TaskB exist in task field
+            task_conditions = or_(
+                *[Model.tasks.cast(JSONB).contains([{"name": task_name}]) for task_name in json_filters["tasks"]]
+            )
+            explicit_conditions.append(task_conditions)
+
+        if explicit_filters["modality"]:
+            # Check any of modality present in the field
+            modality_condition = Model.modality.in_(explicit_filters["modality"])
+            explicit_conditions.append(modality_condition)
+
+        if explicit_filters["model_size"]:
+            # Convert model size to a pre-defined range of numbers
+            model_size_min, model_size_max = get_param_range(explicit_filters["model_size"])
+            explicit_conditions.append(Model.model_size.between(model_size_min, model_size_max))
+
+        # Generate statements according to search or filters
+        if search:
+            if explicit_filters["model_name"]:
+                # For search, query using like operator
+                model_name_condition = Model.name.ilike(f"%{explicit_filters['model_name']}%")
+                explicit_conditions.append(model_name_condition)
+
+            search_conditions = await self.generate_search_stmt(EndpointModel, filters)
+            stmt = (
+                select(EndpointModel)
+                .join(Model, EndpointModel.model_id == Model.id)
+                .filter(or_(*search_conditions, *explicit_conditions))
+                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+                .filter(EndpointModel.project_id.in_(project_ids))
+            )
+            count_stmt = (
+                select(func.count(distinct(EndpointModel.id)))
+                .join(Model, EndpointModel.model_id == Model.id)
+                .filter(or_(*search_conditions, *explicit_conditions))
+                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+                .filter(EndpointModel.project_id.in_(project_ids))
+            )
+        else:
+            if explicit_filters["model_name"]:
+                # For filters, query using == operator
+                model_name_condition = Model.name == explicit_filters["model_name"]
+                explicit_conditions.append(model_name_condition)
+
+            stmt = (
+                select((EndpointModel))
+                .filter_by(**filters)
+                .join(Model, EndpointModel.model_id == Model.id)
+                .where(and_(*explicit_conditions))
+                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+                .filter(EndpointModel.project_id.in_(project_ids))
+            )
+            count_stmt = (
+                select(func.count(distinct(EndpointModel.id)))
+                .filter_by(**filters)
+                .join(Model, EndpointModel.model_id == Model.id)
+                .where(and_(*explicit_conditions))
+                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+                .filter(EndpointModel.project_id.in_(project_ids))
+            )
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(EndpointModel, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.scalars_all(stmt)
+
+        return result, count

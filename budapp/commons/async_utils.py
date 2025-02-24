@@ -19,6 +19,13 @@
 import asyncio
 from typing import Any, Awaitable, Callable, List, Tuple, TypeVar, Union
 
+from fastapi import Header, status
+from fastapi.security.http import HTTPAuthorizationCredentials, get_authorization_scheme_param
+from sqlalchemy.orm import Session
+from typing_extensions import Annotated
+
+from ..user_ops.schemas import User
+
 
 T = TypeVar("T")
 
@@ -89,3 +96,30 @@ async def check_file_extension(filename: str, allowed_extensions: List[str]) -> 
     allowed_extensions = [ext.lower() for ext in allowed_extensions]
 
     return file_extension in allowed_extensions
+
+
+async def get_user_from_auth_header(authorization: Annotated[str, Header()], session: Session) -> User:
+    """Get the user from the authorization header.
+
+    Args:
+        authorization (str): The authorization header.
+        session (Session): The database session.
+
+    Returns:
+        User: The user.
+    """
+    from .dependencies import get_current_active_user, get_current_user
+    from .exceptions import ClientException
+
+    try:
+        scheme, credentials = get_authorization_scheme_param(authorization)
+        token = HTTPAuthorizationCredentials(scheme=scheme, credentials=credentials)
+        db_user = await get_current_user(token, session)
+        current_user = await get_current_active_user(db_user)
+        return current_user
+    except ClientException as e:
+        raise e
+    except Exception as e:
+        raise ClientException(
+            status_code=status.HTTP_401_UNAUTHORIZED, message="Invalid authentication credentials"
+        ) from e

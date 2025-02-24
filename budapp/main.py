@@ -36,6 +36,7 @@ from .endpoint_ops import endpoint_routes
 from .initializers.seeder import seeders
 from .metric_ops import metric_routes
 from .model_ops import model_routes
+from .playground_ops import playground_routes
 from .project_ops import project_routes
 from .user_ops import user_routes
 from .workflow_ops import workflow_routes
@@ -129,6 +130,7 @@ internal_router.include_router(model_routes.model_router)
 internal_router.include_router(notify_routes.notify_router)
 internal_router.include_router(user_routes.user_router)
 internal_router.include_router(workflow_routes.workflow_router)
+internal_router.include_router(playground_routes.playground_router)
 internal_router.include_router(project_routes.project_router)
 
 app.include_router(internal_router)
