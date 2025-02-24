@@ -258,10 +258,8 @@ class EndpointDataManager(DataManagerUtils):
         search: bool = False,
     ) -> Tuple[List[EndpointModel], int]:
         """Get all playground deployments."""
-        if not filters:
-            filters = {}
-        if not order_by:
-            order_by = []
+        filters = filters or {}
+        order_by = order_by or []
 
         # Define explicit conditions
         explicit_conditions = []

@@ -48,39 +48,11 @@ class PlaygroundService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[EndpointModel], int]:
         """Get all playground deployments."""
-        if not filters:
-            filters = {}
-        if not order_by:
-            order_by = []
+        filters = filters or {}
+        order_by = order_by or []
 
-        project_ids = []
-        if current_user_id:
-            # TODO: As per user permissions list the playground deployments (accessible project ids)
-            logger.debug(f"Getting all playground deployments for user {current_user_id}")
-            # TODO: Query all accessible project ids for the user
-            db_project_ids = await ProjectDataManager(self.session).get_all_active_project_ids()
-            project_ids = db_project_ids
-        elif api_key:
-            # if api_key is present identify the project id
-            db_credential = await CredentialDataManager(self.session).retrieve_by_fields(
-                CredentialModel, fields={"key": api_key}, missing_ok=True
-            )
-
-            if not db_credential:
-                logger.error("Invalid API key found")
-                raise ClientException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    message="Invalid API key",
-                )
-            else:
-                project_id = db_credential.project.id
-                project_ids = [project_id]
-                logger.debug(f"Getting all playground deployments for project {project_id} based on API key")
-        else:
-            raise ClientException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                message="Unauthorized to access this resource",
-            )
+        project_ids = await self._get_authorized_project_ids(current_user_id, api_key)
+        logger.debug("authorized project_ids: %s", project_ids)
 
         db_endpoints, count = await EndpointDataManager(self.session).get_all_playground_deployments(
             project_ids,
@@ -90,6 +62,35 @@ class PlaygroundService(SessionMixin):
             order_by,
             search,
         )
-        logger.debug("found %s deployments", len(db_endpoints))
+        logger.debug("found %s deployments", count)
 
         return db_endpoints, count
+
+    async def _get_authorized_project_ids(
+        self, current_user_id: Optional[UUID] = None, api_key: Optional[str] = None
+    ) -> List[UUID]:
+        """Get all authorized project ids."""
+        if current_user_id:
+            # NOTE: As per user permissions list the playground deployments (accessible project ids)
+            # TODO: Query all accessible project ids for the user (Currently all active project ids since permissions are not implemented)
+            logger.debug(f"Getting all playground deployments for user {current_user_id}")
+            return await ProjectDataManager(self.session).get_all_active_project_ids()
+        elif api_key:
+            # if api_key is present identify the project id
+            db_credential = await CredentialDataManager(self.session).retrieve_by_fields(
+                CredentialModel, fields={"key": api_key}, missing_ok=True
+            )
+
+            if not db_credential:
+                logger.error("Invalid API key found")
+                raise ClientException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="Invalid API key",
+                )
+            else:
+                return [db_credential.project.id]
+        else:
+            raise ClientException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                message="Unauthorized to access this resource",
+            )

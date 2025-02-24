@@ -78,7 +78,7 @@ async def list_playground_deployments(
         if not authorization and not api_key:
             raise ClientException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                message="Authorization header or API key is required",
+                message="Unauthorized to access this resource",
             )
 
         # Get current user id, if authorization header is provided
