@@ -692,6 +692,39 @@ class ClusterService(SessionMixin):
             hpu_available_workers=hpu_total_workers,
         )
 
+    async def _perform_bud_cluster_edit_request(
+        self, bud_cluster_id: UUID, data: Dict[str, Any]
+    ) -> Dict:
+        """Perform edit cluster request to bud_cluster app.
+
+        Args:
+            bud_cluster_id: The ID of the cluster to edit.
+            data: The data to edit the cluster with.
+        """
+        edit_cluster_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/{bud_cluster_id}"
+        )
+
+        payload = {"ingress_url": data["ingress_url"]}
+
+        logger.debug(f"Performing edit cluster request to budcluster {payload}")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.patch(edit_cluster_endpoint, json=payload) as response:
+                    response_data = await response.json()
+                    if response.status != 200 or response_data.get("object") == "error":
+                        logger.error(f"Failed to edit cluster: {response.status} {response_data}")
+                        raise ClientException(
+                            "Failed to edit cluster", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
+
+                    logger.debug("Successfully edited cluster from budcluster")
+                    return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send edit cluster request: {e}")
+            raise ClientException("Failed to edit cluster", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR) from e
+
+
     async def edit_cluster(self, cluster_id: UUID, data: Dict[str, Any]) -> ClusterResponse:
         """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
         # Retrieve existing model
@@ -709,6 +742,9 @@ class ClusterService(SessionMixin):
             )
             if duplicate_cluster:
                 raise ClientException("Cluster name already exists")
+
+        if "ingress_url" in data:
+            await self._perform_bud_cluster_edit_request(db_cluster.cluster_id, data)
 
         db_cluster = await ClusterDataManager(self.session).update_by_fields(db_cluster, data)
 
@@ -1189,6 +1225,5 @@ class ClusterService(SessionMixin):
 
         except Exception as e:
             raise ClientException(f"Failed to get node-wise events: {str(e)}")
-        
-        
+
 
