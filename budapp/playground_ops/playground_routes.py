@@ -19,15 +19,13 @@
 from typing import List, Union
 
 from fastapi import APIRouter, Depends, Header, Query, status
-from fastapi.security.http import HTTPAuthorizationCredentials, get_authorization_scheme_param
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from ..commons import logging
+from ..commons.async_utils import get_user_from_auth_header
 from ..commons.constants import ModalityEnum
 from ..commons.dependencies import (
-    get_current_active_user,
-    get_current_user,
     get_session,
     parse_ordering_fields,
 )
@@ -58,7 +56,7 @@ playground_router = APIRouter(prefix="/playground", tags=["playground"])
             "description": "Successfully list all playground deployments",
         },
     },
-    description="List all playground deployments",
+    description="List all playground deployments with filtering and pagination.",
 )
 async def list_playground_deployments(
     session: Annotated[Session, Depends(get_session)],
@@ -75,31 +73,31 @@ async def list_playground_deployments(
     order_by: Annotated[List[str] | None, Depends(parse_ordering_fields)] = None,
     search: bool = False,
 ) -> Union[PlaygroundDeploymentListResponse, ErrorResponse]:
-    """List all playground deployments."""
-    current_user_id = None
-    if authorization:
-        scheme, credentials = get_authorization_scheme_param(authorization)
-        token = HTTPAuthorizationCredentials(scheme=scheme, credentials=credentials)
-        db_user = await get_current_user(token, session)
-        current_user = await get_current_active_user(db_user)
-        current_user_id = current_user.id
-    elif not authorization and not api_key:
-        raise ClientException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            message="Authorization header or API key is required",
-        )
-
-    # Calculate offset
-    offset = (page - 1) * limit
-
-    # Convert PlaygroundDeploymentFilter to dictionary
-    filters_dict = filters.model_dump(exclude_none=True)
-
-    # Update filters_dict only for non-empty lists
-    filter_updates = {"tags": tags, "tasks": tasks, "modality": modality}
-    filters_dict.update({k: v for k, v in filter_updates.items() if v})
-
+    """List all playground deployments with filtering and pagination."""
     try:
+        if not authorization and not api_key:
+            raise ClientException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                message="Authorization header or API key is required",
+            )
+
+        # Get current user id, if authorization header is provided
+        current_user_id = None
+        if authorization:
+            current_user = await get_user_from_auth_header(authorization, session)
+            current_user_id = current_user.id
+
+        # Calculate offset
+        offset = (page - 1) * limit
+
+        # Convert PlaygroundDeploymentFilter to dictionary
+        filters_dict = filters.model_dump(exclude_none=True)
+
+        # Update filters_dict only for non-empty lists
+        filter_updates = {"tags": tags, "tasks": tasks, "modality": modality}
+        filters_dict.update({k: v for k, v in filter_updates.items() if v})
+
+        # Get all playground deployments
         db_endpoints, count = await PlaygroundService(session).get_all_playground_deployments(
             current_user_id,
             api_key,
