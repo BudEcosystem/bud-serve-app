@@ -59,4 +59,4 @@ class ProjectDataManager(DataManagerUtils):
             List[UUID]: List of active project ids.
         """
         stmt = select(Project.id).where(Project.status == ProjectStatusEnum.ACTIVE)
-        return self.execute_all(stmt)
+        return self.scalars_all(stmt)
