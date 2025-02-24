@@ -32,7 +32,7 @@ from ..project_ops.crud import ProjectDataManager
 
 from .crud import ChatSessionDataManager
 from .models import ChatSession
-from .schemas import ChatSessionListResponse, ChatSessionResponse
+from .schemas import ChatSessionListResponse
 
 logger = logging.get_logger(__name__)
 
@@ -102,18 +102,18 @@ class PlaygroundService(SessionMixin):
 class ChatSessionService(SessionMixin):
     """Chat Session Service"""
 
-    async def create_chat_session(self, data: dict) -> ChatSession:
+    async def create_chat_session(self, user_id: UUID, chat_session_data: dict) -> ChatSession:
         """Create a new chat session and insert it into the database."""
-        # is it req to check for duplicate name?
 
-        await ChatSessionDataManager(self.session).validate_fields(ChatSession, data)
+        chat_session_data["user_id"] = user_id
 
-        chat_session = ChatSession(**data)
+        await ChatSessionDataManager(self.session).validate_fields(ChatSession, chat_session_data)
+
+        chat_session = ChatSession(**chat_session_data)
 
         db_chat_session = await ChatSessionDataManager(self.session).insert_one(chat_session)
-        chat_session_response = ChatSessionResponse.model_validate(db_chat_session)
 
-        return chat_session_response
+        return db_chat_session
 
     async def list_chat_sessions(
         self,
@@ -125,30 +125,29 @@ class ChatSessionService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[ChatSessionListResponse], int]:
         """List all chat sessions for a given user."""
-        results, count = await ChatSessionDataManager(self.session).get_all_sessions(
+        db_chat_sessions, count = await ChatSessionDataManager(self.session).get_all_chat_sessions(
             user_id, offset, limit, filters, order_by, search
         )
-        updated_sessions = []
-        for session_obj in results:
-            updated_session = ChatSessionListResponse(
-                id=session_obj.id,
-                name=session_obj.name,
-                total_tokens=10,  # dummy
-                created_at=session_obj.created_at,
-                modified_at=session_obj.modified_at,
+        chat_sessions = []
+        for db_chat_session in db_chat_sessions:
+            chat_session = ChatSessionListResponse(
+                id=db_chat_session.id,
+                name=db_chat_session.name,
+                total_tokens=None,  # TODO: query and update total tokens
+                created_at=db_chat_session.created_at,
+                modified_at=db_chat_session.modified_at,
             )
-            updated_sessions.append(updated_session)
-        return updated_sessions, count
+            chat_sessions.append(chat_session)
+        return chat_sessions, count
 
-    async def get_chat_session_details(self, chat_session_id: UUID) -> ChatSessionResponse:
+    async def get_chat_session_details(self, chat_session_id: UUID) -> ChatSession:
         """Retrieve details of a session by its ID."""
         db_chat_session = await ChatSessionDataManager(self.session).retrieve_by_fields(
             ChatSession,
             fields={"id": chat_session_id},
         )
-        chat_session_response = ChatSessionResponse.model_validate(db_chat_session)
 
-        return chat_session_response
+        return db_chat_session
 
     async def delete_chat_session(self, chat_session_id: UUID) -> None:
         """Delete chat session."""

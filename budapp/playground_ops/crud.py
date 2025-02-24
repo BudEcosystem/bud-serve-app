@@ -33,7 +33,7 @@ logger = logging.get_logger(__name__)
 class ChatSessionDataManager(DataManagerUtils):
     """Data manager for the ChatSession model."""
 
-    async def get_all_sessions(
+    async def get_all_chat_sessions(
         self,
         user_id: UUID,
         offset: int,
@@ -48,15 +48,21 @@ class ChatSessionDataManager(DataManagerUtils):
         # Generate statements based on search or filters
         if search:
             search_conditions = await self.generate_search_stmt(ChatSession, filters)
-            stmt = select(ChatSession).filter(and_(*search_conditions))
-            count_stmt = select(func.count()).select_from(ChatSession).filter(and_(*search_conditions))
+            stmt = select(ChatSession).where(ChatSession.user_id == user_id).filter(and_(*search_conditions))
+            count_stmt = (
+                select(func.count())
+                .select_from(ChatSession)
+                .where(ChatSession.user_id == user_id)
+                .filter(and_(*search_conditions))
+            )
         else:
-            stmt = select(ChatSession).filter_by(**filters)
-            count_stmt = select(func.count()).select_from(ChatSession).filter_by(**filters)
-
-        if user_id:
-            stmt = stmt.filter(ChatSession.user_id == user_id)
-            count_stmt = count_stmt.filter(ChatSession.user_id == user_id)
+            stmt = select(ChatSession).where(ChatSession.user_id == user_id).filter_by(**filters)
+            count_stmt = (
+                select(func.count())
+                .select_from(ChatSession)
+                .where(ChatSession.user_id == user_id)
+                .filter_by(**filters)
+            )
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)

@@ -32,8 +32,8 @@ class ChatSession(Base, TimestampMixin):
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     # deployment_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
-    name: Mapped[str] = mapped_column(String, nullable=False, default="unnamed chat")
-    chat_settings_id: Mapped[UUID] = mapped_column(
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    chat_setting_id: Mapped[UUID] = mapped_column(
         Uuid,
         # ForeignKey("chat_settings.id", ondelete="CASCADE"),
         nullable=True,
@@ -46,6 +46,6 @@ class ChatSession(Base, TimestampMixin):
 
     # Relationships
     # messages: Mapped[list["Message"]] = relationship("Message", back_populates="session")
-    # chat_settings: Mapped["ChatSettings"] = relationship(
-    #     "ChatSettings", back_populates="chat_sessions", foreign_keys=[chat_settings_id]
+    # chat_setting: Mapped["ChatSetting"] = relationship(
+    #     "ChatSetting", back_populates="chat_sessions", foreign_keys=[chat_setting_id]
     # )

@@ -19,7 +19,7 @@
 
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 
 from pydantic import UUID4, BaseModel, ConfigDict, field_validator, Field
 
@@ -76,18 +76,24 @@ class PlaygroundDeploymentFilter(BaseModel):
 
 
 class ChatSessionCreate(BaseModel):
-    # deployment_id: UUID4
-    name: str = Field(default="unnamed chat")
-    chat_settings_id: UUID4 | None = None
+    """Chat session create schema"""
+
+    name: str | None = None
+    chat_setting_id: UUID4 | None = None
     note: list[str] | None = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def set_default_name(cls, value: str | None) -> str:
+        return value or "Unnamed Chat"
 
 
 class ChatSessionResponse(BaseModel):
+    """Chat session response schema"""
+
     id: UUID4
-    user_id: UUID4
-    # deployment_id: UUID4
     name: str
-    chat_settings_id: UUID4 | None = None
+    chat_setting: Any | None = None  # update to ChatSettingResponse when relationship is created with chat setting
     note: list[str] | None = None
     created_at: datetime
     modified_at: datetime
@@ -96,13 +102,17 @@ class ChatSessionResponse(BaseModel):
 
 
 class ChatSessionSuccessResponse(SuccessResponse):
-    session: ChatSessionResponse
+    """Chat session success response schema"""
+
+    chat_session: ChatSessionResponse
 
 
 class ChatSessionListResponse(BaseModel):
+    """Chat session list response schema"""
+
     id: UUID4
     name: str
-    total_tokens: int | None = None  # Aggregated token count for the session
+    total_tokens: int | None = None
     created_at: datetime
     modified_at: datetime
 
@@ -110,9 +120,12 @@ class ChatSessionListResponse(BaseModel):
 
 
 class ChatSessionPaginatedResponse(PaginatedSuccessResponse):
+    """Chat session paginated response schema"""
+
     chat_sessions: list[ChatSessionListResponse] = []
 
 
 class ChatSessionFilter(BaseModel):
-    # user_id: UUID4  #check if req
+    """Chat session filter schema"""
+
     name: str | None = None
