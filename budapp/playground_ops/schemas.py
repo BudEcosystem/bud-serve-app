@@ -18,12 +18,29 @@
 """Contains core Pydantic schemas used for data validation and serialization within the model ops services."""
 
 import re
+from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import UUID4, BaseModel, ConfigDict, field_validator
 
+from ..commons.constants import EndpointStatusEnum
 from ..commons.schemas import PaginatedSuccessResponse
-from ..endpoint_ops.schemas import EndpointListResponse
+from ..model_ops.schemas import ModelResponse
+from ..project_ops.schemas import ProjectResponse
+
+
+class EndpointListResponse(BaseModel):
+    """Endpoint list response schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    status: EndpointStatusEnum
+    model: ModelResponse
+    project: ProjectResponse
+    created_at: datetime
+    modified_at: datetime
 
 
 class PlaygroundDeploymentListResponse(PaginatedSuccessResponse):
@@ -38,6 +55,7 @@ class PlaygroundDeploymentFilter(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     name: str | None = None
+    status: EndpointStatusEnum | None = None
     model_name: str | None = None
     model_size: str | None = None
 
