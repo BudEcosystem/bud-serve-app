@@ -225,10 +225,17 @@ class MetricService(SessionMixin):
                 async with session.post(deployment_cache_metric_endpoint) as response:
                     response_data = await response.json()
                     if response.status != status.HTTP_200_OK:
-                        logger.error(f"Failed to get deployment cache metrics: {response.status} {response_data}")
-                        raise ClientException(
-                            "Failed to get deployment cache metrics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-                        )
+                        if response.status == status.HTTP_404_NOT_FOUND:
+                            response_data = {
+                                "latency": None,
+                                "hit_ratio": None,
+                                "most_reused_prompts": [],
+                            }
+                        else:
+                            logger.error(f"Failed to get deployment cache metrics: {response.status} {response_data}")
+                            raise ClientException(
+                                "Failed to get deployment cache metrics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                            )
 
                     logger.debug("Successfully get deployment cache metrics from budmetric")
                     return response_data
