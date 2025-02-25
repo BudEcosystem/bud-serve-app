@@ -79,7 +79,6 @@ class ChatSessionCreate(BaseModel):
     """Chat session create schema"""
 
     name: str | None = None
-    chat_setting_id: UUID4 | None = None
 
     @field_validator("name", mode="before")
     @classmethod
