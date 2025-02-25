@@ -24,6 +24,7 @@ from fastapi import status
 from ..commons import logging
 from ..commons.db_utils import SessionMixin
 from ..commons.exceptions import ClientException
+from ..commons.constants import EndpointStatusEnum
 from ..credential_ops.crud import CredentialDataManager
 from ..credential_ops.models import Credential as CredentialModel
 from ..endpoint_ops.crud import EndpointDataManager
@@ -180,7 +181,9 @@ class MessageService(SessionMixin):
 
         # validate deployment id
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-            EndpointModel, fields={"id": message_data["deployment_id"]}
+            EndpointModel,
+            fields={"id": message_data["deployment_id"]},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
         )
         # If chat_session_id is not provided, create a new chat session first
         if not message_data.get("chat_session_id"):
