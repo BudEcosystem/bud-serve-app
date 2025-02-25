@@ -152,19 +152,11 @@ class MessageBase(BaseModel):
     tpot: float | None = None
     e2e_latency: float | None = None
     is_cache: bool = False
-    harmfullness: float | None = None
-    faithfulness: float | None = None
+    # harmfullness: float | None = None
+    # faithfulness: float | None = None
 
-    upvotes: int | None = None
-    downvotes: int | None = None
-
-    @field_validator("prompt", mode="before")
-    @classmethod
-    def validate_prompt(cls, value: str | None) -> str:
-        """Ensure prompt is not empty"""
-        if not value:
-            raise ValueError("Prompt cannot be empty")
-        return value
+    # upvotes: int | None = None
+    # downvotes: int | None = None
 
 
 class MessageCreateRequest(MessageBase):
@@ -179,6 +171,8 @@ class MessageResponse(MessageBase):
     id: UUID4
     chat_session_id: UUID4
     parent_message_id: UUID4 | None = None
+    harmfullness: float | None = None
+    faithfulness: float | None = None
     created_at: datetime
     modified_at: datetime
 

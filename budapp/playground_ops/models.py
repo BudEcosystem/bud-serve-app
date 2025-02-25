@@ -33,7 +33,7 @@ class ChatSession(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String, nullable=False)
     chat_setting_id: Mapped[UUID] = mapped_column(
         Uuid,
-        # ForeignKey("chat_settings.id", ondelete="CASCADE"),
+        ForeignKey("chat_settings.id", ondelete="CASCADE"),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
@@ -42,20 +42,22 @@ class ChatSession(Base, TimestampMixin):
     )
 
     # Relationships
-    # chat_setting: Mapped["ChatSetting"] = relationship(
-    #     "ChatSetting", back_populates="chat_sessions", foreign_keys=[chat_setting_id]
-    # )
+    chat_setting: Mapped["ChatSetting"] = relationship(
+        "ChatSetting", back_populates="chat_sessions", foreign_keys=[chat_setting_id]
+    )
     messages: Mapped[list["Message"]] = relationship(
         "Message", back_populates="chat_session", cascade="all, delete-orphan"
     )
     notes: Mapped[list["Note"]] = relationship("Note", back_populates="chat_session", cascade="all, delete-orphan")
 
 
-class Note(Base):
-    __tablename__ = "note"
+class Note(Base, TimestampMixin):
+    __tablename__ = "notes"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    session_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False)
+    chat_session_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False
+    )
     note: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     modified_at: Mapped[datetime] = mapped_column(
@@ -65,7 +67,7 @@ class Note(Base):
     chat_session = relationship("ChatSession", back_populates="notes")
 
 
-class Message(Base):
+class Message(Base, TimestampMixin):
     __tablename__ = "messages"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
@@ -94,8 +96,8 @@ class Message(Base):
     harmfullness: Mapped[float] = mapped_column(Float, nullable=True)
     faithfulness: Mapped[float] = mapped_column(Float, nullable=True)
 
-    upvotes: Mapped[int] = mapped_column(Integer, nullable=True)
-    downvotes: Mapped[int] = mapped_column(Integer, nullable=True)
+    # upvotes: Mapped[int] = mapped_column(Integer, nullable=True)
+    # downvotes: Mapped[int] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     modified_at: Mapped[datetime] = mapped_column(
@@ -107,3 +109,19 @@ class Message(Base):
     parent_message: Mapped["Message"] = relationship(
         "Message", remote_side=[id], backref=backref("child_messages", cascade="all, delete")
     )
+
+
+class ChatSetting(Base, TimestampMixin):
+    __tablename__ = "chat_settings"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    preset_name: Mapped[str] = mapped_column(String, nullable=False)
+    user_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    modified_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    # Relationship back to chat sessions using these settings.
+    chat_sessions: Mapped[list["ChatSession"]] = relationship("ChatSession", back_populates="chat_setting")

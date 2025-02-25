@@ -188,8 +188,8 @@ class MessageService(SessionMixin):
             message_data["parent_message_id"] = None
         else:
             # Fetch the last message in the session to determine parent_id
-            last_message = await MessageDataManager(self.session).get_last_message(message_data["chat_session_id"])
-            message_data["parent_message_id"] = last_message.id if last_message else None
+            last_db_message = await MessageDataManager(self.session).get_last_message(message_data["chat_session_id"])
+            message_data["parent_message_id"] = last_db_message.id if last_db_message else None
 
         # Create a new message
         message = Message(**message_data)
