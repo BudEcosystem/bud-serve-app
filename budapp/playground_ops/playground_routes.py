@@ -412,3 +412,57 @@ async def create_message(
         code=status.HTTP_200_OK,
         object="message.create",
     ).to_http_response()
+
+
+@playground_router.get(
+    "/chat-sessions/{chat_session_id}/messages",
+    responses={
+        status.HTTP_200_OK: {
+            "model": MessagePaginatedResponse,
+            "description": "Successfully retrieved messages.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="Retrieve all messages for a given chat session.",
+)
+async def get_all_messages(
+    chat_session_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+) -> Union[MessagePaginatedResponse, ErrorResponse]:
+    """Retrieve all messages for a given chat session."""
+    offset = (page - 1) * limit
+
+    try:
+        db_messages, count = await MessageService(session).get_messages_by_chat_session(
+            chat_session_id, current_user.id, offset, limit, order_by
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to retrieve messages: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to retrieve messages: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to retrieve messages",
+        ).to_http_response()
+
+    return MessagePaginatedResponse(
+        messages=db_messages,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="messages.list",
+        code=status.HTTP_200_OK,
+        message="Successfully retrieved messages",
+    ).to_http_response()
