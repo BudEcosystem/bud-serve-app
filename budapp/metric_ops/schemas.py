@@ -92,5 +92,5 @@ class DashboardStatsResponse(SuccessResponse):
 class CacheMetricsResponse(SuccessResponse):
     object: str = "cache_metrics"
     latency: Optional[float] = None
-    hit_ratio: float = 0.0
+    hit_ratio: Optional[float] = None
     most_reused_prompts: Optional[List[tuple[str, int]]] = None
