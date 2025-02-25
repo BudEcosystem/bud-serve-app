@@ -16,7 +16,7 @@
 
 """The playground ops services. Contains business logic for playground ops."""
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from uuid import UUID
 
 from fastapi import status
@@ -30,6 +30,9 @@ from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..project_ops.crud import ProjectDataManager
 
+from .crud import ChatSessionDataManager, MessageDataManager
+from .models import ChatSession, Message
+from .schemas import ChatSessionListResponse, ChatSessionCreate
 
 logger = logging.get_logger(__name__)
 
@@ -94,3 +97,102 @@ class PlaygroundService(SessionMixin):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 message="Unauthorized to access this resource",
             )
+
+
+class ChatSessionService(SessionMixin):
+    """Chat Session Service"""
+
+    async def create_chat_session(self, user_id: UUID, chat_session_data: dict) -> ChatSession:
+        """Create a new chat session and insert it into the database."""
+
+        chat_session_data["user_id"] = user_id
+
+        chat_session = ChatSession(**chat_session_data)
+
+        db_chat_session = await ChatSessionDataManager(self.session).insert_one(chat_session)
+
+        return db_chat_session
+
+    async def list_chat_sessions(
+        self,
+        user_id: UUID,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[ChatSessionListResponse], int]:
+        """List all chat sessions for a given user."""
+        db_results, count = await ChatSessionDataManager(self.session).get_all_chat_sessions(
+            user_id, offset, limit, filters, order_by, search
+        )
+        chat_sessions = []
+        for db_result in db_results:
+            db_chat_session = db_result[0]
+            chat_session = ChatSessionListResponse(
+                id=db_chat_session.id,
+                name=db_chat_session.name,
+                total_tokens=db_result[1],
+                created_at=db_chat_session.created_at,
+                modified_at=db_chat_session.modified_at,
+            )
+            chat_sessions.append(chat_session)
+        return chat_sessions, count
+
+    async def get_chat_session_details(self, chat_session_id: UUID) -> ChatSession:
+        """Retrieve details of a session by its ID."""
+        db_chat_session = await ChatSessionDataManager(self.session).retrieve_by_fields(
+            ChatSession,
+            fields={"id": chat_session_id},
+        )
+
+        return db_chat_session
+
+    async def delete_chat_session(self, chat_session_id: UUID) -> None:
+        """Delete chat session."""
+        db_chat_session = await ChatSessionDataManager(self.session).retrieve_by_fields(
+            ChatSession,
+            fields={"id": chat_session_id},
+        )
+
+        await ChatSessionDataManager(self.session).delete_one(db_chat_session)
+
+        return
+
+    async def edit_chat_session(self, chat_session_id: UUID, data: Dict[str, Any]) -> ChatSession:
+        """Edit chat session by validating and updating specific fields."""
+        # Retrieve existing chat session
+        db_chat_session = await ChatSessionDataManager(self.session).retrieve_by_fields(
+            ChatSession,
+            fields={"id": chat_session_id},
+        )
+
+        db_chat_session = await ChatSessionDataManager(self.session).update_by_fields(db_chat_session, data)
+
+        return db_chat_session
+
+
+class MessageService(SessionMixin):
+    """Message Service"""
+
+    async def create_message(self, user_id: UUID, message_data: dict) -> Message:
+        """Create a new message and insert it into the database."""
+
+        # If chat_session_id is not provided, create a new chat session first
+        if not message_data.get("chat_session_id"):
+            chat_session_data = ChatSessionCreate(name=None).model_dump(exclude_unset=True)
+            chat_session_data["user_id"] = user_id
+            chat_session = ChatSession(**chat_session_data)
+            db_chat_session = await ChatSessionDataManager(self.session).insert_one(chat_session)
+            message_data["chat_session_id"] = db_chat_session.id  # Assign the new session ID
+            message_data["parent_message_id"] = None
+        else:
+            # Fetch the last message in the session to determine parent_id
+            last_db_message = await MessageDataManager(self.session).get_last_message(message_data["chat_session_id"])
+            message_data["parent_message_id"] = last_db_message.id if last_db_message else None
+
+        # Create a new message
+        message = Message(**message_data)
+        db_message = await MessageDataManager(self.session).insert_one(message)
+
+        return db_message

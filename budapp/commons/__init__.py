@@ -30,5 +30,8 @@ from budapp.project_ops.models import Project as Project
 from budapp.user_ops.models import User as User
 from budapp.workflow_ops.models import Workflow as Workflow
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStep
+from ..playground_ops.models import ChatSession as ChatSession
+from ..playground_ops.models import Note as Note
+from ..playground_ops.models import Message as Message
 
 from .database import Base as Base

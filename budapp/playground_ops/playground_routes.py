@@ -16,7 +16,8 @@
 
 """The playground ops package, containing essential business logic, services, and routing configurations for the playground ops."""
 
-from typing import List, Union
+from typing import List, Union, Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.orm import Session
@@ -26,13 +27,25 @@ from ..commons import logging
 from ..commons.async_utils import get_user_from_auth_header
 from ..commons.constants import ModalityEnum
 from ..commons.dependencies import (
+    get_current_active_user,
     get_session,
     parse_ordering_fields,
 )
 from ..commons.exceptions import ClientException
-from ..commons.schemas import ErrorResponse
-from .schemas import PlaygroundDeploymentFilter, PlaygroundDeploymentListResponse
-from .services import PlaygroundService
+from budapp.user_ops.schemas import User
+from ..commons.schemas import ErrorResponse, SuccessResponse
+from .schemas import (
+    PlaygroundDeploymentFilter,
+    PlaygroundDeploymentListResponse,
+    ChatSessionCreate,
+    ChatSessionFilter,
+    ChatSessionPaginatedResponse,
+    ChatSessionSuccessResponse,
+    MessageCreateRequest,
+    MessageSuccessResponse,
+    ChatSessionEditRequest,
+)
+from .services import PlaygroundService, ChatSessionService, MessageService
 
 
 logger = logging.get_logger(__name__)
@@ -123,3 +136,279 @@ async def list_playground_deployments(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all playground deployments"
         ).to_http_response()
+
+
+# @playground_router.post(
+#     "/chat-sessions",
+#     responses={
+#         status.HTTP_200_OK: {
+#             "model": ChatSessionSuccessResponse,
+#             "description": "Chat session created successfully.",
+#         },
+#         status.HTTP_500_INTERNAL_SERVER_ERROR: {
+#             "model": ErrorResponse,
+#             "description": "Service is unavailable due to server error",
+#         },
+#         status.HTTP_400_BAD_REQUEST: {
+#             "model": ErrorResponse,
+#             "description": "Service is unavailable due to client error",
+#         },
+#     },
+#     description="Create a chat session.",
+# )
+# async def create_chat_session(
+#     request: ChatSessionCreate,
+#     current_user: Annotated[User, Depends(get_current_active_user)],
+#     session: Annotated[Session, Depends(get_session)],
+# ) -> Union[ChatSessionSuccessResponse, ErrorResponse]:
+#     """Create a new chat session."""
+#     try:
+#         chat_session_data = request.model_dump(exclude_unset=True)
+#         db_chat_session = await ChatSessionService(session).create_chat_session(current_user.id, chat_session_data)
+
+#     except ClientException as e:
+#         logger.exception(f"Failed to create chat session: {e}")
+#         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+#     except Exception as e:
+#         logger.exception(f"Failed to create chat session: {e}")
+#         return ErrorResponse(
+#             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to create chat session"
+#         ).to_http_response()
+
+#     return ChatSessionSuccessResponse(
+#         chat_session=db_chat_session,
+#         message="chat session created successfully",
+#         code=status.HTTP_200_OK,
+#         object="chat_session.create",
+#     ).to_http_response()
+
+
+@playground_router.get(
+    "/chat-sessions",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ChatSessionPaginatedResponse,
+            "description": "Successfully retrieved chat sessions.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="List chat sessions for a user filtered by user ID.",
+)
+async def list_chat_sessions(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: ChatSessionFilter = Depends(),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[ChatSessionPaginatedResponse, ErrorResponse]:
+    """List chat sessions for a user filtered by user ID."""
+    offset = (page - 1) * limit
+
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    try:
+        db_chat_sessions, count = await ChatSessionService(session).list_chat_sessions(
+            current_user.id, offset, limit, filters_dict, order_by, search
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to list chat sessions: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to list chat sessions: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to list chat sessions",
+        ).to_http_response()
+    return ChatSessionPaginatedResponse(
+        chat_sessions=db_chat_sessions,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="chat_sessions.list",
+        code=status.HTTP_200_OK,
+        message="Successfully retrieved chat sessions",
+    ).to_http_response()
+
+
+@playground_router.get(
+    "/chat-sessions/{chat_session_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ChatSessionSuccessResponse,
+            "description": "Successfully retrieved chat session details.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+)
+async def get_chat_session_details(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    chat_session_id: UUID,
+) -> Union[ChatSessionSuccessResponse, ErrorResponse]:
+    """Retrieve details of a specific chat session."""
+    try:
+        db_chat_session = await ChatSessionService(session).get_chat_session_details(chat_session_id)
+
+    except ClientException as e:
+        logger.exception(f"Failed to retrieve details of chat session: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to retrieve details of chat session: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve details of chat session"
+        ).to_http_response()
+
+    return ChatSessionSuccessResponse(
+        chat_session=db_chat_session,
+        message="chat session retrieved successfully",
+        code=status.HTTP_200_OK,
+        object="chat_session.get",
+    ).to_http_response()
+
+
+@playground_router.delete(
+    "/chat-sessions/{chat_session_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Chat session deleted successfully.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="Delete chat session",
+)
+async def delete_chat_session(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    chat_session_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a chat session."""
+    try:
+        await ChatSessionService(session).delete_chat_session(chat_session_id)
+
+    except ClientException as e:
+        logger.exception(f"Failed to delete chat session: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete chat session: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete chat session"
+        ).to_http_response()
+    return SuccessResponse(
+        code=status.HTTP_200_OK,
+        message="Chat session deleted successfully",
+        object="chat_session.delete",
+    )
+
+
+@playground_router.patch(
+    "/chat-sessions/{chat_session_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ChatSessionSuccessResponse,
+            "description": "Successfully edited chat session",
+        },
+    },
+    description="Edit chat session",
+)
+async def edit_chat_session(
+    chat_session_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: ChatSessionEditRequest,
+) -> Union[ChatSessionSuccessResponse, ErrorResponse]:
+    """Edit chat session"""
+    try:
+        db_chat_session = await ChatSessionService(session).edit_chat_session(
+            chat_session_id=chat_session_id, data=request.model_dump(exclude_unset=True, exclude_none=True)
+        )
+        return ChatSessionSuccessResponse(
+            chat_session=db_chat_session,
+            message="Chat session details updated successfully",
+            code=status.HTTP_200_OK,
+            object="chat_session.edit",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to edit chat session: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to edit chat session: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit chat session"
+        ).to_http_response()
+
+
+@playground_router.post(
+    "/messages",
+    responses={
+        status.HTTP_200_OK: {
+            "model": MessageSuccessResponse,
+            "description": "Message created successfully.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="Create a Message.",
+)
+async def create_message(
+    request: MessageCreateRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[MessageSuccessResponse, ErrorResponse]:
+    """Create a new Message."""
+    try:
+        message_data = request.model_dump(exclude_unset=True)
+        db_message = await MessageService(session).create_message(current_user.id, message_data)
+
+    except ClientException as e:
+        logger.exception(f"Failed to create message: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to create message: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to create message"
+        ).to_http_response()
+
+    return MessageSuccessResponse(
+        chat_message=db_message,
+        message="message created successfully",
+        code=status.HTTP_200_OK,
+        object="message.create",
+    ).to_http_response()

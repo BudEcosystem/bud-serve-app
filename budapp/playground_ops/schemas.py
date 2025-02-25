@@ -19,12 +19,12 @@
 
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 
-from pydantic import UUID4, BaseModel, ConfigDict, field_validator
+from pydantic import UUID4, BaseModel, ConfigDict, field_validator, Json
 
 from ..commons.constants import EndpointStatusEnum
-from ..commons.schemas import PaginatedSuccessResponse
+from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from ..model_ops.schemas import ModelResponse
 from ..project_ops.schemas import ProjectResponse
 
@@ -73,3 +73,112 @@ class PlaygroundDeploymentFilter(BaseModel):
             return None
         except Exception:
             return None
+
+
+class ChatSessionCreate(BaseModel):
+    """Chat session create schema"""
+
+    name: str | None = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def set_default_name(cls, value: str | None) -> str:
+        return value or "Unnamed Chat"
+
+
+class ChatSessionResponse(BaseModel):
+    """Chat session response schema"""
+
+    id: UUID4
+    name: str
+    chat_setting: Any | None = None  # update to ChatSettingResponse when relationship is created with chat setting
+    # note: list[str] | None = None
+    created_at: datetime
+    modified_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+class ChatSessionSuccessResponse(SuccessResponse):
+    """Chat session success response schema"""
+
+    chat_session: ChatSessionResponse
+
+
+class ChatSessionListResponse(BaseModel):
+    """Chat session list response schema"""
+
+    id: UUID4
+    name: str
+    total_tokens: int  # not optional
+    created_at: datetime
+    modified_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+class ChatSessionPaginatedResponse(PaginatedSuccessResponse):
+    """Chat session paginated response schema"""
+
+    chat_sessions: list[ChatSessionListResponse] = []
+
+
+class ChatSessionFilter(BaseModel):
+    """Chat session filter schema"""
+
+    name: str | None = None
+
+
+class ChatSessionEditRequest(BaseModel):
+    """Chat session edit schema"""
+
+    name: str | None = None
+    chat_setting_id: UUID4 | None = None
+
+
+class MessageBase(BaseModel):
+    """Base schema for Message model containing shared attributes"""
+
+    prompt: str
+    response: list[dict]
+    deployment_id: UUID4
+
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+    token_per_sec: float | None = None
+    ttft: float | None = None
+    tpot: float | None = None
+    e2e_latency: float | None = None
+    is_cache: bool = False
+    # harmfullness: float | None = None
+    # faithfulness: float | None = None
+
+    # upvotes: int | None = None
+    # downvotes: int | None = None
+
+
+class MessageCreateRequest(MessageBase):
+    """Schema for creating a message"""
+
+    chat_session_id: UUID4 | None = None
+
+
+class MessageResponse(MessageBase):
+    """Schema for returning a message response"""
+
+    id: UUID4
+    chat_session_id: UUID4
+    parent_message_id: UUID4 | None = None
+    harmfullness: float | None = None
+    faithfulness: float | None = None
+    created_at: datetime
+    modified_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+class MessageSuccessResponse(SuccessResponse):
+    """Chat session success response schema"""
+
+    chat_message: MessageResponse
