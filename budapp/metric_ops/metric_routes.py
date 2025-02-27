@@ -16,7 +16,7 @@
 
 """The metric ops package, containing essential business logic, services, and routing configurations for the metric ops."""
 
-from typing import Union
+from typing import List, Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
@@ -27,6 +27,7 @@ from budapp.commons import logging
 from budapp.commons.dependencies import (
     get_current_active_user,
     get_session,
+    parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
@@ -261,10 +262,13 @@ async def get_inference_quality_prompt_analytics(
     score_type: str,
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    page: int = 1,
+    limit: int = 10,
 ) -> Union[InferenceQualityAnalyticsPromptResponse, ErrorResponse]:
     """Get inference quality prompt analytics."""
     try:
-        response = await MetricService(session).get_inference_quality_prompt_analytics(endpoint_id, score_type)
+        response = await MetricService(session).get_inference_quality_prompt_analytics(endpoint_id, score_type, page, limit, ",".join(order_by) if order_by else "created_at:desc")
     except ClientException as e:
         logger.exception(f"Failed to get inference quality prompt analytics: {e}")
         response = ErrorResponse(code=e.status_code, message=e.message)

@@ -288,7 +288,7 @@ class MetricService(SessionMixin):
             ) from e
 
     @staticmethod
-    async def _perform_inference_quality_prompt_analytics(endpoint_id: UUID, score_type: str) -> Dict:
+    async def _perform_inference_quality_prompt_analytics(endpoint_id: UUID, score_type: str, page: int = 1, limit: int = 10, order_by: str = "created_at:desc") -> Dict:
         """Get inference quality prompt analytics."""
         inference_quality_prompt_analytics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/analytics/inference-quality/{score_type}/{endpoint_id}"
 
@@ -297,7 +297,14 @@ class MetricService(SessionMixin):
         )
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(inference_quality_prompt_analytics_endpoint) as response:
+                async with session.post(
+                    inference_quality_prompt_analytics_endpoint,
+                    json={
+                        "page": page,
+                        "limit": limit,
+                        "order_by": order_by,
+                    }
+                ) as response:
                     response_data = await response.json()
                     if response.status != status.HTTP_200_OK:
                         logger.error(f"Failed to get inference quality prompt analytics: {response.status} {response_data}")
@@ -327,9 +334,9 @@ class MetricService(SessionMixin):
             prompt_injection_score=bud_metric_response["prompt_injection_score"],
         )
 
-    async def get_inference_quality_prompt_analytics(self, endpoint_id: UUID, score_type: str) -> InferenceQualityAnalyticsPromptResponse:
+    async def get_inference_quality_prompt_analytics(self, endpoint_id: UUID, score_type: str, page: int = 1, limit: int = 10, order_by: str = "created_at:desc") -> InferenceQualityAnalyticsPromptResponse:
         """Get inference quality prompt analytics."""
-        bud_metric_response = await self._perform_inference_quality_prompt_analytics(endpoint_id, score_type)
+        bud_metric_response = await self._perform_inference_quality_prompt_analytics(endpoint_id, score_type, page, limit, order_by)
 
         return InferenceQualityAnalyticsPromptResponse(
             code=status.HTTP_200_OK,
