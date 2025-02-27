@@ -299,7 +299,7 @@ class MetricService(SessionMixin):
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     inference_quality_prompt_analytics_endpoint,
-                    json={
+                    params={
                         "page": page,
                         "limit": limit,
                         "order_by": order_by,
