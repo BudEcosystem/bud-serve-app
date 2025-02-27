@@ -307,10 +307,16 @@ class MetricService(SessionMixin):
                 ) as response:
                     response_data = await response.json()
                     if response.status != status.HTTP_200_OK:
-                        logger.error(f"Failed to get inference quality prompt analytics: {response.status} {response_data}")
-                        raise ClientException(
-                            "Failed to get inference quality prompt analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-                        )
+                        if response.status == status.HTTP_404_NOT_FOUND:
+                            response_data = {
+                                "score_type": score_type,
+                                "results": []
+                            }
+                        else:
+                            logger.error(f"Failed to get inference quality prompt analytics: {response.status} {response_data}")
+                            raise ClientException(
+                                "Failed to get inference quality prompt analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                            )
 
                     logger.debug("Successfully get inference quality prompt analytics from budmetric")
                     return response_data
