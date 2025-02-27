@@ -97,16 +97,6 @@ class CacheMetricsResponse(SuccessResponse):
     most_reused_prompts: Optional[List[tuple[str, int]]] = None
 
 
-class InferenceQualityAnalyticsRequest(SuccessResponse):
-    """Inference quality analytics request schema."""
-
-    object: str = "inference_quality_analytics"
-    hallucination_score: Optional[float] = None
-    harmfulness_score: Optional[float] = None
-    sensitive_info_score: Optional[float] = None
-    prompt_injection_score: Optional[float] = None
-
-
 class InferenceQualityAnalyticsResponse(SuccessResponse):
     object: str = "inference_quality_analytics"
     hallucination_score: Optional[float] = None
