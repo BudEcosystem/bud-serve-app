@@ -268,7 +268,8 @@ async def get_inference_quality_prompt_analytics(
 ) -> Union[InferenceQualityAnalyticsPromptResponse, ErrorResponse]:
     """Get inference quality prompt analytics."""
     try:
-        response = await MetricService(session).get_inference_quality_prompt_analytics(endpoint_id, score_type, page, limit, ",".join(order_by) if order_by else "created_at:desc")
+        order_by_str = ",".join(":".join(item) for item in order_by)
+        response = await MetricService(session).get_inference_quality_prompt_analytics(endpoint_id, score_type, page, limit, order_by_str if order_by_str else "created_at:desc")
     except ClientException as e:
         logger.exception(f"Failed to get inference quality prompt analytics: {e}")
         response = ErrorResponse(code=e.status_code, message=e.message)
