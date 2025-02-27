@@ -37,6 +37,8 @@ from .schemas import (
     CountAnalyticsRequest,
     CountAnalyticsResponse,
     DashboardStatsResponse,
+    InferenceQualityAnalyticsPromptResponse,
+    InferenceQualityAnalyticsResponse,
     PerformanceAnalyticsRequest,
     PerformanceAnalyticsResponse,
 )
@@ -197,5 +199,78 @@ async def get_deployment_cache_metric(
         logger.exception(f"Failed to get deployment cache metrics: {e}")
         response = ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get deployment cache metrics"
+        )
+    return response.to_http_response()
+
+@metric_router.post(
+    "/analytics/inference-quality/{endpoint_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": InferenceQualityAnalyticsPromptResponse,
+            "description": "Successfully get inference quality score analytics",
+        },
+    },
+    description="Get inference quality score analytics",
+)
+async def get_inference_quality_score_analytics(
+    endpoint_id: UUID,
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[InferenceQualityAnalyticsResponse, ErrorResponse]:
+    """Get inference quality score analytics."""
+    try:
+        response = await MetricService(session).get_inference_quality_analytics(endpoint_id)
+    except ClientException as e:
+        logger.exception(f"Failed to get inference quality score analytics: {e}")
+        response = ErrorResponse(code=e.status_code, message=e.message)
+    except Exception as e:
+        logger.exception(f"Failed to get inference quality score analytics: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get inference quality score analytics"
+        )
+    return response.to_http_response()
+
+@metric_router.post(
+    "/analytics/inference-quality-prompts/{endpoint_id}/{score_type}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": InferenceQualityAnalyticsPromptResponse,
+            "description": "Successfully get inference quality prompt analytics",
+        },
+    },
+    description="Get inference quality prompt analytics",
+)
+async def get_inference_quality_prompt_analytics(
+    endpoint_id: UUID,
+    score_type: str,
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[InferenceQualityAnalyticsPromptResponse, ErrorResponse]:
+    """Get inference quality prompt analytics."""
+    try:
+        response = await MetricService(session).get_inference_quality_prompt_analytics(endpoint_id, score_type)
+    except ClientException as e:
+        logger.exception(f"Failed to get inference quality prompt analytics: {e}")
+        response = ErrorResponse(code=e.status_code, message=e.message)
+    except Exception as e:
+        logger.exception(f"Failed to get inference quality prompt analytics: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get inference quality prompt analytics"
         )
     return response.to_http_response()

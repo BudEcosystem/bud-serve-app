@@ -47,6 +47,8 @@ from .schemas import (
     CountAnalyticsRequest,
     CountAnalyticsResponse,
     DashboardStatsResponse,
+    InferenceQualityAnalyticsPromptResponse,
+    InferenceQualityAnalyticsResponse,
     PerformanceAnalyticsRequest,
     PerformanceAnalyticsResponse,
 )
@@ -257,4 +259,81 @@ class MetricService(SessionMixin):
             latency=bud_metric_response["latency"],
             hit_ratio=bud_metric_response["hit_ratio"],
             most_reused_prompts=bud_metric_response["most_reused_prompts"],
+        )
+
+    @staticmethod
+    async def _perform_inference_quality_analytics(endpoint_id: UUID) -> Dict:
+        """Get inference quality analytics."""
+        inference_quality_analytics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/analytics/inference-quality/{endpoint_id}"
+
+        logger.debug(
+            f"Performing request inference quality analytics request to bud_metric for endpoint id : {endpoint_id}"
+        )
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(inference_quality_analytics_endpoint) as response:
+                    response_data = await response.json()
+                    if response.status != status.HTTP_200_OK:
+                        logger.error(f"Failed to get inference quality analytics: {response.status} {response_data}")
+                        raise ClientException(
+                            "Failed to get inference quality analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
+
+                    logger.debug("Successfully get inference quality analytics from budmetric")
+                    return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send inference quality analytics request: {e}")
+            raise ClientException(
+                "Failed to get inference quality analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    @staticmethod
+    async def _perform_inference_quality_prompt_analytics(endpoint_id: UUID, score_type: str) -> Dict:
+        """Get inference quality prompt analytics."""
+        inference_quality_prompt_analytics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/analytics/inference-quality/{score_type}/{endpoint_id}"
+
+        logger.debug(
+            f"Performing request inference quality prompt analytics request to bud_metric for endpoint id : {endpoint_id}"
+        )
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(inference_quality_prompt_analytics_endpoint) as response:
+                    response_data = await response.json()
+                    if response.status != status.HTTP_200_OK:
+                        logger.error(f"Failed to get inference quality prompt analytics: {response.status} {response_data}")
+                        raise ClientException(
+                            "Failed to get inference quality prompt analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
+
+                    logger.debug("Successfully get inference quality prompt analytics from budmetric")
+                    return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send inference quality prompt analytics request: {e}")
+            raise ClientException(
+                "Failed to get inference quality prompt analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def get_inference_quality_analytics(self, endpoint_id: UUID) -> InferenceQualityAnalyticsResponse:
+        """Get inference quality analytics."""
+        bud_metric_response = await self._perform_inference_quality_analytics(endpoint_id)
+
+        return InferenceQualityAnalyticsResponse(
+            code=status.HTTP_200_OK,
+            object="inference.quality.analytics",
+            message="Successfully fetched inference quality analytics",
+            hallucination_score=bud_metric_response["hallucination_score"],
+            harmfulness_score=bud_metric_response["harmfulness_score"],
+            sensitive_info_score=bud_metric_response["sensitive_info_score"],
+            prompt_injection_score=bud_metric_response["prompt_injection_score"],
+        )
+
+    async def get_inference_quality_prompt_analytics(self, endpoint_id: UUID, score_type: str) -> InferenceQualityAnalyticsPromptResponse:
+        """Get inference quality prompt analytics."""
+        bud_metric_response = await self._perform_inference_quality_prompt_analytics(endpoint_id, score_type)
+
+        return InferenceQualityAnalyticsPromptResponse(
+            code=status.HTTP_200_OK,
+            object="inference.quality.prompt.analytics",
+            message="Successfully fetched inference quality prompt analytics",
+            **bud_metric_response,
         )

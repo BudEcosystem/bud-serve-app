@@ -19,6 +19,7 @@
 
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
+from uuid import UUID
 
 from pydantic import UUID4, BaseModel, model_validator
 
@@ -94,3 +95,27 @@ class CacheMetricsResponse(SuccessResponse):
     latency: Optional[float] = None
     hit_ratio: Optional[float] = None
     most_reused_prompts: Optional[List[tuple[str, int]]] = None
+
+
+class InferenceQualityAnalyticsRequest(SuccessResponse):
+    """Inference quality analytics request schema."""
+
+    object: str = "inference_quality_analytics"
+    hallucination_score: Optional[float] = None
+    harmfulness_score: Optional[float] = None
+    sensitive_info_score: Optional[float] = None
+    prompt_injection_score: Optional[float] = None
+
+
+class InferenceQualityAnalyticsPromptResult(BaseModel):
+    request_id: UUID
+    prompt: str
+    response: str
+    score: float
+    created_at: datetime
+
+
+class InferenceQualityAnalyticsPromptResponse(SuccessResponse):
+    object: str = "inference_quality_analytics_prompt"
+    score_type: Literal["hallucination", "harmfulness", "sensitive_info", "prompt_injection"]
+    results: List[InferenceQualityAnalyticsPromptResult]
