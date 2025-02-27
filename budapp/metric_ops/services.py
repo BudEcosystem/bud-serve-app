@@ -333,7 +333,6 @@ class MetricService(SessionMixin):
 
         return InferenceQualityAnalyticsPromptResponse(
             code=status.HTTP_200_OK,
-            object="inference.quality.prompt.analytics",
             message="Successfully fetched inference quality prompt analytics",
             **bud_metric_response,
         )
