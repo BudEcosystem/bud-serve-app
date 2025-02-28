@@ -24,6 +24,7 @@ from fastapi import status
 from ..commons import logging
 from ..commons.db_utils import SessionMixin
 from ..commons.exceptions import ClientException
+from ..commons.constants import EndpointStatusEnum
 from ..credential_ops.crud import CredentialDataManager
 from ..credential_ops.models import Credential as CredentialModel
 from ..endpoint_ops.crud import EndpointDataManager
@@ -176,6 +177,13 @@ class MessageService(SessionMixin):
 
     async def create_message(self, user_id: UUID, message_data: dict) -> Message:
         """Create a new message and insert it into the database."""
+
+        # validate deployment id
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            fields={"id": message_data["deployment_id"]},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+        )
         # If chat_session_id is not provided, create a new chat session first
         if not message_data.get("chat_session_id"):
             chat_session_data = ChatSessionCreate(name=None).model_dump(exclude_unset=True)
@@ -185,6 +193,10 @@ class MessageService(SessionMixin):
             message_data["chat_session_id"] = db_chat_session.id  # Assign the new session ID
             message_data["parent_message_id"] = None
         else:
+            # validate chat session id
+            db_chat_session = await ChatSessionDataManager(self.session).retrieve_by_fields(
+                ChatSession, fields={"id": message_data["chat_session_id"]}
+            )
             # Fetch the last message in the session to determine parent_id
             last_db_message = await MessageDataManager(self.session).get_last_message(message_data["chat_session_id"])
             message_data["parent_message_id"] = last_db_message.id if last_db_message else None

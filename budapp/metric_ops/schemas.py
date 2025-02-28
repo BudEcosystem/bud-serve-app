@@ -19,10 +19,11 @@
 
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
+from uuid import UUID
 
-from pydantic import UUID4, BaseModel, model_validator
+from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator
 
-from ..commons.schemas import SuccessResponse
+from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse
 
 
 class BaseAnalyticsRequest(BaseModel):
@@ -94,3 +95,39 @@ class CacheMetricsResponse(SuccessResponse):
     latency: Optional[float] = None
     hit_ratio: Optional[float] = None
     most_reused_prompts: Optional[List[tuple[str, int]]] = None
+
+
+class InferenceQualityAnalyticsResponse(SuccessResponse):
+    object: str = "inference_quality_analytics"
+    hallucination_score: Optional[float] = None
+    harmfulness_score: Optional[float] = None
+    sensitive_info_score: Optional[float] = None
+    prompt_injection_score: Optional[float] = None
+
+
+class InferenceQualityAnalyticsPromptResult(BaseModel):
+    request_id: UUID
+    prompt: str
+    response: str
+    score: float
+    created_at: datetime
+
+
+class InferenceQualityAnalyticsPromptResponse(PaginatedSuccessResponse):
+    """Inference quality analytics prompt response schema."""
+
+    model_config = ConfigDict(extra="allow")
+
+    object: str = "inference_quality_analytics_prompt"
+    score_type: Literal["hallucination", "harmfulness", "sensitive_info", "prompt_injection"]
+    items: List[InferenceQualityAnalyticsPromptResult]
+    total_items: int
+    total_record: int = Field(..., alias="total_items")
+
+
+class InferenceQualityAnalyticsPromptFilter(BaseModel):
+    min_score: float = 0.0
+    max_score: float = 1.0
+    created_at: datetime | None = None
+    prompt: str | None = None
+    response: str | None = None
