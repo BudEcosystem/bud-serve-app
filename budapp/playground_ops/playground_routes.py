@@ -20,6 +20,9 @@ from typing import List, Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, status
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
+
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -513,6 +516,9 @@ async def edit_message(
     except ClientException as e:
         logger.exception(f"Failed to edit message: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except ValidationError as e:
+        logger.exception(f"ValidationErrors: {str(e)}")
+        raise RequestValidationError(e.errors())
     except Exception as e:
         logger.exception(f"Failed to edit message: {e}")
         return ErrorResponse(

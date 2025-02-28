@@ -179,11 +179,11 @@ class MessageService(SessionMixin):
         """Create a new message and insert it into the database."""
 
         # validate deployment id
-        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-            EndpointModel,
-            fields={"id": message_data["deployment_id"]},
-            exclude_fields={"status": EndpointStatusEnum.DELETED},
-        )
+        # db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+        #     EndpointModel,
+        #     fields={"id": message_data["deployment_id"]},
+        #     exclude_fields={"status": EndpointStatusEnum.DELETED},
+        # )
         # If chat_session_id is not provided, create a new chat session first
         if not message_data.get("chat_session_id"):
             chat_session_data = ChatSessionCreate(name=None).model_dump(exclude_unset=True)
@@ -234,15 +234,15 @@ class MessageService(SessionMixin):
             Message,
             fields={"id": message_id},
         )
+        if data.get("prompt"):
+            # Retrieve the child message if it exists
+            child_message = await MessageDataManager(self.session).retrieve_by_fields(
+                Message, fields={"parent_message_id": message_id}, missing_ok=True
+            )
 
-        # Retrieve the child message if it exists
-        child_message = await MessageDataManager(self.session).retrieve_by_fields(
-            Message, fields={"parent_message_id": message_id}, missing_ok=True
-        )
-
-        # Delete the child message if it exists
-        if child_message:
-            await MessageDataManager(self.session).delete_one(child_message)
+            # Delete the child message if it exists
+            if child_message:
+                await MessageDataManager(self.session).delete_one(child_message)
 
         # Update the message with new data
         db_message = await MessageDataManager(self.session).update_by_fields(db_message, data)

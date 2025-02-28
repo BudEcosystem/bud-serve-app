@@ -21,12 +21,13 @@ import re
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import UUID4, BaseModel, ConfigDict, field_validator
+from pydantic import UUID4, BaseModel, ConfigDict, field_validator, model_validator
 
 from ..commons.constants import EndpointStatusEnum
 from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from ..model_ops.schemas import ModelResponse
 from ..project_ops.schemas import ProjectResponse
+from ..commons.constants import FeedbackEnum
 
 
 class EndpointListResponse(BaseModel):
@@ -154,9 +155,6 @@ class MessageBase(BaseModel):
     # harmfullness: float | None = None
     # faithfulness: float | None = None
 
-    # upvotes: int | None = None
-    # downvotes: int | None = None
-
 
 class MessageCreateRequest(MessageBase):
     """Schema for creating a message"""
@@ -172,8 +170,7 @@ class MessageResponse(MessageBase):
     # parent_message_id: UUID4 | None = None
     harmfullness: float | None = None
     faithfulness: float | None = None
-    upvotes: int | None = None
-    downvotes: int | None = None
+    feedback: FeedbackEnum | None = None
     created_at: datetime
     modified_at: datetime
 
@@ -199,16 +196,53 @@ class MessageFilter(BaseModel):
 class MessageEditRequest(BaseModel):
     """Message edit schema."""
 
-    prompt: str
-    response: list[dict]
-    deployment_id: UUID4
-    input_tokens: int
-    output_tokens: int
-    total_tokens: int
-    token_per_sec: float
-    ttft: float
-    tpot: float
-    e2e_latency: float
-    is_cache: bool
+    prompt: str | None = None
+    response: list[dict] | None = None
+    deployment_id: UUID4 | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+    token_per_sec: float | None = None
+    ttft: float | None = None
+    tpot: float | None = None
+    e2e_latency: float | None = None
+    is_cache: bool | None = None
     harmfullness: float | None = None
     faithfulness: float | None = None
+    feedback: FeedbackEnum | None = None
+
+    @model_validator(mode="after")
+    def validate_edit_mode(cls, values):
+        """Ensure required fields are set correctly based on the type of edit."""
+
+        prompt = values.prompt
+        response = values.response
+        is_content_edit = prompt is not None or response is not None
+        is_feedback_edit = values.feedback is not None
+
+        # Content edit: Both prompt & response must be provided together
+        if is_content_edit:
+            if prompt is None or response is None:
+                raise ValueError("Both 'prompt' and 'response' must be provided for content edits.")
+
+            required_fields = [
+                "deployment_id",
+                "input_tokens",
+                "output_tokens",
+                "total_tokens",
+                "token_per_sec",
+                "ttft",
+                "tpot",
+                "e2e_latency",
+                "is_cache",
+            ]
+            missing_fields = [field for field in required_fields if getattr(values, field, None) is None]
+
+            if missing_fields:
+                raise ValueError(f"Missing required fields for content edit: {missing_fields}")
+
+        # Ensure at least one field is updated
+        if not is_content_edit and not is_feedback_edit:
+            raise ValueError("At least one of fields prompt and response, or feedback must be provided for update.")
+
+        return values
