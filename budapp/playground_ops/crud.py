@@ -57,13 +57,22 @@ class ChatSessionDataManager(DataManagerUtils):
         if search:
             search_conditions = await self.generate_search_stmt(ChatSession, filters)
             stmt = base_stmt.filter(and_(*search_conditions))
+            count_stmt = (
+                select(func.count())
+                .select_from(ChatSession)
+                .where(ChatSession.user_id == user_id)
+                .filter(and_(*search_conditions))
+            )
         else:
             stmt = base_stmt.filter_by(**filters)
+            count_stmt = (
+                select(func.count())
+                .select_from(ChatSession)
+                .where(ChatSession.user_id == user_id)
+                .filter_by(**filters)
+            )
 
         # Count query
-        count_stmt = (
-            select(func.count()).select_from(ChatSession).where(ChatSession.user_id == user_id).filter_by(**filters)
-        )
         count = self.execute_scalar(count_stmt)
 
         # Apply sorting
@@ -84,10 +93,50 @@ class MessageDataManager(DataManagerUtils):
 
     async def get_last_message(self, chat_session_id: UUID) -> Message | None:
         """Fetch the last inserted message for a given chat session."""
-
         return self.scalar_one_or_none(
             select(Message)
             .where(Message.chat_session_id == chat_session_id)
             .order_by(Message.created_at.desc())
             .limit(1)
         )
+
+    async def get_messages(
+        self,
+        chat_session_id: UUID,
+        filters: Dict,
+        offset: int,
+        limit: int,
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[Message], int]:
+        """Fetch chat messages for a given chat session, ordered by created_at."""
+        await self.validate_fields(Message, {"chat_session_id": chat_session_id})
+        await self.validate_fields(Message, filters)
+
+        # Generate base query
+        base_stmt = select(Message).where(Message.chat_session_id == chat_session_id)
+
+        # Apply filters
+        if search:
+            search_conditions = await self.generate_search_stmt(Message, filters)
+            stmt = base_stmt.filter(and_(*search_conditions))
+            count_stmt = select(func.count()).select_from(Message).filter(and_(*search_conditions))
+        else:
+            stmt = base_stmt.filter_by(**filters)
+            count_stmt = select(func.count()).select_from(Message).filter_by(**filters)
+
+        # Count messages before pagination
+        count = self.execute_scalar(count_stmt)
+
+        # Apply ordering
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(Message, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        # Apply pagination
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Execute query
+        result = self.scalars_all(stmt)
+
+        return result, count

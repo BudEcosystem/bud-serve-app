@@ -19,9 +19,9 @@
 
 import re
 from datetime import datetime
-from typing import Optional, Any
+from typing import Any, Optional
 
-from pydantic import UUID4, BaseModel, ConfigDict, field_validator, Json
+from pydantic import UUID4, BaseModel, ConfigDict, field_validator
 
 from ..commons.constants import EndpointStatusEnum
 from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse
@@ -169,9 +169,11 @@ class MessageResponse(MessageBase):
 
     id: UUID4
     chat_session_id: UUID4
-    parent_message_id: UUID4 | None = None
+    # parent_message_id: UUID4 | None = None
     harmfullness: float | None = None
     faithfulness: float | None = None
+    upvotes: int | None = None
+    downvotes: int | None = None
     created_at: datetime
     modified_at: datetime
 
@@ -182,3 +184,13 @@ class MessageSuccessResponse(SuccessResponse):
     """Chat session success response schema"""
 
     chat_message: MessageResponse
+
+
+class MessagePaginatedResponse(PaginatedSuccessResponse):
+    """Paginated response schema for retrieving messages"""
+
+    chat_messages: list[MessageResponse] = []
+
+
+class MessageFilter(BaseModel):
+    prompt: str | None = None

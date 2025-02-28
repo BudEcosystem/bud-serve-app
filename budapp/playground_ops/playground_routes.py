@@ -16,12 +16,14 @@
 
 """The playground ops package, containing essential business logic, services, and routing configurations for the playground ops."""
 
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
+
+from budapp.user_ops.schemas import User
 
 from ..commons import logging
 from ..commons.async_utils import get_user_from_auth_header
@@ -32,20 +34,20 @@ from ..commons.dependencies import (
     parse_ordering_fields,
 )
 from ..commons.exceptions import ClientException
-from budapp.user_ops.schemas import User
 from ..commons.schemas import ErrorResponse, SuccessResponse
 from .schemas import (
-    PlaygroundDeploymentFilter,
-    PlaygroundDeploymentListResponse,
-    ChatSessionCreate,
+    ChatSessionEditRequest,
     ChatSessionFilter,
     ChatSessionPaginatedResponse,
     ChatSessionSuccessResponse,
     MessageCreateRequest,
+    MessageFilter,
+    MessagePaginatedResponse,
     MessageSuccessResponse,
-    ChatSessionEditRequest,
+    PlaygroundDeploymentFilter,
+    PlaygroundDeploymentListResponse,
 )
-from .services import PlaygroundService, ChatSessionService, MessageService
+from .services import ChatSessionService, MessageService, PlaygroundService
 
 
 logger = logging.get_logger(__name__)
@@ -436,16 +438,20 @@ async def get_all_messages(
     chat_session_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    filters: MessageFilter = Depends(),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=0),
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
 ) -> Union[MessagePaginatedResponse, ErrorResponse]:
     """Retrieve all messages for a given chat session."""
     offset = (page - 1) * limit
 
+    filters_dict = filters.model_dump(exclude_none=True)
+
     try:
         db_messages, count = await MessageService(session).get_messages_by_chat_session(
-            chat_session_id, current_user.id, offset, limit, order_by
+            chat_session_id, filters_dict, offset, limit, order_by, search
         )
     except ClientException as e:
         logger.exception(f"Failed to retrieve messages: {e}")
@@ -458,7 +464,7 @@ async def get_all_messages(
         ).to_http_response()
 
     return MessagePaginatedResponse(
-        messages=db_messages,
+        chat_messages=db_messages,
         total_record=count,
         page=page,
         limit=limit,

@@ -16,7 +16,7 @@
 
 """The playground ops services. Contains business logic for playground ops."""
 
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import status
@@ -29,10 +29,10 @@ from ..credential_ops.models import Credential as CredentialModel
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..project_ops.crud import ProjectDataManager
-
 from .crud import ChatSessionDataManager, MessageDataManager
 from .models import ChatSession, Message
-from .schemas import ChatSessionListResponse, ChatSessionCreate
+from .schemas import ChatSessionCreate, ChatSessionListResponse, MessageResponse
+
 
 logger = logging.get_logger(__name__)
 
@@ -104,7 +104,6 @@ class ChatSessionService(SessionMixin):
 
     async def create_chat_session(self, user_id: UUID, chat_session_data: dict) -> ChatSession:
         """Create a new chat session and insert it into the database."""
-
         chat_session_data["user_id"] = user_id
 
         chat_session = ChatSession(**chat_session_data)
@@ -177,7 +176,6 @@ class MessageService(SessionMixin):
 
     async def create_message(self, user_id: UUID, message_data: dict) -> Message:
         """Create a new message and insert it into the database."""
-
         # If chat_session_id is not provided, create a new chat session first
         if not message_data.get("chat_session_id"):
             chat_session_data = ChatSessionCreate(name=None).model_dump(exclude_unset=True)
@@ -196,3 +194,23 @@ class MessageService(SessionMixin):
         db_message = await MessageDataManager(self.session).insert_one(message)
 
         return db_message
+
+    async def get_messages_by_chat_session(
+        self,
+        chat_session_id: UUID,
+        filters: Dict,
+        offset: int = 0,
+        limit: int = 10,
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[MessageResponse], int]:
+        """Retrieve messages based on provided filters."""
+        db_chat_session = await ChatSessionDataManager(self.session).retrieve_by_fields(
+            ChatSession, fields={"id": chat_session_id}
+        )
+
+        db_messages, count = await MessageDataManager(self.session).get_messages(
+            chat_session_id, filters, offset, limit, order_by, search
+        )
+
+        return db_messages, count
