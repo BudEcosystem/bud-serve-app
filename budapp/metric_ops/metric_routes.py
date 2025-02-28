@@ -16,7 +16,7 @@
 
 """The metric ops package, containing essential business logic, services, and routing configurations for the metric ops."""
 
-from typing import List, Optional, Union
+from typing import List, Literal, Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
@@ -260,7 +260,7 @@ async def get_inference_quality_score_analytics(
 )
 async def get_inference_quality_prompt_analytics(
     endpoint_id: UUID,
-    score_type: str,
+    score_type: Literal["hallucination", "harmfulness", "sensitive_info", "prompt_injection"],
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     filters: Annotated[InferenceQualityAnalyticsPromptFilter, Depends()],
