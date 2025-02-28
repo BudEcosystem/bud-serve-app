@@ -214,3 +214,38 @@ class MessageService(SessionMixin):
         )
 
         return db_messages, count
+
+    async def edit_message(self, message_id: UUID, data: Dict[str, Any]) -> Message:
+        """Edit a message by validating and updating specific fields."""
+        # Retrieve existing message
+        db_message = await MessageDataManager(self.session).retrieve_by_fields(
+            Message,
+            fields={"id": message_id},
+        )
+
+        # Retrieve the child message if it exists
+        child_message = await MessageDataManager(self.session).retrieve_by_fields(
+            Message, fields={"parent_message_id": message_id}, missing_ok=True
+        )
+
+        # Delete the child message if it exists
+        if child_message:
+            await MessageDataManager(self.session).delete_one(child_message)
+
+        # Update the message with new data
+        db_message = await MessageDataManager(self.session).update_by_fields(db_message, data)
+
+        return db_message
+
+    async def delete_message(self, message_id: UUID) -> None:
+        """Delete a message and its child messages."""
+        # Retrieve the message by ID
+        db_message = await MessageDataManager(self.session).retrieve_by_fields(
+            Message,
+            fields={"id": message_id},
+        )
+
+        # Delete the main message
+        await MessageDataManager(self.session).delete_one(db_message)
+
+        return

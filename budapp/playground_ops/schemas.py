@@ -194,3 +194,21 @@ class MessagePaginatedResponse(PaginatedSuccessResponse):
 
 class MessageFilter(BaseModel):
     prompt: str | None = None
+
+
+class MessageEditRequest(BaseModel):
+    """Message edit schema."""
+
+    prompt: str
+    response: list[dict]
+    deployment_id: UUID4
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    token_per_sec: float
+    ttft: float
+    tpot: float
+    e2e_latency: float
+    is_cache: bool
+    harmfullness: float | None = None
+    faithfulness: float | None = None

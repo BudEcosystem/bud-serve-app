@@ -41,6 +41,7 @@ from .schemas import (
     ChatSessionPaginatedResponse,
     ChatSessionSuccessResponse,
     MessageCreateRequest,
+    MessageEditRequest,
     MessageFilter,
     MessagePaginatedResponse,
     MessageSuccessResponse,
@@ -472,3 +473,91 @@ async def get_all_messages(
         code=status.HTTP_200_OK,
         message="Successfully retrieved messages",
     ).to_http_response()
+
+
+@playground_router.patch(
+    "/messages/{message_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": MessageSuccessResponse,
+            "description": "Successfully edited message",
+        },
+    },
+    description="Edit a chat message",
+)
+async def edit_message(
+    message_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: MessageEditRequest,
+) -> Union[MessageSuccessResponse, ErrorResponse]:
+    """Edit a chat message."""
+    try:
+        db_message = await MessageService(session).edit_message(
+            message_id=message_id, data=request.model_dump(exclude_unset=True, exclude_none=True)
+        )
+        return MessageSuccessResponse(
+            chat_message=db_message,
+            message="Message updated successfully",
+            code=status.HTTP_200_OK,
+            object="message.edit",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to edit message: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to edit message: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit message"
+        ).to_http_response()
+
+
+@playground_router.delete(
+    "/messages/{message_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Message deleted successfully.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="Delete a message",
+)
+async def delete_message(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    message_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a message."""
+    try:
+        await MessageService(session).delete_message(message_id)
+
+    except ClientException as e:
+        logger.exception(f"Failed to delete message: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete message: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete message"
+        ).to_http_response()
+
+    return SuccessResponse(
+        code=status.HTTP_200_OK,
+        message="Message deleted successfully",
+        object="message.delete",
+    )
