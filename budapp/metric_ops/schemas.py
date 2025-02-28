@@ -21,7 +21,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 
-from pydantic import UUID4, BaseModel, Field, model_validator
+from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator
 
 from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse
 
@@ -114,6 +114,10 @@ class InferenceQualityAnalyticsPromptResult(BaseModel):
 
 
 class InferenceQualityAnalyticsPromptResponse(PaginatedSuccessResponse):
+    """Inference quality analytics prompt response schema."""
+
+    model_config = ConfigDict(extra="allow")
+
     object: str = "inference_quality_analytics_prompt"
     score_type: Literal["hallucination", "harmfulness", "sensitive_info", "prompt_injection"]
     items: List[InferenceQualityAnalyticsPromptResult]
