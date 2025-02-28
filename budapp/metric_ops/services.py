@@ -289,7 +289,7 @@ class MetricService(SessionMixin):
             ) from e
 
     @staticmethod
-    async def _perform_inference_quality_prompt_analytics(endpoint_id: UUID, score_type: str, page: int = 1, limit: int = 10, order_by: str = "created_at:desc") -> Dict:
+    async def _perform_inference_quality_prompt_analytics(endpoint_id: UUID, score_type: str, page: int = 1, limit: int = 10, filters: InferenceQualityAnalyticsPromptFilter = None, search: bool = False, order_by: str = "created_at:desc") -> Dict:
         """Get inference quality prompt analytics."""
         inference_quality_prompt_analytics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/analytics/inference-quality/{score_type}/{endpoint_id}"
 
@@ -304,7 +304,7 @@ class MetricService(SessionMixin):
                         "page": page,
                         "limit": limit,
                         "order_by": order_by,
-                        "filters": filters,
+                        "filters": filters.model_dump(exclude_none=True, exclude_unset=True, mode="json"),
                         "search": search,
                     }
                 ) as response:
