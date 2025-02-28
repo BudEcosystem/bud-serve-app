@@ -298,15 +298,20 @@ class MetricService(SessionMixin):
         )
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    inference_quality_prompt_analytics_endpoint,
-                    params={
+                params={
                         "page": page,
                         "limit": limit,
                         "order_by": order_by,
-                        "filters": filters.model_dump(exclude_none=True, exclude_unset=True, mode="json"),
-                        "search": search,
+                        "search": str(search).lower(),
                     }
+                # Convert filters to JSON string if present
+                if filters:
+                    filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True, mode="json")
+                    if filters_dict:
+                        params.update(filters_dict)
+                async with session.post(
+                    inference_quality_prompt_analytics_endpoint,
+                    params=params,
                 ) as response:
                     response_data = await response.json()
                     if response.status != status.HTTP_200_OK:
