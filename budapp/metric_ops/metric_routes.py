@@ -38,6 +38,7 @@ from .schemas import (
     CountAnalyticsRequest,
     CountAnalyticsResponse,
     DashboardStatsResponse,
+    InferenceQualityAnalyticsPromptFilter,
     InferenceQualityAnalyticsPromptResponse,
     InferenceQualityAnalyticsResponse,
     PerformanceAnalyticsRequest,
@@ -262,6 +263,8 @@ async def get_inference_quality_prompt_analytics(
     score_type: str,
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[InferenceQualityAnalyticsPromptFilter, Depends()],
+    search: bool = False,
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
     page: int = 1,
     limit: int = 10,
@@ -269,7 +272,7 @@ async def get_inference_quality_prompt_analytics(
     """Get inference quality prompt analytics."""
     try:
         order_by_str = ",".join(":".join(item) for item in order_by)
-        response = await MetricService(session).get_inference_quality_prompt_analytics(endpoint_id, score_type, page, limit, order_by_str if order_by_str else "created_at:desc")
+        response = await MetricService(session).get_inference_quality_prompt_analytics(endpoint_id, score_type, page, limit, filters, search, order_by_str if order_by_str else "created_at:desc")
     except ClientException as e:
         logger.exception(f"Failed to get inference quality prompt analytics: {e}")
         response = ErrorResponse(code=e.status_code, message=e.message)

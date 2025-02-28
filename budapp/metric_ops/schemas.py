@@ -21,9 +21,9 @@ from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 
-from pydantic import UUID4, BaseModel, model_validator
+from pydantic import UUID4, BaseModel, Field, model_validator
 
-from ..commons.schemas import SuccessResponse
+from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse
 
 
 class BaseAnalyticsRequest(BaseModel):
@@ -113,7 +113,16 @@ class InferenceQualityAnalyticsPromptResult(BaseModel):
     created_at: datetime
 
 
-class InferenceQualityAnalyticsPromptResponse(SuccessResponse):
+class InferenceQualityAnalyticsPromptResponse(PaginatedSuccessResponse):
     object: str = "inference_quality_analytics_prompt"
     score_type: Literal["hallucination", "harmfulness", "sensitive_info", "prompt_injection"]
-    results: List[InferenceQualityAnalyticsPromptResult]
+    items: List[InferenceQualityAnalyticsPromptResult]
+    total_items: int
+    total_records: int = Field(..., alias="total_items")
+
+
+class InferenceQualityAnalyticsPromptFilter(BaseModel):
+    score: float | None = None
+    created_at: datetime | None = None
+    prompt: str | None = None
+    response: str | None = None
