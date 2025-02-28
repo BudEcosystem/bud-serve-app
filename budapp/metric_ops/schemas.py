@@ -126,7 +126,8 @@ class InferenceQualityAnalyticsPromptResponse(PaginatedSuccessResponse):
 
 
 class InferenceQualityAnalyticsPromptFilter(BaseModel):
-    score: float | None = None
+    min_score: float = 0.0
+    max_score: float = 1.0
     created_at: datetime | None = None
     prompt: str | None = None
     response: str | None = None
