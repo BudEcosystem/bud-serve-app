@@ -122,7 +122,7 @@ class InferenceQualityAnalyticsPromptResponse(PaginatedSuccessResponse):
     score_type: Literal["hallucination", "harmfulness", "sensitive_info", "prompt_injection"]
     items: List[InferenceQualityAnalyticsPromptResult]
     total_items: int
-    total_records: int = Field(..., alias="total_items")
+    total_record: int = Field(..., alias="total_items")
 
 
 class InferenceQualityAnalyticsPromptFilter(BaseModel):
