@@ -245,7 +245,7 @@ class MessageService(SessionMixin):
             fields={"id": message_id},
         )
 
-        # Delete the main message
+        # Delete the message
         await MessageDataManager(self.session).delete_one(db_message)
 
         return
