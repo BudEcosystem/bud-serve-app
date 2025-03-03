@@ -19,7 +19,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, String, Uuid, ForeignKey, Integer, Float, Boolean, JSON, Enum
+from sqlalchemy import DateTime, String, Uuid, ForeignKey, Integer, Float, Boolean, JSON, Enum, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
 
 from budapp.commons.database import Base, TimestampMixin
@@ -122,8 +122,20 @@ class ChatSetting(Base, TimestampMixin):
     __tablename__ = "chat_settings"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    preset_name: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
     user_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+
+    system_prompt: Mapped[str] = mapped_column(String, nullable=True)
+    temperature: Mapped[float] = mapped_column(Float, nullable=False)
+    limit_sequence_length: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sequence_length: Mapped[int] = mapped_column(Integer, nullable=True)
+    context_overflow_policy: Mapped[str] = mapped_column(String, nullable=False)  # enum
+    stop_strings: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
+    topKSampling: Mapped[float] = mapped_column(Float, nullable=True)
+    repeatPenalty: Mapped[float] = mapped_column(Float, nullable=True)
+    topPSampling: Mapped[float] = mapped_column(Float, nullable=True)
+    minPSampling: Mapped[float] = mapped_column(Float, nullable=True)
+    structured_json_schema: Mapped[dict] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     modified_at: Mapped[datetime] = mapped_column(

@@ -21,7 +21,7 @@ import re
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import UUID4, BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import UUID4, BaseModel, ConfigDict, field_validator, model_validator, Field
 
 from ..commons.constants import EndpointStatusEnum
 from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse
@@ -87,12 +87,35 @@ class ChatSessionCreate(BaseModel):
         return value or "Unnamed Chat"
 
 
+class ChatSettingResponse(BaseModel):
+    """Chat setting response schema"""
+
+    id: UUID4
+    name: str
+    system_prompt: str | None = None
+    temperature: float
+    limit_sequence_length: bool
+    sequence_length: int | None = None
+    context_overflow_policy: str
+    stop_strings: list[str] | None = None
+    topKSampling: float | None = None
+    repeatPenalty: float | None = None
+    topPSampling: float | None = None
+    minPSampling: float | None = None
+    structured_json_schema: dict | None = None
+
+    created_at: datetime
+    modified_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
 class ChatSessionResponse(BaseModel):
     """Chat session response schema"""
 
     id: UUID4
     name: str
-    chat_setting: Any | None = None  # update to ChatSettingResponse when relationship is created with chat setting
+    chat_setting: ChatSettingResponse | None = None
     # note: list[str] | None = None
     created_at: datetime
     modified_at: datetime
@@ -133,7 +156,7 @@ class ChatSessionFilter(BaseModel):
 class ChatSessionEditRequest(BaseModel):
     """Chat session edit schema"""
 
-    name: str | None = None
+    name: str | None = Field(None, min_length=1, max_length=300)
     chat_setting_id: UUID4 | None = None
 
 
@@ -246,3 +269,66 @@ class MessageEditRequest(BaseModel):
             raise ValueError("At least one of fields prompt and response, or feedback must be provided for update.")
 
         return values
+
+
+class ChatSettingCreate(BaseModel):
+    """Chat setting create schema"""
+
+    name: str = Field(..., min_length=1, max_length=300)
+    system_prompt: str | None = None
+    temperature: float
+    limit_sequence_length: bool = False
+    sequence_length: int | None = None
+    context_overflow_policy: str
+    stop_strings: list[str] | None = None
+    topKSampling: float | None = None
+    repeatPenalty: float | None = None
+    topPSampling: float | None = None
+    minPSampling: float | None = None
+    structured_json_schema: dict | None = None
+
+
+class ChatSettingSuccessResponse(SuccessResponse):
+    """Chat setting success response schema"""
+
+    chat_setting: ChatSettingResponse
+
+
+class ChatSettingListResponse(BaseModel):
+    """Chat session list response schema"""
+
+    id: UUID4
+    name: str
+    created_at: datetime
+    modified_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+class ChatSettingPaginatedResponse(PaginatedSuccessResponse):
+    """Chat setting paginated response schema"""
+
+    chat_settings: list[ChatSettingListResponse] = []
+
+
+class ChatSettingFilter(BaseModel):
+    """Chat session filter schema"""
+
+    name: str | None = None
+
+
+class ChatSettingEditRequest(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=255)
+    system_prompt: str | None = None
+    temperature: float | None = None
+    limit_sequence_length: bool | None = None
+    sequence_length: int | None = None
+    context_overflow_policy: str | None = None  # Enum validation can be added if needed
+    stop_strings: list[str] | None = None
+    topKSampling: float | None = None
+    repeatPenalty: float | None = None
+    topPSampling: float | None = None
+    minPSampling: float | None = None
+    structured_json_schema: dict | None = None
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())

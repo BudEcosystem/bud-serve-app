@@ -30,9 +30,9 @@ from ..credential_ops.models import Credential as CredentialModel
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..project_ops.crud import ProjectDataManager
-from .crud import ChatSessionDataManager, MessageDataManager
-from .models import ChatSession, Message
-from .schemas import ChatSessionCreate, ChatSessionListResponse, MessageResponse
+from .crud import ChatSessionDataManager, MessageDataManager, ChatSettingDataManager
+from .models import ChatSession, Message, ChatSetting
+from .schemas import ChatSessionCreate, ChatSessionListResponse, MessageResponse, ChatSettingListResponse
 
 
 logger = logging.get_logger(__name__)
@@ -259,5 +259,67 @@ class MessageService(SessionMixin):
 
         # Delete the message
         await MessageDataManager(self.session).delete_one(db_message)
+
+        return
+
+
+class ChatSettingService(SessionMixin):
+    """Chat Setting Service"""
+
+    async def create_chat_setting(self, user_id: UUID, chat_setting_data: dict) -> ChatSetting:
+        """Create a new chat setting and insert it into the database."""
+        chat_setting_data["user_id"] = user_id
+
+        chat_setting = ChatSetting(**chat_setting_data)
+
+        db_chat_setting = await ChatSettingDataManager(self.session).insert_one(chat_setting)
+
+        return db_chat_setting
+
+    async def list_chat_settings(
+        self,
+        user_id: UUID,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[ChatSettingListResponse], int]:
+        """List all chat settings for a given user."""
+        db_chat_settings, count = await ChatSettingDataManager(self.session).get_all_chat_settings(
+            user_id, offset, limit, filters, order_by, search
+        )
+
+        return db_chat_settings, count
+
+    async def get_chat_setting_details(self, chat_setting_id: UUID) -> ChatSetting:
+        """Retrieve details of a chat setting by its ID."""
+        db_chat_setting = await ChatSettingDataManager(self.session).retrieve_by_fields(
+            ChatSetting,
+            fields={"id": chat_setting_id},
+        )
+
+        return db_chat_setting
+
+    async def edit_chat_setting(self, chat_setting_id: UUID, data: Dict[str, Any]) -> ChatSetting:
+        """Edit chat setting by validating and updating specific fields."""
+        # Retrieve existing chat setting
+        db_chat_setting = await ChatSettingDataManager(self.session).retrieve_by_fields(
+            ChatSetting,
+            fields={"id": chat_setting_id},
+        )
+
+        db_chat_setting = await ChatSettingDataManager(self.session).update_by_fields(db_chat_setting, data)
+
+        return db_chat_setting
+
+    async def delete_chat_setting(self, chat_setting_id: UUID) -> None:
+        """Delete chat setting."""
+        db_chat_setting = await ChatSettingDataManager(self.session).retrieve_by_fields(
+            ChatSetting,
+            fields={"id": chat_setting_id},
+        )
+
+        await ChatSettingDataManager(self.session).delete_one(db_chat_setting)
 
         return
