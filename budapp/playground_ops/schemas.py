@@ -80,6 +80,7 @@ class ChatSessionCreate(BaseModel):
     """Chat session create schema"""
 
     name: str | None = None
+    chat_setting_id: UUID4 | None = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -183,6 +184,7 @@ class MessageCreateRequest(MessageBase):
     """Schema for creating a message"""
 
     chat_session_id: UUID4 | None = None
+    chat_setting_id: UUID4 | None = None
 
 
 class MessageResponse(MessageBase):
