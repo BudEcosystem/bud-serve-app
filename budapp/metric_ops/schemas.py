@@ -17,6 +17,7 @@
 
 """Contains core Pydantic schemas used for data validation and serialization within the metric ops services."""
 
+import math
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
@@ -90,11 +91,22 @@ class DashboardStatsResponse(SuccessResponse):
     inactive_clusters: int
 
 
-class CacheMetricsResponse(SuccessResponse):
+class CacheMetricsResponse(PaginatedSuccessResponse):
+    model_config = ConfigDict(extra="allow")
+
     object: str = "cache_metrics"
     latency: Optional[float] = None
     hit_ratio: Optional[float] = None
     most_reused_prompts: Optional[List[tuple[str, int]]] = None
+    total_pages: Optional[int] = None
+    items: List[tuple[str, int]] = Field(..., alias="most_reused_prompts")
+    total_record: int = Field(..., alias="total_unique_prompts")
+
+    @model_validator(mode="after")
+    def calculate_total_pages(self) -> "CacheMetricsResponse":
+        """Calculate the total number of pages for the most reused prompts."""
+        self.total_pages = math.ceil(self.total_unique_prompts / self.limit)
+        return self
 
 
 class InferenceQualityAnalyticsResponse(SuccessResponse):

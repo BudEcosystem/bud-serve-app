@@ -249,9 +249,9 @@ class MetricService(SessionMixin):
             ) from e
 
 
-    async def get_deployment_cache_metric(self, endpoint_id: UUID) -> CacheMetricsResponse:
+    async def get_deployment_cache_metric(self, endpoint_id: UUID, page: int = 1, limit: int = 10) -> CacheMetricsResponse:
         """Get deployment cache metrics."""
-        bud_metric_response = await self._perform_deployment_cache_metric(endpoint_id)
+        bud_metric_response = await self._perform_deployment_cache_metric(endpoint_id, page, limit)
 
         return CacheMetricsResponse(
             code=status.HTTP_200_OK,
@@ -260,6 +260,9 @@ class MetricService(SessionMixin):
             latency=bud_metric_response["latency"],
             hit_ratio=bud_metric_response["hit_ratio"],
             most_reused_prompts=bud_metric_response["most_reused_prompts"],
+            page=page,
+            limit=limit,
+            total_unique_prompts=bud_metric_response["total_unique_prompts"],
         )
 
     @staticmethod

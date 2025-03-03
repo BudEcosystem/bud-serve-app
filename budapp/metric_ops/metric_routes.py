@@ -190,10 +190,12 @@ async def get_deployment_cache_metric(
     endpoint_id: UUID,
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    page: int = 1,
+    limit: int = 10,
 ) -> Union[CacheMetricsResponse, ErrorResponse]:
     """Get deployment cache metrics."""
     try:
-        response = await MetricService(session).get_deployment_cache_metric(endpoint_id)
+        response = await MetricService(session).get_deployment_cache_metric(endpoint_id, page=page, limit=limit)
     except ClientException as e:
         logger.exception(f"Failed to get deployment cache metrics: {e}")
         return ErrorResponse(code=e.status_code, message=e.message)
