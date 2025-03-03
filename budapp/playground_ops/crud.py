@@ -19,7 +19,7 @@
 from typing import Dict, List, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import func, select, or_
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
@@ -56,12 +56,12 @@ class ChatSessionDataManager(DataManagerUtils):
         # Apply filters
         if search:
             search_conditions = await self.generate_search_stmt(ChatSession, filters)
-            stmt = base_stmt.filter(and_(*search_conditions))
+            stmt = base_stmt.filter(or_(*search_conditions))
             count_stmt = (
                 select(func.count())
                 .select_from(ChatSession)
                 .where(ChatSession.user_id == user_id)
-                .filter(and_(*search_conditions))
+                .filter(or_(*search_conditions))
             )
         else:
             stmt = base_stmt.filter_by(**filters)
@@ -119,8 +119,8 @@ class MessageDataManager(DataManagerUtils):
         # Apply filters
         if search:
             search_conditions = await self.generate_search_stmt(Message, filters)
-            stmt = base_stmt.filter(and_(*search_conditions))
-            count_stmt = select(func.count()).select_from(Message).filter(and_(*search_conditions))
+            stmt = base_stmt.filter(or_(*search_conditions))
+            count_stmt = select(func.count()).select_from(Message).filter(or_(*search_conditions))
         else:
             stmt = base_stmt.filter_by(**filters)
             count_stmt = select(func.count()).select_from(Message).filter_by(**filters)
