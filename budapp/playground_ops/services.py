@@ -16,7 +16,7 @@
 
 """The playground ops services. Contains business logic for playground ops."""
 
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import status
@@ -30,10 +30,10 @@ from ..credential_ops.models import Credential as CredentialModel
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..project_ops.crud import ProjectDataManager
-
 from .crud import ChatSessionDataManager, MessageDataManager
 from .models import ChatSession, Message
-from .schemas import ChatSessionListResponse, ChatSessionCreate
+from .schemas import ChatSessionCreate, ChatSessionListResponse, MessageResponse
+
 
 logger = logging.get_logger(__name__)
 
@@ -105,7 +105,6 @@ class ChatSessionService(SessionMixin):
 
     async def create_chat_session(self, user_id: UUID, chat_session_data: dict) -> ChatSession:
         """Create a new chat session and insert it into the database."""
-
         chat_session_data["user_id"] = user_id
 
         chat_session = ChatSession(**chat_session_data)
@@ -207,3 +206,58 @@ class MessageService(SessionMixin):
         db_message = await MessageDataManager(self.session).insert_one(message)
 
         return db_message
+
+    async def get_messages_by_chat_session(
+        self,
+        chat_session_id: UUID,
+        filters: Dict,
+        offset: int = 0,
+        limit: int = 10,
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[MessageResponse], int]:
+        """Retrieve messages based on provided filters."""
+        db_chat_session = await ChatSessionDataManager(self.session).retrieve_by_fields(
+            ChatSession, fields={"id": chat_session_id}
+        )
+
+        db_messages, count = await MessageDataManager(self.session).get_messages(
+            chat_session_id, filters, offset, limit, order_by, search
+        )
+
+        return db_messages, count
+
+    async def edit_message(self, message_id: UUID, data: Dict[str, Any]) -> Message:
+        """Edit a message by validating and updating specific fields."""
+        # Retrieve existing message
+        db_message = await MessageDataManager(self.session).retrieve_by_fields(
+            Message,
+            fields={"id": message_id},
+        )
+        if data.get("prompt"):
+            # Retrieve the child message if it exists
+            child_message = await MessageDataManager(self.session).retrieve_by_fields(
+                Message, fields={"parent_message_id": message_id}, missing_ok=True
+            )
+
+            # Delete the child message if it exists
+            if child_message:
+                await MessageDataManager(self.session).delete_one(child_message)
+
+        # Update the message with new data
+        db_message = await MessageDataManager(self.session).update_by_fields(db_message, data)
+
+        return db_message
+
+    async def delete_message(self, message_id: UUID) -> None:
+        """Delete a message and its child messages."""
+        # Retrieve the message by ID
+        db_message = await MessageDataManager(self.session).retrieve_by_fields(
+            Message,
+            fields={"id": message_id},
+        )
+
+        # Delete the message
+        await MessageDataManager(self.session).delete_one(db_message)
+
+        return

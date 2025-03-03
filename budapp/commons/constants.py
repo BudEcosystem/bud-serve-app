@@ -659,6 +659,18 @@ class VisibilityEnum(Enum):
     INTERNAL = "internal"
 
 
+class FeedbackEnum(Enum):
+    """Enumeration of Feedback types in the system.
+
+    Attributes:
+        UPVOTE: Represents an upvote entity.
+        DOWNVOTE: Represents an downvote entity.
+    """
+
+    UPVOTE = "upvote"
+    DOWNVOTE = "downvote"
+
+
 APP_ICONS = {
     "general": {
         "model_mono": "icons/general/model_mono.png",

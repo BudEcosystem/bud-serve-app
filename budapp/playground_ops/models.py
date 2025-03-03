@@ -19,10 +19,11 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, String, Uuid, ForeignKey, Integer, Float, Boolean, JSON
+from sqlalchemy import DateTime, String, Uuid, ForeignKey, Integer, Float, Boolean, JSON, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
 
 from budapp.commons.database import Base, TimestampMixin
+from ..commons.constants import FeedbackEnum
 
 
 class ChatSession(Base, TimestampMixin):
@@ -96,9 +97,15 @@ class Message(Base, TimestampMixin):
     harmfullness: Mapped[float] = mapped_column(Float, nullable=True)
     faithfulness: Mapped[float] = mapped_column(Float, nullable=True)
 
-    # upvotes: Mapped[int] = mapped_column(Integer, nullable=True)
-    # downvotes: Mapped[int] = mapped_column(Integer, nullable=True)
-
+    feedback: Mapped[FeedbackEnum | None] = mapped_column(
+        Enum(
+            FeedbackEnum,
+            name="feedback_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=True,
+        default=None,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     modified_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False

@@ -16,12 +16,17 @@
 
 """The playground ops package, containing essential business logic, services, and routing configurations for the playground ops."""
 
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, status
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
+
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
+
+from budapp.user_ops.schemas import User
 
 from ..commons import logging
 from ..commons.async_utils import get_user_from_auth_header
@@ -32,20 +37,21 @@ from ..commons.dependencies import (
     parse_ordering_fields,
 )
 from ..commons.exceptions import ClientException
-from budapp.user_ops.schemas import User
 from ..commons.schemas import ErrorResponse, SuccessResponse
 from .schemas import (
-    PlaygroundDeploymentFilter,
-    PlaygroundDeploymentListResponse,
-    ChatSessionCreate,
+    ChatSessionEditRequest,
     ChatSessionFilter,
     ChatSessionPaginatedResponse,
     ChatSessionSuccessResponse,
     MessageCreateRequest,
+    MessageEditRequest,
+    MessageFilter,
+    MessagePaginatedResponse,
     MessageSuccessResponse,
-    ChatSessionEditRequest,
+    PlaygroundDeploymentFilter,
+    PlaygroundDeploymentListResponse,
 )
-from .services import PlaygroundService, ChatSessionService, MessageService
+from .services import ChatSessionService, MessageService, PlaygroundService
 
 
 logger = logging.get_logger(__name__)
@@ -412,3 +418,152 @@ async def create_message(
         code=status.HTTP_200_OK,
         object="message.create",
     ).to_http_response()
+
+
+@playground_router.get(
+    "/chat-sessions/{chat_session_id}/messages",
+    responses={
+        status.HTTP_200_OK: {
+            "model": MessagePaginatedResponse,
+            "description": "Successfully retrieved messages.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="Retrieve all messages for a given chat session.",
+)
+async def get_all_messages(
+    chat_session_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: MessageFilter = Depends(),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[MessagePaginatedResponse, ErrorResponse]:
+    """Retrieve all messages for a given chat session."""
+    offset = (page - 1) * limit
+
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    try:
+        db_messages, count = await MessageService(session).get_messages_by_chat_session(
+            chat_session_id, filters_dict, offset, limit, order_by, search
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to retrieve messages: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to retrieve messages: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to retrieve messages",
+        ).to_http_response()
+
+    return MessagePaginatedResponse(
+        chat_messages=db_messages,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="messages.list",
+        code=status.HTTP_200_OK,
+        message="Successfully retrieved messages",
+    ).to_http_response()
+
+
+@playground_router.patch(
+    "/messages/{message_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": MessageSuccessResponse,
+            "description": "Successfully edited message",
+        },
+    },
+    description="Edit a chat message",
+)
+async def edit_message(
+    message_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: MessageEditRequest,
+) -> Union[MessageSuccessResponse, ErrorResponse]:
+    """Edit a chat message."""
+    try:
+        db_message = await MessageService(session).edit_message(
+            message_id=message_id, data=request.model_dump(exclude_unset=True, exclude_none=True)
+        )
+        return MessageSuccessResponse(
+            chat_message=db_message,
+            message="Message updated successfully",
+            code=status.HTTP_200_OK,
+            object="message.edit",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to edit message: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except ValidationError as e:
+        logger.exception(f"ValidationErrors: {str(e)}")
+        raise RequestValidationError(e.errors())
+    except Exception as e:
+        logger.exception(f"Failed to edit message: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit message"
+        ).to_http_response()
+
+
+@playground_router.delete(
+    "/messages/{message_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Message deleted successfully.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="Delete a message",
+)
+async def delete_message(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    message_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a message."""
+    try:
+        await MessageService(session).delete_message(message_id)
+
+    except ClientException as e:
+        logger.exception(f"Failed to delete message: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete message: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete message"
+        ).to_http_response()
+
+    return SuccessResponse(
+        code=status.HTTP_200_OK,
+        message="Message deleted successfully",
+        object="message.delete",
+    )
