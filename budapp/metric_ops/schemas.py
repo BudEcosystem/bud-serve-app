@@ -98,15 +98,8 @@ class CacheMetricsResponse(PaginatedSuccessResponse):
     latency: Optional[float] = None
     hit_ratio: Optional[float] = None
     most_reused_prompts: Optional[List[tuple[str, int]]] = None
-    total_pages: Optional[int] = None
     items: List[tuple[str, int]] = Field(..., alias="most_reused_prompts")
     total_record: int = Field(..., alias="total_unique_prompts")
-
-    @model_validator(mode="after")
-    def calculate_total_pages(self) -> "CacheMetricsResponse":
-        """Calculate the total number of pages for the most reused prompts."""
-        self.total_pages = math.ceil(self.total_unique_prompts / self.limit)
-        return self
 
 
 class InferenceQualityAnalyticsResponse(SuccessResponse):
