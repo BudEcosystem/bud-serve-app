@@ -216,7 +216,7 @@ class MetricService(SessionMixin):
         return db_dashboard_stats
 
     @staticmethod
-    async def _perform_deployment_cache_metric(endpoint_id: UUID) -> Dict:
+    async def _perform_deployment_cache_metric(endpoint_id: UUID, page: int = 1, limit: int = 10) -> Dict:
         """Get deployment cache metrics."""
         deployment_cache_metric_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/analytics/cache-metrics/{endpoint_id}"
 
@@ -225,7 +225,10 @@ class MetricService(SessionMixin):
         )
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(deployment_cache_metric_endpoint) as response:
+                async with session.post(
+                    deployment_cache_metric_endpoint,
+                    params = {"page": page, "limit": limit}
+                ) as response:
                     response_data = await response.json()
                     if response.status != status.HTTP_200_OK:
                         if response.status == status.HTTP_404_NOT_FOUND:
