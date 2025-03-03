@@ -30,14 +30,58 @@ async def update_credential(
     try:
         payload = credential_update_request.payload
         logger.debug(f"Update CredentialReceived payload: {payload}")
-        db_credential = await CredentialDataManager(session).retrieve_by_fields(Credential, {"hashed_key": payload.hashed_key})
+        db_credential = await CredentialDataManager(session).retrieve_by_fields(
+            Credential, {"hashed_key": payload.hashed_key}
+        )
         db_last_used_at = db_credential.last_used_at
         if db_last_used_at is None or db_last_used_at < payload.last_used_at:
-            await CredentialDataManager(session).update_by_fields(db_credential, {"last_used_at": payload.last_used_at})
+            await CredentialDataManager(session).update_by_fields(
+                db_credential, {"last_used_at": payload.last_used_at}
+            )
         return SuccessResponse(message="Credential updated successfully").to_http_response()
     except ClientException as e:
         logger.exception(f"Failed to execute credential update: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to update credential: {e}")
-        return ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update credential").to_http_response()
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update credential"
+        ).to_http_response()
+
+
+# TODO: add cloud provider routes
+@credential_router.get("/cloud-providers")
+async def get_cloud_providers(
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Get all cloud providers."""
+    # return await CredentialDataManager(session).get_cloud_providers()
+    pass
+
+
+@credential_router.post("/cloud-providers")
+async def create_cloud_provider(
+    cloud_provider: CloudProvider,
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Create a new cloud provider credential."""
+    pass
+
+
+@credential_router.put("/cloud-providers/{credential_id}")
+async def update_cloud_provider(
+    credential_id: str,
+    cloud_provider: CloudProvider,
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Update a cloud provider credential_."""
+    pass
+
+
+@credential_router.delete("/cloud-providers/{credential_id}")
+async def delete_cloud_provider(
+    credential_id: str,
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Delete a cloud provider credential."""
+    pass

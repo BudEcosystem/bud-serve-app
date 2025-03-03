@@ -71,3 +71,20 @@ class Credential(Base, TimestampMixin):
     project: Mapped["Project"] = relationship("Project", foreign_keys=[project_id])
 
 
+class CloudCredentials(Base, TimestampMixin):
+    """Cloud Credentials : model for cloud credentials."""
+
+    __tablename__ = "cloud_credentials"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    provider_id: Mapped[UUID] = mapped_column(ForeignKey("cloud_providers.id", ondelete="CASCADE"), nullable=False)
+    # Make sure while deleting , dependency is removed first
+
+
+class CloudProviders(Base, TimestampMixin):  # TODO: write seeder for cloud providers , Azure , AWS , GCP , etc.
+    """Cloud Providers : model for cloud providers."""
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=False)
+    logo_url: Mapped[str] = mapped_column(String, nullable=False)
