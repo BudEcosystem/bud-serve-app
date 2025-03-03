@@ -4,6 +4,8 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 from budapp.commons import logging
 from budapp.commons.schemas import CloudEventBase
+from isort import logo
+from budapp.commons.schemas import SuccessResponse
 
 
 logger = logging.get_logger(__name__)
@@ -29,3 +31,21 @@ class CredentialUpdateRequest(CloudEventBase):
         logger.info(f"{data}")
         logger.info("================================================")
         return data
+
+
+# Cloud Providers
+class CloudProvidersSchema(BaseModel):
+    """Schema for cloud providers."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    name: str
+    description: str
+    logo_url: str
+
+
+class CloudProvidersListResponse(SuccessResponse):
+    """Response to list the cloud providers."""
+
+    providers: list[CloudProvidersSchema]
