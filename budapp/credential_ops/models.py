@@ -90,5 +90,5 @@ class CloudProviders(Base, TimestampMixin):  # TODO: write seeder for cloud prov
     description: Mapped[str] = mapped_column(String, nullable=False)
     logo_url: Mapped[str] = mapped_column(String, nullable=False)
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    schema_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    schema_definition: Mapped[dict] = mapped_column(JSONB, nullable=False)
     unique_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)

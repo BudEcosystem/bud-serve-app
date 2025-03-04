@@ -43,6 +43,7 @@ class CloudProvidersSchema(BaseModel):
     name: str
     description: str
     logo_url: str
+    schema_definition: str
 
 
 class CloudProvidersListResponse(SuccessResponse):
@@ -53,7 +54,8 @@ class CloudProvidersListResponse(SuccessResponse):
 class CloudProvidersCreateRequest(BaseModel):
     """Request to create a new cloud provider."""
 
-    provider_id: str
-    provider_api_key: str
+    provider_id: str # TODO: Probably we need to use UUID, test and replace
+    credential_values: dict[str, str] # JSON Structure
+
 
     # JSON Payload With Credential -  Depends on the provider & Validate

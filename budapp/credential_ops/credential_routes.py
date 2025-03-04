@@ -14,7 +14,7 @@ from .crud import CredentialDataManager, CredentialDataManager, CloudProviderDat
 from .models import Credential, CloudProviders
 from .schemas import CredentialUpdateRequest,CloudProvidersListResponse
 from budapp.credential_ops.schemas import CloudProvidersCreateRequest
-
+from .services import ClusterProviderService
 
 logger = logging.get_logger(__name__)
 
@@ -88,15 +88,32 @@ async def create_cloud_provider(
     """Create a new cloud provider credential."""
     logger.debug(f"Creating cloud provider: {cloud_provider_requst}")
 
-    # Validate the provider id in the database
-    provider = await CloudProviderDataManager(session).retrieve_by_fields(
-        CloudProviders,
-        {"id": cloud_provider_requst.provider_id}
-    )
-    if not provider:
-        raise ValueError("Provider ID is invalid")
+    try:
+        # Validate the provider id in the database
+        provider = await CloudProviderDataManager(session).retrieve_by_fields(
+            CloudProviders,
+            {"id": cloud_provider_requst.provider_id}
+        )
+        if not provider:
+            return ErrorResponse(
+                code=status.HTTP_400_BAD_REQUEST,
+                message="Provider ID is invalid"
+            ).to_http_response()
 
-    pass
+        # Save credentials via service
+        await ClusterProviderService(session).create_provider_credential(cloud_provider_requst)
+
+        return SuccessResponse(
+            code=status.HTTP_201_CREATED,
+            message="Cloud provider created successfully"
+        ).to_http_response()
+
+    except Exception as e:
+        logger.exception(f"Failed to create cloud provider: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to create cloud provider"
+        ).to_http_response()
 
 
 @credential_router.put("/cloud-providers/{credential_id}")

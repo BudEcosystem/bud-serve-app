@@ -61,7 +61,7 @@ class CloudProviderSeeder(BaseSeeder):
                         "name": cloud_provider["name"],
                         "description": cloud_provider["description"],
                         "logo_url": cloud_provider["logo_url"],
-                        "schema_json": cloud_provider["schema"],
+                        "schema_definition": cloud_provider["schema"],
                     }
                     await CloudProviderDataManager(session).update_by_fields(existing_provider, update_data)
                     logger.info(f"Provider {cloud_provider['unique_id']} updated successfully.")
@@ -73,7 +73,7 @@ class CloudProviderSeeder(BaseSeeder):
                     description=cloud_provider["description"],
                     logo_url=cloud_provider["logo_url"],
                     unique_id=cloud_provider["unique_id"],
-                    schema_json=cloud_provider["schema"],
+                    schema_definition=cloud_provider["schema"],
                 )
 
                 await CloudProviderDataManager(session).insert_one(cloud_provider_data)

@@ -499,7 +499,7 @@ async def get_node_wise_metrics(
     """Get node-wise metrics for a cluster."""
     try:
         metrics = await ClusterService(session).get_node_wise_metrics(cluster_id)
-        
+
         return NodeMetricsResponse(
             code=status.HTTP_200_OK, message="Successfully retrieved node metrics", **metrics
         )
@@ -541,9 +541,9 @@ async def get_node_wise_events_by_hostname(
         events_raw = await ClusterService(session).get_node_wise_events_by_hostname(cluster_id, node_hostname)
 
         events = events_raw.get("events", [])
-        
+
         return ClusterNodeWiseEventsResponse(
-            code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname",     
+            code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname",
             events=events
         )
     except ClientException as e:
@@ -554,3 +554,43 @@ async def get_node_wise_events_by_hostname(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Error retrieving node-wise metrics by hostname",
         ).to_http_response()
+
+
+# Routes For Cluster Creation
+@cluster_router.post(
+    "/cloud/create",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Create Cloud Cluster workflow executed successfully",
+        },
+    },
+    description="Create Cloud Cluster",
+)
+async def create_client_cloud_cluster(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    name: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
+    icon: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
+    # TODO: check if we need the workflow creation
+) -> Union[SuccessResponse, ErrorResponse]:
+    # TODO: check if it requires .to_http_response()
+
+    try:
+        # TODO: implement cluster creation logic
+        return SuccessResponse(code=status.HTTP_200_OK, message="Cluster created successfully")
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message)
+    except Exception as e:
+        logger.exception(f"Error creating cluster: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to execute create cluster workflow"
+        )

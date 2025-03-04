@@ -448,6 +448,21 @@ class PrometheusConfig(BaseModel):
 
 class NodeMetricsResponse(SuccessResponse):
     """Node metrics response schema."""
-    
+
     nodes: Dict[str, Dict[str, object]]
 
+
+# Cloud Cluster Schemas
+class CreateCloudClusterRequest(BaseModel):
+    """Request schema for creating a cloud cluster."""
+
+    name: str = Field(min_length=1, max_length=100, description="Name of the cloud cluster")
+    icon: str = Field(min_length=1, max_length=100, description="Icon URL for the cloud cluster")
+    credential_id: UUID4 = Field(description="UUID of the CloudCredentials record to use for this cluster")
+    provider_id: UUID4 = Field(description="UUID of the CloudProviders record to use for this cluster")
+
+
+# class CloudClusterResponse(SuccessResponse):
+#     """Cloud cluster response schema."""
+
+#     cluster: CloudCluster
