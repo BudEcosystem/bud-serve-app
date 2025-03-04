@@ -53,6 +53,7 @@ from .schemas import (
     MetricTypeEnum,
 )
 from .services import ClusterService
+from budapp.cluster_ops.schemas import CreateCloudClusterRequest
 
 
 logger = logging.get_logger(__name__)
@@ -91,6 +92,7 @@ async def create_cluster_workflow(
     workflow_id: Annotated[UUID | None, Form()] = None,
     workflow_total_steps: Annotated[int | None, Form()] = None,
     trigger_workflow: Annotated[bool, Form()] = False,
+    # Cloud Cluster
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Create cluster workflow."""
     # Perform router level validation
@@ -556,7 +558,7 @@ async def get_node_wise_events_by_hostname(
         ).to_http_response()
 
 
-# Routes For Cluster Creation
+# Routes For Cluster Creation, Should remove if existing method can delete
 @cluster_router.post(
     "/cloud/create",
     responses={
@@ -575,17 +577,16 @@ async def get_node_wise_events_by_hostname(
     },
     description="Create Cloud Cluster",
 )
-async def create_client_cloud_cluster(
+async def create_client_cloud_cluster_workflow(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    name: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
-    icon: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
+    create_request: CreateCloudClusterRequest
     # TODO: check if we need the workflow creation
 ) -> Union[SuccessResponse, ErrorResponse]:
     # TODO: check if it requires .to_http_response()
 
     try:
-        # TODO: implement cluster creation logic
+
         return SuccessResponse(code=status.HTTP_200_OK, message="Cluster created successfully")
     except ClientException as e:
         return ErrorResponse(code=e.status_code, message=e.message)

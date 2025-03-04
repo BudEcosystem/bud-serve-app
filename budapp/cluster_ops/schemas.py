@@ -460,7 +460,7 @@ class CreateCloudClusterRequest(BaseModel):
     icon: str = Field(min_length=1, max_length=100, description="Icon URL for the cloud cluster")
     credential_id: UUID4 = Field(description="UUID of the CloudCredentials record to use for this cluster")
     provider_id: UUID4 = Field(description="UUID of the CloudProviders record to use for this cluster")
-
+    region: str = Field(min_length=4, max_length=100, description="Region to create the cluster in")
 
 # class CloudClusterResponse(SuccessResponse):
 #     """Cloud cluster response schema."""
