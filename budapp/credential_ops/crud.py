@@ -16,8 +16,12 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the credential ops."""
 
+from sqlalchemy import select
+
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
+from budapp.credential_ops.models import CloudProviders
+from budapp.credential_ops.schemas import CloudProvidersCreateRequest
 
 
 logger = logging.get_logger(__name__)
@@ -33,3 +37,11 @@ class ProprietaryCredentialDataManager(DataManagerUtils):
     """Data manager for the ProprietaryCredential model."""
 
     pass
+
+class CloudProviderDataManager(DataManagerUtils):
+    """Data manager for the CloudProvider model."""
+
+    async def get_all_providers(self) -> list[CloudProviders]:
+        """Get all cloud providers."""
+        stmt = select(CloudProviders)
+        return self.scalars_all(stmt)

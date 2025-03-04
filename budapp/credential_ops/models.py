@@ -17,9 +17,10 @@
 """The credential ops package, containing essential business logic, services, and routing configurations for the credential ops."""
 
 from datetime import UTC, datetime
+from enum import UNIQUE
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Float, String, Uuid
+from sqlalchemy import DateTime, Enum, ForeignKey, Float, String, Uuid,Boolean
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -88,3 +89,6 @@ class CloudProviders(Base, TimestampMixin):  # TODO: write seeder for cloud prov
     name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=False)
     logo_url: Mapped[str] = mapped_column(String, nullable=False)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    schema_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    unique_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)

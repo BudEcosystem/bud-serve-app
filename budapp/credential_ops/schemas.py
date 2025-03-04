@@ -49,3 +49,11 @@ class CloudProvidersListResponse(SuccessResponse):
     """Response to list the cloud providers."""
 
     providers: list[CloudProvidersSchema]
+
+class CloudProvidersCreateRequest(BaseModel):
+    """Request to create a new cloud provider."""
+
+    provider_id: str
+    provider_api_key: str
+
+    # JSON Payload With Credential -  Depends on the provider & Validate

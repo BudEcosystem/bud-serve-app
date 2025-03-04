@@ -1,4 +1,5 @@
 from typing import Annotated
+from typing_extensions import Union
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
@@ -9,9 +10,10 @@ from budapp.commons.exceptions import ClientException
 
 from ..commons.api_utils import pubsub_api_endpoint
 from ..commons.schemas import ErrorResponse, SuccessResponse
-from .crud import CredentialDataManager
-from .models import Credential
-from .schemas import CredentialUpdateRequest
+from .crud import CredentialDataManager, CredentialDataManager, CloudProviderDataManager
+from .models import Credential, CloudProviders
+from .schemas import CredentialUpdateRequest,CloudProvidersListResponse
+from budapp.credential_ops.schemas import CloudProvidersCreateRequest
 
 
 logger = logging.get_logger(__name__)
@@ -55,16 +57,45 @@ async def get_cloud_providers(
     session: Annotated[Session, Depends(get_session)],
 ):
     """Get all cloud providers."""
-    # return await CredentialDataManager(session).get_cloud_providers()
-    pass
+    logger.debug("Getting all the cloud providers")
+    try:
+        # Use CloudProviderDataManager to get all providers
+        providers = await CloudProviderDataManager(session).get_all_providers()
+
+        # Convert CloudCredentials objects to CloudProvidersSchema
+        # This converts the list of CloudCredentials to list of CloudProvidersSchema
+        provider_schemas = [provider.to_schema() for provider in providers]
+
+        response = CloudProvidersListResponse(
+            providers=provider_schemas,
+            code=status.HTTP_200_OK,
+            message="Cloud providers retrieved successfully"
+        )
+        return response.to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get cloud providers: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to get cloud providers"
+        ).to_http_response()
 
 
 @credential_router.post("/cloud-providers")
 async def create_cloud_provider(
-    cloud_provider: CloudProvider,
+    cloud_provider_requst: CloudProvidersCreateRequest,
     session: Annotated[Session, Depends(get_session)],
 ):
     """Create a new cloud provider credential."""
+    logger.debug(f"Creating cloud provider: {cloud_provider_requst}")
+
+    # Validate the provider id in the database
+    provider = await CloudProviderDataManager(session).retrieve_by_fields(
+        CloudProviders,
+        {"id": cloud_provider_requst.provider_id}
+    )
+    if not provider:
+        raise ValueError("Provider ID is invalid")
+
     pass
 
 
