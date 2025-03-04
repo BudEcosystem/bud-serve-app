@@ -93,6 +93,7 @@ async def create_cluster_workflow(
     workflow_total_steps: Annotated[int | None, Form()] = None,
     trigger_workflow: Annotated[bool, Form()] = False,
     # Cloud Cluster
+    cluster_type: Annotated[str, Form(description="Type of cluster", enum=["ON_PREM", "CLOUD"])] = "ON_PREM",
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Create cluster workflow."""
     # Perform router level validation
