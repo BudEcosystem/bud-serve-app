@@ -94,6 +94,10 @@ async def create_cluster_workflow(
     trigger_workflow: Annotated[bool, Form()] = False,
     # Cloud Cluster
     cluster_type: Annotated[str, Form(description="Type of cluster", enum=["ON_PREM", "CLOUD"])] = "ON_PREM",
+    # Cluster Specific Inputs
+    credential_id:  Annotated[UUID | None, Form()] = None,
+    provider_id:  Annotated[UUID | None, Form()] = None,
+    region: Annotated[str | None, Form()] = None
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Create cluster workflow."""
     # Perform router level validation
@@ -108,6 +112,15 @@ async def create_cluster_workflow(
             code=status.HTTP_400_BAD_REQUEST,
             message="workflow_total_steps and workflow_id cannot be provided together",
         ).to_http_response()
+
+    if cluster_type == "CLOUD" and workflow_id is not None and trigger_workflow:
+        # validate all the details are
+        required_fields = [credential_id, provider_id, region]
+        if None in required_fields:
+            return ErrorResponse(
+                code=status.HTTP_400_BAD_REQUEST,
+                message="credential_id, provider_id, and region are required for CLOUD cluster creation",
+            ).to_http_response()
 
     # Check if at least one of the other fields is provided
     other_fields = [name, ingress_url, configuration_file]
@@ -560,39 +573,39 @@ async def get_node_wise_events_by_hostname(
 
 
 # Routes For Cluster Creation, Should remove if existing method can delete
-@cluster_router.post(
-    "/cloud/create",
-    responses={
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
-        status.HTTP_200_OK: {
-            "model": SuccessResponse,
-            "description": "Create Cloud Cluster workflow executed successfully",
-        },
-    },
-    description="Create Cloud Cluster",
-)
-async def create_client_cloud_cluster_workflow(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
-    create_request: CreateCloudClusterRequest
-    # TODO: check if we need the workflow creation
-) -> Union[SuccessResponse, ErrorResponse]:
-    # TODO: check if it requires .to_http_response()
+# @cluster_router.post(
+#     "/cloud/create",
+#     responses={
+#         status.HTTP_500_INTERNAL_SERVER_ERROR: {
+#             "model": ErrorResponse,
+#             "description": "Service is unavailable due to server error",
+#         },
+#         status.HTTP_400_BAD_REQUEST: {
+#             "model": ErrorResponse,
+#             "description": "Service is unavailable due to client error",
+#         },
+#         status.HTTP_200_OK: {
+#             "model": SuccessResponse,
+#             "description": "Create Cloud Cluster workflow executed successfully",
+#         },
+#     },
+#     description="Create Cloud Cluster",
+# )
+# async def create_client_cloud_cluster_workflow(
+#     current_user: Annotated[User, Depends(get_current_active_user)],
+#     session: Annotated[Session, Depends(get_session)],
+#     create_request: CreateCloudClusterRequest
+#     # TODO: check if we need the workflow creation
+# ) -> Union[SuccessResponse, ErrorResponse]:
+#     # TODO: check if it requires .to_http_response()
 
-    try:
+#     try:
 
-        return SuccessResponse(code=status.HTTP_200_OK, message="Cluster created successfully")
-    except ClientException as e:
-        return ErrorResponse(code=e.status_code, message=e.message)
-    except Exception as e:
-        logger.exception(f"Error creating cluster: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to execute create cluster workflow"
-        )
+#         return SuccessResponse(code=status.HTTP_200_OK, message="Cluster created successfully")
+#     except ClientException as e:
+#         return ErrorResponse(code=e.status_code, message=e.message)
+#     except Exception as e:
+#         logger.exception(f"Error creating cluster: {e}")
+#         return ErrorResponse(
+#             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to execute create cluster workflow"
+#         )
