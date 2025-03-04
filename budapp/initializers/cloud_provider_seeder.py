@@ -76,7 +76,7 @@ class CloudProviderSeeder(BaseSeeder):
                     schema_json=cloud_provider["schema"],
                 )
 
-                await CloudProviderDataManager(session).insert(cloud_provider_data)
+                await CloudProviderDataManager(session).insert_one(cloud_provider_data)
 
                 logger.info(f"Provider {cloud_provider['unique_id']} created successfully.")
 
