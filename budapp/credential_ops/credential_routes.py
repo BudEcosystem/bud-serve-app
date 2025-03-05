@@ -55,7 +55,7 @@ async def update_credential(
 @credential_router.get("/cloud-providers")
 async def get_cloud_providers(
     session: Annotated[Session, Depends(get_session)],
-):
+) -> Union[CloudProvidersListResponse, ErrorResponse]:
     """Get all cloud providers."""
     logger.debug("Getting all the cloud providers")
     try:

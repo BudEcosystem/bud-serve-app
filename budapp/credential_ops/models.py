@@ -79,10 +79,11 @@ class CloudCredentials(Base, TimestampMixin):
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
     provider_id: Mapped[UUID] = mapped_column(ForeignKey("cloud_providers.id", ondelete="CASCADE"), nullable=False)
+    credential: Mapped[dict] = mapped_column(JSONB, nullable=False)
     # Make sure while deleting , dependency is removed first
 
 
-class CloudProviders(Base, TimestampMixin):  # TODO: write seeder for cloud providers , Azure , AWS , GCP , etc.
+class CloudProviders(Base, TimestampMixin):
     """Cloud Providers : model for cloud providers."""
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)

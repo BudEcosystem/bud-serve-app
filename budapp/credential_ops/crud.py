@@ -21,7 +21,7 @@ from sqlalchemy import select
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.credential_ops.models import CloudProviders
-from budapp.credential_ops.schemas import CloudProvidersCreateRequest
+# from budapp.credential_ops.schemas import CloudProvidersCreateRequest
 
 
 logger = logging.get_logger(__name__)
@@ -45,3 +45,8 @@ class CloudProviderDataManager(DataManagerUtils):
         """Get all cloud providers."""
         stmt = select(CloudProviders)
         return self.scalars_all(stmt)
+
+class CloudProviderCredentialDataManager(DataManagerUtils):
+    """Data manager for the CloudProviderCredential model."""
+
+    pass

@@ -142,6 +142,10 @@ async def create_cluster_workflow(
                 workflow_total_steps=workflow_total_steps,
                 step_number=step_number,
                 trigger_workflow=trigger_workflow,
+                credential_id=credential_id,
+                provider_id=provider_id,
+                region=region,
+                cluster_type=cluster_type
             ),
             configuration_file=configuration_file,
         )

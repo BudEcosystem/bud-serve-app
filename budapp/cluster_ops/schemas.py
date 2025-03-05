@@ -137,6 +137,14 @@ class CreateClusterWorkflowRequest(BaseModel):
     step_number: int | None = None
     trigger_workflow: bool | None = None
 
+    cluster_type: str | None = "ON_PREM"
+
+    # Cloud
+    credential_id: UUID4 | None = None
+    provider_id: UUID4 | None = None
+    region: str | None = None
+
+
     @field_validator("icon", mode="before")
     @classmethod
     def icon_validate(cls, value: str | None) -> str | None:
@@ -153,6 +161,15 @@ class CreateClusterWorkflowSteps(BaseModel):
     icon: str | None = None
     ingress_url: AnyHttpUrl | None = None
     configuration_yaml: dict | None = None
+
+     # Cloud specific fields
+    cluster_type: str = "ON_PREM"  # "ON_PREM" or "CLOUD"
+    credential_id: UUID4 | None = None
+    provider_id: UUID4 | None = None
+    region: str | None = None
+
+    # Cloud Credentials
+    credentials: dict | None = None
 
 
 class EditClusterRequest(BaseModel):
