@@ -61,6 +61,7 @@ class Note(Base, TimestampMixin):
     chat_session_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False
     )
+    user_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     note: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     modified_at: Mapped[datetime] = mapped_column(

@@ -55,8 +55,13 @@ from .schemas import (
     ChatSettingPaginatedResponse,
     ChatSettingFilter,
     ChatSettingEditRequest,
+    NoteCreateRequest,
+    NoteSuccessResponse,
+    NoteEditRequest,
+    NotePaginatedResponse,
+    NoteFilter,
 )
-from .services import ChatSessionService, MessageService, PlaygroundService, ChatSettingService
+from .services import ChatSessionService, MessageService, PlaygroundService, ChatSettingService, NoteService
 
 
 logger = logging.get_logger(__name__)
@@ -799,4 +804,192 @@ async def delete_chat_setting(
         code=status.HTTP_200_OK,
         message="Chat setting deleted successfully",
         object="chat_setting.delete",
+    )
+
+
+@playground_router.post(
+    "/notes",
+    responses={
+        status.HTTP_200_OK: {
+            "model": NoteSuccessResponse,
+            "description": "Note created successfully.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="Create a note.",
+)
+async def create_note(
+    request: NoteCreateRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[NoteSuccessResponse, ErrorResponse]:
+    """Create a new note."""
+    try:
+        note_data = request.model_dump(exclude_unset=True)
+        db_note = await NoteService(session).create_note(current_user.id, note_data)
+    except ClientException as e:
+        logger.exception(f"Failed to create note: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to create note: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to create note",
+        ).to_http_response()
+
+    return NoteSuccessResponse(
+        note=db_note,
+        message="Note created successfully",
+        code=status.HTTP_200_OK,
+        object="note.create",
+    ).to_http_response()
+
+
+@playground_router.get(
+    "/chat-sessions/{chat_session_id}/notes",
+    responses={
+        status.HTTP_200_OK: {
+            "model": NotePaginatedResponse,
+            "description": "Successfully retrieved notes.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="Retrieve all notes with filtering, sorting, and search capabilities.",
+)
+async def get_all_notes(
+    chat_session_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: NoteFilter = Depends(),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[NotePaginatedResponse, ErrorResponse]:
+    """Retrieve a paginated list of notes with optional filters and search."""
+    offset = (page - 1) * limit
+
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    try:
+        db_notes, total_count = await NoteService(session).get_all_notes(
+            chat_session_id, current_user.id, offset, limit, filters_dict, order_by, search
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to retrieve notes: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to retrieve notes: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve notes"
+        ).to_http_response()
+
+    return NotePaginatedResponse(
+        notes=db_notes,
+        total_record=total_count,
+        page=page,
+        limit=limit,
+        object="note.list",
+        code=status.HTTP_200_OK,
+        message="Notes retrieved successfully",
+    ).to_http_response()
+
+
+@playground_router.patch(
+    "/notes/{note_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": NoteSuccessResponse,
+            "description": "Successfully edited note",
+        },
+    },
+    description="Edit note",
+)
+async def edit_note(
+    note_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: NoteEditRequest,
+) -> Union[NoteSuccessResponse, ErrorResponse]:
+    """Edit note"""
+    try:
+        db_note = await NoteService(session).edit_note(
+            note_id=note_id, data=request.model_dump(exclude_unset=True, exclude_none=True)
+        )
+        return NoteSuccessResponse(
+            note=db_note,
+            message="Note details updated successfully",
+            code=status.HTTP_200_OK,
+            object="note.edit",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to edit note: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to edit note: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit note"
+        ).to_http_response()
+
+
+@playground_router.delete(
+    "/notes/{note_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Note deleted successfully.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="Delete note",
+)
+async def delete_note(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    note_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a note."""
+    try:
+        await NoteService(session).delete_note(note_id)
+    except ClientException as e:
+        logger.exception(f"Failed to delete note: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete note: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete note"
+        ).to_http_response()
+    return SuccessResponse(
+        code=status.HTTP_200_OK,
+        message="Note deleted successfully",
+        object="note.delete",
     )

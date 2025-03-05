@@ -334,3 +334,45 @@ class ChatSettingEditRequest(BaseModel):
     structured_json_schema: dict | None = None
 
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+class NoteCreateRequest(BaseModel):
+    """Schema for creating a note"""
+
+    chat_session_id: UUID4
+    note: str = Field(..., min_length=1, max_length=5000)
+
+
+class NoteEditRequest(BaseModel):
+    """Schema for editing a note"""
+
+    note: str = Field(..., min_length=1, max_length=5000)
+
+
+class NoteResponse(BaseModel):
+    """Schema for note response"""
+
+    id: UUID4
+    note: str
+    created_at: datetime
+    modified_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+class NoteSuccessResponse(SuccessResponse):
+    """Note success response schema"""
+
+    note: NoteResponse
+
+
+class NotePaginatedResponse(PaginatedSuccessResponse):
+    """Note paginated response schema"""
+
+    notes: list[NoteResponse] = []
+
+
+class NoteFilter(BaseModel):
+    """Note filter schema"""
+
+    note: str | None = None

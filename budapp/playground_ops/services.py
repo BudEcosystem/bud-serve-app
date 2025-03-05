@@ -30,9 +30,9 @@ from ..credential_ops.models import Credential as CredentialModel
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..project_ops.crud import ProjectDataManager
-from .crud import ChatSessionDataManager, MessageDataManager, ChatSettingDataManager
-from .models import ChatSession, Message, ChatSetting
-from .schemas import ChatSessionCreate, ChatSessionListResponse, MessageResponse, ChatSettingListResponse
+from .crud import ChatSessionDataManager, MessageDataManager, ChatSettingDataManager, NoteDataManager
+from .models import ChatSession, Message, ChatSetting, Note
+from .schemas import ChatSessionCreate, ChatSessionListResponse, MessageResponse, ChatSettingListResponse, NoteResponse
 
 
 logger = logging.get_logger(__name__)
@@ -328,5 +328,69 @@ class ChatSettingService(SessionMixin):
         )
 
         await ChatSettingDataManager(self.session).delete_one(db_chat_setting)
+
+        return
+
+
+class NoteService(SessionMixin):
+    """Note Service"""
+
+    async def create_note(self, user_id: UUID, note_data: dict) -> Note:
+        """Create a new note and insert it into the database."""
+        # validate chat session id
+        db_chat_session = await ChatSessionDataManager(self.session).retrieve_by_fields(
+            ChatSession, fields={"id": note_data["chat_session_id"]}
+        )
+
+        note_data["user_id"] = user_id
+
+        note = Note(**note_data)
+
+        db_note = await NoteDataManager(self.session).insert_one(note)
+
+        return db_note
+
+    async def get_all_notes(
+        self,
+        chat_session_id: UUID,
+        user_id: UUID,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[NoteResponse], int]:
+        """Retrieve all notes for a given chat session and user."""
+        # validate chat session id
+        db_chat_session = await ChatSessionDataManager(self.session).retrieve_by_fields(
+            ChatSession, fields={"id": chat_session_id}
+        )
+
+        db_notes, total_count = await NoteDataManager(self.session).get_all_notes(
+            chat_session_id, user_id, offset, limit, filters, order_by, search
+        )
+
+        return db_notes, total_count
+
+    async def edit_note(self, note_id: UUID, data: Dict[str, Any]) -> Note:
+        """Edit note by validating and updating specific fields."""
+        # Retrieve existing note
+        db_note = await NoteDataManager(self.session).retrieve_by_fields(
+            Note,
+            fields={"id": note_id},
+        )
+
+        db_note = await NoteDataManager(self.session).update_by_fields(db_note, data)
+
+        return db_note
+
+    async def delete_note(self, note_id: UUID) -> None:
+        """Delete note."""
+        db_note = await NoteDataManager(self.session).retrieve_by_fields(
+            Note,
+            fields={"id": note_id},
+        )
+
+        await NoteDataManager(self.session).delete_one(db_note)
 
         return
