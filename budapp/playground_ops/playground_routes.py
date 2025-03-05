@@ -50,8 +50,13 @@ from .schemas import (
     MessageSuccessResponse,
     PlaygroundDeploymentFilter,
     PlaygroundDeploymentListResponse,
+    ChatSettingCreate,
+    ChatSettingSuccessResponse,
+    ChatSettingPaginatedResponse,
+    ChatSettingFilter,
+    ChatSettingEditRequest,
 )
-from .services import ChatSessionService, MessageService, PlaygroundService
+from .services import ChatSessionService, MessageService, PlaygroundService, ChatSettingService
 
 
 logger = logging.get_logger(__name__)
@@ -566,4 +571,232 @@ async def delete_message(
         code=status.HTTP_200_OK,
         message="Message deleted successfully",
         object="message.delete",
+    )
+
+
+@playground_router.post(
+    "/chat-settings",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ChatSettingSuccessResponse,
+            "description": "Chat setting created successfully.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="Create a chat setting.",
+)
+async def create_chat_setting(
+    request: ChatSettingCreate,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[ChatSettingSuccessResponse, ErrorResponse]:
+    """Create a new chat setting."""
+    try:
+        chat_setting_data = request.model_dump(exclude_unset=True)
+        db_chat_setting = await ChatSettingService(session).create_chat_setting(current_user.id, chat_setting_data)
+
+    except ClientException as e:
+        logger.exception(f"Failed to create chat setting: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to create chat setting: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to create chat setting",
+        ).to_http_response()
+
+    return ChatSettingSuccessResponse(
+        chat_setting=db_chat_setting,
+        message="Chat setting created successfully",
+        code=status.HTTP_200_OK,
+        object="chat_setting.create",
+    ).to_http_response()
+
+
+@playground_router.get(
+    "/chat-settings",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ChatSettingPaginatedResponse,
+            "description": "Successfully retrieved chat settings.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="List all chat settings.",
+)
+async def list_chat_settings(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: ChatSettingFilter = Depends(),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[ChatSettingPaginatedResponse, ErrorResponse]:
+    """List all chat settings for a user."""
+    offset = (page - 1) * limit
+
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    try:
+        db_chat_settings, count = await ChatSettingService(session).list_chat_settings(
+            current_user.id, offset, limit, filters_dict, order_by, search
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to list chat settings: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to list chat settings: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list chat settings"
+        ).to_http_response()
+    return ChatSettingPaginatedResponse(
+        chat_settings=db_chat_settings,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="chat_settings.list",
+        code=status.HTTP_200_OK,
+        message="Successfully retrieved chat settings",
+    ).to_http_response()
+
+
+@playground_router.get(
+    "/chat-settings/{chat_setting_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ChatSettingSuccessResponse,
+            "description": "Successfully retrieved chat setting details.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+)
+async def get_chat_setting_details(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    chat_setting_id: UUID,
+) -> Union[ChatSettingSuccessResponse, ErrorResponse]:
+    """Retrieve details of a specific chat setting."""
+    try:
+        db_chat_setting = await ChatSettingService(session).get_chat_setting_details(chat_setting_id)
+    except ClientException as e:
+        logger.exception(f"Failed to retrieve details of chat setting: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to retrieve details of chat setting: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve details of chat setting"
+        ).to_http_response()
+    return ChatSettingSuccessResponse(
+        chat_setting=db_chat_setting,
+        message="Chat setting retrieved successfully",
+        code=status.HTTP_200_OK,
+        object="chat_setting.get",
+    ).to_http_response()
+
+
+@playground_router.patch(
+    "/chat-settings/{chat_setting_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ChatSettingSuccessResponse,
+            "description": "Successfully edited chat setting",
+        },
+    },
+    description="Edit chat setting",
+)
+async def edit_chat_setting(
+    chat_setting_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: ChatSettingEditRequest,
+) -> Union[ChatSettingSuccessResponse, ErrorResponse]:
+    """Edit chat setting"""
+    try:
+        db_chat_setting = await ChatSettingService(session).edit_chat_setting(
+            chat_setting_id=chat_setting_id, data=request.model_dump(exclude_unset=True, exclude_none=True)
+        )
+        return ChatSettingSuccessResponse(
+            chat_setting=db_chat_setting,
+            message="Chat setting details updated successfully",
+            code=status.HTTP_200_OK,
+            object="chat_setting.edit",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to edit chat setting: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to edit chat setting: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit chat setting"
+        ).to_http_response()
+
+
+@playground_router.delete(
+    "/chat-settings/{chat_setting_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Chat setting deleted successfully.",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="Delete chat setting",
+)
+async def delete_chat_setting(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    chat_setting_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a chat setting."""
+    try:
+        await ChatSettingService(session).delete_chat_setting(chat_setting_id)
+    except ClientException as e:
+        logger.exception(f"Failed to delete chat setting: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete chat setting: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete chat setting"
+        ).to_http_response()
+    return SuccessResponse(
+        code=status.HTTP_200_OK,
+        message="Chat setting deleted successfully",
+        object="chat_setting.delete",
     )
