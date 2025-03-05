@@ -95,14 +95,14 @@ class ChatSettingResponse(BaseModel):
     name: str
     system_prompt: str | None = None
     temperature: float
-    limit_sequence_length: bool
-    sequence_length: int | None = None
+    limit_response_length: bool
+    sequence_length: int
     context_overflow_policy: str
     stop_strings: list[str] | None = None
-    topKSampling: float | None = None
-    repeatPenalty: float | None = None
-    topPSampling: float | None = None
-    minPSampling: float | None = None
+    top_k_sampling: int
+    repeat_penalty: float
+    top_p_sampling: float
+    min_p_sampling: float
     structured_json_schema: dict | None = None
 
     created_at: datetime
@@ -278,15 +278,15 @@ class ChatSettingCreate(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=300)
     system_prompt: str | None = None
-    temperature: float
-    limit_sequence_length: bool = False
-    sequence_length: int | None = None
+    temperature: float = 1
+    limit_response_length: bool = False
+    sequence_length: int | None = 1000
     context_overflow_policy: str
     stop_strings: list[str] | None = None
-    topKSampling: float | None = None
-    repeatPenalty: float | None = None
-    topPSampling: float | None = None
-    minPSampling: float | None = None
+    top_k_sampling: int | None = 40
+    repeat_penalty: float | None = 0
+    top_p_sampling: float | None = 1
+    min_p_sampling: float | None = 0.05
     structured_json_schema: dict | None = None
 
 
@@ -323,14 +323,14 @@ class ChatSettingEditRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
     system_prompt: str | None = None
     temperature: float | None = None
-    limit_sequence_length: bool | None = None
+    limit_response_length: bool | None = None
     sequence_length: int | None = None
     context_overflow_policy: str | None = None  # Enum validation can be added if needed
     stop_strings: list[str] | None = None
-    topKSampling: float | None = None
-    repeatPenalty: float | None = None
-    topPSampling: float | None = None
-    minPSampling: float | None = None
+    top_k_sampling: int | None = None
+    repeat_penalty: float | None = None
+    top_p_sampling: float | None = None
+    min_p_sampling: float | None = None
     structured_json_schema: dict | None = None
 
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())

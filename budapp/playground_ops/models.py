@@ -19,9 +19,11 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, String, Uuid, ForeignKey, Integer, Float, Boolean, JSON, Enum, ARRAY
+from sqlalchemy import DateTime, String, Uuid, ForeignKey, Integer, Float, Boolean, JSON, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
-
+from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.dialects.postgresql import JSONB
 from budapp.commons.database import Base, TimestampMixin
 from ..commons.constants import FeedbackEnum
 
@@ -127,15 +129,15 @@ class ChatSetting(Base, TimestampMixin):
 
     system_prompt: Mapped[str] = mapped_column(String, nullable=True)
     temperature: Mapped[float] = mapped_column(Float, nullable=False)
-    limit_sequence_length: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    limit_response_length: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     sequence_length: Mapped[int] = mapped_column(Integer, nullable=True)
     context_overflow_policy: Mapped[str] = mapped_column(String, nullable=False)  # enum
-    stop_strings: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
-    topKSampling: Mapped[float] = mapped_column(Float, nullable=True)
-    repeatPenalty: Mapped[float] = mapped_column(Float, nullable=True)
-    topPSampling: Mapped[float] = mapped_column(Float, nullable=True)
-    minPSampling: Mapped[float] = mapped_column(Float, nullable=True)
-    structured_json_schema: Mapped[dict] = mapped_column(JSON, nullable=True)
+    stop_strings: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
+    top_k_sampling: Mapped[float] = mapped_column(Integer, nullable=True)
+    repeat_penalty: Mapped[float] = mapped_column(Float, nullable=True)
+    top_p_sampling: Mapped[float] = mapped_column(Float, nullable=True)
+    min_p_sampling: Mapped[float] = mapped_column(Float, nullable=True)
+    structured_json_schema: Mapped[dict] = mapped_column(JSONB, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     modified_at: Mapped[datetime] = mapped_column(
