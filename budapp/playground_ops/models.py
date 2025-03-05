@@ -131,7 +131,7 @@ class ChatSetting(Base, TimestampMixin):
     temperature: Mapped[float] = mapped_column(Float, nullable=False)
     limit_response_length: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     sequence_length: Mapped[int] = mapped_column(Integer, nullable=True)
-    context_overflow_policy: Mapped[str] = mapped_column(String, nullable=False)  # enum
+    context_overflow_policy: Mapped[str] = mapped_column(String, nullable=True)  # enum
     stop_strings: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
     top_k_sampling: Mapped[int] = mapped_column(Integer, nullable=True)
     repeat_penalty: Mapped[float] = mapped_column(Float, nullable=True)

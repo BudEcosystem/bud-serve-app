@@ -26,7 +26,7 @@ def upgrade() -> None:
     op.add_column("chat_settings", sa.Column("temperature", sa.Float(), nullable=False))
     op.add_column("chat_settings", sa.Column("limit_response_length", sa.Boolean(), nullable=False))
     op.add_column("chat_settings", sa.Column("sequence_length", sa.Integer(), nullable=True))
-    op.add_column("chat_settings", sa.Column("context_overflow_policy", sa.String(), nullable=False))
+    op.add_column("chat_settings", sa.Column("context_overflow_policy", sa.String(), nullable=True))
     op.add_column("chat_settings", sa.Column("stop_strings", postgresql.ARRAY(sa.String()), nullable=True))
     op.add_column("chat_settings", sa.Column("top_k_sampling", sa.Integer(), nullable=True))
     op.add_column("chat_settings", sa.Column("repeat_penalty", sa.Float(), nullable=True))

@@ -97,7 +97,7 @@ class ChatSettingResponse(BaseModel):
     temperature: float
     limit_response_length: bool
     sequence_length: int
-    context_overflow_policy: str
+    context_overflow_policy: str | None = None
     stop_strings: list[str] | None = None
     top_k_sampling: int
     repeat_penalty: float
@@ -281,7 +281,7 @@ class ChatSettingCreate(BaseModel):
     temperature: float = 1
     limit_response_length: bool = False
     sequence_length: int | None = 1000
-    context_overflow_policy: str
+    context_overflow_policy: str | None = None
     stop_strings: list[str] | None = None
     top_k_sampling: int | None = 40
     repeat_penalty: float | None = 0
