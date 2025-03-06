@@ -421,6 +421,7 @@ class WorkflowTypeEnum(StrEnum):
     LOCAL_MODEL_ONBOARDING = auto()
     ADD_WORKER_TO_ENDPOINT = auto()
     LICENSE_FAQ_FETCH = auto()
+    LOCAL_MODEL_QUANTIZATION = auto()
 
 
 class NotificationType(Enum):
