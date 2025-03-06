@@ -808,7 +808,7 @@ async def delete_chat_setting(
 
 
 @playground_router.post(
-    "/notes",
+    "/chat-sessions/notes",
     responses={
         status.HTTP_200_OK: {
             "model": NoteSuccessResponse,
@@ -910,7 +910,7 @@ async def get_all_notes(
 
 
 @playground_router.patch(
-    "/notes/{note_id}",
+    "/chat-sessions/notes/{note_id}",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
@@ -955,7 +955,7 @@ async def edit_note(
 
 
 @playground_router.delete(
-    "/notes/{note_id}",
+    "/chat-sessions/notes/{note_id}",
     responses={
         status.HTTP_200_OK: {
             "model": SuccessResponse,
