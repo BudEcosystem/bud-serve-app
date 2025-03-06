@@ -165,7 +165,7 @@ class MessageBase(BaseModel):
     """Base schema for Message model containing shared attributes"""
 
     prompt: str
-    response: list[dict]
+    response: dict
     deployment_id: UUID4
 
     input_tokens: int | None = None
@@ -185,6 +185,7 @@ class MessageCreateRequest(MessageBase):
 
     chat_session_id: UUID4 | None = None
     chat_setting_id: UUID4 | None = None
+    request_id: UUID4
 
 
 class MessageResponse(MessageBase):
@@ -222,8 +223,9 @@ class MessageEditRequest(BaseModel):
     """Message edit schema."""
 
     prompt: str | None = None
-    response: list[dict] | None = None
+    response: dict | None = None
     deployment_id: UUID4 | None = None
+    request_id: UUID4 | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
     total_tokens: int | None = None
