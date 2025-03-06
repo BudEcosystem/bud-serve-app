@@ -179,11 +179,11 @@ class MessageService(SessionMixin):
         """Create a new message and insert it into the database."""
 
         # validate deployment id
-        # db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-        #     EndpointModel,
-        #     fields={"id": message_data["deployment_id"]},
-        #     exclude_fields={"status": EndpointStatusEnum.DELETED},
-        # )
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            fields={"id": message_data["deployment_id"]},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+        )
 
         chat_setting_id = message_data.pop("chat_setting_id", None)
         if chat_setting_id:
