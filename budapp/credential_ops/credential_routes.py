@@ -17,6 +17,7 @@ from budapp.credential_ops.schemas import CloudProvidersCreateRequest
 from .services import ClusterProviderService
 from budapp.credential_ops.schemas import CloudProvidersSchema
 import uuid
+import json
 
 logger = logging.get_logger(__name__)
 
@@ -66,29 +67,25 @@ async def get_cloud_providers(
         # Convert SQLAlchemy objects to CloudProvidersSchema objects
         provider_schemas = []
         for provider in providers:
-            # Extract attributes and handle type conversions
-            provider_dict = {}
-            for column in provider.__table__.columns:
-                value = getattr(provider, column.name)
+            provider_dict = {
+                column.name: str(getattr(provider, column.name)) if isinstance(getattr(provider, column.name), uuid.UUID)
+                else getattr(provider, column.name)
+                for column in provider.__table__.columns
+            }
 
-                # Convert specific types as needed
-                if isinstance(value, uuid.UUID):
-                    value = str(value)  # Convert UUID to string
+            # Ensure schema_definition is a valid JSON string
+            if "schema_definition" in provider_dict and not isinstance(provider_dict["schema_definition"], str):
+                provider_dict["schema_definition"] = json.dumps(provider_dict["schema_definition"])
 
-                # Handle schema_definition specifically
-                if column.name == 'schema_definition' and not isinstance(value, str):
-                    import json
-                    value = json.dumps(value)
+            # Ensure `id` is always a string before validation
+            if isinstance(provider_dict.get("id"), uuid.UUID):
+                provider_dict["id"] = str(provider_dict["id"])
 
-                provider_dict[column.name] = value
-
-            # Create schema object
             try:
                 schema = CloudProvidersSchema(**provider_dict)
                 provider_schemas.append(schema)
             except Exception as e:
                 logger.error(f"Failed to create schema for provider {provider_dict.get('id', 'unknown')}: {e}")
-                # Continue with next provider instead of failing the whole request
                 continue
 
         # Create response
