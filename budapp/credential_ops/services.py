@@ -9,6 +9,7 @@ import json
 import uuid
 from fastapi import HTTPException, status
 from typing import Dict, Any, Union
+from uuid import UUID
 
 logger = logging.get_logger(__name__)
 
@@ -16,7 +17,7 @@ logger = logging.get_logger(__name__)
 class ClusterProviderService(SessionMixin):
     """ClusterProviderService is a service class that provides cluster-related operations."""
 
-    async def create_provider_credential(self, req: CloudProvidersCreateRequest) -> None:
+    async def create_provider_credential(self, req: CloudProvidersCreateRequest, current_user_id: UUID) -> None:
         """
         Create a new credential for a provider.
 
@@ -65,13 +66,11 @@ class ClusterProviderService(SessionMixin):
                         detail=f"Required field '{field}' is missing in the credential values"
                     )
 
-            # TODO: Get the user_id from the request context
-            # For now, using a placeholder
-            user_id = uuid.uuid4()  # This should be replaced with actual user_id
+
 
             # Save the credential values
             cloud_credential = CloudCredentials(
-                user_id=user_id,
+                user_id=current_user_id,
                 provider_id=provider_id,
                 credential=req.credential_values
             )

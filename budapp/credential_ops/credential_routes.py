@@ -5,7 +5,10 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
-from budapp.commons.dependencies import get_session
+from budapp.commons.dependencies import (
+    get_session,
+    get_current_active_user
+)
 from budapp.commons.exceptions import ClientException
 
 from ..commons.api_utils import pubsub_api_endpoint
@@ -18,6 +21,9 @@ from .services import ClusterProviderService
 from budapp.credential_ops.schemas import CloudProvidersSchema
 import uuid
 import json
+from budapp.user_ops.schemas import User
+
+
 
 logger = logging.get_logger(__name__)
 
@@ -105,6 +111,7 @@ async def get_cloud_providers(
 
 @credential_router.post("/cloud-providers")
 async def create_cloud_provider(
+    current_user: Annotated[User, Depends(get_current_active_user)],
     cloud_provider_requst: CloudProvidersCreateRequest,
     session: Annotated[Session, Depends(get_session)],
 ):
@@ -124,7 +131,7 @@ async def create_cloud_provider(
             ).to_http_response()
 
         # Save credentials via service
-        await ClusterProviderService(session).create_provider_credential(cloud_provider_requst)
+        await ClusterProviderService(session).create_provider_credential(cloud_provider_requst, current_user.id)
 
         return SuccessResponse(
             code=status.HTTP_201_CREATED,
