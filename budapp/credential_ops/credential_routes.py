@@ -116,20 +116,20 @@ async def create_cloud_provider(
         ).to_http_response()
 
 
-@credential_router.put("/cloud-providers/{credential_id}")
-async def update_cloud_provider(
-    credential_id: str,
-    cloud_provider: CloudProviders,
-    session: Annotated[Session, Depends(get_session)],
-):
-    """Update a cloud provider credential_."""
-    pass
+# @credential_router.put("/cloud-providers/{credential_id}")
+# async def update_cloud_provider(
+#     credential_id: str,
+#     cloud_provider: CloudProviders,
+#     session: Annotated[Session, Depends(get_session)],
+# ):
+#     """Update a cloud provider credential_."""
+#     pass
 
 
-@credential_router.delete("/cloud-providers/{credential_id}")
-async def delete_cloud_provider(
-    credential_id: str,
-    session: Annotated[Session, Depends(get_session)],
-):
-    """Delete a cloud provider credential."""
-    pass
+# @credential_router.delete("/cloud-providers/{credential_id}")
+# async def delete_cloud_provider(
+#     credential_id: str,
+#     session: Annotated[Session, Depends(get_session)],
+# ):
+#     """Delete a cloud provider credential."""
+#     pass
