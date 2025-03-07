@@ -1,26 +1,14 @@
-#  -----------------------------------------------------------------------------
-#  Copyright (c) 2024 Bud Ecosystem Inc.
-#  #
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#  #
-#      http://www.apache.org/licenses/LICENSE-2.0
-#  #
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-#  -----------------------------------------------------------------------------
+"""Services for handling credential and cloud provider operations."""
 
-from budapp.cluster_ops.utils import logging
+from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
-from budapp.credential_ops.crud import CloudProviderDataManager
+from budapp.credential_ops.crud import CloudProviderDataManager, CloudProviderCredentialDataManager
 from budapp.credential_ops.models import CloudCredentials, CloudProviders
 from budapp.credential_ops.schemas import CloudProvidersCreateRequest
 import json
-
+import uuid
+from fastapi import HTTPException, status
+from typing import Dict, Any, Union
 
 logger = logging.get_logger(__name__)
 
@@ -29,19 +17,42 @@ class ClusterProviderService(SessionMixin):
     """ClusterProviderService is a service class that provides cluster-related operations."""
 
     async def create_provider_credential(self, req: CloudProvidersCreateRequest) -> None:
-        """Create a new credential for a provider."""
+        """
+        Create a new credential for a provider.
+
+        Args:
+            req: CloudProvidersCreateRequest containing provider_id and credential_values
+
+        Raises:
+            ValueError: If provider is not found or required fields are missing
+            HTTPException: If there are validation errors
+        """
         try:
+            # Convert provider_id string to UUID if needed
+            provider_id = req.provider_id
+            if not isinstance(provider_id, uuid.UUID):
+                try:
+                    provider_id = uuid.UUID(provider_id)
+                except ValueError:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid provider_id format: {provider_id}"
+                    )
+
             # Get the provider from the database
             provider = await CloudProviderDataManager(self.session).retrieve_by_fields(
-                CloudProviders, {"id": req.provider_id}
+                CloudProviders, {"id": provider_id}
             )
 
             # Validate the provider
             if not provider:
-                raise ValueError(f"Provider with id {req.provider_id} not found")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Provider with id {provider_id} not found"
+                )
 
-            # Parse the schema definition from the provider
-            schema = json.loads(provider.schema_definition) if provider.schema_definition else {}
+            # Handle schema_definition which might be a dict or a JSON string
+            schema = self._get_schema_definition(provider.schema_definition)
 
             # Get the required fields from the schema
             required_fields = schema.get("required", [])
@@ -49,16 +60,55 @@ class ClusterProviderService(SessionMixin):
             # Validate the required fields
             for field in required_fields:
                 if field not in req.credential_values:
-                    raise ValueError(f"Required field '{field}' is missing in the credential values")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Required field '{field}' is missing in the credential values"
+                    )
+
+            # TODO: Get the user_id from the request context
+            # For now, using a placeholder
+            user_id = uuid.uuid4()  # This should be replaced with actual user_id
 
             # Save the credential values
             cloud_credential = CloudCredentials(
-                provider_id=req.provider_id,
-                credential=req.credential_values  # Assuming CloudCredentials has a field for credential_values
+                user_id=user_id,
+                provider_id=provider_id,
+                credential=req.credential_values
             )
             await CloudProviderDataManager(self.session).insert_one(cloud_credential)
 
             logger.debug(f"Created credential for provider {cloud_credential.id}")
+        except HTTPException:
+            # Re-raise HTTP exceptions without additional logging
+            raise
         except Exception as e:
             logger.error(f"Failed to create credential for provider {req.provider_id}: {e}")
-            raise e
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create credential: {str(e)}"
+            )
+
+    def _get_schema_definition(self, schema_definition: Union[Dict[str, Any], str]) -> Dict[str, Any]:
+        """
+        Parse the schema_definition which could be a dict or a JSON string.
+
+        Args:
+            schema_definition: The schema definition as either a dict or JSON string
+
+        Returns:
+            Dict containing the parsed schema
+
+        Raises:
+            ValueError: If the schema_definition is invalid
+        """
+        if isinstance(schema_definition, dict):
+            return schema_definition
+        elif isinstance(schema_definition, str):
+            try:
+                return json.loads(schema_definition)
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid schema_definition JSON: {e}")
+                raise ValueError(f"Invalid schema_definition: {e}")
+        else:
+            logger.error(f"Unexpected schema_definition type: {type(schema_definition)}")
+            return {}  # Return empty dict as fallback
