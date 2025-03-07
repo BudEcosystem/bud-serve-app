@@ -119,7 +119,7 @@ async def create_cloud_provider(
 @credential_router.put("/cloud-providers/{credential_id}")
 async def update_cloud_provider(
     credential_id: str,
-    cloud_provider: CloudProvider,
+    cloud_provider: CloudProviders,
     session: Annotated[Session, Depends(get_session)],
 ):
     """Update a cloud provider credential_."""
