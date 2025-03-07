@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 from budapp.commons import logging
 from budapp.commons.schemas import CloudEventBase
-from isort import logo
+
 from budapp.commons.schemas import SuccessResponse
 
 
