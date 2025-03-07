@@ -424,7 +424,8 @@ class ClusterService(SessionMixin):
             cluster_create_request["credential_id"] = str(data["credential_id"])
             cluster_create_request["provider_id"] = str(data["provider_id"])
             cluster_create_request["region"] = data["region"]
-            cluster_create_request["credentials"] = data["credentials"] # TODO: Probably convert it into json string
+            cluster_create_request["credentials"] = json.dumps(data["credentials"])
+            cluster_create_request["cluster_type"] = cluster_type  # Stringified JSON
 
             # Make the request for cloud cluster
             async with aiohttp.ClientSession() as session:
