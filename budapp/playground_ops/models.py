@@ -39,10 +39,6 @@ class ChatSession(Base, TimestampMixin):
         ForeignKey("chat_settings.id", ondelete="CASCADE"),
         nullable=True,
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    modified_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
 
     # Relationships
     chat_setting: Mapped["ChatSetting"] = relationship(
@@ -61,11 +57,8 @@ class Note(Base, TimestampMixin):
     chat_session_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False
     )
+    user_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     note: Mapped[str] = mapped_column(String, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    modified_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
 
     chat_session = relationship("ChatSession", back_populates="notes")
 
@@ -77,9 +70,9 @@ class Message(Base, TimestampMixin):
     chat_session_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False
     )
-
+    request_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     prompt: Mapped[str] = mapped_column(String, nullable=False)
-    response: Mapped[list[dict]] = mapped_column(JSON, nullable=False)
+    response: Mapped[dict] = mapped_column(JSON, nullable=False)
 
     deployment_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     parent_message_id: Mapped[UUID] = mapped_column(
@@ -108,10 +101,6 @@ class Message(Base, TimestampMixin):
         nullable=True,
         default=None,
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    modified_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
 
     # Relationships
     chat_session: Mapped["ChatSession"] = relationship("ChatSession", back_populates="messages")
@@ -138,11 +127,6 @@ class ChatSetting(Base, TimestampMixin):
     top_p_sampling: Mapped[float] = mapped_column(Float, nullable=True)
     min_p_sampling: Mapped[float] = mapped_column(Float, nullable=True)
     structured_json_schema: Mapped[dict] = mapped_column(JSONB, nullable=True)
-
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    modified_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
 
     # Relationship back to chat sessions using these settings.
     chat_sessions: Mapped[list["ChatSession"]] = relationship("ChatSession", back_populates="chat_setting")

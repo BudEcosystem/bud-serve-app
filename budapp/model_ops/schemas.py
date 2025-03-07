@@ -589,7 +589,7 @@ class LeaderboardModelInfo(BaseModel):
     """Leaderboard model info schema."""
 
     uri: str
-    model_size: int
+    model_size: int | None = None
     is_selected: bool = False
 
 
