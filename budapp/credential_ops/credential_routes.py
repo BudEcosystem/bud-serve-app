@@ -63,13 +63,31 @@ async def get_cloud_providers(
         # Use CloudProviderDataManager to get all providers
         providers = await CloudProviderDataManager(session).get_all_providers()
         logger.debug(providers)
-        provider_schemas = [CloudProvidersSchema.model_validate(provider) for provider in providers]
+
+        # Convert SQLAlchemy models to dictionaries first
+        provider_dicts = [
+            {
+                "id": provider.id,
+                "name": provider.name,
+                "description": provider.description,
+                "type": provider.type,
+                "created_at": provider.created_at,
+                "updated_at": provider.updated_at
+                # Add any other fields from your CloudProviders model
+            }
+            for provider in providers
+        ]
+
+        # Now validate with Pydantic schema
+        provider_schemas = [CloudProvidersSchema.model_validate(provider_dict)
+                            for provider_dict in provider_dicts]
+
         response = CloudProvidersListResponse(
             providers=provider_schemas,
             code=status.HTTP_200_OK,
             message="Cloud providers retrieved successfully"
         )
-        return response.to_http_response()
+        return response
     except Exception as e:
         logger.exception(f"Failed to get cloud providers: {e}")
         return ErrorResponse(
