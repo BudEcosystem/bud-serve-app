@@ -70,9 +70,11 @@ async def get_cloud_providers(
                 "id": provider.id,
                 "name": provider.name,
                 "description": provider.description,
-                "type": provider.type,
-                "created_at": provider.created_at,
-                "updated_at": provider.updated_at
+                "logo_url": provider.logo_url,
+                "unique_id": provider.unique_id,
+                "schema_definition": provider.schema_definition,
+                # "created_at": provider.created_at,
+                # "updated_at": provider.updated_at
                 # Add any other fields from your CloudProviders model
             }
             for provider in providers
