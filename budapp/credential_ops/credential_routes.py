@@ -63,12 +63,7 @@ async def get_cloud_providers(
         # Use CloudProviderDataManager to get all providers
         providers = await CloudProviderDataManager(session).get_all_providers()
         logger.debug(providers)
-
-
-        # Convert CloudCredentials objects to CloudProvidersSchema
-        # This converts the list of CloudCredentials to list of CloudProvidersSchema
         provider_schemas = [CloudProvidersSchema.model_validate(provider) for provider in providers]
-
         response = CloudProvidersListResponse(
             providers=provider_schemas,
             code=status.HTTP_200_OK,
