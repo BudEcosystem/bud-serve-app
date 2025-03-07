@@ -16,11 +16,13 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the credential ops."""
 
+from uuid import UUID
 from sqlalchemy import select
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.credential_ops.models import CloudProviders
+from budapp.credential_ops.models import CloudCredentials
 # from budapp.credential_ops.schemas import CloudProvidersCreateRequest
 
 
@@ -49,4 +51,22 @@ class CloudProviderDataManager(DataManagerUtils):
 class CloudProviderCredentialDataManager(DataManagerUtils):
     """Data manager for the CloudProviderCredential model."""
 
-    pass
+    # async def get_all_credentials(self) -> list[CloudProviderCredential]:
+    #     """Get all cloud provider credentials."""
+    #     stmt = select(CloudProviderCredential)
+    #     return self.scalars_all(stmt)
+
+    # async def get_credentials_by_provider(self, provider_id: int) -> list[CloudProviderCredential]:
+    #     """Get cloud provider credentials by provider ID."""
+    #     stmt = select(CloudProviderCredential).where(CloudProviderCredential.provider_id == provider_id)
+    #     return self.scalars_all(stmt)
+
+    async def get_credentials_by_user(self, user_id: UUID) -> list[CloudCredentials]:
+        """Get cloud provider credentials by user ID."""
+        stmt = select(CloudCredentials).where(CloudCredentials.user_id == user_id)
+        return self.scalars_all(stmt)
+
+    # async def get_credentials_by_provider_and_user(self, provider_id: int, user_id: int) -> list[CloudProviderCredential]:
+    #     """Get cloud provider credentials by provider ID and user ID."""
+    #     stmt = select(CloudProviderCredential).where(CloudProviderCredential.provider_id == provider_id).where(CloudProviderCredential.user_id == user_id)
+    #     return self.scalars_all(stmt)

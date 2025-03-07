@@ -136,4 +136,26 @@ class CloudProvidersCreateRequest(BaseModel):
     credential_values: dict[str, str] # JSON Structure
 
 
-    # JSON Payload With Credential -  Depends on the provider & Validate
+class CloudCredentialSchema(BaseModel):
+    """
+    Schema for cloud credential.
+
+    Attributes:
+        id: Unique identifier for the credential
+        provider_id: ID of the provider this credential is for
+        provider_name: Display name of the provider
+        created_at: When the credential was created
+        credential_summary: Summary of credential values with sensitive information masked
+    """
+    id: str = Field(..., description="Unique identifier for the credential")
+    provider_id: str = Field(..., description="ID of the provider this credential is for")
+    provider_name: str = Field(..., description="Display name of the provider")
+    created_at: datetime = Field(..., description="When the credential was created")
+    credential_summary: Dict[str, Any] = Field(
+        ...,
+        description="Summary of credential values with sensitive information masked"
+    )
+
+class CloudCredentialResponse(SuccessResponse):
+    """Response containing cloud credentials."""
+    credentials: list[CloudCredentialSchema]
