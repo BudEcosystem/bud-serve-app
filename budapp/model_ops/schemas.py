@@ -859,9 +859,9 @@ class TopLeaderboardRequest(BaseModel):
 class QuantizeConfig(BaseModel):
     """Quantize config schema."""
 
-    bit: Literal[8, 4, 2] | None
-    granularity: Literal["per_tensor", "per_channel", "per_group", "per_head", "per_token"] | None
-    symmetric: bool | None
+    bit: Literal[8, 4, 2]
+    granularity: Literal["per_tensor", "per_channel", "per_group", "per_head", "per_token"]
+    symmetric: bool
 
 class QuantizeModelWorkflowRequest(BaseModel):
     """Quantize model workflow request schema."""
@@ -870,7 +870,7 @@ class QuantizeModelWorkflowRequest(BaseModel):
     workflow_total_steps: int | None = None
     step_number: int = Field(..., gt=0)
     trigger_workflow: bool = False
-    base_model_id: UUID4
+    model_id: UUID4
     model_name: str | None = None
     target_type: Literal["int8", "int4", "int2"] | None = None
     target_device: Literal["cpu", "cuda"] | None = None
@@ -893,8 +893,8 @@ class QuantizeModelWorkflowRequest(BaseModel):
 class QuantizeModelWorkflowStepData(BaseModel):
     """Quantize model workflow step data schema."""
 
-    base_model_id: UUID4 | None
-    model_name: str | None
+    model_id: UUID4 | None
+    quantized_model_name: str | None
     target_type: str | None
     target_device: str | None
     method: str | None

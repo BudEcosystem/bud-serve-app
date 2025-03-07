@@ -56,8 +56,8 @@ class QuantizationService(SessionMixin):
         workflow_id = request.workflow_id
         workflow_total_steps = request.workflow_total_steps
         trigger_workflow = request.trigger_workflow
-        base_model_id = request.base_model_id
-        model_name = request.model_name
+        model_id = request.model_id
+        quantized_model_name = request.quantized_model_name
         target_type = request.target_type
         target_device = request.target_device
         method = request.method
@@ -79,9 +79,9 @@ class QuantizationService(SessionMixin):
 
 
         #validate base model id
-        if base_model_id:
+        if model_id:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                Model, {"id": base_model_id, "status": ModelStatusEnum.ACTIVE}
+                Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
             )
             if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
                 raise ClientException("Quantization is only supported for local models")
@@ -103,8 +103,8 @@ class QuantizationService(SessionMixin):
 
         # Prepare workflow step data
         workflow_step_data = QuantizeModelWorkflowStepData(
-            base_model_id=base_model_id,
-            model_name=model_name,
+            model_id=model_id,
+            quantized_model_name=quantized_model_name,
             target_type=target_type,
             target_device=target_device,
             method=method,
@@ -157,7 +157,8 @@ class QuantizationService(SessionMixin):
             db_workflow,
             {"current_step": workflow_current_step},
         )
-
+        #TODO: add validation for cluster_id
+        
         # Perform simulation
         if method is not None and weight_config is not None and activation_config is not None:
             # Perform weight quantization
@@ -172,8 +173,8 @@ class QuantizationService(SessionMixin):
 
             # Define the keys required for model extraction
             keys_of_interest = [
-                "base_model_id",
-                "model_name",
+                "model_id",
+                "quantized_model_name",
                 "method",
                 "weight_config",
                 "activation_config",
@@ -189,7 +190,7 @@ class QuantizationService(SessionMixin):
                         required_data[key] = db_workflow_step.data[key]
 
             # Check if all required keys are present
-            required_keys = ["base_model_id", "model_name", "method", "weight_config", "activation_config", "cluster_id", "simulator_id"]
+            required_keys = ["model_id", "quantized_model_name", "method", "weight_config", "activation_config", "cluster_id", "simulator_id"]
             missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data for add worker to deployment: {', '.join(missing_keys)}")
@@ -232,7 +233,6 @@ class QuantizationService(SessionMixin):
         quantize_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/deploy-quantization"
         )
-        logger.debug(f"payload for add worker to deployment : {payload}")
 
         try:
             async with aiohttp.ClientSession() as session:
