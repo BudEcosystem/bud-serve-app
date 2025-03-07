@@ -9,7 +9,7 @@ from budapp.commons.schemas import SuccessResponse
 
 import json
 from typing import Dict, Any, Union
-
+import uuid
 
 logger = logging.get_logger(__name__)
 
@@ -51,7 +51,7 @@ class CloudProvidersSchema(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    id: str = Field(..., description="Unique identifier for the cloud provider")
+    id: Union[str, uuid.UUID] = Field(..., description="Unique identifier for the cloud provider")
     name: str = Field(..., description="Display name of the cloud provider")
     description: str = Field(..., description="Detailed description of the cloud provider")
     logo_url: str = Field(..., description="URL to the provider's logo image")

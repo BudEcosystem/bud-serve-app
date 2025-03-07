@@ -16,6 +16,7 @@ from .schemas import CredentialUpdateRequest,CloudProvidersListResponse
 from budapp.credential_ops.schemas import CloudProvidersCreateRequest
 from .services import ClusterProviderService
 from budapp.credential_ops.schemas import CloudProvidersSchema
+import uuid
 
 logger = logging.get_logger(__name__)
 
@@ -65,15 +66,30 @@ async def get_cloud_providers(
         # Convert SQLAlchemy objects to CloudProvidersSchema objects
         provider_schemas = []
         for provider in providers:
-            # Extract attributes from SQLAlchemy model
-            provider_dict = {
-                column.name: getattr(provider, column.name)
-                for column in provider.__table__.columns
-            }
+            # Extract attributes and handle type conversions
+            provider_dict = {}
+            for column in provider.__table__.columns:
+                value = getattr(provider, column.name)
 
-            # Create schema object - validation will happen automatically
-            schema = CloudProvidersSchema(**provider_dict)
-            provider_schemas.append(schema)
+                # Convert specific types as needed
+                if isinstance(value, uuid.UUID):
+                    value = str(value)  # Convert UUID to string
+
+                # Handle schema_definition specifically
+                if column.name == 'schema_definition' and not isinstance(value, str):
+                    import json
+                    value = json.dumps(value)
+
+                provider_dict[column.name] = value
+
+            # Create schema object
+            try:
+                schema = CloudProvidersSchema(**provider_dict)
+                provider_schemas.append(schema)
+            except Exception as e:
+                logger.error(f"Failed to create schema for provider {provider_dict.get('id', 'unknown')}: {e}")
+                # Continue with next provider instead of failing the whole request
+                continue
 
         # Create response
         response = CloudProvidersListResponse(
