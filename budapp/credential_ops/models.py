@@ -81,6 +81,8 @@ class CloudCredentials(Base, TimestampMixin):
     provider_id: Mapped[UUID] = mapped_column(ForeignKey("cloud_providers.id", ondelete="CASCADE"), nullable=False)
     credential: Mapped[dict] = mapped_column(JSONB, nullable=False)
     # Make sure while deleting , dependency is removed first
+    #
+    provider = relationship("CloudProviders", back_populates="credentials")
 
 
 class CloudProviders(Base, TimestampMixin):
@@ -93,3 +95,5 @@ class CloudProviders(Base, TimestampMixin):
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     schema_definition: Mapped[dict] = mapped_column(JSONB, nullable=False)
     unique_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+
+    credentials = relationship("CloudCredentials", back_populates="provider")

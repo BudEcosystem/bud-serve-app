@@ -28,15 +28,10 @@ logger = logging.get_logger(__name__)
 class ClusterProviderService(SessionMixin):
     """ClusterProviderService is a service class that provides cluster-related operations."""
 
-
-
     async def create_provider_credential(self, req: CloudProvidersCreateRequest) -> None:
         """Create a new credential for a provider."""
         try:
-            # Get the provider from database
-            # db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-            #    EndpointModel, {"id": required_data["endpoint_id"]}, exclude_fields={"status": EndpointStatusEnum.DELETED}
-            # )
+            # Get the provider from the database
             provider = await CloudProviderDataManager(self.session).retrieve_by_fields(
                 CloudProviders, {"id": req.provider_id}
             )
@@ -45,26 +40,23 @@ class ClusterProviderService(SessionMixin):
             if not provider:
                 raise ValueError(f"Provider with id {req.provider_id} not found")
 
-            # Get the shema for validation
             # Parse the schema definition from the provider
-            schema = json.loads(provider.schema) if provider.schema else {}
+            schema = json.loads(provider.schema_definition) if provider.schema_definition else {}
 
             # Get the required fields from the schema
-            required_fields = schema.get("schema", {}).get("required", [])
+            required_fields = schema.get("required", [])
 
-            if required_fields:
-                for field in required_fields:
-                    if field not in req.credential_values:
-                        raise ValueError(f"Required field '{field}' is missing in the credential values")
-            elif not req.credential_values:
-                raise ValueError("No credential values provided")
+            # Validate the required fields
+            for field in required_fields:
+                if field not in req.credential_values:
+                    raise ValueError(f"Required field '{field}' is missing in the credential values")
 
             # Save the credential values
-            cloud_credential = await CloudProviderDataManager(self.session).insert_one(
-                CloudCredentials(
-                    provider_id=req.provider_id,
-                )
+            cloud_credential = CloudCredentials(
+                provider_id=req.provider_id,
+                credential=req.credential_values
             )
+            await CloudProviderDataManager(self.session).insert_one(cloud_credential)
 
             logger.debug(f"Created credential for provider {cloud_credential.id}")
         except Exception as e:
