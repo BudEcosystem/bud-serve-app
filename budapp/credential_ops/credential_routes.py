@@ -62,12 +62,12 @@ async def get_cloud_providers(
     try:
         # Use CloudProviderDataManager to get all providers
         providers = await CloudProviderDataManager(session).get_all_providers()
-        logger.debug(providers)
+
 
         # Convert SQLAlchemy models to dictionaries first
         provider_dicts = [
             {
-                "id": provider.id,
+                "id": str(provider.id),
                 "name": provider.name,
                 "description": provider.description,
                 "logo_url": provider.logo_url,
