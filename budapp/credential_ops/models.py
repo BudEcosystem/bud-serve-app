@@ -85,7 +85,7 @@ class CloudCredentials(Base, TimestampMixin):
 
 class CloudProviders(Base, TimestampMixin):
     """Cloud Providers : model for cloud providers."""
-
+    __tablename__ = "cloud_providers"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=False)
