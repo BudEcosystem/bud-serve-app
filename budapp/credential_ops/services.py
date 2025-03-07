@@ -54,7 +54,7 @@ class ClusterProviderService(SessionMixin):
             # Save the credential values
             cloud_credential = CloudCredentials(
                 provider_id=req.provider_id,
-                credential_values=req.credential_values  # Assuming CloudCredentials has a field for credential_values
+                credential=req.credential_values  # Assuming CloudCredentials has a field for credential_values
             )
             await CloudProviderDataManager(self.session).insert_one(cloud_credential)
 
