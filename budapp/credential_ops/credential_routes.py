@@ -52,7 +52,6 @@ async def update_credential(
         ).to_http_response()
 
 
-# TODO: add cloud provider routes
 @credential_router.get("/cloud-providers")
 async def get_cloud_providers(
     session: Annotated[Session, Depends(get_session)],
@@ -63,27 +62,20 @@ async def get_cloud_providers(
         # Use CloudProviderDataManager to get all providers
         providers = await CloudProviderDataManager(session).get_all_providers()
 
-
-        # Convert SQLAlchemy models to dictionaries first
-        provider_dicts = [
-            {
-                "id": str(provider.id),
-                "name": provider.name,
-                "description": provider.description,
-                "logo_url": provider.logo_url,
-                "unique_id": provider.unique_id,
-                "schema_definition": provider.schema_definition,
-                # "created_at": provider.created_at,
-                # "updated_at": provider.updated_at
-                # Add any other fields from your CloudProviders model
+        # Convert SQLAlchemy objects to CloudProvidersSchema objects
+        provider_schemas = []
+        for provider in providers:
+            # Extract attributes from SQLAlchemy model
+            provider_dict = {
+                column.name: getattr(provider, column.name)
+                for column in provider.__table__.columns
             }
-            for provider in providers
-        ]
 
-        # Now validate with Pydantic schema
-        provider_schemas = [CloudProvidersSchema.model_validate(provider_dict)
-                            for provider_dict in provider_dicts]
+            # Create schema object - validation will happen automatically
+            schema = CloudProvidersSchema(**provider_dict)
+            provider_schemas.append(schema)
 
+        # Create response
         response = CloudProvidersListResponse(
             providers=provider_schemas,
             code=status.HTTP_200_OK,
