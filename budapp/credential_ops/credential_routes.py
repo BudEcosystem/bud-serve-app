@@ -1,7 +1,7 @@
 from typing import Annotated
 from typing_extensions import Union
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
@@ -155,8 +155,7 @@ async def get_user_cloud_credentials(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    """
-    Retrieve all cloud provider credentials for the current user.
+    """Retrieve all cloud provider credentials for the current user.
 
     Returns:
         CloudCredentialResponse: List of cloud provider credentials for the user.
@@ -188,6 +187,9 @@ async def get_user_cloud_credentials(
             )
             credential_schemas.append(credential_schema)
 
+        # Sort credentials by created_at in descending order (newest first)
+        credential_schemas.sort(key=lambda x: x.created_at, reverse=True)
+
         return CloudCredentialResponse(
             credentials=credential_schemas,
             code=status.HTTP_200_OK,
@@ -206,8 +208,7 @@ async def get_user_cloud_credential(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    """
-    Retrieve a specific cloud provider credential for the current user.
+    """Retrieve a specific cloud provider credential for the current user.
 
     Args:
         credential_id: ID of the credential to retrieve
