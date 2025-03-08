@@ -180,6 +180,8 @@ async def get_user_cloud_credentials(
                 id=str(cred.id),
                 provider_id=str(cred.provider_id),
                 provider_name=provider.name if provider else "Unknown Provider",
+                icon=provider.logo_url, #type: ignore
+                provider_description=provider.description if provider else "No Description Available",
                 created_at=cred.created_at,
                 # Mask sensitive information in credential values
                 credential_summary=_get_masked_credential_summary(cred.credential, provider.schema_definition if provider else {})

@@ -150,6 +150,8 @@ class CloudCredentialSchema(BaseModel):
     id: str = Field(..., description="Unique identifier for the credential")
     provider_id: str = Field(..., description="ID of the provider this credential is for")
     provider_name: str = Field(..., description="Display name of the provider")
+    icon: str = Field(..., description="Icon URL for the provider")
+    provider_description: str = Field(..., description="Description of the provider")
     created_at: datetime = Field(..., description="When the credential was created")
     credential_summary: Dict[str, Any] = Field(
         ...,
