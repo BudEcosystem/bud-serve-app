@@ -870,8 +870,8 @@ class QuantizeModelWorkflowRequest(BaseModel):
     workflow_total_steps: int | None = None
     step_number: int = Field(..., gt=0)
     trigger_workflow: bool = False
-    model_id: UUID4
-    model_name: str | None = None
+    model_id: UUID4 | None = None
+    quantized_model_name: str | None = None
     target_type: Literal["int8", "int4", "int2"] | None = None
     target_device: Literal["cpu", "cuda"] | None = None
     method: Literal["dynamic", "static"] | None = None
@@ -893,11 +893,11 @@ class QuantizeModelWorkflowRequest(BaseModel):
 class QuantizeModelWorkflowStepData(BaseModel):
     """Quantize model workflow step data schema."""
 
-    model_id: UUID4 | None
+    model_id: UUID4 | None = None
     quantized_model_name: str | None
     target_type: str | None
     target_device: str | None
-    method: str | None
-    weight_config: QuantizeConfig | None
-    activation_config: QuantizeConfig | None
+    method: str | None = None
+    weight_config: QuantizeConfig | None = None
+    activation_config: QuantizeConfig | None = None
 
