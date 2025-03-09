@@ -23,6 +23,7 @@ from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.credential_ops.models import CloudProviders
 from budapp.credential_ops.models import CloudCredentials
+from typing import Optional
 # from budapp.credential_ops.schemas import CloudProvidersCreateRequest
 
 
@@ -51,22 +52,22 @@ class CloudProviderDataManager(DataManagerUtils):
 class CloudProviderCredentialDataManager(DataManagerUtils):
     """Data manager for the CloudProviderCredential model."""
 
-    # async def get_all_credentials(self) -> list[CloudProviderCredential]:
-    #     """Get all cloud provider credentials."""
-    #     stmt = select(CloudProviderCredential)
-    #     return self.scalars_all(stmt)
+    async def get_credentials_by_user(self, user_id: UUID, provider_id: Optional[UUID] = None) -> list[CloudCredentials]:
+        """
+        Get cloud provider credentials by user ID, optionally filtered by provider ID.
 
-    # async def get_credentials_by_provider(self, provider_id: int) -> list[CloudProviderCredential]:
-    #     """Get cloud provider credentials by provider ID."""
-    #     stmt = select(CloudProviderCredential).where(CloudProviderCredential.provider_id == provider_id)
-    #     return self.scalars_all(stmt)
+        Args:
+            user_id: The ID of the user whose credentials to retrieve
+            provider_id: Optional provider ID to filter credentials by
 
-    async def get_credentials_by_user(self, user_id: UUID) -> list[CloudCredentials]:
-        """Get cloud provider credentials by user ID."""
+        Returns:
+            List of CloudCredentials that match the criteria
+        """
         stmt = select(CloudCredentials).where(CloudCredentials.user_id == user_id)
-        return self.scalars_all(stmt)
 
-    # async def get_credentials_by_provider_and_user(self, provider_id: int, user_id: int) -> list[CloudProviderCredential]:
-    #     """Get cloud provider credentials by provider ID and user ID."""
-    #     stmt = select(CloudProviderCredential).where(CloudProviderCredential.provider_id == provider_id).where(CloudProviderCredential.user_id == user_id)
-    #     return self.scalars_all(stmt)
+        # If provider_id is provided, add it to the query filter
+        if provider_id:
+            stmt = stmt.where(CloudCredentials.provider_id == provider_id)
+
+        result = self.scalars_all(stmt)
+        return result

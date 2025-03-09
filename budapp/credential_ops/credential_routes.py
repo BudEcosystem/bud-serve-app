@@ -29,6 +29,7 @@ from budapp.credential_ops.schemas import CloudCredentialSchema
 from fastapi import Path
 from uuid import UUID
 from budapp.credential_ops.models import CloudCredentials
+from typing import Optional
 
 logger = logging.get_logger(__name__)
 
@@ -154,17 +155,40 @@ async def create_cloud_provider(
 async def get_user_cloud_credentials(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    provider_id: Annotated[Optional[str], Query(
+        title="Provider ID",
+        description="Filter credentials by cloud provider ID",
+        required=False
+    )] = None,
 ):
-    """Retrieve all cloud provider credentials for the current user.
+    """Retrieve cloud provider credentials for the current user.
+
+    Args:
+        provider_id: Optional parameter to filter credentials by provider ID
 
     Returns:
-        CloudCredentialResponse: List of cloud provider credentials for the user.
+        CloudCredentialResponse: List of cloud provider credentials for the user,
+            filtered by provider_id if specified.
     """
-    logger.debug(f"Retrieving cloud credentials for user: {current_user.id}")
-
+    logger.debug(f"Retrieving cloud credentials for user: {current_user.id}" +
+                    (f" filtered by provider: {provider_id}" if provider_id else ""))
     try:
+        # Convert provider_id to UUID if provided
+        provider_uuid = None
+        if provider_id:
+            try:
+                provider_uuid = UUID(provider_id)
+            except ValueError:
+                return ErrorResponse(
+                    code=status.HTTP_400_BAD_REQUEST,
+                    message="Invalid provider ID format"
+                ).to_http_response()
+
         # Use the CloudProviderCredentialDataManager to get user credentials
-        credentials = await CloudProviderCredentialDataManager(session).get_credentials_by_user(current_user.id)
+        credentials = await CloudProviderCredentialDataManager(session).get_credentials_by_user(
+            current_user.id,
+            provider_uuid
+        )
 
         # Convert database models to response schemas
         credential_schemas = []
