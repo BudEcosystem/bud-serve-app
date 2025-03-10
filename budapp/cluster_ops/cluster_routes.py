@@ -85,10 +85,13 @@ async def create_cluster_workflow(
     step_number: Annotated[int, Form(gt=0)],
     name: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
     icon: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
+
+
     ingress_url: Annotated[AnyHttpUrl | None, Form()] = None,
     configuration_file: Annotated[
         UploadFile | None, File(description="The configuration file for the cluster")
     ] = None,
+
     workflow_id: Annotated[UUID | None, Form()] = None,
     workflow_total_steps: Annotated[int | None, Form()] = None,
     trigger_workflow: Annotated[bool, Form()] = False,
@@ -158,7 +161,7 @@ async def create_cluster_workflow(
         logger.exception(f"ValidationErrors: {str(e)}")
         raise RequestValidationError(e.errors())
     except Exception as e:
-        logger.error(f"Error occurred while executing create cluster workflow: {str(e)}")
+        logger.error(f"Error occurred while executing create cluster workflow: {str(e)}", exc_info=True)
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to execute create cluster workflow"
         ).to_http_response()
