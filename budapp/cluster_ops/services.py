@@ -403,7 +403,7 @@ class ClusterService(SessionMixin):
         cluster_create_request = {
             "enable_master_node": True,
             "name": data["name"],
-            "ingress_url": data["ingress_url"],
+            "ingress_url": data.get("ingress_url", ""), # Empty String
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
