@@ -1,0 +1,308 @@
+{
+    "openai": {
+        "name": "OpenAI",
+        "type": "openai",
+        "description": "Offers advanced models for language, image generation, and audio conversion.",
+        "icon": "icons/providers/openai.png"
+    },
+    "text-completion-openai": {
+        "name": "OpenAI (Text Completion)",
+        "type": "text-completion-openai",
+        "description": "Includes GPT-3.5 Turbo models optimized for text completion tasks.",
+        "icon": "icons/providers/openai.png"
+    },
+    "azure": {
+        "name": "Azure OpenAI",
+        "type": "azure",
+        "description": "Provides access to OpenAI's GPT-4, Codex, and other models through Azure integration.",
+        "icon": "icons/providers/azure_ai_studio.png"
+    },
+    "azure_ai": {
+        "name": "Azure AI Studio",
+        "type": "azure_ai",
+        "description": "Incorporates Cohere Command, Mistral Large, and AI21 Jamba Instruct models.",
+        "icon": "icons/providers/azure_ai_studio.png"
+    },
+    "vertex_ai-ai21_models": {
+        "name": "Vertex AI AI21",
+        "type": "vertex_ai-ai21_models",
+        "description": "Supports text generation and completion, ideal for summarization, content creation, and conversational agents.",
+        "icon": "icons/providers/vertexai.png"
+    },
+    "vertex_ai-anthropic_models": {
+        "name": "Vertex AI Anthropic",
+        "type": "vertex_ai-anthropic_models",
+        "description": "Can be implemented for ethical and aligned conversational AI applications.",
+        "icon": "icons/providers/vertexai.png"
+    },
+    "vertex_ai-chat-models": {
+        "name": "Vertex AI Chat",
+        "type": "vertex_ai-chat-models",
+        "description": "Can be implemented for real-time conversational interfaces and customer support.",
+        "icon": "icons/providers/vertexai.png"
+    },
+    "vertex_ai-code-chat-models": {
+        "name": "Vertex AI Code Chat",
+        "type": "vertex_ai-code-chat-models",
+        "description": "Can be implemented for interactive coding assistance and debugging workflows.",
+        "icon": "icons/providers/vertexai.png"
+    },
+    "vertex_ai-code-text-models": {
+        "name": "Vertex AI Code Text",
+        "type": "vertex_ai-code-text-models",
+        "description": "Suitable for generating and completing code snippets for development tasks.",
+        "icon": "icons/providers/vertexai.png"
+    },
+    "vertex_ai-embedding-models": {
+        "name": "Vertex AI Embedding",
+        "type": "vertex_ai-embedding-models",
+        "description": "Enhances search, classification, and clustering in data-rich applications.",
+        "icon": "icons/providers/vertexai.png"
+    },
+    "vertex_ai-image-models": {
+        "name": "Vertex AI Image",
+        "type": "vertex_ai-image-models",
+        "description": "Enables image generation for design, marketing, and creative projects.",
+        "icon": "icons/providers/vertexai.png"
+    },
+    "vertex_ai-language-models": {
+        "name": "Vertex AI Language",
+        "type": "vertex_ai-language-models",
+        "description": "Suitable for natural language understanding and multilingual processing tasks.",
+        "icon": "icons/providers/vertexai.png"
+    },
+    "vertex_ai-llama_models": {
+        "name": "Vertex AI Llama",
+        "type": "vertex_ai-llama_models",
+        "description": "Ideal for advanced language modeling and conversational AI use cases.",
+        "icon": "icons/providers/vertexai.png"
+    },
+    "vertex_ai-mistral_models": {
+        "name": "Vertex AI Mistral",
+        "type": "vertex_ai-mistral_models",
+        "description": "Useful for text generation and instruction tasks in edge and lightweight environments.",
+        "icon": "icons/providers/vertexai.png"
+    },
+    "vertex_ai-text-models": {
+        "name": "Vertex AI Text",
+        "type": "vertex_ai-text-models",
+        "description": "Designed for text generation and language understanding in chatbots and content automation.",
+        "icon": "icons/providers/vertexai.png"
+    },
+    "vertex_ai-vision-models": {
+        "name": "Vertex AI Vision",
+        "type": "vertex_ai-vision-models",
+        "description": "Can be implemented for visual analysis, object detection, and image recognition.",
+        "icon": "icons/providers/vertexai.png"
+    },
+    "gemini": {
+        "name": "Gemini - Google AI Studio",
+        "type": "gemini",
+        "description": "Access Google’s Gemini Pro, 1.5 Pro, and Pro Vision models for multimodal AI.",
+        "icon": "icons/providers/gemini_google_ai_studio.png"
+    },
+    "sagemaker": {
+        "name": "AWS Sagemaker",
+        "type": "sagemaker",
+        "description": "Supports Jumpstart Huggingface embedding models and Meta’s Llama series.",
+        "icon": "icons/providers/aws_sagemaker.png"
+    },
+    "bedrock": {
+        "name": "AWS Bedrock",
+        "type": "bedrock",
+        "description": "Offers embedding, image, and natural language processing models.",
+        "icon": "icons/providers/aws_bedrock.png"
+    },
+    "mistral": {
+        "name": "Mistral AI API",
+        "type": "mistral",
+        "description": "Provides embedding, coding, edge, math, image, and multimodal reasoning models.",
+        "icon": "icons/providers/mistral_ai_api.png"
+    },
+    "codestral": {
+        "name": "Codestral API",
+        "type": "codestral",
+        "description": "Features a robust code completion model for plugins or direct queries.",
+        "icon": "icons/providers/mistral_ai_api.png"
+    },
+    "text-completion-codestral": {
+        "name": "Codestral API (Text Completion)",
+        "type": "text-completion-codestral",
+        "description": "Access Codestral's latest and 2405 text completion models.",
+        "icon": "icons/providers/mistral_ai_api.png"
+    },
+    "cohere": {
+        "name": "Cohere",
+        "type": "cohere",
+        "description": "Offers the Command family for text generation, Rerank for search optimization, and Embed for search, classification, and clustering.",
+        "icon": "icons/providers/cohere.png"
+    },
+    "cohere_chat": {
+        "name": "Cohere (Chat)",
+        "type": "cohere_chat",
+        "description": "Designed for conversational agents in customer support, chatbots, and virtual assistants.",
+        "icon": "icons/providers/cohere.png"
+    },
+    "anyscale": {
+        "name": "Anyscale",
+        "type": "anyscale",
+        "description": "Offers Llama Chat, Code Instruct, and Mistral Instruct models for versatile applications.",
+        "icon": "icons/providers/anyscale.png"
+    },
+    "huggingface": {
+        "name": "Huggingface",
+        "type": "huggingface",
+        "description": "Provides Meta-Llama, Falcon, MPT, CodeLlama, WizardCoder, and Phind models, along with custom models.",
+        "icon": "icons/providers/huggingface.png"
+    },
+    "perplexity": {
+        "name": "Perplexity AI (pplx-api)",
+        "type": "perplexity",
+        "description": "Includes Llama 3.1 Sonar, OpenHermes Mistral, and PPLX Chat completion models.",
+        "icon": "icons/providers/perplexity_ai.png"
+    },
+    "groq": {
+        "name": "Groq",
+        "type": "groq",
+        "description": "Features Llama, Mixtral, Gemma, and Whisper Speech-to-Text models.",
+        "icon": "icons/providers/groq.png"
+    },
+    "together_ai": {
+        "name": "Together AI",
+        "type": "together_ai",
+        "description": "Offers Llama, Falcon, Alpaca, and other Chat and Code LLMs, along with language/instruction models.",
+        "icon": "icons/providers/together_ai.png"
+    },
+    "databricks": {
+        "name": "Databricks",
+        "type": "databricks",
+        "description": "Supports text summarization, code generation, image generation, virtual assistants, synthetic data generation, and content creation.",
+        "icon": "icons/providers/databricks.png"
+    },
+    "cerebras": {
+        "name": "Cerebras",
+        "type": "cerebras",
+        "description": "Delivers chat completion models for conversational AI tasks.",
+        "icon": "icons/providers/cerebras.png"
+    },
+    "friendliai": {
+        "name": "FriendliAI",
+        "type": "friendliai",
+        "description": "Features vision, instruct, chat, and coding models aggregated from multiple providers.",
+        "icon": "icons/providers/friendliai.png"
+    },
+    "deepseek": {
+        "name": "Deepseek",
+        "type": "deepseek",
+        "description": "Advanced models like DeepSeek LLM, Coder, Math, VL for various AI-driven tasks, from coding to math reasoning and vision-language applications",
+        "icon": "icons/providers/deepseek.png"
+    },
+    "fireworks_ai": {
+        "name": "Fireworks AI",
+        "type": "fireworks_ai",
+        "description": "Provides a model library for serverless applications, with over 140 LLMs, stable diffusion and Flux image models, and Whisper series speech models.",
+        "icon": "icons/providers/fireworks_ai.png"
+    },
+    "cloudflare": {
+        "name": "Cloudflare Workers AI",
+        "type": "cloudflare",
+        "description": "Workers AI: Features Meta’s Llama, Mistral Instruct, and CodeLlama models.",
+        "icon": "icons/providers/cloudflare_workers_ai.png"
+    },
+    "deepinfra": {
+        "name": "DeepInfra",
+        "type": "deepinfra",
+        "description": "Includes Meta’s Llama, Mistral Instruct, and CodeLlama models.",
+        "icon": "icons/providers/deepinfra.png"
+    },
+    "ai21": {
+        "name": "AI21",
+        "type": "ai21",
+        "description": "Showcases Jamba-1.5 (Mini and Large) and J2 series (Light, Mid, Ultra) models.",
+        "icon": "icons/providers/ai21.png"
+    },
+    "nlp_cloud": {
+        "name": "NLP Cloud",
+        "type": "nlp_cloud",
+        "description": "Supports models for text, image, audio, and video generation.",
+        "icon": "icons/providers/nlp_cloud.png"
+    },
+    "replicate": {
+        "name": "Replicate",
+        "type": "replicate",
+        "description": "Hosts Llama Chat (70B & 13B), Vicuna, and Flan-T5 models.",
+        "icon": "icons/providers/replicate.png"
+    },
+    "voyage": {
+        "name": "Voyage AI",
+        "type": "voyage",
+        "description": "Includes text embedding models for coding, finance, law, multilingual, and multimodal tasks.",
+        "icon": "icons/providers/voyage_ai.png"
+    },
+    "aleph_alpha": {
+        "name": "Aleph Alpha",
+        "type": "aleph_alpha",
+        "description": "Features the Luminous model series for advanced AI applications.",
+        "icon": "icons/providers/aleph_alpha.png"
+    },
+    "openrouter": {
+        "name": "OpenRouter",
+        "type": "openrouter",
+        "description": "Aggregates text, chat, and vision models from OpenAI, Anthropic, Google PaLM, and Meta’s Llama.",
+        "icon": "icons/providers/openrouter.png"
+    },
+    "watsonx": {
+        "name": "IBM watsonx.ai",
+        "type": "watsonx",
+        "description": "Diverse range of foundation models across domains like cybersecurity, translation, Q&A, and image processing with strong governance and customization options.",
+        "icon": "icons/providers/ibm_watsonx.ai.png"
+    },
+    "predibase": {
+        "name": "Predibase",
+        "type": "predibase",
+        "description": "Supports models from the Llama, Qwen, Mistral, and Gemma series for a variety of AI-driven tasks, including text generation and language understanding.",
+        "icon": "icons/providers/predibase.png"
+    },
+    "volcengine": {
+        "name": "Volcano Engine",
+        "type": "volcengine",
+        "description": "Includes Bytedance Doubao model series for AI applications.",
+        "icon": "icons/providers/volcano_engine.png"
+    },
+    "clarifai": {
+        "name": "Clarifai",
+        "type": "clarifai",
+        "description": "Integrates Llama, Mistral, Jurassic, WizardCoder, Anthropic, OpenAI, GCP, Cohere, Databricks, Microsoft, and Salesforce models.",
+        "icon": "icons/providers/clarifai.png"
+    },
+    "baseten": {
+        "name": "Baseten",
+        "type": "baseten",
+        "description": "Features Falcon, Wizard, and MPT models.",
+        "icon": "icons/providers/baseten.png"
+    },
+    "sambanova": {
+        "name": "Sambanova",
+        "type": "sambanova",
+        "description": "Offers high-performance for Llama 3 series that excels in real-time inference for dynamic AI workloads.",
+        "icon": "icons/providers/sambanova.png"
+    },
+    "github": {
+        "name": "Github",
+        "type": "github",
+        "description": "All GitHub model are available for deployment.",
+        "icon": "icons/providers/github.png"
+    },
+    "petals": {
+        "name": "Petals",
+        "type": "petals",
+        "description": "Enables text generation with distributed Llama 3.1, Mixtral, Falcon, and BLOOM models, along with fine-tuning capabilities.",
+        "icon": "icons/providers/petals.png"
+    },
+    "anthropic": {
+        "name": "Anthropic",
+        "type": "anthropic",
+        "description": "Anthropic is an AI safety and research company that's working to build reliable, interpretable, and steerable AI systems.",
+        "icon": "icons/providers/anthropic.png"
+    }
+}
