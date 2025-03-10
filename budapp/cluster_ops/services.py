@@ -440,7 +440,7 @@ class ClusterService(SessionMixin):
 
                     async with session.post(
                         create_cluster_endpoint,
-                        json=form
+                        data=form
                     ) as response:
                         response_data = await response.json()
                         logger.debug(f"Response from budcluster service: {response_data}")
