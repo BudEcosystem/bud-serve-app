@@ -436,7 +436,7 @@ class ClusterService(SessionMixin):
                     form.add_field("cluster_create_request", json.dumps(cluster_create_request))
 
                     # Log Form data
-                    logger.debug(f"Form data: {form}")
+                    logger.debug(f"Form data: {json.dumps(cluster_create_request)}")
 
                     async with session.post(
                         create_cluster_endpoint,
