@@ -660,6 +660,8 @@ class ClusterService(SessionMixin):
         cpu_total_workers = 0
         gpu_total_workers = 0
         hpu_total_workers = 0
+        total_nodes = len(data.get("nodes", []))
+        available_nodes = len([node for node in data.get("nodes", []) if node.get("status", False)])
 
         # Iterate through each node
         for node in data.get("nodes", []):
@@ -690,6 +692,8 @@ class ClusterService(SessionMixin):
             gpu_available_workers=gpu_total_workers,
             hpu_total_workers=hpu_total_workers,
             hpu_available_workers=hpu_total_workers,
+            total_nodes=total_nodes,
+            available_nodes=available_nodes,
         )
 
     async def _perform_bud_cluster_edit_request(
