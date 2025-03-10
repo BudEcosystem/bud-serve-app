@@ -431,9 +431,16 @@ class ClusterService(SessionMixin):
             # Make the request for cloud cluster
             async with aiohttp.ClientSession() as session:
                 try:
+
+                    form = aiohttp.FormData()
+                    form.add_field("cluster_create_request", json.dumps(cluster_create_request))
+
+                    # Log Form data
+                    logger.debug(f"Form data: {form}")
+
                     async with session.post(
                         create_cluster_endpoint,
-                        json=cluster_create_request
+                        json=form
                     ) as response:
                         response_data = await response.json()
                         logger.debug(f"Response from budcluster service: {response_data}")
