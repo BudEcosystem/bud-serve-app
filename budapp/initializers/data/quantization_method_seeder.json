@@ -1,0 +1,23 @@
+[
+    {
+        "name": "RTN",
+        "description": "RTN is a quantization method that uses a rounding technique to quantize the weights and activations of a model.",
+        "hardware_support": ["CPU", "GPU"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CPU", "GPU"]
+    },
+    {
+        "name": "AWQ",
+        "description": "AWQ (Activation-aware Weight Quantization) is a hardware-friendly weight-only quantization method that selectively scales salient weight channels before quantization to minimize accuracy loss. It improves performance while maintaining generalization across different models and domains.",
+        "hardware_support": ["CPU", "GPU"],
+        "method_type": ["INT2", "INT4", "INT8"],
+        "runtime_hardware_support": ["CPU", "GPU"]
+    },
+    {
+        "name": "AdaDim",
+        "description": "AdaDim (Adaptive Dimensions) is a quantization framework that adaptively selects between per-input-channel (per-IC) and per-output-channel (per-OC) quantization to mitigate activation outlier effects. It improves accuracy for sub-4-bit weight quantization without requiring specialized mixed-precision kernels.",
+        "hardware_support": ["GPU"],
+        "method_type": ["INT4", "INT8"],
+        "runtime_hardware_support": ["CPU", "GPU"]
+    }
+]

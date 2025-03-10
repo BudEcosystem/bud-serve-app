@@ -901,3 +901,24 @@ class QuantizeModelWorkflowStepData(BaseModel):
     weight_config: QuantizeConfig | None = None
     activation_config: QuantizeConfig | None = None
 
+
+class QuantizationMethod(BaseModel):
+    """Quantization method schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+    description: str
+    hardware_support: list[str]
+    method_type: list[str]
+    runtime_hardware_support: list[str]
+
+class QuantizationMethodResponse(PaginatedSuccessResponse):
+    """Quantization method response schema."""
+
+    quantization_methods: list[QuantizationMethod] = []
+
+class QuantizationMethodFilter(BaseModel):
+    """Quantization method filter schema."""
+
+    name: str | None = None
