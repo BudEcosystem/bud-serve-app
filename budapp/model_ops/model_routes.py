@@ -40,6 +40,7 @@ from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
+from .quantization_services import QuantizationService
 from .schemas import (
     CancelDeploymentWorkflowRequest,
     CreateCloudModelWorkflowRequest,
@@ -55,6 +56,7 @@ from .schemas import (
     ModelPaginatedResponse,
     ProviderFilter,
     ProviderResponse,
+    QuantizeModelWorkflowRequest,
     RecommendedTagsResponse,
     TagsListResponse,
     TasksListResponse,
@@ -907,4 +909,45 @@ async def list_leaderboards(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to list leaderboards",
+        ).to_http_response()
+
+
+@model_router.post(
+    "/quantize-model-workflow",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RetrieveWorkflowDataResponse,
+            "description": "Successfully quantize model workflow",
+        },
+    },
+    description="Quantize model workflow",
+)
+async def quantize_model_workflow(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: QuantizeModelWorkflowRequest,
+) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
+    """Quantize model workflow."""
+    try:
+        db_workflow = await QuantizationService(session).quantize_model_workflow(
+            current_user_id=current_user.id,
+            request=request,
+        )
+
+        return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
+    except ClientException as e:
+        logger.exception(f"Failed to quantize model workflow: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to quantize model workflow: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to quantize model workflow"
         ).to_http_response()
