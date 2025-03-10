@@ -3,11 +3,11 @@ from datetime import datetime
 from pydantic import UUID4, BaseModel, ConfigDict, Field
 
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
-from budapp.model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider
 
 from ..cluster_ops.schemas import ClusterResponse
 from ..commons.constants import ModelProviderTypeEnum, VisibilityEnum, WorkflowStatusEnum, WorkflowTypeEnum
 from ..endpoint_ops.schemas import EndpointResponse
+from ..model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider, QuantizeModelWorkflowStepData
 from ..project_ops.schemas import ProjectResponse
 
 
@@ -46,6 +46,7 @@ class RetrieveWorkflowStepData(BaseModel):
     bud_serve_cluster_events: dict | None = None
     project: ProjectResponse | None = None
     cluster: ClusterResponse | None = None
+    qunatization_config: QuantizeModelWorkflowStepData | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
