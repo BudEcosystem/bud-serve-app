@@ -56,6 +56,8 @@ class ClusterCreate(ClusterBase):
     created_by: UUID4
     cluster_id: UUID4
     status_sync_at: datetime
+    total_nodes: int
+    available_nodes: int
 
 
 class ClusterResourcesInfo(BaseModel):
@@ -70,6 +72,8 @@ class ClusterResourcesInfo(BaseModel):
     gpu_available_workers: int
     hpu_total_workers: int
     hpu_available_workers: int
+    total_nodes: int
+    available_nodes: int
 
 
 class ClusterResponse(BaseModel):
