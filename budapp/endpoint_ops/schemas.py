@@ -48,6 +48,7 @@ class EndpointCreate(BaseModel):
     total_replicas: int
     number_of_nodes: int
     deployment_config: dict | None
+    node_list: list | None
 
 
 class EndpointFilter(BaseModel):

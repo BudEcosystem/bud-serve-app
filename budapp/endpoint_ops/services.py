@@ -294,6 +294,7 @@ class EndpointService(SessionMixin):
         credential_id = payload.content.result.get("credential_id")
         number_of_nodes = payload.content.result.get("number_of_nodes")
         total_replicas = payload.content.result["deployment_status"]["replicas"]["total"]
+        node_list = payload.content.result.get("deploy_config", [])
 
         # Calculate the active replicas with status "Running"
         active_replicas = sum(
@@ -371,6 +372,7 @@ class EndpointService(SessionMixin):
             active_replicas=active_replicas,
             total_replicas=total_replicas,
             deployment_config=required_data["deploy_config"],
+            node_list=[node["name"] for node in node_list]
         )
 
         db_endpoint = await EndpointDataManager(self.session).insert_one(
@@ -480,6 +482,10 @@ class EndpointService(SessionMixin):
         total_replicas = len(payload.content.result["worker_data_list"])
         logger.debug(f"Number of workers : {total_replicas}")
 
+        # Get node list
+        node_list = list({worker["node_name"] for worker in payload.content.result.get("worker_data_list", []) if worker["status"] == "Running"})
+        logger.debug(f"Node list: {node_list}")
+
         # Calculate the active replicas with status "Running"
         active_replicas = sum(
             1 for worker in payload.content.result["worker_data_list"] if worker["status"] == "Running"
@@ -509,6 +515,7 @@ class EndpointService(SessionMixin):
                 "status": endpoint_status,
                 "total_replicas": total_replicas,
                 "active_replicas": active_replicas,
+                "node_list": node_list,
             },
         )
         logger.debug(
@@ -1235,9 +1242,13 @@ class EndpointService(SessionMixin):
         total_replicas = payload.content.result["deployment_status"]["replicas"]["total"]
         logger.debug(f"Total replicas: {total_replicas}")
 
+        # Get Node List
+        db_endpoint_node_list = db_endpoint.node_list
+        add_worker_node_list = payload.content.result.get("deploy_config", [])
+
         self.session.refresh(db_endpoint)
         db_endpoint = await EndpointDataManager(self.session).update_by_fields(
-            db_endpoint, {"deployment_config": deployment_config, "total_replicas": total_replicas}
+            db_endpoint, {"deployment_config": deployment_config, "total_replicas": total_replicas, "node_list": list(set(db_endpoint_node_list + add_worker_node_list))}
         )
         logger.debug(f"Updated deployment config: {deployment_config}")
 
