@@ -311,14 +311,13 @@ class ClusterService(SessionMixin):
             keys_of_interest = [
                 "name",
                 "icon",
-                "ingress_url",
                 # "configuration_yaml",
                 "cluster_type", # Addition For Cloud Cluster
             ]
 
             # Add type-specific keys
             if cluster_type == "ON_PREM":
-                keys_of_interest.append("configuration_yaml")
+                keys_of_interest.extend(["configuration_yaml", "ingress_url"])
             elif cluster_type == "CLOUD":
                 keys_of_interest.extend(["credential_id", "provider_id", "region", "credentials"])
 
