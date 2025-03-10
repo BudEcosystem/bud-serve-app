@@ -98,18 +98,20 @@ class ClusterResponse(BaseModel):
     gpu_available_workers: int
     hpu_total_workers: int
     hpu_available_workers: int
+    total_nodes: int
+    available_nodes: int
 
-    @computed_field
-    @property
-    def total_nodes(self) -> int:
-        """Total nodes."""
-        return self.cpu_total_workers + self.gpu_total_workers + self.hpu_total_workers
+    # @computed_field
+    # @property
+    # def total_nodes(self) -> int:
+    #     """Total nodes."""
+    #     return self.cpu_total_workers + self.gpu_total_workers + self.hpu_total_workers
 
-    @computed_field
-    @property
-    def available_nodes(self) -> int:
-        """Available nodes."""
-        return self.cpu_available_workers + self.gpu_available_workers + self.hpu_available_workers
+    # @computed_field
+    # @property
+    # def available_nodes(self) -> int:
+    #     """Available nodes."""
+    #     return self.cpu_available_workers + self.gpu_available_workers + self.hpu_available_workers
 
 
 class ClusterPaginatedResponse(ClusterResponse):

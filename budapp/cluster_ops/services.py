@@ -119,6 +119,8 @@ class ClusterService(SessionMixin):
                 gpu_available_workers=cluster.gpu_available_workers,
                 hpu_total_workers=cluster.hpu_total_workers,
                 hpu_available_workers=cluster.hpu_available_workers,
+                total_nodes=cluster.total_nodes,
+                available_nodes=cluster.available_nodes,
             )
             updated_clusters.append(updated_cluster)
 
