@@ -21,7 +21,9 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, String, Uuid, ForeignKey, Integer, Float, Boolean, JSON, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
-
+from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.dialects.postgresql import JSONB
 from budapp.commons.database import Base, TimestampMixin
 from ..commons.constants import FeedbackEnum
 
@@ -36,10 +38,6 @@ class ChatSession(Base, TimestampMixin):
         Uuid,
         ForeignKey("chat_settings.id", ondelete="CASCADE"),
         nullable=True,
-    )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    modified_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
 
     # Relationships
@@ -59,11 +57,8 @@ class Note(Base, TimestampMixin):
     chat_session_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False
     )
+    user_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     note: Mapped[str] = mapped_column(String, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    modified_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
 
     chat_session = relationship("ChatSession", back_populates="notes")
 
@@ -75,9 +70,9 @@ class Message(Base, TimestampMixin):
     chat_session_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False
     )
-
+    request_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     prompt: Mapped[str] = mapped_column(String, nullable=False)
-    response: Mapped[list[dict]] = mapped_column(JSON, nullable=False)
+    response: Mapped[dict] = mapped_column(JSON, nullable=False)
 
     deployment_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     parent_message_id: Mapped[UUID] = mapped_column(
@@ -106,10 +101,6 @@ class Message(Base, TimestampMixin):
         nullable=True,
         default=None,
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    modified_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
 
     # Relationships
     chat_session: Mapped["ChatSession"] = relationship("ChatSession", back_populates="messages")
@@ -122,13 +113,20 @@ class ChatSetting(Base, TimestampMixin):
     __tablename__ = "chat_settings"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    preset_name: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
     user_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    modified_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
+    system_prompt: Mapped[str] = mapped_column(String, nullable=True)
+    temperature: Mapped[float] = mapped_column(Float, nullable=False)
+    limit_response_length: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sequence_length: Mapped[int] = mapped_column(Integer, nullable=True)
+    context_overflow_policy: Mapped[str] = mapped_column(String, nullable=True)  # enum
+    stop_strings: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True)
+    top_k_sampling: Mapped[int] = mapped_column(Integer, nullable=True)
+    repeat_penalty: Mapped[float] = mapped_column(Float, nullable=True)
+    top_p_sampling: Mapped[float] = mapped_column(Float, nullable=True)
+    min_p_sampling: Mapped[float] = mapped_column(Float, nullable=True)
+    structured_json_schema: Mapped[dict] = mapped_column(JSONB, nullable=True)
 
     # Relationship back to chat sessions using these settings.
     chat_sessions: Mapped[list["ChatSession"]] = relationship("ChatSession", back_populates="chat_setting")

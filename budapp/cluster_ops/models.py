@@ -57,6 +57,8 @@ class Cluster(Base, TimestampMixin):
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
     cluster_id: Mapped[UUID] = mapped_column(Uuid, nullable=True)
     status_sync_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    total_nodes: Mapped[int] = mapped_column(Integer, default=0)
+    available_nodes: Mapped[int] = mapped_column(Integer, default=0)
 
     endpoints: Mapped[list["Endpoint"]] = relationship(
         "Endpoint",

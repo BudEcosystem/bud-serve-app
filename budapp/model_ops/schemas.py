@@ -589,7 +589,7 @@ class LeaderboardModelInfo(BaseModel):
     """Leaderboard model info schema."""
 
     uri: str
-    model_size: int
+    model_size: int | None = None
     is_selected: bool = False
 
 
@@ -855,3 +855,49 @@ class TopLeaderboardRequest(BaseModel):
         if not self.benchmarks:
             raise ValueError("Benchmarks are required")
         return self
+
+class QuantizeConfig(BaseModel):
+    """Quantize config schema."""
+
+    bit: Literal[8, 4, 2]
+    granularity: Literal["per_tensor", "per_channel", "per_group", "per_head", "per_token"]
+    symmetric: bool
+
+class QuantizeModelWorkflowRequest(BaseModel):
+    """Quantize model workflow request schema."""
+
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None
+    step_number: int = Field(..., gt=0)
+    trigger_workflow: bool = False
+    model_id: UUID4 | None = None
+    quantized_model_name: str | None = None
+    target_type: Literal["int8", "int4", "int2"] | None = None
+    target_device: Literal["cpu", "cuda"] | None = None
+    method: Literal["dynamic", "static"] | None = None
+    weight_config: QuantizeConfig | None = None
+    activation_config: QuantizeConfig | None = None
+
+    @model_validator(mode="after")
+    def validate_fields(self) -> "QuantizeModelWorkflowRequest":
+        """Validate the fields of the request."""
+        if self.workflow_id is None and self.workflow_total_steps is None:
+            raise ValueError("workflow_total_steps is required when workflow_id is not provided")
+
+        if self.workflow_id is not None and self.workflow_total_steps is not None:
+            raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
+
+        return self
+
+
+class QuantizeModelWorkflowStepData(BaseModel):
+    """Quantize model workflow step data schema."""
+
+    model_id: UUID4 | None = None
+    quantized_model_name: str | None
+    target_type: str | None
+    target_device: str | None
+    method: str | None = None
+    weight_config: QuantizeConfig | None = None
+    activation_config: QuantizeConfig | None = None
+

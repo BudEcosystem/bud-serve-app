@@ -39,6 +39,7 @@ from budapp.model_ops.crud import (
 from budapp.model_ops.models import CloudModel, Model
 from budapp.model_ops.models import ModelSecurityScanResult as ModelSecurityScanResultModel
 from budapp.model_ops.models import Provider as ProviderModel
+from budapp.model_ops.schemas import QuantizeModelWorkflowStepData
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
@@ -134,6 +135,17 @@ class WorkflowService(SessionMixin):
             tags = required_data.get("tags")
             description = required_data.get("description")
             additional_concurrency = required_data.get("additional_concurrency")
+            quantized_model_name = required_data.get("quantized_model_name")
+
+            quantization_config = QuantizeModelWorkflowStepData(
+                model_id=model_id,
+                quantized_model_name=required_data.get("quantized_model_name"),
+                target_type=required_data.get("target_type"),
+                target_device=required_data.get("target_device"),
+                method=required_data.get("method"),
+                weight_config=required_data.get("weight_config"),
+                activation_config=required_data.get("activation_config"),
+            ) if quantized_model_name else None
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -222,6 +234,7 @@ class WorkflowService(SessionMixin):
                 bud_simulator_events=bud_simulator_events if bud_simulator_events else None,
                 project=db_project if db_project else None,
                 cluster=db_cluster if db_cluster else None,
+                qunatization_config=quantization_config if quantization_config else None
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -299,6 +312,15 @@ class WorkflowService(SessionMixin):
                 "cluster_id",
                 "project_id",
             ],
+            "local_model_quantization": [
+                "model_id",
+                "target_type",
+                "target_device",
+                "quantized_model_name",
+                "method",
+                "weight_config",
+                "activation_config"
+            ]
         }
 
         # Combine all lists using set union

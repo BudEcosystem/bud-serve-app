@@ -236,6 +236,7 @@ class MetricService(SessionMixin):
                                 "latency": None,
                                 "hit_ratio": None,
                                 "most_reused_prompts": [],
+                                "total_unique_prompts": 0,
                             }
                         else:
                             logger.error(f"Failed to get deployment cache metrics: {response.status} {response_data}")
