@@ -209,7 +209,7 @@ class ClusterService(SessionMixin):
             if not cloud_credentials:
                 raise ClientException("Cloud provider credential not found")
 
-            credentials = cloud_credentials.credentials
+            credentials = cloud_credentials.credential
 
         if cluster_name:
             # Check duplicate cluster name
