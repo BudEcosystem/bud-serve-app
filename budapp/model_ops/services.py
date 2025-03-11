@@ -1184,7 +1184,8 @@ class LocalModelWorkflowService(SessionMixin):
 
         if query_uri and query_provider_type and query_provider_type == ModelProviderTypeEnum.DISK.value:
             # Check for valid local path
-            if not os.path.exists(query_uri):
+            model_path = os.path.join(app_settings.add_model_dir, query_uri)
+            if not os.path.exists(model_path):
                 raise ClientException("Given local path does not exist")
 
         # Check duplicate hugging face uri

@@ -5,7 +5,6 @@ from budapp.initializers.provider_seeder import ProviderSeeder
 from budapp.initializers.template_seeder import TemplateSeeder
 from budapp.initializers.user_seeder import UserSeeder
 from budapp.initializers.quantization_method_seeder import QuantizationMethodSeeder
-
 seeders = {
     "user": UserSeeder,
     "provider": ProviderSeeder,
