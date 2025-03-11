@@ -249,3 +249,15 @@ class ModelSecurityScanResult(Base, TimestampMixin):
     model_issues: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
     model: Mapped["Model"] = relationship("Model", back_populates="model_security_scan_result")
+
+class QuantizationMethod(Base):
+    """Model for a AI model quantization method."""
+
+    __tablename__ = "quantization_method"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=True)
+    hardware_support: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=False)
+    method_type: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=False)
+    runtime_hardware_support: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=False)

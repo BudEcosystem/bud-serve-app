@@ -234,7 +234,7 @@ class WorkflowService(SessionMixin):
                 bud_simulator_events=bud_simulator_events if bud_simulator_events else None,
                 project=db_project if db_project else None,
                 cluster=db_cluster if db_cluster else None,
-                qunatization_config=quantization_config if quantization_config else None
+                quantization_config=quantization_config if quantization_config else None
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
