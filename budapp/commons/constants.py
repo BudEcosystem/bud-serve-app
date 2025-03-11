@@ -492,6 +492,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     DELETE_ENDPOINT_EVENTS = "delete_endpoint_events"
     DELETE_WORKER_EVENTS = "delete_worker_events"
     LICENSE_FAQ_EVENTS = "license_faq_events"
+    QUANTIZATION_SIMULATION_EVENTS = "bud_simulator_events"
 
 
 class ClusterStatusEnum(StrEnum):
