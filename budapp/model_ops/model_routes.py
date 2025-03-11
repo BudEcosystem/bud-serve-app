@@ -56,6 +56,8 @@ from .schemas import (
     ModelPaginatedResponse,
     ProviderFilter,
     ProviderResponse,
+    QuantizationMethodFilter,
+    QuantizationMethodResponse,
     QuantizeModelWorkflowRequest,
     RecommendedTagsResponse,
     TagsListResponse,
@@ -717,6 +719,52 @@ async def list_all_model_authors(
         code=status.HTTP_200_OK,
     ).to_http_response()
 
+@model_router.get(
+    "/quantization-methods",
+    responses={
+        status.HTTP_200_OK: {
+            "model": QuantizationMethodResponse,
+            "description": "Successfully listed quantization methods",
+        },
+    },
+    description="List quantization methods",
+)
+async def list_quantization_methods(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[QuantizationMethodFilter, Depends()],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = Query(False, description="Whether to search for quantization methods"),
+) -> Union[QuantizationMethodResponse, ErrorResponse]:
+    """List quantization methods."""
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Convert UserFilter to dictionary
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    try:
+        db_quantization_methods, count = await QuantizationService(session).get_quantization_methods(
+            offset, limit, filters_dict, order_by, search
+        )
+        logger.info(f"db_quantization_methods: {db_quantization_methods[0]}")
+        logger.info(f"count: {count}")
+    except Exception as e:
+        logger.exception(f"Failed to get all quantization methods: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all quantization methods"
+        ).to_http_response()
+
+    return QuantizationMethodResponse(
+        quantization_methods=db_quantization_methods,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="quantization_methods.list",
+        code=status.HTTP_200_OK,
+    ).to_http_response()
 
 @model_router.get(
     "/{model_id}",

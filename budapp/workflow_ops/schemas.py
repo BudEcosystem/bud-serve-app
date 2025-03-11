@@ -46,7 +46,7 @@ class RetrieveWorkflowStepData(BaseModel):
     bud_serve_cluster_events: dict | None = None
     project: ProjectResponse | None = None
     cluster: ClusterResponse | None = None
-    qunatization_config: QuantizeModelWorkflowStepData | None = None
+    quantization_config: QuantizeModelWorkflowStepData | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
