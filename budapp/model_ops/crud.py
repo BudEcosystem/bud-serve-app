@@ -28,7 +28,7 @@ from budapp.commons.constants import CloudModelStatusEnum, EndpointStatusEnum, M
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.commons.exceptions import DatabaseException
 from budapp.endpoint_ops.models import Endpoint
-from budapp.model_ops.models import CloudModel, Model, PaperPublished
+from budapp.model_ops.models import CloudModel, Model, PaperPublished, QuantizationMethod as QuantizationMethodModel
 from budapp.model_ops.models import Provider as ProviderModel
 
 
@@ -610,3 +610,44 @@ class ModelSecurityScanResultDataManager(DataManagerUtils):
     """Data manager for the ModelSecurityScanResult model."""
 
     pass
+
+
+class QuantizationMethodDataManager(DataManagerUtils):
+    """Data manager for the QuantizationMethod model."""
+
+    async def get_all_quantization_methods(
+        self,
+        offset: int,
+        limit: int,
+        filters: Dict[str, Any] = {},
+        order_by: List[Tuple[str, str]] = [],
+        search: bool = False,
+    ) -> Tuple[List[QuantizationMethodModel], int]:
+        """List all quantization methods in the database."""
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(QuantizationMethodModel, filters)
+            stmt = select(
+                QuantizationMethodModel,
+            ).filter(or_(*search_conditions))
+            count_stmt = select(func.count()).select_from(QuantizationMethodModel).filter(or_(*search_conditions))
+        else:
+            stmt = select(
+                QuantizationMethodModel,
+            ).filter_by(**filters)
+            count_stmt = select(func.count()).select_from(QuantizationMethodModel).filter_by(**filters)
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(QuantizationMethodModel, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.scalars_all(stmt)
+        logger.info(f"result: {result}")
+        return result, count

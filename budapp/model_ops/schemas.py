@@ -871,10 +871,10 @@ class QuantizeModelWorkflowRequest(BaseModel):
     step_number: int = Field(..., gt=0)
     trigger_workflow: bool = False
     model_id: UUID4 | None = None
-    quantized_model_name: str | None = None
-    target_type: Literal["int8", "int4", "int2"] | None = None
-    target_device: Literal["cpu", "cuda"] | None = None
-    method: Literal["dynamic", "static"] | None = None
+    quantized_model_name: str
+    target_type: Literal["INT8", "INT4", "INT2"] | None = None
+    target_device: Literal["CPU", "CUDA"] | None = None
+    method: str | None = None
     weight_config: QuantizeConfig | None = None
     activation_config: QuantizeConfig | None = None
 
@@ -901,3 +901,24 @@ class QuantizeModelWorkflowStepData(BaseModel):
     weight_config: QuantizeConfig | None = None
     activation_config: QuantizeConfig | None = None
 
+
+class QuantizationMethod(BaseModel):
+    """Quantization method schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+    description: str
+    hardware_support: list[str]
+    method_type: list[str]
+    runtime_hardware_support: list[str]
+
+class QuantizationMethodResponse(PaginatedSuccessResponse):
+    """Quantization method response schema."""
+
+    quantization_methods: list[QuantizationMethod] = []
+
+class QuantizationMethodFilter(BaseModel):
+    """Quantization method filter schema."""
+
+    name: str | None = None

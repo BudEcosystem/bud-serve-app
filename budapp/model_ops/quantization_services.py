@@ -16,7 +16,7 @@
 
 """The model ops services. Contains business logic for quantiation in model ops."""
 
-from typing import Dict
+from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
 import aiohttp
@@ -38,9 +38,9 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.schemas import WorkflowUtilCreate
 from budapp.workflow_ops.services import WorkflowService
 
-from .crud import ModelDataManager, ProviderDataManager
+from .crud import ModelDataManager, ProviderDataManager, QuantizationMethodDataManager
 from .models import Model
-from .models import Provider as ProviderModel
+from .models import Provider as ProviderModel, QuantizationMethod
 from .schemas import QuantizeConfig, QuantizeModelWorkflowRequest, QuantizeModelWorkflowStepData
 
 
@@ -48,6 +48,10 @@ logger = logging.get_logger(__name__)
 
 class QuantizationService(SessionMixin):
     """Quantization service."""
+
+    async def get_quantization_methods(self, offset: int, limit: int, filters: Dict[str, Any] = {}, order_by: List[Tuple[str, str]] = [], search: bool = False) -> Tuple[List[QuantizationMethod], int]:
+        """Get all quantization methods."""
+        return await QuantizationMethodDataManager(self.session).get_all_quantization_methods(offset, limit, filters, order_by, search)
 
     async def quantize_model_workflow(self, current_user_id: UUID, request: QuantizeModelWorkflowRequest) -> None:
         """Quantize a model."""
@@ -100,6 +104,13 @@ class QuantizationService(SessionMixin):
                 db_workflow,
                 {"title": db_model.name, "icon": model_icon},
             )
+
+        if method is not None:
+            db_method = await QuantizationMethodDataManager(self.session).retrieve_by_fields(
+                QuantizationMethod, {"name": method}
+            )
+            if db_method is None:
+                raise ClientException("Invalid quantization method")
 
         # Prepare workflow step data
         workflow_step_data = QuantizeModelWorkflowStepData(
