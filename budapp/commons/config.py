@@ -239,6 +239,9 @@ class AppConfig(BaseConfig):
     # Prometheus URL
     prometheus_url: str = Field(alias="PROMETHEUS_URL", default="https://metrics.fmops.in")
 
+    # Add model directory
+    add_model_dir: DirectoryPath = Field(os.path.expanduser("~/.cache"), alias="ADD_MODEL_DIR")
+
     @computed_field
     def static_dir(self) -> str:
         """Get the static directory."""
