@@ -26,6 +26,7 @@ from budapp.commons.config import app_settings
 from budapp.commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
+    BudServeWorkflowStepEventName,
     ModelProviderTypeEnum,
     ModelStatusEnum,
     WorkflowTypeEnum,
@@ -36,7 +37,7 @@ from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManage
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.schemas import WorkflowUtilCreate
-from budapp.workflow_ops.services import WorkflowService
+from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 from .crud import ModelDataManager, ProviderDataManager, QuantizationMethodDataManager
 from .models import Model
@@ -105,12 +106,12 @@ class QuantizationService(SessionMixin):
                 {"title": db_model.name, "icon": model_icon},
             )
 
-        # if method is not None:
-        #     db_method = await QuantizationMethodDataManager(self.session).retrieve_by_fields(
-        #         QuantizationMethod, {"name": method}
-        #     )
-        #     if db_method is None:
-        #         raise ClientException("Invalid quantization method")
+        if method is not None:
+            db_method = await QuantizationMethodDataManager(self.session).retrieve_by_fields(
+                QuantizationMethod, {"name": method}
+            )
+            if db_method is None:
+                raise ClientException("Invalid quantization method")
 
         # Prepare workflow step data
         workflow_step_data = QuantizeModelWorkflowStepData(
@@ -169,11 +170,40 @@ class QuantizationService(SessionMixin):
             {"current_step": workflow_current_step},
         )
         #TODO: add validation for cluster_id
-        
+
         # Perform simulation
         if method is not None and weight_config is not None and activation_config is not None:
             # Perform weight quantization
-            pass
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": db_workflow.id}
+            )
+
+            # Define the keys required for model security scan
+            keys_of_interest = [
+                "model_id",
+                "method"
+            ]
+
+            # from workflow steps extract necessary information
+            required_data = {}
+            for db_workflow_step in db_workflow_steps:
+                for key in keys_of_interest:
+                    if key in db_workflow_step.data:
+                        required_data[key] = db_workflow_step.data[key]
+
+            # Check if all required keys are present
+            required_keys = ["model_id", "method"]
+            missing_keys = [key for key in required_keys if key not in required_data]
+            if missing_keys:
+                raise ClientException(f"Missing required data for quantization simulation: {', '.join(missing_keys)}")
+
+            # Perform quantization simulation
+            try:
+                await self._trigger_quantization_simulation(
+                    current_step_number, required_data, db_workflow, current_user_id
+                )
+            except ClientException as e:
+                raise e
 
         # Trigger workflow
         if trigger_workflow:
@@ -219,10 +249,110 @@ class QuantizationService(SessionMixin):
 
         return db_workflow
 
+    async def _trigger_quantization_simulation(
+        self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID
+    ) -> None:
+        """Trigger quantization simulation."""
+
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": data["model_id"]}
+        )
+
+        # Create request payload
+        deployment_config = {
+            "avg_context_length": 100,
+            "avg_sequence_length": 100,
+            "ttft": [100, 100],
+            "per_session_tokens_per_sec": [100, 100],
+            "e2e_latency": [100, 100],
+            "additional_concurrency": 100
+        }
+        payload = {
+            "pretrained_model_uri": db_model.local_path,
+            "input_tokens": deployment_config["avg_context_length"],
+            "output_tokens": deployment_config["avg_sequence_length"],
+            "concurrency": deployment_config["additional_concurrency"],
+            "cluster_id": str(data["cluster_id"]),
+            "notification_metadata": {
+                "name": BUD_INTERNAL_WORKFLOW,
+                "subscriber_ids": str(current_user_id),
+                "workflow_id": str(db_workflow.id),
+            },
+            "source_topic": f"{app_settings.source_topic}",
+        }
+
+        payload["target_ttft"] = deployment_config["ttft"][0] if deployment_config["ttft"] else None
+        payload["target_throughput_per_user"] = (
+            deployment_config["per_session_tokens_per_sec"][1]
+            if deployment_config["per_session_tokens_per_sec"]
+            else None
+        )
+        payload["target_e2e_latency"] = (
+            deployment_config["e2e_latency"][0] if deployment_config["e2e_latency"] else None
+        )
+        payload["is_proprietary_model"] = False
+
+        # Perform bud simulation request
+        quantization_simulation_response = await self._perform_quantization_simulation_request(payload)
+
+        # Add payload dict to response
+        for step in quantization_simulation_response["steps"]:
+            step["payload"] = {}
+
+        simulator_id = quantization_simulation_response.get("workflow_id")
+
+        # NOTE: Dependency with recommended cluster api (GET /clusters/recommended/{workflow_id})
+        # NOTE: Replace concurrent_requests with additional_concurrency
+        # Required to compare with concurrent_requests in simulator response
+        deployment_config["concurrent_requests"] = deployment_config["additional_concurrency"]
+        quantization_simulation_events = {
+            "simulator_id": simulator_id,
+            BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value: quantization_simulation_response,
+            "deploy_config": deployment_config,
+            "model_id": str(data["model_id"]),
+        }
+
+        # Increment current step number
+        current_step_number = current_step_number + 1
+        workflow_current_step = current_step_number
+
+        # Update or create next workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, quantization_simulation_events
+        )
+        logger.debug(f"Workflow step created with id {db_workflow_step.id}")
+
+        # Update progress in workflow
+        quantization_simulation_response["progress_type"] = BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": quantization_simulation_response, "current_step": workflow_current_step}
+        )
+
+    async def _perform_quantization_simulation_request(self, payload: Dict) -> Dict:
+        """Perform quantization simulation request."""
+        quantization_simulation_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/run"
+        )
+        logger.debug(f"payload for quantization simulation on add worker to endpoint : {payload}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(quantization_simulation_endpoint, json=payload) as response:
+                    response_data = await response.json()
+                    if response.status >= 400:
+                        raise ClientException("Unable to perform quantization simulation")
+
+                    return response_data
+        except ClientException as e:
+            raise e
+        except Exception as e:
+            logger.error(f"Failed to perform quantization simulation request: {e}")
+            raise ClientException("Unable to perform quantization simulation") from e
+        
     async def _perform_model_quantization(
         self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID
     ) -> None:
-        """Perform weight quantization."""
+        """Perform model quantization."""
         # Create request payload
         payload = {
             "quantization_config": {
