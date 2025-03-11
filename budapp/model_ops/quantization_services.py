@@ -105,12 +105,12 @@ class QuantizationService(SessionMixin):
                 {"title": db_model.name, "icon": model_icon},
             )
 
-        if method is not None:
-            db_method = await QuantizationMethodDataManager(self.session).retrieve_by_fields(
-                QuantizationMethod, {"name": method}
-            )
-            if db_method is None:
-                raise ClientException("Invalid quantization method")
+        # if method is not None:
+        #     db_method = await QuantizationMethodDataManager(self.session).retrieve_by_fields(
+        #         QuantizationMethod, {"name": method}
+        #     )
+        #     if db_method is None:
+        #         raise ClientException("Invalid quantization method")
 
         # Prepare workflow step data
         workflow_step_data = QuantizeModelWorkflowStepData(
