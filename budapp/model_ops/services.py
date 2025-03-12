@@ -994,20 +994,25 @@ class LocalModelWorkflowService(SessionMixin):
             vision_config = None
 
         # Get base model relation
+        base_model = None
+        base_model_relation = None
         model_tree = model_info.get("model_tree", {})
-        base_model_relation = await self.get_base_model_relation(model_tree)
 
-        # Sanitize base model
-        base_model = model_tree.get("base_model", [])
-        if isinstance(base_model, list) and len(base_model) > 0:
-            base_model = base_model
-        elif isinstance(base_model, str):
-            base_model = [base_model]
-        base_model = normalize_value(base_model)
+        # Model tree only available for HuggingFace
+        if model_tree:
+            base_model_relation = await self.get_base_model_relation(model_tree)
 
-        # If base model is the same as the model uri, set base model to None
-        if required_data["uri"] == base_model:
-            base_model = None
+            # Sanitize base model
+            base_model = model_tree.get("base_model", [])
+            if isinstance(base_model, list) and len(base_model) > 0:
+                base_model = base_model
+            elif isinstance(base_model, str):
+                base_model = [base_model]
+            base_model = normalize_value(base_model)
+
+            # If base model is the same as the model uri, set base model to None
+            if required_data["uri"] == base_model:
+                base_model = None
 
         # Dummy Values
         # TODO: remove this after implementing actual service
