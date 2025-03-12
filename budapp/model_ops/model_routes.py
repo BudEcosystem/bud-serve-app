@@ -999,3 +999,43 @@ async def quantize_model_workflow(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to quantize model workflow"
         ).to_http_response()
+
+@model_router.post(
+    "/cancel-quantization",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully cancel model quantization",
+        },
+    },
+    description="Cancel model quantization",
+)
+async def cancel_model_quantization(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    cancel_request: CancelDeploymentWorkflowRequest,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Cancel model quantization."""
+    try:
+        await QuantizationService(session).cancel_model_quantization_workflow(cancel_request.workflow_id)
+        return SuccessResponse(
+            message="Model quantization cancelled successfully",
+            code=status.HTTP_200_OK,
+            object="model.cancel_quantization",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to cancel model quantization: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to cancel model quantization: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to cancel model quantization"
+        ).to_http_response()

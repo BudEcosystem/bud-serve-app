@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
 import aiohttp
+from fastapi import status
 
 from budapp.cluster_ops.crud import ClusterDataManager
 from budapp.cluster_ops.models import Cluster
@@ -28,13 +29,18 @@ from budapp.commons.config import app_settings
 from budapp.commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
+    BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     ModelProviderTypeEnum,
     ModelStatusEnum,
+    NotificationTypeEnum,
     WorkflowTypeEnum,
 )
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
+from budapp.core.schemas import NotificationPayload, NotificationResult
+from budapp.model_ops.services import ModelServiceUtil
+from budapp.shared.notification_service import BudNotifyService, NotificationBuilder
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
@@ -42,8 +48,8 @@ from budapp.workflow_ops.schemas import WorkflowUtilCreate
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 from .crud import ModelDataManager, ProviderDataManager, QuantizationMethodDataManager
-from .models import Model
-from .models import Provider as ProviderModel, QuantizationMethod
+from .models import Model, QuantizationMethod
+from .models import Provider as ProviderModel
 from .schemas import QuantizeConfig, QuantizeModelWorkflowRequest, QuantizeModelWorkflowStepData
 
 
@@ -108,6 +114,18 @@ class QuantizationService(SessionMixin):
                 db_workflow,
                 {"title": db_model.name, "icon": model_icon},
             )
+
+        if quantized_model_name is not None:
+            # Check for model with duplicate name
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model,
+                {"name": quantized_model_name, "status": ModelStatusEnum.ACTIVE},
+                missing_ok=True,
+                case_sensitive=False,
+            )
+            if db_model:
+                logger.error(f"Unable to create model with name {quantized_model_name} as it already exists")
+                raise ClientException("Model name should be unique")
 
         if method is not None:
             db_method = await QuantizationMethodDataManager(self.session).retrieve_by_fields(
@@ -432,4 +450,144 @@ class QuantizationService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to perform model quantization request: {e}")
             raise ClientException("Unable to perform model quantization") from e
+    
+    async def add_quantization_to_model_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Add quantization to model from notification event."""
+        logger.debug("Received event for adding quantization to model")
 
+        # Get workflow and steps
+        workflow_id = payload.workflow_id
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for model extraction
+        keys_of_interest = [
+            "model_id",
+            "quantized_model_name"
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        # Check for model with duplicate name
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model,
+            {"name": required_data["quantized_model_name"], "status": ModelStatusEnum.ACTIVE},
+            missing_ok=True,
+            case_sensitive=False,
+        )
+        if db_model:
+            logger.error(f"Unable to create model with name {required_data['quantized_model_name']} as it already exists")
+            required_data["quantized_model_name"] = f"{required_data['quantized_model_name']}_quantized"
+
+
+        model_info = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": required_data["model_id"]}
+        )
+
+        model_info.name = required_data["quantized_model_name"]
+        model_info.local_path = payload.content.result["local_path"]
+        model_info.status = ModelStatusEnum.ACTIVE
+        model_info.base_model = model_info.uri
+        model_info.base_model_relation = BaseModelRelationEnum.QUANTIZED
+        model_info.uri = required_data["quantized_model_name"]
+
+        #create model
+        db_model = await ModelDataManager(self.session).insert_one(model_info)
+
+        # Update to workflow step
+        workflow_update_data = {
+            "model_id": str(db_model.id),
+            # "tags": extracted_tags,
+            # "description": model_description,
+        }
+
+        current_step_number = db_workflow.current_step + 1
+        workflow_current_step = current_step_number
+
+        # Update or create next workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            workflow_id, current_step_number, workflow_update_data
+        )
+        logger.debug(f"Workflow step updated {db_workflow_step.id}")
+
+        # Send notification to workflow creator
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
+        notification_request = (
+            NotificationBuilder()
+            .set_content(
+                title=db_model.name,
+                message="Model Quantization Completed",
+                icon=model_icon,
+                result=NotificationResult(target_id=db_model.id, target_type="model").model_dump(
+                    exclude_none=True, exclude_unset=True
+                ),
+            )
+            .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.MODEL_QUANTIZATION_SUCCESS.value)
+            .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)
+
+    async def cancel_model_quantization_workflow(self, workflow_id: UUID) -> None:
+        """Cancel model quantization workflow."""
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": db_workflow.id}
+        )
+
+        # Define the keys required for endpoint creation
+        keys_of_interest = [
+            BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value,
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+        logger.debug("Collected required data from workflow steps")
+
+        if required_data.get(BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value) is None:
+            raise ClientException("Model quantization process has not been initiated")
+
+        budserve_quantization_response = required_data.get(BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value)
+        dapr_workflow_id = budserve_quantization_response.get("workflow_id")
+
+        try:
+            await self._perform_cancel_model_quantization_request(dapr_workflow_id)
+        except ClientException as e:
+            raise e
+
+    async def _perform_cancel_model_quantization_request(self, workflow_id: str) -> Dict:
+        """Perform cancel model quantization request to bud_cluster app.
+
+        Args:
+            workflow_id: The ID of the workflow to cancel.
+        """
+        cancel_model_quantization_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/cancel/{workflow_id}"
+
+        logger.debug(f"Performing cancel model quantization request to budcluster {cancel_model_quantization_endpoint}")
+        try:
+            async with aiohttp.ClientSession() as session, session.post(cancel_model_quantization_endpoint) as response:
+                response_data = await response.json()
+                if response.status != 200 or response_data.get("object") == "error":
+                    logger.error(f"Failed to cancel model quantization: {response.status} {response_data}")
+                    raise ClientException(
+                        "Failed to cancel model quantization", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+
+                logger.debug("Successfully cancelled quantization deployment")
+                return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send cancel quantization deployment request: {e}")
+            raise ClientException(
+                "Failed to cancel model deployment", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
