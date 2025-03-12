@@ -877,6 +877,7 @@ class QuantizeModelWorkflowRequest(BaseModel):
     method: str | None = None
     weight_config: QuantizeConfig | None = None
     activation_config: QuantizeConfig | None = None
+    cluster_id: UUID4 | None = None
 
     @model_validator(mode="after")
     def validate_fields(self) -> "QuantizeModelWorkflowRequest":
@@ -900,7 +901,8 @@ class QuantizeModelWorkflowStepData(BaseModel):
     method: str | None = None
     weight_config: QuantizeConfig | None = None
     activation_config: QuantizeConfig | None = None
-
+    cluster_id: UUID4 | None = None
+    simulation_id: UUID4 | None = None
 
 class QuantizationMethod(BaseModel):
     """Quantization method schema."""

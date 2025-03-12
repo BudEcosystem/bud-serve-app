@@ -47,6 +47,8 @@ class RetrieveWorkflowStepData(BaseModel):
     project: ProjectResponse | None = None
     cluster: ClusterResponse | None = None
     quantization_config: QuantizeModelWorkflowStepData | None = None
+    quantization_deployment_events: dict | None = None
+    quantization_simulation_events: dict | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
