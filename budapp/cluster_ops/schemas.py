@@ -36,7 +36,8 @@ class ClusterBase(BaseModel):
     """Cluster base schema."""
 
     name: str
-    ingress_url: str
+    ingress_url: Optional[str] = None  # Optional URL for cluster ingress since cloud clusters were introduced
+    cluster_type: str = Field(default="ON_PERM", description="Type of cluster: ON_PERM or CLOUD")
     icon: str
 
 

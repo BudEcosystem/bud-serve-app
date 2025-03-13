@@ -26,6 +26,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.constants import ClusterStatusEnum
 from budapp.commons.database import Base, TimestampMixin
+from budapp.credential_ops.models import CloudCredentials, CloudProviders
 
 
 class Cluster(Base, TimestampMixin):
@@ -34,7 +35,8 @@ class Cluster(Base, TimestampMixin):
     __tablename__ = "cluster"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    ingress_url: Mapped[str] = mapped_column(String, nullable=False)
+    ingress_url: Mapped[str] = mapped_column(String, nullable=True) # as cloud cluster doesnt have ingress url by default
+    cluster_type: Mapped[str] = mapped_column(String, nullable=False,default="ON_PERM") # New Addition ->  ON_PERM || CLOUD
     status: Mapped[str] = mapped_column(
         Enum(
             ClusterStatusEnum,
@@ -59,6 +61,15 @@ class Cluster(Base, TimestampMixin):
     status_sync_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     total_nodes: Mapped[int] = mapped_column(Integer, default=0)
     available_nodes: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Relation For Cloud Provider & Credential ID
+    cloud_provider_id: Mapped[UUID] = mapped_column(Uuid, nullable=True)
+    credential_id: Mapped[UUID] = mapped_column(Uuid, nullable=True)
+
+    cloud_credential: Mapped["CloudCredentials"] = relationship("CloudCredentials",foreign_keys=[credential_id])
+    cloud_provider: Mapped["CloudProviders"] = relationship("CloudProviders",foreign_keys=[cloud_provider_id])
+
+
 
     endpoints: Mapped[list["Endpoint"]] = relationship(
         "Endpoint",

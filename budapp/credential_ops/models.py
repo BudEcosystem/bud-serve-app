@@ -80,8 +80,8 @@ class CloudCredentials(Base, TimestampMixin):
     user_id: Mapped[UUID] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
     provider_id: Mapped[UUID] = mapped_column(ForeignKey("cloud_providers.id", ondelete="CASCADE"), nullable=False)
     credential: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    # Make sure while deleting , dependency is removed first
-    #
+    credential_name: Mapped[str] = mapped_column(String, nullable=False, default="No Name")
+
     provider = relationship("CloudProviders", back_populates="credentials")
 
 
