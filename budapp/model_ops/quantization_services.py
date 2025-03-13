@@ -492,7 +492,7 @@ class QuantizationService(SessionMixin):
         )
 
         model_info.name = required_data["quantized_model_name"]
-        model_info.local_path = payload.content.result["local_path"]
+        model_info.local_path = payload.content.result["model_path"]
         model_info.status = ModelStatusEnum.ACTIVE
         model_info.base_model = model_info.uri
         model_info.base_model_relation = BaseModelRelationEnum.QUANTIZED
