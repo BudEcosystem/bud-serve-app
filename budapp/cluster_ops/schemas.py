@@ -90,7 +90,8 @@ class ClusterResponse(BaseModel):
     id: UUID
     name: str
     icon: str
-    ingress_url: str
+    ingress_url: Optional[str] = None  # Optional URL for cluster ingress
+    cluster_type: Optional[str] = None
     created_at: datetime
     modified_at: datetime
     status: ClusterStatusEnum
