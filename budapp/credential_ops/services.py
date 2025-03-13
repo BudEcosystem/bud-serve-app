@@ -72,7 +72,8 @@ class ClusterProviderService(SessionMixin):
             cloud_credential = CloudCredentials(
                 user_id=current_user_id,
                 provider_id=provider_id,
-                credential=req.credential_values
+                credential=req.credential_values,
+                credential_name=req.credential_name
             )
             await CloudProviderDataManager(self.session).insert_one(cloud_credential)
 

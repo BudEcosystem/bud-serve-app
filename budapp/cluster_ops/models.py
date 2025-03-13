@@ -65,9 +65,10 @@ class Cluster(Base, TimestampMixin):
     # Relation For Cloud Provider & Credential ID
     cloud_provider_id: Mapped[UUID] = mapped_column(Uuid, nullable=True)
     credential_id: Mapped[UUID] = mapped_column(Uuid, nullable=True)
+    region: Mapped[str] = mapped_column(String, nullable=True)
 
-    cloud_credential: Mapped["CloudCredentials"] = relationship("CloudCredentials",foreign_keys=[credential_id])
-    cloud_provider: Mapped["CloudProviders"] = relationship("CloudProviders",foreign_keys=[cloud_provider_id])
+    # cloud_credential: Mapped["CloudCredentials"] = relationship("CloudCredentials",foreign_keys=[credential_id])
+    # cloud_provider: Mapped["CloudProviders"] = relationship("CloudProviders",foreign_keys=[cloud_provider_id])
 
 
 

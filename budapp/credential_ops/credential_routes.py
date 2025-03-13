@@ -206,6 +206,7 @@ async def get_user_cloud_credentials(
                 icon=provider.logo_url, #type: ignore
                 provider_description=provider.description if provider else "No Description Available",
                 created_at=cred.created_at,
+                credential_name=cred.credential_name,
                 # Mask sensitive information in credential values
                 credential_summary=_get_masked_credential_summary(cred.credential, provider.schema_definition if provider else {})
             )
@@ -278,7 +279,10 @@ async def get_user_cloud_credential(
         # Create credential schema
         credential_schema = CloudCredentialSchema(
             id=str(credential.id),
+            icon=provider.logo_url, #type: ignore
             provider_id=str(credential.provider_id),
+            credential_name=credential.credential_name,
+            provider_description=provider.description if provider else "No Description Available",
             provider_name=provider.name if provider else "Unknown Provider",
             created_at=credential.created_at,
             # For individual credential view, provide more detailed but still masked info

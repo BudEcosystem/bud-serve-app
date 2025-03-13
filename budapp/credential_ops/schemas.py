@@ -134,6 +134,7 @@ class CloudProvidersCreateRequest(BaseModel):
 
     provider_id: str # TODO: Probably we need to use UUID, test and replace
     credential_values: dict[str, str] # JSON Structure
+    credential_name: str
 
 
 class CloudCredentialSchema(BaseModel):
@@ -153,6 +154,7 @@ class CloudCredentialSchema(BaseModel):
     icon: str = Field(..., description="Icon URL for the provider")
     provider_description: str = Field(..., description="Description of the provider")
     created_at: datetime = Field(..., description="When the credential was created")
+    credential_name: str = Field(..., description="Name of the credential")
     credential_summary: Dict[str, Any] = Field(
         ...,
         description="Summary of credential values with sensitive information masked"

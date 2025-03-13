@@ -526,6 +526,8 @@ class ClusterService(SessionMixin):
         """
         logger.debug("Received event for creating cluster")
 
+        # TODO : ask varun if this is can actuallt get data saved in workflow in cluster repo
+
         # Get workflow and steps
         workflow_id = payload.workflow_id
         db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
@@ -538,6 +540,10 @@ class ClusterService(SessionMixin):
             "name",
             "icon",
             "ingress_url",
+            "cluster_type",
+            "cloud_provider_id",
+            "credential_id",
+            "region"
         ]
 
         # from workflow steps extract necessary information
@@ -572,12 +578,18 @@ class ClusterService(SessionMixin):
         cluster_data = ClusterCreate(
             name=required_data["name"],
             icon=required_data["icon"],
-            ingress_url=required_data["ingress_url"],
+            ingress_url=required_data.get("ingress_url"),
             created_by=db_workflow.created_by,
             cluster_id=UUID(bud_cluster_id),
             **cluster_resources.model_dump(exclude_unset=True, exclude_none=True),
             status=ClusterStatusEnum.AVAILABLE,
             status_sync_at=datetime.now(tz=timezone.utc),
+            # Cloud Cluster
+            cluster_type=required_data.get("cluster_type", "ON_PERM"),
+            cloud_provider_id=required_data.get("cloud_provider_id", None),
+            credential_id=required_data.get("credential_id", None),
+            region=required_data.get("region", None),
+
         )
 
         # Mark workflow as completed

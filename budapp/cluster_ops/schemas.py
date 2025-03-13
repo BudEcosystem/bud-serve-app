@@ -60,6 +60,11 @@ class ClusterCreate(ClusterBase):
     total_nodes: int
     available_nodes: int
 
+    # Optional
+    cloud_provider_id: Optional[UUID4] = None
+    credential_id: Optional[UUID4] = None
+    region: Optional[str] = None
+
 
 class ClusterResourcesInfo(BaseModel):
     """Cluster resources schema."""
