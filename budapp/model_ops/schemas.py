@@ -903,6 +903,8 @@ class QuantizeModelWorkflowStepData(BaseModel):
     activation_config: QuantizeConfig | None = None
     cluster_id: UUID4 | None = None
     simulation_id: UUID4 | None = None
+    quantization_data: dict | None = None
+    quantized_model_id: UUID4 | None = None
 
 class QuantizationMethod(BaseModel):
     """Quantization method schema."""

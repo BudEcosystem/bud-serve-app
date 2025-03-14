@@ -153,6 +153,8 @@ class WorkflowService(SessionMixin):
                 activation_config=required_data.get("activation_config"),
                 cluster_id=required_data.get("cluster_id"),
                 simulation_id=required_data.get("simulation_id"),
+                quantization_data=required_data.get("quantization_data"),
+                quantized_model_id=required_data.get("quantized_model_id"),
             ) if quantized_model_name else None
 
             db_provider = (
@@ -334,6 +336,8 @@ class WorkflowService(SessionMixin):
                 BudServeWorkflowStepEventName.QUANTIZATION_SIMULATION_EVENTS.value,
                 "cluster_id",
                 "simulation_id",
+                "quantization_data",
+                "quantized_model_id",
             ]
         }
 
