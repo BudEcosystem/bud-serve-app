@@ -491,15 +491,44 @@ class QuantizationService(SessionMixin):
             Model, {"id": required_data["model_id"]}
         )
 
-        model_info.name = required_data["quantized_model_name"]
-        model_info.local_path = payload.content.result["model_path"]
-        model_info.status = ModelStatusEnum.ACTIVE
-        model_info.base_model = model_info.uri
-        model_info.base_model_relation = BaseModelRelationEnum.QUANTIZED
-        model_info.uri = required_data["quantized_model_name"]
+        # Create a new model instance with the quantized model data
+        new_model_info = Model(
+            name=required_data["quantized_model_name"],
+            local_path=payload.content.result["model_path"],
+            status=ModelStatusEnum.ACTIVE,
+            base_model=model_info.uri,
+            base_model_relation=BaseModelRelationEnum.QUANTIZED,
+            uri=required_data["quantized_model_name"],
+            author=model_info.author,
+            description=model_info.description,
+            modality=model_info.modality,
+            source=model_info.source,
+            model_size=model_info.model_size,
+            model_weights_size=model_info.model_weights_size,
+            kv_cache_size=model_info.kv_cache_size,
+            architecture_text_config=model_info.architecture_text_config,
+            architecture_vision_config=model_info.architecture_vision_config,
+            tasks=model_info.tasks,
+            tags=model_info.tags,
+            model_type=model_info.model_type,
+            family=model_info.family,
+            icon=model_info.icon,
+            github_url=model_info.github_url,
+            huggingface_url=model_info.huggingface_url,
+            website_url=model_info.website_url,
+            provider_type=model_info.provider_type,
+            provider_id=model_info.provider_id,
+            strengths=model_info.strengths,
+            limitations=model_info.limitations,
+            languages=model_info.languages,
+            use_cases=model_info.use_cases,
+            examples=model_info.examples,
+            # created_by=model_info.created_by,
+            # organization_id=model_info.organization_id
+        )
 
         #create model
-        db_model = await ModelDataManager(self.session).insert_one(model_info)
+        db_model = await ModelDataManager(self.session).insert_one(new_model_info)
 
         # Update to workflow step
         workflow_update_data = {
