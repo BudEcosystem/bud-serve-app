@@ -20,9 +20,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import status
+import aiohttp
 
 from ..commons import logging
 from ..commons.db_utils import SessionMixin
+from ..commons.config import app_settings
 from ..commons.exceptions import ClientException
 from ..commons.constants import EndpointStatusEnum
 from ..credential_ops.crud import CredentialDataManager
@@ -268,6 +270,40 @@ class MessageService(SessionMixin):
         await MessageDataManager(self.session).delete_one(db_message)
 
         return
+
+    async def _fetch_message_metrics(self, request_id: UUID) -> dict:
+        """Fetch message metrics from the bud_metrics_app.
+
+        Args:
+            request_id: The UUID of the request whose metrics need to be fetched.
+
+        Returns:
+            A dictionary containing the message metrics.
+        """
+        metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/message/{request_id}"
+
+        payload = {"request_id": request_id}
+
+        logger.debug(f"Fetching message metrics from bud_metrics_app: {payload}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(metrics_endpoint, json=payload) as response:
+                    response_data = await response.json()
+                    if response.status != 200:
+                        logger.error(f"Failed to fetch message metrics: {response.status} {response_data}")
+                        raise ClientException(
+                            "Failed to fetch message metrics",
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        )
+
+                    logger.debug(f"Successfully fetched message metrics: {response_data}")
+                    return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send message metrics fetch request: {e}")
+            raise ClientException(
+                "Failed to fetch message metrics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
 
 
 class ChatSettingService(SessionMixin):

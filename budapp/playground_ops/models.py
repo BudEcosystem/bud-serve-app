@@ -97,8 +97,8 @@ class Message(Base, TimestampMixin):
     e2e_latency: Mapped[float] = mapped_column(Float, nullable=True)
     is_cache: Mapped[bool] = mapped_column(Boolean, nullable=False)
     harmfullness: Mapped[float] = mapped_column(Float, nullable=True)
-    faithfulness: Mapped[float] = mapped_column(Float, nullable=True)
-
+    hallucinations: Mapped[float] = mapped_column(Float, nullable=True)
+    is_updated_by_subscriber: Mapped[bool] = mapped_column(Boolean, nullable=False)
     feedback: Mapped[FeedbackEnum | None] = mapped_column(
         Enum(
             FeedbackEnum,
