@@ -523,7 +523,7 @@ class QuantizationService(SessionMixin):
             languages=model_info.languages,
             use_cases=model_info.use_cases,
             examples=model_info.examples,
-            # created_by=model_info.created_by,
+            created_by=db_workflow.created_by,
             # organization_id=model_info.organization_id
         )
 
