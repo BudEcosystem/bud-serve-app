@@ -1,0 +1,74 @@
+[
+  {
+    "name": "AWS",
+    "unique_id": "aws",
+    "logo_url": "icons/providers/vertexai.png",
+    "description": "Amazon Web Services",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "client_id": {
+          "type": "string",
+          "label": "Client ID",
+          "description": "Enter your Client ID",
+          "required": true
+        },
+        "client_secret": {
+          "type": "string",
+          "label": "Client Secret",
+          "description": "Enter your Client Secret",
+          "required": true
+        },
+        "tenant_id": {
+          "type": "string",
+          "label": "Tenant ID",
+          "description": "Enter your Tenant ID",
+          "required": true
+        },
+        "subscription_id": {
+          "type": "string",
+          "label": "Subscription ID",
+          "description": "Enter your Subscription ID",
+          "required": true
+        }
+      },
+      "required": ["client_id", "client_secret", "tenant_id", "subscription_id"]
+    }
+  },
+  {
+    "name": "Azure",
+    "unique_id": "azure",
+    "description": "Microsoft Azure",
+    "logo_url": "icons/providers/vertexai.png",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "client_id": {
+          "type": "string",
+          "label": "Client ID",
+          "description": "Enter your Client ID",
+          "required": true
+        },
+        "client_secret": {
+          "type": "string",
+          "label": "Client Secret",
+          "description": "Enter your Client Secret",
+          "required": true
+        },
+        "tenant_id": {
+          "type": "string",
+          "label": "Tenant ID",
+          "description": "Enter your Tenant ID",
+          "required": true
+        },
+        "subscription_id": {
+          "type": "string",
+          "label": "Subscription ID",
+          "description": "Enter your Subscription ID",
+          "required": true
+        }
+      },
+      "required": ["client_id", "client_secret", "tenant_id", "subscription_id"]
+    }
+  }
+]
