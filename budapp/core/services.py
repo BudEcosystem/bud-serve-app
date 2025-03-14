@@ -19,6 +19,7 @@
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from budapp.model_ops.quantization_services import QuantizationService
 from sqlalchemy.orm import Session
 
 from budapp.cluster_ops.services import ClusterService
@@ -262,6 +263,25 @@ class NotificationService(SessionMixin):
         if payload.event == "results":
             await EndpointService(self.session).add_worker_from_notification_event(payload)
 
+    async def update_deploy_quantization_events(self, payload: NotificationPayload) -> None:
+        """Update the deploy quantization events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        # Update workflow step data event
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value, payload)
+
+        # Update progress in workflow
+        await self._update_workflow_progress(BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value, payload)
+
+        # Add quantization to model
+        if payload.event == "results":
+            await QuantizationService(self.session).add_quantization_to_model_from_notification_event(payload)
+
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
         """Update the workflow step events for a workflow step.
 
@@ -422,6 +442,7 @@ class SubscriberHandler:
             PayloadType.DELETE_WORKER: self._handle_delete_worker,
             PayloadType.ADD_WORKER: self._handle_add_worker_to_deployment,
             PayloadType.FETCH_LICENSE_FAQS: self._handle_license_faqs_update,
+            PayloadType.DEPLOY_QUANTIZATION: self._handle_deploy_quantization,
         }
 
         handler = handlers.get(payload.type)
@@ -529,6 +550,13 @@ class SubscriberHandler:
             message="Update license faqs in db",
         ).to_http_response()
 
+    async def _handle_deploy_quantization(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the deploy quantization event."""
+        await NotificationService(self.session).update_deploy_quantization_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated deploy quantization event in workflow step",
+        ).to_http_response()
 
 class IconService(SessionMixin):
     """Service for managing icons."""
