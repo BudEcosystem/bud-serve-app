@@ -499,7 +499,7 @@ class QuantizationService(SessionMixin):
             name=required_data["quantized_model_name"],
             local_path=payload.content.result["model_path"],
             status=ModelStatusEnum.ACTIVE,
-            base_model=model_info.uri,
+            base_model=[model_info.uri],
             base_model_relation=BaseModelRelationEnum.QUANTIZED,
             uri=required_data["quantized_model_name"],
             author=model_info.author,
@@ -517,7 +517,7 @@ class QuantizationService(SessionMixin):
             family=model_info.family,
             icon=model_info.icon,
             github_url=model_info.github_url,
-            huggingface_url=model_info.huggingface_url,
+            # huggingface_url=model_info.huggingface_url,
             website_url=model_info.website_url,
             provider_type=model_info.provider_type,
             provider_id=model_info.provider_id,
@@ -535,9 +535,9 @@ class QuantizationService(SessionMixin):
 
         # Update to workflow step
         workflow_update_data = {
-            "model_id": str(db_model.id),
-            # "tags": extracted_tags,
-            # "description": model_description,
+            "quantized_model_id": str(db_model.id),
+            "quantized_model": db_model,
+            "quantization_data": payload.content.result['quantization_data'],
         }
 
         current_step_number = db_workflow.current_step + 1
