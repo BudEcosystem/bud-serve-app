@@ -249,6 +249,7 @@ class QuantizationService(SessionMixin):
                 "activation_config",
                 "cluster_id",
                 "simulator_id",
+                "target_device"
             ]
 
             # from workflow steps extract necessary information
@@ -259,7 +260,7 @@ class QuantizationService(SessionMixin):
                         required_data[key] = db_workflow_step.data[key]
 
             # Check if all required keys are present
-            required_keys = ["model_id", "quantized_model_name", "method", "weight_config", "activation_config", "cluster_id", "simulator_id"]
+            required_keys = ["model_id", "quantized_model_name", "method", "weight_config", "activation_config", "cluster_id", "simulator_id", "target_device"]
             missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data for add worker to deployment: {', '.join(missing_keys)}")
@@ -270,7 +271,7 @@ class QuantizationService(SessionMixin):
 
             # Get base model
             required_data["base_model_uri"] = db_model.local_path
-
+            required_data["model_size"] = db_model.model_size
             try:
                 # Perform model quantization
                 await self._trigger_quantization_deployment(
@@ -393,6 +394,8 @@ class QuantizationService(SessionMixin):
             },
             "quantization_name": data["quantized_model_name"],
             "model": data["base_model_uri"],
+            "model_size": data["model_size"],
+            "device_type": data["target_device"],
             "simulator_id": data["simulator_id"],
             "cluster_id": str(data["cluster_id"]),
             "notification_metadata": {
@@ -491,21 +494,50 @@ class QuantizationService(SessionMixin):
             Model, {"id": required_data["model_id"]}
         )
 
-        model_info.name = required_data["quantized_model_name"]
-        model_info.local_path = payload.content.result["model_path"]
-        model_info.status = ModelStatusEnum.ACTIVE
-        model_info.base_model = model_info.uri
-        model_info.base_model_relation = BaseModelRelationEnum.QUANTIZED
-        model_info.uri = required_data["quantized_model_name"]
+        # Create a new model instance with the quantized model data
+        new_model_info = Model(
+            name=required_data["quantized_model_name"],
+            local_path=payload.content.result["model_path"],
+            status=ModelStatusEnum.ACTIVE,
+            base_model=[model_info.uri],
+            base_model_relation=BaseModelRelationEnum.QUANTIZED,
+            uri=required_data["quantized_model_name"],
+            author=model_info.author,
+            description=model_info.description,
+            modality=model_info.modality,
+            source=model_info.source,
+            model_size=model_info.model_size,
+            model_weights_size=model_info.model_weights_size,
+            kv_cache_size=model_info.kv_cache_size,
+            architecture_text_config=model_info.architecture_text_config,
+            architecture_vision_config=model_info.architecture_vision_config,
+            tasks=model_info.tasks,
+            tags=model_info.tags,
+            model_type=model_info.model_type,
+            family=model_info.family,
+            icon=model_info.icon,
+            github_url=model_info.github_url,
+            # huggingface_url=model_info.huggingface_url,
+            website_url=model_info.website_url,
+            provider_type=model_info.provider_type,
+            provider_id=model_info.provider_id,
+            strengths=model_info.strengths,
+            limitations=model_info.limitations,
+            languages=model_info.languages,
+            use_cases=model_info.use_cases,
+            examples=model_info.examples,
+            created_by=db_workflow.created_by,
+            # organization_id=model_info.organization_id
+        )
 
         #create model
-        db_model = await ModelDataManager(self.session).insert_one(model_info)
+        db_model = await ModelDataManager(self.session).insert_one(new_model_info)
 
         # Update to workflow step
         workflow_update_data = {
-            "model_id": str(db_model.id),
-            # "tags": extracted_tags,
-            # "description": model_description,
+            "quantized_model_id": str(db_model.id),
+            "quantized_model": db_model,
+            "quantization_data": payload.content.result['quantization_data'],
         }
 
         current_step_number = db_workflow.current_step + 1
