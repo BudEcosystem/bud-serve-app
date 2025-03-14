@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid, Numeric
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import JSONB
@@ -219,6 +219,10 @@ class CloudModel(Base, TimestampMixin):
     provider_id: Mapped[UUID] = mapped_column(ForeignKey("provider.id"), nullable=False)
     is_present_in_model: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    max_input_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    input_cost_per_token: Mapped[Optional[float]] = mapped_column(Numeric, nullable=True)
+    output_cost_per_token: Mapped[Optional[float]] = mapped_column(Numeric, nullable=True)
+
     provider: Mapped[Optional["Provider"]] = relationship("Provider", back_populates="cloud_models")
 
 
@@ -249,6 +253,7 @@ class ModelSecurityScanResult(Base, TimestampMixin):
     model_issues: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
     model: Mapped["Model"] = relationship("Model", back_populates="model_security_scan_result")
+
 
 class QuantizationMethod(Base):
     """Model for a AI model quantization method."""

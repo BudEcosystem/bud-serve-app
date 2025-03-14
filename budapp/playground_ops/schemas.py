@@ -42,6 +42,9 @@ class EndpointListResponse(BaseModel):
     project: ProjectResponse
     created_at: datetime
     modified_at: datetime
+    input_cost_per_token: float
+    output_cost_per_token: float
+    context_length: int
 
 
 class PlaygroundDeploymentListResponse(PaginatedSuccessResponse):
