@@ -305,7 +305,8 @@ class QuantizationService(SessionMixin):
             "input_tokens": deployment_config["avg_context_length"],
             "output_tokens": deployment_config["avg_sequence_length"],
             "concurrency": deployment_config["additional_concurrency"],
-            # "cluster_id": str(data["cluster_id"]),
+            "is_quantization": True,
+            "quantization_method": data["method"],
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
@@ -314,15 +315,9 @@ class QuantizationService(SessionMixin):
             "source_topic": f"{app_settings.source_topic}",
         }
 
-        payload["target_ttft"] = deployment_config["ttft"][0] if deployment_config["ttft"] else None
-        payload["target_throughput_per_user"] = (
-            deployment_config["per_session_tokens_per_sec"][1]
-            if deployment_config["per_session_tokens_per_sec"]
-            else None
-        )
-        payload["target_e2e_latency"] = (
-            deployment_config["e2e_latency"][0] if deployment_config["e2e_latency"] else None
-        )
+        payload["target_ttft"] = deployment_config["ttft"][0]
+        payload["target_throughput_per_user"] = deployment_config["per_session_tokens_per_sec"][1]
+        payload["target_e2e_latency"] = deployment_config["e2e_latency"][0]
         payload["is_proprietary_model"] = False
 
         # Perform bud simulation request
