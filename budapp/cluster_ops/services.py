@@ -173,12 +173,12 @@ class ClusterService(SessionMixin):
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
             workflow_id, workflow_create, current_user_id
         )
+        configuration_yaml = None
 
         # Validate the configuration file
         if configuration_file:
-
             # Validate the configuration file for ON_PERM cluster
-            configuration_yaml = None
+
             if cluster_type == "ON_PREM" and configuration_file:
                 if not await check_file_extension(configuration_file.filename, ["yaml", "yml"]):
                     logger.error("Invalid file extension for configuration file")
@@ -239,18 +239,22 @@ class ClusterService(SessionMixin):
                 {"icon": cluster_icon},
             )
 
+        logger.debug("====== Preparing The Payload")
+
         # Prepare workflow step data (UI Steps)
         workflow_step_data = CreateClusterWorkflowSteps(
             name=cluster_name,
             icon=cluster_icon,
             ingress_url=ingress_url,
-            configuration_yaml=configuration_yaml if configuration_file and cluster_type == "ON_PREM" else None,
+            configuration_yaml=configuration_yaml,
             cluster_type=cluster_type,
             credential_id=credential_id if cluster_type == "CLOUD" else None,
             provider_id=provider_id if cluster_type == "CLOUD" else None,
             region=region if cluster_type == "CLOUD" else None,
             credentials=credentials if cluster_type == "CLOUD" else None
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+
+        logger.debug(f"====== {workflow_step_data}")
 
         # Get workflow steps
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -434,24 +438,31 @@ class ClusterService(SessionMixin):
 
                     form = aiohttp.FormData()
                     form.add_field("cluster_create_request", json.dumps(cluster_create_request))
+                    # For cloud cluster, we create a temporary YAML file with minimal configuration
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".yaml", mode="w") as temp_file:
+                        # Write minimal configuration to the temporary file
+                        yaml.safe_dump({"name": "dummy-cluster"}, temp_file)
+                        # temp_file.flush()
+                        # Open the file as a binary for proper upload
+                        with open(temp_file.name, "rb") as config_file:
+                            form.add_field("configuration", config_file, filename="dummy.yaml")
+                            # Log Form data
+                            logger.debug(f"Form data: {json.dumps(cluster_create_request)}")
 
-                    # Log Form data
-                    logger.debug(f"Form data: {json.dumps(cluster_create_request)}")
+                            async with session.post(
+                                create_cluster_endpoint,
+                                data=form
+                            ) as response:
+                                response_data = await response.json()
+                                logger.debug(f"Response from budcluster service: {response_data}")
 
-                    async with session.post(
-                        create_cluster_endpoint,
-                        data=form
-                    ) as response:
-                        response_data = await response.json()
-                        logger.debug(f"Response from budcluster service: {response_data}")
+                                if response.status != 200 or response_data.get("object") == "error":
+                                    error_message = response_data.get("message", "Failed to create cloud cluster")
+                                    logger.error(f"Failed to create cloud cluster with external service: {error_message}")
+                                    raise ClientException(error_message)
 
-                        if response.status != 200 or response_data.get("object") == "error":
-                            error_message = response_data.get("message", "Failed to create cloud cluster")
-                            logger.error(f"Failed to create cloud cluster with external service: {error_message}")
-                            raise ClientException(error_message)
-
-                        logger.debug("Successfully created cloud cluster with budcluster service")
-                        return response_data
+                                logger.debug("Successfully created cloud cluster with budcluster service")
+                                return response_data
 
                 except ClientException as e:
                     raise e
@@ -467,6 +478,8 @@ class ClusterService(SessionMixin):
                     # Write configuration yaml to temporary yaml file
                     yaml.safe_dump(data["configuration_yaml"], temp_file)
 
+
+
                     logger.debug(f"cluster_create_request: {cluster_create_request}")
                     # Perform the request as a form data
                     async with aiohttp.ClientSession() as session:
@@ -477,6 +490,11 @@ class ClusterService(SessionMixin):
                         with open(temp_file.name, "rb") as config_file:
                             form.add_field("configuration", config_file, filename=temp_file.name)
                             try:
+                                logger.debug(f"************************")
+                                logger.debug(config_file)
+                                logger.debug(f"************************")
+
+
                                 async with session.post(create_cluster_endpoint, data=form) as response:
                                     response_data = await response.json()
                                     logger.debug(f"Response from budcluster service: {response_data}")
