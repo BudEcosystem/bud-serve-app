@@ -442,28 +442,27 @@ class ClusterService(SessionMixin):
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".yaml", mode="w") as temp_file:
                         # Write minimal configuration to the temporary file
                         yaml.safe_dump({"name": "dummy-cluster"}, temp_file)
-                        temp_file.flush()
-
+                        # temp_file.flush()
                         # Open the file as a binary for proper upload
                         with open(temp_file.name, "rb") as config_file:
                             form.add_field("configuration", config_file, filename="dummy.yaml")
-                    # Log Form data
-                    logger.debug(f"Form data: {json.dumps(cluster_create_request)}")
+                            # Log Form data
+                            logger.debug(f"Form data: {json.dumps(cluster_create_request)}")
 
-                    async with session.post(
-                        create_cluster_endpoint,
-                        data=form
-                    ) as response:
-                        response_data = await response.json()
-                        logger.debug(f"Response from budcluster service: {response_data}")
+                            async with session.post(
+                                create_cluster_endpoint,
+                                data=form
+                            ) as response:
+                                response_data = await response.json()
+                                logger.debug(f"Response from budcluster service: {response_data}")
 
-                        if response.status != 200 or response_data.get("object") == "error":
-                            error_message = response_data.get("message", "Failed to create cloud cluster")
-                            logger.error(f"Failed to create cloud cluster with external service: {error_message}")
-                            raise ClientException(error_message)
+                                if response.status != 200 or response_data.get("object") == "error":
+                                    error_message = response_data.get("message", "Failed to create cloud cluster")
+                                    logger.error(f"Failed to create cloud cluster with external service: {error_message}")
+                                    raise ClientException(error_message)
 
-                        logger.debug("Successfully created cloud cluster with budcluster service")
-                        return response_data
+                                logger.debug("Successfully created cloud cluster with budcluster service")
+                                return response_data
 
                 except ClientException as e:
                     raise e
