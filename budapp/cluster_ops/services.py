@@ -173,11 +173,12 @@ class ClusterService(SessionMixin):
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
             workflow_id, workflow_create, current_user_id
         )
+        configuration_yaml = None
 
         # Validate the configuration file
         if configuration_file:
             # Validate the configuration file for ON_PERM cluster
-            configuration_yaml = None
+
             if cluster_type == "ON_PREM" and configuration_file:
                 if not await check_file_extension(configuration_file.filename, ["yaml", "yml"]):
                     logger.error("Invalid file extension for configuration file")
