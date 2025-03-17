@@ -176,7 +176,6 @@ class ClusterService(SessionMixin):
 
         # Validate the configuration file
         if configuration_file:
-
             # Validate the configuration file for ON_PERM cluster
             configuration_yaml = None
             if cluster_type == "ON_PREM" and configuration_file:
@@ -239,18 +238,22 @@ class ClusterService(SessionMixin):
                 {"icon": cluster_icon},
             )
 
+        logger.debug("====== Preparing The Payload")
+
         # Prepare workflow step data (UI Steps)
         workflow_step_data = CreateClusterWorkflowSteps(
             name=cluster_name,
             icon=cluster_icon,
             ingress_url=ingress_url,
-            configuration_yaml=configuration_yaml if configuration_file and cluster_type == "ON_PREM" else None,
+            configuration_yaml=configuration_yaml,
             cluster_type=cluster_type,
             credential_id=credential_id if cluster_type == "CLOUD" else None,
             provider_id=provider_id if cluster_type == "CLOUD" else None,
             region=region if cluster_type == "CLOUD" else None,
             credentials=credentials if cluster_type == "CLOUD" else None
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+
+        logger.debug(f"====== {workflow_step_data}")
 
         # Get workflow steps
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -467,6 +470,8 @@ class ClusterService(SessionMixin):
                     # Write configuration yaml to temporary yaml file
                     yaml.safe_dump(data["configuration_yaml"], temp_file)
 
+
+
                     logger.debug(f"cluster_create_request: {cluster_create_request}")
                     # Perform the request as a form data
                     async with aiohttp.ClientSession() as session:
@@ -477,6 +482,11 @@ class ClusterService(SessionMixin):
                         with open(temp_file.name, "rb") as config_file:
                             form.add_field("configuration", config_file, filename=temp_file.name)
                             try:
+                                logger.debug(f"************************")
+                                logger.debug(config_file)
+                                logger.debug(f"************************")
+
+
                                 async with session.post(create_cluster_endpoint, data=form) as response:
                                     response_data = await response.json()
                                     logger.debug(f"Response from budcluster service: {response_data}")

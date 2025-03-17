@@ -116,9 +116,6 @@ async def create_cluster_workflow(
             message="workflow_total_steps and workflow_id cannot be provided together",
         ).to_http_response()
 
-    # Debugging
-    logger.debug(configuration_file)
-
     if cluster_type == "CLOUD" and workflow_id is not None and trigger_workflow:
         # validate all the details are
         required_fields = [credential_id, provider_id, region]
