@@ -438,7 +438,15 @@ class ClusterService(SessionMixin):
 
                     form = aiohttp.FormData()
                     form.add_field("cluster_create_request", json.dumps(cluster_create_request))
+                    # For cloud cluster, we create a temporary YAML file with minimal configuration
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".yaml", mode="w") as temp_file:
+                        # Write minimal configuration to the temporary file
+                        yaml.safe_dump({"name": "dummy-cluster"}, temp_file)
+                        temp_file.flush()
 
+                        # Open the file as a binary for proper upload
+                        with open(temp_file.name, "rb") as config_file:
+                            form.add_field("configuration", config_file, filename="dummy.yaml")
                     # Log Form data
                     logger.debug(f"Form data: {json.dumps(cluster_create_request)}")
 
