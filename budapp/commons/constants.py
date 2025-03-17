@@ -2572,6 +2572,7 @@ class NotificationTypeEnum(StrEnum):
     CLUSTER_DELETION_SUCCESS = auto()
     DEPLOYMENT_DELETION_SUCCESS = auto()
     MODEL_QUANTIZATION_SUCCESS = auto()
+    MODEL_BENCHMARK_SUCCESS = auto()
 
 
 BENCHMARK_FIELDS_TYPE_MAPPER = {
@@ -2615,3 +2616,11 @@ BENCHMARK_FIELDS_LABEL_MAPPER = {
     "bcfl": "BCFL",
     "live_code_bench": "Live Code Bench",
 }
+
+
+class BenchmarkStatusEnum(Enum):
+    """Benchmark status."""
+
+    SUCCESS = "success"
+    FAILED = "failed"
+    PROCESSING = "processing"
