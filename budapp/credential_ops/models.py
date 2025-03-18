@@ -19,12 +19,13 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Float, String, Uuid
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, String, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.constants import CredentialTypeEnum
 from budapp.commons.database import Base, TimestampMixin
+from budapp.commons.security import hash_token
 
 
 class ProprietaryCredential(Base, TimestampMixin):
@@ -42,11 +43,13 @@ class ProprietaryCredential(Base, TimestampMixin):
         ),
         nullable=False,
     )
+    provider_id: Mapped[UUID] = mapped_column(ForeignKey("provider.id"), nullable=False)
 
     # placeholder for api base, project, organization, etc.
     other_provider_creds: Mapped[dict] = mapped_column(JSONB, nullable=True)
 
     endpoints: Mapped[list["Endpoint"]] = relationship("Endpoint", back_populates="credential")
+    provider: Mapped["Provider"] = relationship("Provider")
 
 
 class Credential(Base, TimestampMixin):
@@ -70,4 +73,7 @@ class Credential(Base, TimestampMixin):
 
     project: Mapped["Project"] = relationship("Project", foreign_keys=[project_id])
 
-
+    @staticmethod
+    def set_hashed_key(key: str):
+        hashed_key = hash_token(f"sk-{key}")
+        return hashed_key

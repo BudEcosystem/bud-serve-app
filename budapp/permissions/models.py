@@ -47,3 +47,36 @@ class Permission(Base, TimestampMixin):
         if not self.scopes:
             return []
         return json.loads(self.scopes)
+
+
+class ProjectPermission(Base):
+    """Project Permission model."""
+
+    __tablename__ = "project_permission"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("project.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), nullable=False
+    )
+    auth_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    scopes: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    modified_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    user: Mapped["User"] = relationship(
+        back_populates="project_permissions", foreign_keys=[user_id]
+    )
+    project: Mapped["Project"] = relationship(
+        back_populates="project_permissions", foreign_keys=[project_id]
+    )
+
+    @hybrid_property
+    def scopes_list(self):
+        if not self.scopes:
+            return []
+        return json.loads(self.scopes)

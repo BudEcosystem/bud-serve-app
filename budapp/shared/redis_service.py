@@ -1,4 +1,5 @@
-from typing import Optional, Union
+import json
+from typing import Any, Callable, Optional, Union
 
 import redis.asyncio as aioredis
 from redis.typing import AbsExpiryT, EncodableT, ExpiryT, KeyT, PatternT, ResponseT
@@ -91,3 +92,39 @@ class RedisService:
             except Exception as e:
                 logger.exception(f"Error deleting Redis key: {e}")
                 raise RedisException(f"Error deleting Redis key {names}") from e
+
+    async def delete_keys_by_pattern(self, pattern):
+        """Delete all keys matching a pattern from Redis."""
+        async with self.redis_singleton as redis:
+            matching_keys = await redis.keys(pattern)
+            if matching_keys:
+                await redis.delete(*matching_keys)
+                return len(matching_keys)
+            return 0
+
+
+def cache(
+    key_func: Callable[[Any, Any], str],
+    ttl: Optional[int] = None,
+    serializer: Callable = json.dumps,
+    deserializer: Callable = json.loads,
+):
+    def decorator(func: Callable):
+        async def wrapper(*args, **kwargs) -> Any:
+            redis_service = RedisService()
+
+            key = key_func(*args, **kwargs)
+            cached_data = await redis_service.get(key)
+
+            if cached_data:
+                return deserializer(cached_data)
+
+            result = await func(*args, **kwargs)
+
+            await redis_service.set(key, serializer(result), ex=ttl)
+
+            return result
+
+        return wrapper
+
+    return decorator

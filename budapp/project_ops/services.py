@@ -19,6 +19,8 @@
 from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
+from fastapi import HTTPException, status
+
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
@@ -89,3 +91,12 @@ class ProjectService(SessionMixin):
             )
 
         return result, count
+
+    async def check_project_membership(self, project_id: UUID, user_id: UUID) -> None:
+        user_ids_list = await ProjectDataManager(self.session).get_active_user_ids_in_project(project_id)
+
+        if user_id not in user_ids_list:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User is not a member of the project",
+            )
