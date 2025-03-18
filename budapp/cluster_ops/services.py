@@ -213,6 +213,8 @@ class ClusterService(SessionMixin):
 
             credentials = cloud_credentials.credential
 
+            logger.debug(f"====== {credentials.provider}")
+
         if cluster_name:
             # Check duplicate cluster name
             db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
