@@ -255,7 +255,7 @@ class ClusterService(SessionMixin):
             provider_id=provider_id if cluster_type == "CLOUD" else None,
             region=region if cluster_type == "CLOUD" else None,
             credentials=credentials if cluster_type == "CLOUD" else None,
-            cloud_provider_unique_id= cloud_credentials.provider.unique_id if cluster_type == "CLOUD" else None
+            cloud_provider_unique_id=cloud_credentials.provider.unique_id if cluster_type == "CLOUD" else None
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         logger.debug(f"====== {workflow_step_data}")
@@ -329,7 +329,7 @@ class ClusterService(SessionMixin):
             if cluster_type == "ON_PREM":
                 keys_of_interest.extend(["configuration_yaml", "ingress_url"])
             elif cluster_type == "CLOUD":
-                keys_of_interest.extend(["credential_id", "provider_id", "region", "credentials"])
+                keys_of_interest.extend(["credential_id", "provider_id", "region", "credentials","cloud_provider_unique_id"])
 
             # from workflow steps extract necessary information
             required_data = {}
@@ -437,7 +437,7 @@ class ClusterService(SessionMixin):
             cluster_create_request["cluster_type"] = cluster_type
             cluster_create_request["cloud_provider_unique_id"] = data["cloud_provider_unique_id"]
 
-            logging.debug(f"=====Cluster create request: {cluster_create_request}")
+            logger.debug(f"=====Cluster create request: {cluster_create_request}")
             raise ClientException("Hard Stop!!")
 
             # Make the request for cloud cluster
