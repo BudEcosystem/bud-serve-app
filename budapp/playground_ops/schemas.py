@@ -42,9 +42,9 @@ class EndpointListResponse(BaseModel):
     project: ProjectResponse
     created_at: datetime
     modified_at: datetime
-    input_cost_per_token: float
-    output_cost_per_token: float
-    context_length: int
+    input_cost: dict | None = None
+    output_cost: dict | None = None
+    context_length: int | None = None
 
 
 class PlaygroundDeploymentListResponse(PaginatedSuccessResponse):

@@ -220,8 +220,8 @@ class CloudModel(Base, TimestampMixin):
     is_present_in_model: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     max_input_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    input_cost_per_token: Mapped[Optional[float]] = mapped_column(Numeric, nullable=True)
-    output_cost_per_token: Mapped[Optional[float]] = mapped_column(Numeric, nullable=True)
+    input_cost: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    output_cost: Mapped[dict] = mapped_column(JSONB, nullable=True)
 
     provider: Mapped[Optional["Provider"]] = relationship("Provider", back_populates="cloud_models")
 
