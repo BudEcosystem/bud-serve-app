@@ -20,6 +20,8 @@ from ..commons.constants import (
     WorkflowTypeEnum,
     ModelStatusEnum,
     ClusterStatusEnum,
+    BenchmarkStatusEnum,
+    ModelProviderTypeEnum,
 )
 from ..commons.exceptions import ClientException, RedisException
 from ..core.schemas import NotificationPayload, NotificationResult
@@ -30,7 +32,7 @@ from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
-from .models import BenchmarkCRUD
+from .models import BenchmarkCRUD, BenchmarkSchema
 from .schemas import RunBenchmarkWorkflowRequest, RunBenchmarkWorkflowStepData
 
 from ..model_ops.crud import ModelDataManager
@@ -52,6 +54,7 @@ class BenchmarkService(SessionMixin):
         # resources
         model_id = request.model_id
         cluster_id = request.cluster_id
+        credential_id = request.credential_id
 
         current_step_number = step_number
 
@@ -74,6 +77,14 @@ class BenchmarkService(SessionMixin):
             )
             if not db_model:
                 raise ClientException("Model does not exist")
+            if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+                model_uri = db_model.uri
+                model_source = db_model.source
+                if model_uri.startswith(f"{model_source}/"):
+                    model_uri = model_uri.removeprefix(f"{model_source}/")
+                request.model = model_uri if not credential_id else f"{model_source}/{model_uri}"
+            else:
+                request.model = db_model.local_path
 
         if cluster_id:
             db_cluster = await ClusterService(self.session).retrieve_by_fields(
@@ -179,7 +190,7 @@ class BenchmarkService(SessionMixin):
 
             try:
                 # Perform add worker deployment
-                await self._perform_run_benchmark_request(
+                await self._add_run_benchmark_workflow_step(
                     current_step_number, required_data, db_workflow, current_user_id
                 )
             except ClientException as e:
@@ -189,7 +200,25 @@ class BenchmarkService(SessionMixin):
 
     async def _add_run_benchmark_workflow_step(self, current_user_id: UUID, request: RunBenchmarkWorkflowRequest, db_workflow: WorkflowModel, current_user_id: UUID):
         """Add run benchmark workflow step."""
+        # insert benchmark in budapp db
+        db_benchmark = await BenchmarkCRUD(self.session).insert_one(
+            BenchmarkSchema(
+                name=request.name,
+                tags=request.tags,
+                description=request.description,
+                eval_with=request.eval_with,
+                user_id=current_user_id,
+                model_id=request.model_id,
+                cluster_id=request.cluster_id,
+                nodes=request.nodes,
+                concurrency=request.concurrent_requests,
+                status=BenchmarkStatusEnum.PROCESSING
+            )
+        )
+        logger.debug(f"Benchmark created with id {db_benchmark.id}")
+
         run_benchmark_payload = {
+            "benchmark_id": db_benchmark.id,
             **request.model_dump(mode="json"),
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,

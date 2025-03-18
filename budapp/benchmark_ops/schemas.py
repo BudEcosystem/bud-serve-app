@@ -36,11 +36,15 @@ class RunBenchmarkWorkflowStepData(BaseModel):
 
     # step 6
     model_id: Optional[UUID]
+    model: Optional[str]
 
     # step 7
-    user_confirmation: Optional[bool]
+    credential_id: Optional[UUID]
 
     # step 8
+    user_confirmation: Optional[bool]
+
+    # step 9
     run_as_simulation: Optional[bool]
 
     @model_validator(mode="after")
@@ -48,6 +52,8 @@ class RunBenchmarkWorkflowStepData(BaseModel):
         """Validate the fields of the request."""
         if self.datasets is None and (self.max_input_tokens is None or self.max_output_tokens is None):
             raise ValueError("At least one of datasets or configuration (max_input_tokens and max_output_tokens) is required")
+        if self.use_cache is True and (self.embedding_model is None or self.eviction_policy is None or self.score_threshold is None):  # noqa: E501self.embedding_model is None:
+            raise ValueError("embedding_model, eviction_policy and score_threshold must be provided if use_cache is True")
         return self
 
 
