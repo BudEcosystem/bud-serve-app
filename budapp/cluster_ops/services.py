@@ -211,9 +211,9 @@ class ClusterService(SessionMixin):
             if not cloud_credentials:
                 raise ClientException("Cloud provider credential not found")
 
-            credentials = cloud_credentials.credential
+            credentials = cloud_credentials.credential # type: ignore
 
-            logger.debug(f"====== {cloud_credentials.provider}")
+            logger.debug(f"====== Unique ID {cloud_credentials.provider.unique_id}") # type: ignore
 
         if cluster_name:
             # Check duplicate cluster name
