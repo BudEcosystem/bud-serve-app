@@ -32,7 +32,14 @@ from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..project_ops.crud import ProjectDataManager
 from .crud import ChatSessionDataManager, MessageDataManager, ChatSettingDataManager, NoteDataManager
 from .models import ChatSession, Message, ChatSetting, Note
-from .schemas import ChatSessionCreate, ChatSessionListResponse, MessageResponse, ChatSettingListResponse, NoteResponse
+from .schemas import (
+    ChatSessionCreate,
+    ChatSessionListResponse,
+    MessageResponse,
+    ChatSettingListResponse,
+    NoteResponse,
+    EndpointListResponse,
+)
 
 
 logger = logging.get_logger(__name__)
@@ -66,9 +73,24 @@ class PlaygroundService(SessionMixin):
             order_by,
             search,
         )
-        logger.debug("found %s deployments", count)
+        db_deployments_list = []
+        for db_endpoint in db_endpoints:
+            deployment, input_cost, output_cost, context_length = db_endpoint
+            db_deployment = EndpointListResponse(
+                id=deployment.id,
+                name=deployment.name,
+                status=deployment.status,
+                model=deployment.model,
+                project=deployment.project,
+                created_at=deployment.created_at,
+                modified_at=deployment.modified_at,
+                input_cost=input_cost,
+                output_cost=output_cost,
+                context_length=context_length,
+            )
+            db_deployments_list.append(db_deployment)
 
-        return db_endpoints, count
+        return db_deployments_list, count
 
     async def _get_authorized_project_ids(
         self, current_user_id: Optional[UUID] = None, api_key: Optional[str] = None
