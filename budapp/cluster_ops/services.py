@@ -213,7 +213,7 @@ class ClusterService(SessionMixin):
 
             credentials = cloud_credentials.credential
 
-            logger.debug(f"====== {credentials.provider}")
+            logger.debug(f"====== {cloud_credentials.provider}")
 
         if cluster_name:
             # Check duplicate cluster name
