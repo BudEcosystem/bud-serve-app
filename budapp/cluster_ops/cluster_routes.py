@@ -53,6 +53,7 @@ from .schemas import (
     MetricTypeEnum,
 )
 from .services import ClusterService
+from budapp.cluster_ops.schemas import CreateCloudClusterRequest
 
 
 logger = logging.get_logger(__name__)
@@ -84,13 +85,22 @@ async def create_cluster_workflow(
     step_number: Annotated[int, Form(gt=0)],
     name: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
     icon: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
+
+
     ingress_url: Annotated[AnyHttpUrl | None, Form()] = None,
     configuration_file: Annotated[
         UploadFile | None, File(description="The configuration file for the cluster")
     ] = None,
+
     workflow_id: Annotated[UUID | None, Form()] = None,
     workflow_total_steps: Annotated[int | None, Form()] = None,
     trigger_workflow: Annotated[bool, Form()] = False,
+    # Cloud Cluster
+    cluster_type: Annotated[str, Form(description="Type of cluster", enum=["ON_PREM", "CLOUD"])] = "ON_PREM",
+    # Cluster Specific Inputs
+    credential_id:  Annotated[UUID | None, Form()] = None,
+    provider_id:  Annotated[UUID | None, Form()] = None,
+    region: Annotated[str | None, Form()] = None
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Create cluster workflow."""
     # Perform router level validation
@@ -105,6 +115,15 @@ async def create_cluster_workflow(
             code=status.HTTP_400_BAD_REQUEST,
             message="workflow_total_steps and workflow_id cannot be provided together",
         ).to_http_response()
+
+    if cluster_type == "CLOUD" and workflow_id is not None and trigger_workflow:
+        # validate all the details are
+        required_fields = [credential_id, provider_id, region]
+        if None in required_fields:
+            return ErrorResponse(
+                code=status.HTTP_400_BAD_REQUEST,
+                message="credential_id, provider_id, and region are required for CLOUD cluster creation",
+            ).to_http_response()
 
     # Check if at least one of the other fields is provided
     other_fields = [name, ingress_url, configuration_file]
@@ -126,6 +145,10 @@ async def create_cluster_workflow(
                 workflow_total_steps=workflow_total_steps,
                 step_number=step_number,
                 trigger_workflow=trigger_workflow,
+                credential_id=credential_id,
+                provider_id=provider_id,
+                region=region,
+                cluster_type=cluster_type
             ),
             configuration_file=configuration_file,
         )
@@ -138,7 +161,7 @@ async def create_cluster_workflow(
         logger.exception(f"ValidationErrors: {str(e)}")
         raise RequestValidationError(e.errors())
     except Exception as e:
-        logger.error(f"Error occurred while executing create cluster workflow: {str(e)}")
+        logger.error(f"Error occurred while executing create cluster workflow: {str(e)}", exc_info=True)
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to execute create cluster workflow"
         ).to_http_response()
@@ -499,7 +522,7 @@ async def get_node_wise_metrics(
     """Get node-wise metrics for a cluster."""
     try:
         metrics = await ClusterService(session).get_node_wise_metrics(cluster_id)
-        
+
         return NodeMetricsResponse(
             code=status.HTTP_200_OK, message="Successfully retrieved node metrics", **metrics
         )
@@ -541,9 +564,9 @@ async def get_node_wise_events_by_hostname(
         events_raw = await ClusterService(session).get_node_wise_events_by_hostname(cluster_id, node_hostname)
 
         events = events_raw.get("events", [])
-        
+
         return ClusterNodeWiseEventsResponse(
-            code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname",     
+            code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname",
             events=events
         )
     except ClientException as e:

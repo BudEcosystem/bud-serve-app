@@ -17,9 +17,10 @@
 """The credential ops package, containing essential business logic, services, and routing configurations for the credential ops."""
 
 from datetime import UTC, datetime
+from enum import UNIQUE
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Float, String, Uuid
+from sqlalchemy import DateTime, Enum, ForeignKey, Float, String, Uuid,Boolean
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -71,3 +72,28 @@ class Credential(Base, TimestampMixin):
     project: Mapped["Project"] = relationship("Project", foreign_keys=[project_id])
 
 
+class CloudCredentials(Base, TimestampMixin):
+    """Cloud Credentials : model for cloud credentials."""
+
+    __tablename__ = "cloud_credentials"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    provider_id: Mapped[UUID] = mapped_column(ForeignKey("cloud_providers.id", ondelete="CASCADE"), nullable=False)
+    credential: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    credential_name: Mapped[str] = mapped_column(String, nullable=False, default="No Name")
+
+    provider = relationship("CloudProviders", back_populates="credentials")
+
+
+class CloudProviders(Base, TimestampMixin):
+    """Cloud Providers : model for cloud providers."""
+    __tablename__ = "cloud_providers"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=False)
+    logo_url: Mapped[str] = mapped_column(String, nullable=False)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    schema_definition: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    unique_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+
+    credentials = relationship("CloudCredentials", back_populates="provider")
