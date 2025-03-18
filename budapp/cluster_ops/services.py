@@ -159,6 +159,7 @@ class ClusterService(SessionMixin):
 
         # Get Cluster Credential
         credentials = None
+        cloud_credentials = None
 
         current_step_number = step_number
 
@@ -215,9 +216,6 @@ class ClusterService(SessionMixin):
 
             logger.debug(f"====== Unique ID {cloud_credentials.provider.unique_id}") # type: ignore
 
-            # Ignore for testing
-            raise ClientException("Hard Stop!!")
-
         if cluster_name:
             # Check duplicate cluster name
             db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
@@ -256,7 +254,8 @@ class ClusterService(SessionMixin):
             credential_id=credential_id if cluster_type == "CLOUD" else None,
             provider_id=provider_id if cluster_type == "CLOUD" else None,
             region=region if cluster_type == "CLOUD" else None,
-            credentials=credentials if cluster_type == "CLOUD" else None
+            credentials=credentials if cluster_type == "CLOUD" else None,
+            cloud_provider_unique_id= cloud_credentials.provider.unique_id if cluster_type == "CLOUD" else None
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         logger.debug(f"====== {workflow_step_data}")
@@ -436,6 +435,10 @@ class ClusterService(SessionMixin):
             cluster_create_request["region"] = data["region"]
             cluster_create_request["credentials"] = data["credentials"]
             cluster_create_request["cluster_type"] = cluster_type
+            cluster_create_request["cloud_provider_unique_id"] = data["cloud_provider_unique_id"]
+
+            logging.debug(f"=====Cluster create request: {cluster_create_request}")
+            raise ClientException("Hard Stop!!")
 
             # Make the request for cloud cluster
             async with aiohttp.ClientSession() as session:
