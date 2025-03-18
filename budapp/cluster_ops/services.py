@@ -438,7 +438,6 @@ class ClusterService(SessionMixin):
             cluster_create_request["cloud_provider_unique_id"] = data["cloud_provider_unique_id"]
 
             logger.debug(f"=====Cluster create request: {cluster_create_request}")
-            raise ClientException("Hard Stop!!")
 
             # Make the request for cloud cluster
             async with aiohttp.ClientSession() as session:
