@@ -157,7 +157,7 @@ class BenchmarkService(SessionMixin):
                 "description",
                 "concurrent_requests",
                 "eval_with",
-                "use_cache",
+                # "use_cache",
                 "cluster_id",
                 "nodes",
                 "model_id",
@@ -167,7 +167,7 @@ class BenchmarkService(SessionMixin):
 
             keys_of_interest_for_dataset = ["datasets"]
             keys_of_interest_for_configuration = ["max_input_tokens", "max_output_tokens"]
-            keys_of_interest_for_cache = ["embedding_model", "eviction_policy", "max_size", "ttl", "score_threshold"]
+            # keys_of_interest_for_cache = ["embedding_model", "eviction_policy", "max_size", "ttl", "score_threshold"]
 
             # from workflow steps extract necessary information
             required_data = {}
@@ -182,8 +182,8 @@ class BenchmarkService(SessionMixin):
                 required_keys += keys_of_interest_for_dataset
             elif required_data.get("eval_with", "") == "configuration":
                 required_keys += keys_of_interest_for_configuration
-            if required_data.get("use_cache", False):
-                required_keys += keys_of_interest_for_cache
+            # if required_data.get("use_cache", False):
+            #     required_keys += keys_of_interest_for_cache
             missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data for run benchmark workflow: {', '.join(missing_keys)}")
@@ -201,24 +201,27 @@ class BenchmarkService(SessionMixin):
     async def _add_run_benchmark_workflow_step(self, current_user_id: UUID, request: RunBenchmarkWorkflowRequest, db_workflow: WorkflowModel, current_user_id: UUID):
         """Add run benchmark workflow step."""
         # insert benchmark in budapp db
-        db_benchmark = await BenchmarkCRUD(self.session).insert_one(
-            BenchmarkSchema(
-                name=request.name,
-                tags=request.tags,
-                description=request.description,
-                eval_with=request.eval_with,
-                user_id=current_user_id,
-                model_id=request.model_id,
-                cluster_id=request.cluster_id,
-                nodes=request.nodes,
-                concurrency=request.concurrent_requests,
-                status=BenchmarkStatusEnum.PROCESSING
+        benchmark_id = None
+        with BenchmarkCRUD() as crud:
+            db_benchmark =  crud.insert(
+                BenchmarkSchema(
+                    name=request.name,
+                    tags=request.tags,
+                    description=request.description,
+                    eval_with=request.eval_with,
+                    user_id=current_user_id,
+                    model_id=request.model_id,
+                    cluster_id=request.cluster_id,
+                    nodes=request.nodes,
+                    concurrency=request.concurrent_requests,
+                    status=BenchmarkStatusEnum.PROCESSING
+                )
             )
-        )
-        logger.debug(f"Benchmark created with id {db_benchmark.id}")
+            logger.debug(f"Benchmark created with id {db_benchmark.id}")
+            benchmark_id = db_benchmark.id
 
         run_benchmark_payload = {
-            "benchmark_id": db_benchmark.id,
+            "benchmark_id": benchmark_id,
             **request.model_dump(mode="json"),
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
@@ -297,23 +300,27 @@ class BenchmarkService(SessionMixin):
         logger.debug("Collected required data from workflow steps")
 
         # Get benchmark
-        db_benchmark = await BenchmarkCRUD(self.session).fetch_one(
-            conditions={"id": required_data["benchmark_id"]},
-            raise_on_error=False,
-        )
+        with BenchmarkCRUD() as crud:
+            db_benchmark = crud.fetch_one(
+                conditions={"id": required_data["benchmark_id"]},
+                raise_on_error=False,
+            )
 
-        if not db_benchmark:
-            logger.error(f"Benchmark with id {required_data['benchmark_id']} not found")
-            return
+            if not db_benchmark:
+                logger.error(f"Benchmark with id {required_data['benchmark_id']} not found")
+                return
 
-        benchmark_result = payload.content.result.get("result", {})
+            benchmark_response = payload.content.result
+            if benchmark_response["benchmark_status"]:
+                update_data = {"status": BenchmarkStatusEnum.SUCCESS, "bud_cluster_benchmark_id": benchmark_response["bud_cluster_benchmark_id"], "result": benchmark_response["result"]}
+            else:
+                update_data = {"status": BenchmarkStatusEnum.FAILED, "reason": benchmark_response["result"]}
 
-        self.session.refresh(db_benchmark)
-        db_benchmark = await BenchmarkCRUD(self.session).update(
-            data={},
-            conditions={"id": db_benchmark.id},
-        )
-        logger.debug(f"Updated benchmark: {db_benchmark}")
+            db_benchmark = crud.update(
+                data=update_data,
+                conditions={"id": db_benchmark.id},
+            )
+            logger.debug(f"Updated benchmark: {db_benchmark}")
 
         # Update current step number
         current_step_number = db_workflow.current_step + 1

@@ -44,6 +44,7 @@ class BenchmarkSchema(PSQLBase, TimestampMixin):
         nullable=False,
     )
     reason: Mapped[str] = mapped_column(String, nullable=True)
+    result: Mapped[dict] = mapped_column(JSONB, nullable=True)
 
     model: Mapped["Model"] = relationship("Model", back_populates="benchmarks")
     cluster: Mapped["Cluster"] = relationship("Cluster", back_populates="benchmarks")

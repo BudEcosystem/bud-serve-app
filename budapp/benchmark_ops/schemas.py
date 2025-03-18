@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 from uuid import UUID
 
 from pydantic import UUID4, BaseModel, Field, model_validator
@@ -21,18 +21,18 @@ class RunBenchmarkWorkflowStepData(BaseModel):
     max_output_tokens: Optional[int]
 
     # step 3
-    use_cache: Optional[bool]
-    embedding_model: Optional[str]
-    eviction_policy: Optional[str]
-    max_size: Optional[int]
-    ttl: Optional[int]
-    score_threshold: Optional[float]
+    # use_cache: Optional[bool]
+    # embedding_model: Optional[str]
+    # eviction_policy: Optional[str]
+    # max_size: Optional[int]
+    # ttl: Optional[int]
+    # score_threshold: Optional[float]
 
     # step 4
     cluster_id: Optional[UUID]
 
     # step 5
-    nodes: Optional[list[str]]
+    nodes: Optional[list[dict[str, Any]]]
 
     # step 6
     model_id: Optional[UUID]
@@ -52,8 +52,8 @@ class RunBenchmarkWorkflowStepData(BaseModel):
         """Validate the fields of the request."""
         if self.datasets is None and (self.max_input_tokens is None or self.max_output_tokens is None):
             raise ValueError("At least one of datasets or configuration (max_input_tokens and max_output_tokens) is required")
-        if self.use_cache is True and (self.embedding_model is None or self.eviction_policy is None or self.score_threshold is None):  # noqa: E501self.embedding_model is None:
-            raise ValueError("embedding_model, eviction_policy and score_threshold must be provided if use_cache is True")
+        # if self.use_cache is True and (self.embedding_model is None or self.eviction_policy is None or self.score_threshold is None):  # noqa: E501self.embedding_model is None:
+        #     raise ValueError("embedding_model, eviction_policy and score_threshold must be provided if use_cache is True")
         return self
 
 
