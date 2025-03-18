@@ -30,6 +30,7 @@ from budapp.model_ops.models import Model as Model, CloudModel
 
 from ..commons.helpers import get_param_range
 from ..commons.constants import ModelProviderTypeEnum
+
 from ..project_ops.models import Project as ProjectModel
 from .models import Endpoint as EndpointModel
 
@@ -275,27 +276,33 @@ class EndpointDataManager(DataManagerUtils):
         await self.validate_fields(EndpointModel, filters)
 
         if json_filters["tags"]:
+            # Either TagA or TagB exist in tag field
             tag_conditions = or_(
                 *[Model.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]]
             )
             explicit_conditions.append(tag_conditions)
 
         if json_filters["tasks"]:
+            # Either TaskA or TaskB exist in task field
             task_conditions = or_(
                 *[Model.tasks.cast(JSONB).contains([{"name": task_name}]) for task_name in json_filters["tasks"]]
             )
             explicit_conditions.append(task_conditions)
 
         if explicit_filters["modality"]:
+            # Check any of modality present in the field
             modality_condition = Model.modality.in_(explicit_filters["modality"])
             explicit_conditions.append(modality_condition)
 
         if explicit_filters["model_size"]:
+            # Convert model size to a pre-defined range of numbers
             model_size_min, model_size_max = get_param_range(explicit_filters["model_size"])
             explicit_conditions.append(Model.model_size.between(model_size_min, model_size_max))
 
+        # Generate statements according to search or filters
         if search:
             if explicit_filters["model_name"]:
+                # For search, query using like operator
                 model_name_condition = Model.name.ilike(f"%{explicit_filters['model_name']}%")
                 explicit_conditions.append(model_name_condition)
 
