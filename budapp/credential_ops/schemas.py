@@ -10,6 +10,7 @@ from budapp.commons.schemas import SuccessResponse
 import json
 from typing import Dict, Any, Union
 import uuid
+from typing import List
 
 logger = logging.get_logger(__name__)
 
@@ -163,3 +164,17 @@ class CloudCredentialSchema(BaseModel):
 class CloudCredentialResponse(SuccessResponse):
     """Response containing cloud credentials."""
     credentials: list[CloudCredentialSchema]
+
+class CloudProviderRegionsResponse(SuccessResponse):
+    """
+    Response model for cloud provider regions.
+
+    Attributes:
+        provider_id: Unique identifier of the cloud provider
+        provider_name: Name of the cloud provider
+        regions: List of regions supported by the provider
+        code: HTTP status code
+        message: Status message
+    """
+    provider_id: str = Field(..., description="Unique identifier of the cloud provider")
+    regions: List[Dict[str, Any]] = Field(..., description="List of regions supported by the provider")
