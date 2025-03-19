@@ -183,6 +183,7 @@ class CreateClusterWorkflowSteps(BaseModel):
 
     # Cloud Credentials
     credentials: dict | None = None
+    cloud_provider_unique_id: str | None = None
 
 
 class EditClusterRequest(BaseModel):
