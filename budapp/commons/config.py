@@ -254,6 +254,9 @@ class AppConfig(BaseConfig):
     cache_ttl: Optional[int] = Field(alias="CACHE_TTL", default=None)
     cache_score_threshold: float = Field(alias="CACHE_SCORE_THRESHOLD", default=0.1)
 
+    # Frontend URL
+    frontend_url: AnyUrl = Field(alias="FRONTEND_URL", default="http://localhost:3000")
+
     @computed_field
     def static_dir(self) -> str:
         """Get the static directory."""

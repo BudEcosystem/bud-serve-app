@@ -39,7 +39,7 @@ class PermissionDataManager(DataManagerUtils):
         await self.validate_fields(Permission, fields)
 
         stmt = select(Permission).filter_by(**fields)
-        db_permission = await self.scalar_one_or_none(stmt)
+        db_permission = self.scalar_one_or_none(stmt)
 
         if not missing_ok and db_permission is None:
             logger.info("Permission not found in database")
@@ -58,7 +58,7 @@ class ProjectPermissionDataManager(DataManagerUtils):
         await self.validate_fields(ProjectPermission, fields)
 
         stmt = select(ProjectPermission).filter_by(**fields)
-        db_project_permission = await self.scalar_one_or_none(stmt)
+        db_project_permission = self.scalar_one_or_none(stmt)
 
         if not missing_ok and db_project_permission is None:
             logger.info("Permission not found in database")

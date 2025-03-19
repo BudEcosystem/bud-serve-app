@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import IntEnum
-from typing import Annotated, Dict, Optional
+from typing import Annotated, Dict, List, Optional, Union
 from uuid import UUID
 
 from pydantic import (
@@ -15,10 +15,10 @@ from pydantic import (
 )
 
 from budapp.commons import logging
-from budapp.commons.schemas import CloudEventBase
 
 from ..commons.config import app_settings
 from ..commons.constants import CredentialTypeEnum
+from ..commons.schemas import CloudEventBase, PaginatedSuccessResponse
 from ..initializers.provider_seeder import ProviderSeeder
 
 
@@ -238,6 +238,12 @@ class ProprietaryCredentialDetailedView(ProprietaryCredentialResponseList):
     """Proprietary Credential detailed view schema"""
 
     endpoints: list
+
+
+class PaginatedCredentialResponse(PaginatedSuccessResponse):
+    """Paginated Credential response schema"""
+
+    credentials: List[Union[ProprietaryCredentialResponseList, CredentialDetails]]
 
 
 def common_validator_for_provider_creds(v, info: ValidationInfo):

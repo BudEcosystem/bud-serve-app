@@ -38,6 +38,10 @@ logger = logging.get_logger(__name__)
 class ProjectDataManager(DataManagerUtils):
     """Data manager for the Project model."""
 
+    async def create_project(self, project: Project) -> Project:
+        """Create a new project in the database."""
+        return await self.insert_one(project)
+
     def get_unique_user_count_in_all_projects(self) -> int:
         """Get the count of unique users across all active projects.
 
@@ -85,7 +89,7 @@ class ProjectDataManager(DataManagerUtils):
                     conditions.append(field == value)
             stmt = select(Project).filter(*conditions)
 
-        db_project = await self.scalar_one_or_none(stmt)
+        db_project = self.scalar_one_or_none(stmt)
 
         if not missing_ok and db_project is None:
             logger.info("Project not found in database")

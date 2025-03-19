@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Dict, List, Optional, Union
 from uuid import UUID
 
@@ -8,13 +8,13 @@ from fastapi.exceptions import HTTPException
 
 from budapp.commons.db_utils import SessionMixin
 
+from ..commons import logging
 from ..commons.config import app_settings
 from ..commons.constants import EndpointStatusEnum, ModelProviderTypeEnum, PermissionEnum, ProjectStatusEnum
-from ..commons.logging import logger
 from ..commons.security import RSAHandler
 from ..endpoint_ops.crud import EndpointDataManager
+from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..model_ops.crud import ProviderDataManager
-from ..model_ops.models import Endpoint as EndpointModel
 
 # from ..models import Route as RouteModel
 from ..model_ops.models import Model
@@ -41,6 +41,9 @@ from .schemas import (
     ProprietaryCredentialUpdate,
     RouterConfig,
 )
+
+
+logger = logging.get_logger(__name__)
 
 
 class CredentialService(SessionMixin):
@@ -91,7 +94,7 @@ class CredentialService(SessionMixin):
         # Generate new credential if type is BUDSERVE
         api_key = f"budserve_{await generate_random_string(40)}"
 
-        expiry = datetime.now(datetime.UTC) + timedelta(days=request.expiry) if request.expiry else None
+        expiry = datetime.now(UTC) + timedelta(days=request.expiry) if request.expiry else None
         credential_data = BudCredentialCreate(
             name=request.name,
             user_id=user_id,
@@ -222,7 +225,7 @@ class CredentialService(SessionMixin):
             db_credential.name = credential_update_data["name"]
 
         if credential_update_data.get("expiry", None):
-            credential_update_data["expiry"] = datetime.now(datetime.UTC) + timedelta(days=data.expiry)
+            credential_update_data["expiry"] = datetime.now(UTC) + timedelta(days=data.expiry)
 
         if credential_update_data.get("max_budget", None):
             if (

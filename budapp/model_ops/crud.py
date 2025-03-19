@@ -215,7 +215,7 @@ class ModelDataManager(DataManagerUtils):
         if search_value:
             distinct_on_name_query = distinct_on_name_query.where(
                 distinct_tasks_query.c.name.ilike(f"{search_value}%")
-            )Execute
+            )
 
         # Add pagination
         distinct_tasks_with_pagination = distinct_on_name_query.offset(offset).limit(limit)

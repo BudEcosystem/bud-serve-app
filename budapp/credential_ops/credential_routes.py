@@ -6,12 +6,11 @@ from sqlalchemy.orm import Session
 
 from ..commons import logging
 from ..commons.api_utils import pubsub_api_endpoint
-from ..commons.constants import PROPRIETARY_CREDENTIAL_DATA, CredentialTypeEnum
+from ..commons.constants import CredentialTypeEnum
 from ..commons.dependencies import get_current_active_user, get_session, parse_ordering_fields
 from ..commons.exceptions import ClientException
 from ..commons.schemas import (
     ErrorResponse,
-    PaginatedResponse,
     SingleResponse,
     SuccessResponse,
 )
@@ -20,17 +19,18 @@ from ..user_ops.schemas import User
 from .crud import CredentialDataManager
 from .models import Credential
 from .schemas import (
+    PROPRIETARY_CREDENTIAL_DATA,
     CredentialDetails,
     CredentialFilter,
     CredentialRequest,
     CredentialResponse,
     CredentialUpdate,
     CredentialUpdateRequest,
+    PaginatedCredentialResponse,
     ProprietaryCredentialDetailedView,
     ProprietaryCredentialFilter,
     ProprietaryCredentialRequest,
     ProprietaryCredentialResponse,
-    ProprietaryCredentialResponseList,
     ProprietaryCredentialUpdate,
     RouterConfig,
 )
@@ -113,7 +113,7 @@ async def add_credential(
 
 @credential_router.get(
     "/",
-    response_model=PaginatedResponse[CredentialDetails],
+    response_model=PaginatedCredentialResponse,
     responses=error_responses,
     description="Get saved credentials of user",
 )
@@ -134,10 +134,9 @@ async def retrieve_credentials(
     filters_dict["user_id"] = current_user.id
     results, count = await CredentialService(session).get_credentials(offset, limit, filters_dict, order_by, search)
 
-    return PaginatedResponse(
-        success=True,
+    return PaginatedCredentialResponse(
         message="Credentials listed successfully",
-        results=results,
+        credentials=results,
         total_record=count,
         page=page,
         limit=limit,
@@ -255,7 +254,7 @@ async def add_proprietary_credential(
 
 @proprietary_credential_router.get(
     "/",
-    response_model=PaginatedResponse[ProprietaryCredentialResponseList],
+    response_model=PaginatedCredentialResponse,
     responses=error_responses,
     description="Get proprietary credentials of user",
 )
@@ -278,10 +277,9 @@ async def retrieve_proprietary_credentials(
         offset, limit, filters_dict, order_by, search
     )
 
-    return PaginatedResponse(
-        success=True,
+    return PaginatedCredentialResponse(
         message="Proprietary credentials listed successfully",
-        results=results,
+        credentials=results,
         total_record=count,
         page=page,
         limit=limit,

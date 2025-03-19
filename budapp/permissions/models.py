@@ -26,7 +26,6 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.database import Base, TimestampMixin
-from budapp.user_ops.models import User
 
 
 class Permission(Base, TimestampMixin):
