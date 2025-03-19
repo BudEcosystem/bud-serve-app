@@ -27,7 +27,7 @@
     "name": "Azure",
     "unique_id": "azure",
     "description": "Microsoft Azure",
-    "logo_url": "icons/providers/vertexai.png",
+    "logo_url": "icons/providers/azure_openai.png",
     "schema": {
       "type": "object",
       "properties": {

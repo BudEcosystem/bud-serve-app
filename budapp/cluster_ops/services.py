@@ -562,7 +562,7 @@ class ClusterService(SessionMixin):
             "icon",
             "ingress_url",
             "cluster_type",
-            "cloud_provider_id",
+            "provider_id",
             "credential_id",
             "region",
         ]
@@ -607,7 +607,7 @@ class ClusterService(SessionMixin):
             status_sync_at=datetime.now(tz=timezone.utc),
             # Cloud Cluster
             cluster_type=required_data.get("cluster_type", "ON_PERM"),
-            cloud_provider_id=required_data.get("cloud_provider_id", None),
+            cloud_provider_id=required_data.get("provider_id", None),
             credential_id=required_data.get("credential_id", None),
             region=required_data.get("region", None),
         )
@@ -953,6 +953,10 @@ class ClusterService(SessionMixin):
             credential_id = db_cluster.credential_id
             provider_id = db_cluster.cloud_provider_id
 
+            # Debug
+            logger.debug(f"+++ CLOUD +++ {credential_id}")
+            logger.debug(f"+++ CLOUD +++ {provider_id}")
+
             cloud_credentials = await CloudProviderCredentialDataManager(self.session).retrieve_by_fields(
                 CloudCredentials,
                 fields={"id": credential_id, "provider_id": provider_id},
@@ -966,12 +970,13 @@ class ClusterService(SessionMixin):
             provider_unique_id = cloud_credentials.provider.unique_id
 
             cloud_payload = {
-                "credentail_id": credential_id,
-                "provider_id": provider_id,
+                "credentail_id": str(credential_id),
+                "provider_id": str(provider_id),
                 "region": db_cluster.region,
                 "credentials": credentials,
-                "provider_unique_id": provider_unique_id,
+                "provider_unique_id": str(provider_unique_id),
                 "cluster_type": db_cluster.cluster_type,
+                "name": db_cluster.name
             }
 
         # Perform delete cluster request to bud_cluster app
