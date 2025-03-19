@@ -188,8 +188,13 @@ class MessageCreateRequest(MessageBase):
 
     chat_session_id: UUID4 | None = None
     chat_setting_id: UUID4 | None = None
-    chat_session_name: str | None = Field(None, min_length=1, max_length=300)
     request_id: UUID4
+
+    @field_validator("prompt")
+    def validate_prompt(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Prompt cannot be empty.")
+        return value
 
 
 class MessageResponse(MessageBase):
