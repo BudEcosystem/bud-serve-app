@@ -976,7 +976,7 @@ class ClusterService(SessionMixin):
                 "credentials": credentials,
                 "provider_unique_id": str(provider_unique_id),
                 "cluster_type": db_cluster.cluster_type,
-                "cluster_name": db_cluster.name
+                "name": db_cluster.name
             }
 
         # Perform delete cluster request to bud_cluster app
