@@ -188,6 +188,7 @@ class MessageCreateRequest(MessageBase):
 
     chat_session_id: UUID4 | None = None
     chat_setting_id: UUID4 | None = None
+    chat_session_name: str | None = Field(None, min_length=1, max_length=300)
     request_id: UUID4
 
 

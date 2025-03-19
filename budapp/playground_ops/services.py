@@ -213,9 +213,9 @@ class MessageService(SessionMixin):
 
         # If chat_session_id is not provided, create a new chat session first
         if not message_data.get("chat_session_id"):
-            chat_session_data = ChatSessionCreate(name=None, chat_setting_id=chat_setting_id).model_dump(
-                exclude_unset=True, exclude_none=True
-            )
+            chat_session_data = ChatSessionCreate(
+                name=message_data.pop("chat_session_name", None), chat_setting_id=chat_setting_id
+            ).model_dump(exclude_unset=True, exclude_none=True)
             chat_session_data["user_id"] = user_id
             chat_session = ChatSession(**chat_session_data)
             db_chat_session = await ChatSessionDataManager(self.session).insert_one(chat_session)
