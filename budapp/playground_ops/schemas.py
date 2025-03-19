@@ -190,6 +190,12 @@ class MessageCreateRequest(MessageBase):
     chat_setting_id: UUID4 | None = None
     request_id: UUID4
 
+    @field_validator("prompt")
+    def validate_prompt(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Prompt cannot be empty.")
+        return value
+
 
 class MessageResponse(MessageBase):
     """Schema for returning a message response"""
