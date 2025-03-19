@@ -214,7 +214,7 @@ class MessageService(SessionMixin):
         # If chat_session_id is not provided, create a new chat session first
         if not message_data.get("chat_session_id"):
             prompt = message_data.get("prompt")
-            chat_session_name = prompt[:20]
+            chat_session_name = prompt[:20].strip()
 
             chat_session_data = ChatSessionCreate(name=chat_session_name, chat_setting_id=chat_setting_id).model_dump(
                 exclude_unset=True, exclude_none=True
