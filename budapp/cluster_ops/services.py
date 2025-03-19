@@ -562,7 +562,7 @@ class ClusterService(SessionMixin):
             "icon",
             "ingress_url",
             "cluster_type",
-            "cloud_provider_id",
+            "provider_id",
             "credential_id",
             "region",
         ]
@@ -607,7 +607,7 @@ class ClusterService(SessionMixin):
             status_sync_at=datetime.now(tz=timezone.utc),
             # Cloud Cluster
             cluster_type=required_data.get("cluster_type", "ON_PERM"),
-            cloud_provider_id=required_data.get("cloud_provider_id", None),
+            cloud_provider_id=required_data.get("provider_id", None),
             credential_id=required_data.get("credential_id", None),
             region=required_data.get("region", None),
         )
