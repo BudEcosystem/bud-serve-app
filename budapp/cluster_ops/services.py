@@ -970,11 +970,11 @@ class ClusterService(SessionMixin):
             provider_unique_id = cloud_credentials.provider.unique_id
 
             cloud_payload = {
-                "credentail_id": credential_id,
-                "provider_id": provider_id,
+                "credentail_id": str(credential_id),
+                "provider_id": str(provider_id),
                 "region": db_cluster.region,
                 "credentials": credentials,
-                "provider_unique_id": provider_unique_id,
+                "provider_unique_id": str(provider_unique_id),
                 "cluster_type": db_cluster.cluster_type,
             }
 
