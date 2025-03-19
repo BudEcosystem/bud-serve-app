@@ -953,6 +953,10 @@ class ClusterService(SessionMixin):
             credential_id = db_cluster.credential_id
             provider_id = db_cluster.cloud_provider_id
 
+            # Debug
+            logger.debug(f"+++ CLOUD +++ {credential_id}")
+            logger.debug(f"+++ CLOUD +++ {provider_id}")
+
             cloud_credentials = await CloudProviderCredentialDataManager(self.session).retrieve_by_fields(
                 CloudCredentials,
                 fields={"id": credential_id, "provider_id": provider_id},
