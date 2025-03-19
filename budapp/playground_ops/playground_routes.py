@@ -416,6 +416,9 @@ async def create_message(
     except ClientException as e:
         logger.exception(f"Failed to create message: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except ValidationError as e:
+        logger.exception(f"ValidationErrors: {str(e)}")
+        raise RequestValidationError(e.errors())
     except Exception as e:
         logger.exception(f"Failed to create message: {e}")
         return ErrorResponse(
