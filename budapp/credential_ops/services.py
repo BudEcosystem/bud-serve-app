@@ -309,7 +309,7 @@ class CredentialService(SessionMixin):
         api_base = db_endpoint.url
         if db_model.provider_type != ModelProviderTypeEnum.CLOUD_MODEL:
             api_base = f"{db_endpoint.url}/v1"
-            deploy_model_uri = f"{app_settings.MODEL_REGISTRY_DIR}/{db_model.local_path}"
+            deploy_model_uri = f"{app_settings.add_model_dir}/{db_model.local_path}"
             actual_model_name = f"openai/{deploy_model_uri}"
         else:
             model_uri = db_model.uri
@@ -323,7 +323,7 @@ class CredentialService(SessionMixin):
             litellm_params={
                 "model": actual_model_name,
                 "api_base": api_base,
-                "api_key": app_settings.LITELLM_PROXY_MASTER_KEY,
+                "api_key": app_settings.litellm_proxy_master_key,
             },
             model_info={
                 "id": db_model.id,

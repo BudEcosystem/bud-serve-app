@@ -35,7 +35,7 @@ def get_psql_url() -> PostgresDsn:
         raise ValueError("POSTGRES_HOST, POSTGRES_PORT, and POSTGRES_DB must be set")
 
     return PostgresDsn.build(
-        scheme="postgresql+psycopg",
+        scheme="postgresql",
         username=os.getenv("POSTGRES_USER"),
         password=os.getenv("POSTGRES_PASSWORD"),
         host=os.getenv("POSTGRES_HOST"),
@@ -106,6 +106,8 @@ def run_migrations_online() -> None:
         with context.begin_transaction():
             context.run_migrations()
 
+
+create_db()
 
 if context.is_offline_mode():
     run_migrations_offline()
