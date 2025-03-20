@@ -20,16 +20,17 @@ import asyncio
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
+from budmicroframe.main import configure_app
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 
 from .auth import auth_routes
+from .benchmark_ops import benchmark_routes
 from .cluster_ops import cluster_routes
 from .commons import logging
-from .commons.config import app_settings
-from .commons.constants import Environment
+from .commons.config import app_settings, secrets_settings
 from .core import common_routes, meta_routes, notify_routes
 from .credential_ops import credential_routes
 from .endpoint_ops import endpoint_routes
@@ -96,13 +97,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.exception("Failed to cleanup config & store sync.")
 
 
-app = FastAPI(
-    title=app_settings.name,
-    description=app_settings.description,
-    version=app_settings.version,
-    root_path=app_settings.api_root,
+# app = FastAPI(
+#     title=app_settings.name,
+#     description=app_settings.description,
+#     version=app_settings.version,
+#     root_path=app_settings.api_root,
+#     lifespan=lifespan,
+#     openapi_url=None if app_settings.env == Environment.PRODUCTION else "/openapi.json",
+# )
+
+app = configure_app(
+    app_settings,
+    secrets_settings,
     lifespan=lifespan,
-    openapi_url=None if app_settings.env == Environment.PRODUCTION else "/openapi.json",
 )
 
 # Serve static files
@@ -120,6 +127,7 @@ if app_settings.cors_origins:
 
 internal_router = APIRouter()
 internal_router.include_router(auth_routes.auth_router)
+internal_router.include_router(benchmark_routes.benchmark_router)
 internal_router.include_router(cluster_routes.cluster_router)
 internal_router.include_router(common_routes.common_router)
 internal_router.include_router(credential_routes.credential_router)
