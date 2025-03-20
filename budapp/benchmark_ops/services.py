@@ -9,22 +9,25 @@ from fastapi import status
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
 
-from ..cluster_ops.services import ClusterService
+from ..cluster_ops.crud import ClusterDataManager
+from ..cluster_ops.models import Cluster as ClusterModel
 from ..commons.config import app_settings
 from ..commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
+    BenchmarkStatusEnum,
     BudServeWorkflowStepEventName,
+    ClusterStatusEnum,
+    ModelProviderTypeEnum,
+    ModelStatusEnum,
     NotificationTypeEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
-    ModelStatusEnum,
-    ClusterStatusEnum,
-    BenchmarkStatusEnum,
-    ModelProviderTypeEnum,
 )
 from ..commons.exceptions import ClientException, RedisException
 from ..core.schemas import NotificationPayload, NotificationResult
+from ..model_ops.crud import ModelDataManager
+from ..model_ops.models import Model
 from ..model_ops.services import ModelService, ModelServiceUtil
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
@@ -35,9 +38,6 @@ from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .models import BenchmarkCRUD, BenchmarkSchema
 from .schemas import RunBenchmarkWorkflowRequest, RunBenchmarkWorkflowStepData
 
-from ..model_ops.crud import ModelDataManager
-from ..model_ops.models import Model
-
 
 logger = logging.get_logger(__name__)
 
@@ -45,6 +45,7 @@ class BenchmarkService(SessionMixin):
     """Benchmark service."""
 
     async def run_benchmark_workflow(self, current_user_id: UUID, request: RunBenchmarkWorkflowRequest):
+        """Run benchmark workflow."""
         # Get request data
         step_number = request.step_number
         workflow_id = request.workflow_id
@@ -60,11 +61,11 @@ class BenchmarkService(SessionMixin):
 
         # Retrieve or create workflow
         workflow_create = WorkflowUtilCreate(
-            workflow_type=WorkflowTypeEnum.ADD_WORKER_TO_ENDPOINT,
-            title="Add Worker to Deployment",
+            workflow_type=WorkflowTypeEnum.MODEL_BENCHMARK,
+            title="Run model benchmark",
             total_steps=workflow_total_steps,
             icon=APP_ICONS["general"]["deployment_mono"],
-            tag="Deployment",
+            tag="Benchmark",
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
             workflow_id, workflow_create, current_user_id
@@ -83,19 +84,21 @@ class BenchmarkService(SessionMixin):
                 if model_uri.startswith(f"{model_source}/"):
                     model_uri = model_uri.removeprefix(f"{model_source}/")
                 request.model = model_uri if not credential_id else f"{model_source}/{model_uri}"
+                request.provider_type = db_model.provider_type.value
             else:
                 request.model = db_model.local_path
+                request.provider_type = db_model.provider_type.value
 
         if cluster_id:
-            db_cluster = await ClusterService(self.session).retrieve_by_fields(
-                db_cluster, fields={"id": cluster_id}, exclude_fields={"status": ClusterStatusEnum.DELETED}
+            db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+                ClusterModel, fields={"id": cluster_id}, exclude_fields={"status": ClusterStatusEnum.DELETED}
             )
             if not db_cluster:
                 raise ClientException("Cluster does not exist")
-            request.cluster_id = db_cluster.bud_cluster_id
+            request.bud_cluster_id = db_cluster.cluster_id
 
         # Prepare workflow step data
-        workflow_step_data = RunBenchmarkWorkflowStepData(**request.model_dump(exclude={"workflow_id", "workflow_total_steps", "step_number", "trigger_workflow"})).model_dump(mode="json")
+        workflow_step_data = RunBenchmarkWorkflowStepData(**request.model_dump(exclude={"workflow_id", "workflow_total_steps", "step_number", "trigger_workflow"})).model_dump(mode="json", exclude_none=True)
 
         # Get workflow steps
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -136,7 +139,6 @@ class BenchmarkService(SessionMixin):
         db_max_workflow_step_number = max(step.step_number for step in db_workflow_steps) if db_workflow_steps else 0
         workflow_current_step = max(current_step_number, db_max_workflow_step_number)
         logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
-
         # This will ensure workflow step number is updated to the latest step number
         db_workflow = await WorkflowDataManager(self.session).update_by_fields(
             db_workflow,
@@ -157,17 +159,20 @@ class BenchmarkService(SessionMixin):
                 "description",
                 "concurrent_requests",
                 "eval_with",
+                "datasets",
+                "max_input_tokens",
+                "max_output_tokens",
                 # "use_cache",
                 "cluster_id",
+                "bud_cluster_id",
                 "nodes",
                 "model_id",
+                "model",
+                "provider_type",
+                "credential_id",
                 "user_confirmation",
                 "run_as_simulation",
             ]
-
-            keys_of_interest_for_dataset = ["datasets"]
-            keys_of_interest_for_configuration = ["max_input_tokens", "max_output_tokens"]
-            # keys_of_interest_for_cache = ["embedding_model", "eviction_policy", "max_size", "ttl", "score_threshold"]
 
             # from workflow steps extract necessary information
             required_data = {}
@@ -179,11 +184,13 @@ class BenchmarkService(SessionMixin):
             # Check if all required keys are present
             required_keys = keys_of_interest
             if required_data.get("eval_with", "") == "dataset":
-                required_keys += keys_of_interest_for_dataset
+                required_keys.remove("max_input_tokens")
+                required_keys.remove("max_output_tokens")
             elif required_data.get("eval_with", "") == "configuration":
-                required_keys += keys_of_interest_for_configuration
-            # if required_data.get("use_cache", False):
-            #     required_keys += keys_of_interest_for_cache
+                required_keys.remove("datasets")
+            if required_data.get("provider_type", "") == "local":
+                required_keys.remove("credential_id")
+
             missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data for run benchmark workflow: {', '.join(missing_keys)}")
@@ -198,22 +205,22 @@ class BenchmarkService(SessionMixin):
 
         return db_workflow
 
-    async def _add_run_benchmark_workflow_step(self, current_step_number: int, request: RunBenchmarkWorkflowRequest, db_workflow: WorkflowModel, current_user_id: UUID):
+    async def _add_run_benchmark_workflow_step(self, current_step_number: int, request: dict, db_workflow: WorkflowModel, current_user_id: UUID):
         """Add run benchmark workflow step."""
         # insert benchmark in budapp db
         benchmark_id = None
         with BenchmarkCRUD() as crud:
             db_benchmark =  crud.insert(
                 BenchmarkSchema(
-                    name=request.name,
-                    tags=request.tags,
-                    description=request.description,
-                    eval_with=request.eval_with,
+                    name=request["name"],
+                    tags=request["tags"],
+                    description=request["description"],
+                    eval_with=request["eval_with"],
                     user_id=current_user_id,
-                    model_id=request.model_id,
-                    cluster_id=request.cluster_id,
-                    nodes=request.nodes,
-                    concurrency=request.concurrent_requests,
+                    model_id=request["model_id"],
+                    cluster_id=request["cluster_id"],
+                    nodes=request["nodes"],
+                    concurrency=request["concurrent_requests"],
                     status=BenchmarkStatusEnum.PROCESSING
                 )
             )
@@ -221,8 +228,8 @@ class BenchmarkService(SessionMixin):
             benchmark_id = db_benchmark.id
 
         run_benchmark_payload = {
-            "benchmark_id": benchmark_id,
-            **request.model_dump(mode="json"),
+            "benchmark_id": str(benchmark_id),
+            **request,
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
@@ -234,6 +241,35 @@ class BenchmarkService(SessionMixin):
         logger.debug(f"Performing run benchmark request to budcluster {run_benchmark_payload}")
 
         run_benchmark_response = await self._perform_run_benchmark_request(run_benchmark_payload)
+        # run_benchmark_response = {
+        #     "object": "workflow_metadata",
+        #     "workflow_id": "d54dece7-b1d9-4bc0-a43f-40fca695a74d",
+        #     "workflow_name": "create_cloud_deployment",
+        #     "steps": [
+        #         {
+        #         "id": "verify_cluster_connection",
+        #         "title": "Verifying cluster connection",
+        #         "description": "Verify the cluster connection"
+        #         },
+        #         {
+        #         "id": "deploy_to_engine",
+        #         "title": "Deploying model to engine",
+        #         "description": "Deploy the model to the engine"
+        #         },
+        #         {
+        #         "id": "verify_deployment_status",
+        #         "title": "Verifying deployment status",
+        #         "description": "Verify the deployment status"
+        #         },
+        #         {
+        #         "id": "run_performance_benchmark",
+        #         "title": "Running performance benchmark",
+        #         "description": "Run the performance benchmark"
+        #         }
+        #     ],
+        #     "status": "PENDING",
+        #     "eta": 1800
+        # }
 
         # Add payload dict to response
         for step in run_benchmark_response["steps"]:

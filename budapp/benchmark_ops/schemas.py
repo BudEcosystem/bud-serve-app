@@ -15,10 +15,10 @@ class RunBenchmarkWorkflowStepData(BaseModel):
     eval_with: Literal["dataset", "configuration"]
 
     # step 2
-    datasets: Optional[list[UUID]]
+    datasets: Optional[list[UUID]] = None
     # or
-    max_input_tokens: Optional[int]
-    max_output_tokens: Optional[int]
+    max_input_tokens: Optional[int] = None
+    max_output_tokens: Optional[int] = None
 
     # step 3
     # use_cache: Optional[bool]
@@ -28,33 +28,26 @@ class RunBenchmarkWorkflowStepData(BaseModel):
     # ttl: Optional[int]
     # score_threshold: Optional[float]
 
+    # step 3
+    cluster_id: Optional[UUID] = None
+    bud_cluster_id: Optional[UUID] = None
+
     # step 4
-    cluster_id: Optional[UUID]
+    nodes: Optional[list[dict[str, Any]]] = None
 
     # step 5
-    nodes: Optional[list[dict[str, Any]]]
+    model_id: Optional[UUID] = None
+    model: Optional[str] = None
+    provider_type: Optional[str] = None
 
     # step 6
-    model_id: Optional[UUID]
-    model: Optional[str]
+    credential_id: Optional[UUID] = None
 
     # step 7
-    credential_id: Optional[UUID]
+    user_confirmation: Optional[bool] = None
 
     # step 8
-    user_confirmation: Optional[bool]
-
-    # step 9
-    run_as_simulation: Optional[bool]
-
-    @model_validator(mode="after")
-    def validate_fields(self) -> "RunBenchmarkWorkflowStepData":
-        """Validate the fields of the request."""
-        if self.datasets is None and (self.max_input_tokens is None or self.max_output_tokens is None):
-            raise ValueError("At least one of datasets or configuration (max_input_tokens and max_output_tokens) is required")
-        # if self.use_cache is True and (self.embedding_model is None or self.eviction_policy is None or self.score_threshold is None):  # noqa: E501self.embedding_model is None:
-        #     raise ValueError("embedding_model, eviction_policy and score_threshold must be provided if use_cache is True")
-        return self
+    run_as_simulation: Optional[bool] = None
 
 
 class RunBenchmarkWorkflowRequest(RunBenchmarkWorkflowStepData):
@@ -73,5 +66,8 @@ class RunBenchmarkWorkflowRequest(RunBenchmarkWorkflowStepData):
 
         if self.workflow_id is not None and self.workflow_total_steps is not None:
             raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
+
+        # if self.use_cache is True and (self.embedding_model is None or self.eviction_policy is None or self.score_threshold is None):  # noqa: E501self.embedding_model is None:
+        #     raise ValueError("embedding_model, eviction_policy and score_threshold must be provided if use_cache is True")
 
         return self

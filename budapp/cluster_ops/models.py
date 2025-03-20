@@ -20,13 +20,12 @@ import json
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Uuid
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.constants import ClusterStatusEnum
 from budapp.commons.database import Base, TimestampMixin
-from budapp.credential_ops.models import CloudCredentials, CloudProviders
 
 
 class Cluster(Base, TimestampMixin):
@@ -76,10 +75,9 @@ class Cluster(Base, TimestampMixin):
         "Endpoint",
         back_populates="cluster",
     )
-    # benchmarks: Mapped[list["Benchmark"]] = relationship(
-    #     "Benchmark",
-    #     back_populates="cluster",
-    # )
+    benchmarks: Mapped[list["BenchmarkSchema"]] = relationship(
+        back_populates="cluster",
+    )
     created_user: Mapped["User"] = relationship(back_populates="created_clusters", foreign_keys=[created_by])
 
     @hybrid_property

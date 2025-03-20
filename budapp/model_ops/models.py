@@ -111,7 +111,7 @@ class Model(Base, TimestampMixin):
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
 
     endpoints: Mapped[list["Endpoint"]] = relationship(back_populates="model")
-    # benchmarks: Mapped[list["Benchmark"]] = relationship(back_populates="model")
+    benchmarks: Mapped[list["BenchmarkSchema"]] = relationship(back_populates="model")
     created_user: Mapped["User"] = relationship(back_populates="created_models", foreign_keys=[created_by])
     paper_published: Mapped[List["PaperPublished"]] = relationship("PaperPublished", back_populates="model")
     model_licenses: Mapped["ModelLicenses"] = relationship("ModelLicenses", back_populates="model")
