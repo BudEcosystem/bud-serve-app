@@ -198,7 +198,7 @@ class BenchmarkService(SessionMixin):
 
         return db_workflow
 
-    async def _add_run_benchmark_workflow_step(self, current_user_id: UUID, request: RunBenchmarkWorkflowRequest, db_workflow: WorkflowModel, current_user_id: UUID):
+    async def _add_run_benchmark_workflow_step(self, current_step_number: int, request: RunBenchmarkWorkflowRequest, db_workflow: WorkflowModel, current_user_id: UUID):
         """Add run benchmark workflow step."""
         # insert benchmark in budapp db
         benchmark_id = None
