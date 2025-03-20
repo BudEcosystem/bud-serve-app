@@ -213,6 +213,7 @@ class ModelCreate(ModelBase):
     architecture_text_config: ModelArchitectureLLMConfig | None = None
     architecture_vision_config: ModelArchitectureVisionConfig | None = None
     scan_verified: bool | None = None
+    icon: str | None = None
 
 
 class ModelDetailResponse(BaseModel):

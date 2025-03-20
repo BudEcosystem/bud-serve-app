@@ -30,6 +30,7 @@ from fastapi import Path
 from uuid import UUID
 from budapp.credential_ops.models import CloudCredentials
 from typing import Optional
+from budapp.credential_ops.schemas import CloudProviderRegionsResponse
 
 logger = logging.get_logger(__name__)
 
@@ -305,6 +306,63 @@ async def get_user_cloud_credential(
             message="Failed to retrieve cloud provider credential"
         ).to_http_response()
 
+
+# Regions Listing
+@credential_router.get("/cloud-providers/{provider_id}/regions", response_model=CloudProviderRegionsResponse)
+async def get_provider_regions(
+    provider_id: Annotated[str, Path(title="The ID of the cloud provider")],
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Retrieve the regions supported by a specific cloud provider.
+
+    Args:
+        provider_id: The UUID of the cloud provider.
+
+    Returns:`
+        CloudProviderRegionsResponse: List of regions supported by the provider.
+
+    Raises:
+        HTTPException: If the provider is not found.
+    """
+    logger.debug(f"Retrieving regions for cloud provider: {provider_id}")
+
+    try:
+        # Convert string ID to UUID
+        try:
+            provider_uuid = UUID(provider_id)
+        except ValueError:
+            return ErrorResponse(
+                code=status.HTTP_400_BAD_REQUEST,
+                message="Invalid provider ID format"
+            ).to_http_response()
+
+        # Get the provider from the database
+        provider = await CloudProviderDataManager(session).retrieve_by_fields(
+                    CloudProviders, {"id": provider_uuid}
+                )
+
+        if not provider:
+            return ErrorResponse(
+                code=status.HTTP_404_NOT_FOUND,
+                message="Cloud provider not found"
+            ).to_http_response()
+
+        # Use provider service to get regions for this specific provider
+        regions = await ClusterProviderService(session).get_provider_regions(provider.unique_id) # type: ignore
+
+        return CloudProviderRegionsResponse(
+                    provider_id=str(provider.id), # type: ignore
+                    regions=regions,
+                    code=status.HTTP_200_OK,
+                    message=f"Retrieved {len(regions)} regions for {provider.name}" # type: ignore
+                )
+
+    except Exception as e:
+        logger.error(f"Failed to retrieve regions for cloud provider: {provider_id} {e}", exc_info=True)
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to retrieve cloud provider credential"
+        ).to_http_response()
 
 # Helper function for masking sensitive data
 def _get_masked_credential_summary(credential_values: dict, schema_definition: dict, detailed: bool = False) -> dict:

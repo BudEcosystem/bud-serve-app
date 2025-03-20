@@ -2,44 +2,32 @@
   {
     "name": "AWS",
     "unique_id": "aws",
-    "logo_url": "icons/providers/vertexai.png",
+    "logo_url": "icons/providers/aws.png",
     "description": "Amazon Web Services",
     "schema": {
       "type": "object",
       "properties": {
-        "client_id": {
+        "access_key_id": {
           "type": "string",
-          "label": "Client ID",
-          "description": "Enter your Client ID",
+          "label": "Access Key ID",
+          "description": "Enter your AWS Access Key ID",
           "required": true
         },
-        "client_secret": {
+        "secret_access_key": {
           "type": "string",
-          "label": "Client Secret",
-          "description": "Enter your Client Secret",
-          "required": true
-        },
-        "tenant_id": {
-          "type": "string",
-          "label": "Tenant ID",
-          "description": "Enter your Tenant ID",
-          "required": true
-        },
-        "subscription_id": {
-          "type": "string",
-          "label": "Subscription ID",
-          "description": "Enter your Subscription ID",
+          "label": "Secret Access Key",
+          "description": "Enter your AWS Secret Access Key",
           "required": true
         }
       },
-      "required": ["client_id", "client_secret", "tenant_id", "subscription_id"]
+      "required": ["access_key_id", "secret_access_key"]
     }
   },
   {
     "name": "Azure",
     "unique_id": "azure",
     "description": "Microsoft Azure",
-    "logo_url": "icons/providers/vertexai.png",
+    "logo_url": "icons/providers/azure_openai.png",
     "schema": {
       "type": "object",
       "properties": {
