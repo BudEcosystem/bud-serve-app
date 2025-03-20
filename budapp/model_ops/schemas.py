@@ -213,6 +213,7 @@ class ModelCreate(ModelBase):
     architecture_text_config: ModelArchitectureLLMConfig | None = None
     architecture_vision_config: ModelArchitectureVisionConfig | None = None
     scan_verified: bool | None = None
+    icon: str | None = None
 
 
 class ModelDetailResponse(BaseModel):
@@ -877,6 +878,7 @@ class QuantizeModelWorkflowRequest(BaseModel):
     method: str | None = None
     weight_config: QuantizeConfig | None = None
     activation_config: QuantizeConfig | None = None
+    cluster_id: UUID4 | None = None
 
     @model_validator(mode="after")
     def validate_fields(self) -> "QuantizeModelWorkflowRequest":
@@ -900,7 +902,10 @@ class QuantizeModelWorkflowStepData(BaseModel):
     method: str | None = None
     weight_config: QuantizeConfig | None = None
     activation_config: QuantizeConfig | None = None
-
+    cluster_id: UUID4 | None = None
+    simulation_id: UUID4 | None = None
+    quantization_data: dict | None = None
+    quantized_model_id: UUID4 | None = None
 
 class QuantizationMethod(BaseModel):
     """Quantization method schema."""

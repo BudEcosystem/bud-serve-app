@@ -17,6 +17,7 @@
 """The crud package, containing essential business logic, services, and routing configurations for the credential ops."""
 
 from typing import Dict, List, Optional
+from uuid import UUID
 
 from fastapi import status
 from fastapi.exceptions import HTTPException
@@ -25,6 +26,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
+from budapp.credential_ops.models import CloudCredentials, CloudProviders
 from budapp.credential_ops.models import (
     Credential as CredentialModel,
 )
@@ -237,3 +239,35 @@ class ProprietaryCredentialDataManager(DataManagerUtils):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
             ) from None
+
+
+class CloudProviderDataManager(DataManagerUtils):
+    """Data manager for the CloudProvider model."""
+
+    async def get_all_providers(self) -> list[CloudProviders]:
+        """Get all cloud providers."""
+        stmt = select(CloudProviders)
+        return self.scalars_all(stmt)
+
+class CloudProviderCredentialDataManager(DataManagerUtils):
+    """Data manager for the CloudProviderCredential model."""
+
+    async def get_credentials_by_user(self, user_id: UUID, provider_id: Optional[UUID] = None) -> list[CloudCredentials]:
+        """
+        Get cloud provider credentials by user ID, optionally filtered by provider ID.
+
+        Args:
+            user_id: The ID of the user whose credentials to retrieve
+            provider_id: Optional provider ID to filter credentials by
+
+        Returns:
+            List of CloudCredentials that match the criteria
+        """
+        stmt = select(CloudCredentials).where(CloudCredentials.user_id == user_id)
+
+        # If provider_id is provided, add it to the query filter
+        if provider_id:
+            stmt = stmt.where(CloudCredentials.provider_id == provider_id)
+
+        result = self.scalars_all(stmt)
+        return result

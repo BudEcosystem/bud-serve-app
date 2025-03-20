@@ -19,7 +19,7 @@
 import json
 import tempfile
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 import aiohttp
@@ -75,6 +75,8 @@ from .schemas import (
     MetricTypeEnum,
     PrometheusConfig,
 )
+from budapp.credential_ops.crud import CloudProviderCredentialDataManager
+from budapp.credential_ops.models import CloudCredentials
 
 
 logger = logging.get_logger(__name__)
@@ -149,6 +151,16 @@ class ClusterService(SessionMixin):
         ingress_url = request.ingress_url
         trigger_workflow = request.trigger_workflow
 
+        # Cloud Specific
+        cluster_type = request.cluster_type or "ON_PREM"
+        credential_id = request.credential_id
+        provider_id = request.provider_id
+        region = request.region
+
+        # Get Cluster Credential
+        credentials = None
+        cloud_credentials = None
+
         current_step_number = step_number
 
         # Retrieve or create workflow
@@ -162,18 +174,45 @@ class ClusterService(SessionMixin):
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
             workflow_id, workflow_create, current_user_id
         )
+        configuration_yaml = None
 
         # Validate the configuration file
         if configuration_file:
-            if not await check_file_extension(configuration_file.filename, ["yaml", "yml"]):
-                logger.error("Invalid file extension for configuration file")
-                raise ClientException("Invalid file extension for configuration file")
+            # Validate the configuration file for ON_PERM cluster
+
+            if cluster_type == "ON_PREM" and configuration_file:
+                if not await check_file_extension(configuration_file.filename, ["yaml", "yml"]):
+                    logger.error("Invalid file extension for configuration file")
+                    raise ClientException("Invalid file extension for configuration file")
 
             try:
                 configuration_yaml = yaml.safe_load(configuration_file.file)
             except yaml.YAMLError as e:
                 logger.exception(f"Invalid cluster configuration yaml file found: {e}")
                 raise ClientException("Invalid cluster configuration yaml file found") from e
+
+        # For CLOUD clusters, validate required cloud parameters
+        if cluster_type == "CLOUD":
+            if not credential_id:
+                raise ClientException("Credential ID is required for cloud clusters")
+            if not provider_id:
+                raise ClientException("Provider ID is required for cloud clusters")
+            if not region:
+                raise ClientException("Region is required for cloud clusters")
+
+        # Data Validation & Credential Fetching
+        if cluster_type == "CLOUD":
+            cloud_credentials = await CloudProviderCredentialDataManager(self.session).retrieve_by_fields(
+                CloudCredentials,
+                fields={"id": credential_id, "provider_id": provider_id},
+                missing_ok=False,
+            )
+            if not cloud_credentials:
+                raise ClientException("Cloud provider credential not found")
+
+            credentials = cloud_credentials.credential  # type: ignore
+
+            logger.debug(f"====== Unique ID {cloud_credentials.provider.unique_id}")  # type: ignore
 
         if cluster_name:
             # Check duplicate cluster name
@@ -201,13 +240,23 @@ class ClusterService(SessionMixin):
                 {"icon": cluster_icon},
             )
 
-        # Prepare workflow step data
+        logger.debug("====== Preparing The Payload")
+
+        # Prepare workflow step data (UI Steps)
         workflow_step_data = CreateClusterWorkflowSteps(
             name=cluster_name,
             icon=cluster_icon,
             ingress_url=ingress_url,
-            configuration_yaml=configuration_yaml if configuration_file else None,
+            configuration_yaml=configuration_yaml,
+            cluster_type=cluster_type,
+            credential_id=credential_id if cluster_type == "CLOUD" else None,
+            provider_id=provider_id if cluster_type == "CLOUD" else None,
+            region=region if cluster_type == "CLOUD" else None,
+            credentials=credentials if cluster_type == "CLOUD" else None,
+            cloud_provider_unique_id=cloud_credentials.provider.unique_id if cluster_type == "CLOUD" else None,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+
+        logger.debug(f"====== {workflow_step_data}")
 
         # Get workflow steps
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -270,9 +319,17 @@ class ClusterService(SessionMixin):
             keys_of_interest = [
                 "name",
                 "icon",
-                "ingress_url",
-                "configuration_yaml",
+                # "configuration_yaml",
+                "cluster_type",  # Addition For Cloud Cluster
             ]
+
+            # Add type-specific keys
+            if cluster_type == "ON_PREM":
+                keys_of_interest.extend(["configuration_yaml", "ingress_url"])
+            elif cluster_type == "CLOUD":
+                keys_of_interest.extend(
+                    ["credential_id", "provider_id", "region", "credentials", "cloud_provider_unique_id"]
+                )
 
             # from workflow steps extract necessary information
             required_data = {}
@@ -282,8 +339,8 @@ class ClusterService(SessionMixin):
                         required_data[key] = db_workflow_step.data[key]
 
             # Check if all required keys are present
-            required_keys = ["name", "icon", "ingress_url", "configuration_yaml"]
-            missing_keys = [key for key in required_keys if key not in required_data]
+            # required_keys = ["name", "icon", "ingress_url", "configuration_yaml"]
+            missing_keys = [key for key in keys_of_interest if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
 
@@ -356,7 +413,7 @@ class ClusterService(SessionMixin):
         cluster_create_request = {
             "enable_master_node": True,
             "name": data["name"],
-            "ingress_url": data["ingress_url"],
+            "ingress_url": data.get("ingress_url", ""),  # Empty String
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
@@ -365,59 +422,119 @@ class ClusterService(SessionMixin):
             "source_topic": f"{app_settings.source_topic}",
         }
 
-        # Create temporary yaml file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".yaml", mode="w") as temp_file:
-            try:
-                # Write configuration yaml to temporary yaml file
-                yaml.safe_dump(data["configuration_yaml"], temp_file)
+        # Extra Values
+        cluster_type = data.get("cluster_type", "ON_PREM")
+        cluster_create_request["cluster_type"] = cluster_type
 
-                logger.debug(f"cluster_create_request: {cluster_create_request}")
-                # Perform the request as a form data
-                async with aiohttp.ClientSession() as session:
+        # Add cloud-specific parameters if it's a cloud cluster
+        if cluster_type == "CLOUD":
+            # TODO: Replace with cloud-specific cedentials and provider information
+            cluster_create_request["credential_id"] = str(data["credential_id"])
+            cluster_create_request["provider_id"] = str(data["provider_id"])
+            cluster_create_request["region"] = data["region"]
+            cluster_create_request["credentials"] = data["credentials"]
+            cluster_create_request["cluster_type"] = cluster_type
+            cluster_create_request["cloud_provider_unique_id"] = data["cloud_provider_unique_id"]
+
+            logger.debug(f"=====Cluster create request: {cluster_create_request}")
+
+            # Make the request for cloud cluster
+            async with aiohttp.ClientSession() as session:
+                try:
                     form = aiohttp.FormData()
                     form.add_field("cluster_create_request", json.dumps(cluster_create_request))
+                    # For cloud cluster, we create a temporary YAML file with minimal configuration
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".yaml", mode="w") as temp_file:
+                        # Write minimal configuration to the temporary file
+                        yaml.safe_dump({"name": "dummy-cluster"}, temp_file)
+                        # temp_file.flush()
+                        # Open the file as a binary for proper upload
+                        with open(temp_file.name, "rb") as config_file:
+                            form.add_field("configuration", config_file, filename="dummy.yaml")
+                            # Log Form data
+                            logger.debug(f"Form data: {json.dumps(cluster_create_request)}")
 
-                    # Open the file for reading after writing is complete
-                    with open(temp_file.name, "rb") as config_file:
-                        form.add_field("configuration", config_file, filename=temp_file.name)
-                        try:
                             async with session.post(create_cluster_endpoint, data=form) as response:
                                 response_data = await response.json()
                                 logger.debug(f"Response from budcluster service: {response_data}")
 
                                 if response.status != 200 or response_data.get("object") == "error":
-                                    error_message = response_data.get("message", "Failed to create cluster")
-                                    logger.error(f"Failed to create cluster with external service: {error_message}")
+                                    error_message = response_data.get("message", "Failed to create cloud cluster")
+                                    logger.error(
+                                        f"Failed to create cloud cluster with external service: {error_message}"
+                                    )
                                     raise ClientException(error_message)
 
-                                logger.debug("Successfully created cluster with budcluster service")
+                                logger.debug("Successfully created cloud cluster with budcluster service")
                                 return response_data
 
-                        except ClientException as e:
-                            raise e
+                except ClientException as e:
+                    raise e
 
-                        except Exception as e:
-                            logger.error(f"Failed to make request to budcluster service: {e}")
-                            raise ClientException("Unable to create cluster with external service") from e
+                except Exception as e:
+                    logger.error(f"Failed to make request to budcluster service: {e}")
+                    raise ClientException("Unable to create cloud cluster with external service") from e
 
-            except yaml.YAMLError as e:
-                logger.error(f"Failed to process YAML configuration: {e}")
-                raise ClientException("Invalid YAML configuration") from e
+        else:
+            # Create temporary yaml file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".yaml", mode="w") as temp_file:
+                try:
+                    # Write configuration yaml to temporary yaml file
+                    yaml.safe_dump(data["configuration_yaml"], temp_file)
 
-            except IOError as e:
-                logger.error(f"Failed to write temporary file: {e}")
-                raise ClientException("Failed to process configuration file") from e
+                    logger.debug(f"cluster_create_request: {cluster_create_request}")
+                    # Perform the request as a form data
+                    async with aiohttp.ClientSession() as session:
+                        form = aiohttp.FormData()
+                        form.add_field("cluster_create_request", json.dumps(cluster_create_request))
 
-            except ClientException as e:
-                raise e
+                        # Open the file for reading after writing is complete
+                        with open(temp_file.name, "rb") as config_file:
+                            form.add_field("configuration", config_file, filename=temp_file.name)
+                            try:
+                                logger.debug(f"************************")
+                                logger.debug(config_file)
+                                logger.debug(f"************************")
 
-            except Exception as e:
-                logger.exception(f"Unexpected error during cluster creation request {e}")
-                raise ClientException("Unexpected error during cluster creation") from e
+                                async with session.post(create_cluster_endpoint, data=form) as response:
+                                    response_data = await response.json()
+                                    logger.debug(f"Response from budcluster service: {response_data}")
 
-            finally:
-                # Delete the temporary file
-                temp_file.close()
+                                    if response.status != 200 or response_data.get("object") == "error":
+                                        error_message = response_data.get("message", "Failed to create cluster")
+                                        logger.error(
+                                            f"Failed to create cluster with external service: {error_message}"
+                                        )
+                                        raise ClientException(error_message)
+
+                                    logger.debug("Successfully created cluster with budcluster service")
+                                    return response_data
+
+                            except ClientException as e:
+                                raise e
+
+                            except Exception as e:
+                                logger.error(f"Failed to make request to budcluster service: {e}")
+                                raise ClientException("Unable to create cluster with external service") from e
+
+                except yaml.YAMLError as e:
+                    logger.error(f"Failed to process YAML configuration: {e}")
+                    raise ClientException("Invalid YAML configuration") from e
+
+                except IOError as e:
+                    logger.error(f"Failed to write temporary file: {e}")
+                    raise ClientException("Failed to process configuration file") from e
+
+                except ClientException as e:
+                    raise e
+
+                except Exception as e:
+                    logger.exception(f"Unexpected error during cluster creation request {e}")
+                    raise ClientException("Unexpected error during cluster creation") from e
+
+                finally:
+                    # Delete the temporary file
+                    temp_file.close()
 
     async def create_cluster_from_notification_event(self, payload: NotificationPayload) -> None:
         """Create a cluster in database.
@@ -429,6 +546,8 @@ class ClusterService(SessionMixin):
             ClientException: If the cluster already exists.
         """
         logger.debug("Received event for creating cluster")
+
+        # TODO : ask varun if this is can actuallt get data saved in workflow in cluster repo
 
         # Get workflow and steps
         workflow_id = payload.workflow_id
@@ -442,6 +561,10 @@ class ClusterService(SessionMixin):
             "name",
             "icon",
             "ingress_url",
+            "cluster_type",
+            "provider_id",
+            "credential_id",
+            "region",
         ]
 
         # from workflow steps extract necessary information
@@ -476,12 +599,17 @@ class ClusterService(SessionMixin):
         cluster_data = ClusterCreate(
             name=required_data["name"],
             icon=required_data["icon"],
-            ingress_url=required_data["ingress_url"],
+            ingress_url=required_data.get("ingress_url"),
             created_by=db_workflow.created_by,
             cluster_id=UUID(bud_cluster_id),
             **cluster_resources.model_dump(exclude_unset=True, exclude_none=True),
             status=ClusterStatusEnum.AVAILABLE,
             status_sync_at=datetime.now(tz=timezone.utc),
+            # Cloud Cluster
+            cluster_type=required_data.get("cluster_type", "ON_PERM"),
+            cloud_provider_id=required_data.get("provider_id", None),
+            credential_id=required_data.get("credential_id", None),
+            region=required_data.get("region", None),
         )
 
         # Mark workflow as completed
@@ -698,18 +826,14 @@ class ClusterService(SessionMixin):
             available_nodes=available_nodes,
         )
 
-    async def _perform_bud_cluster_edit_request(
-        self, bud_cluster_id: UUID, data: Dict[str, Any]
-    ) -> Dict:
+    async def _perform_bud_cluster_edit_request(self, bud_cluster_id: UUID, data: Dict[str, Any]) -> Dict:
         """Perform edit cluster request to bud_cluster app.
 
         Args:
             bud_cluster_id: The ID of the cluster to edit.
             data: The data to edit the cluster with.
         """
-        edit_cluster_endpoint = (
-            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/{bud_cluster_id}"
-        )
+        edit_cluster_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/{bud_cluster_id}"
 
         payload = {"ingress_url": data["ingress_url"]}
 
@@ -729,7 +853,6 @@ class ClusterService(SessionMixin):
         except Exception as e:
             logger.exception(f"Failed to send edit cluster request: {e}")
             raise ClientException("Failed to edit cluster", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR) from e
-
 
     async def edit_cluster(self, cluster_id: UUID, data: Dict[str, Any]) -> ClusterResponse:
         """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
@@ -810,7 +933,6 @@ class ClusterService(SessionMixin):
             raise ClientException("Cannot delete cluster with active deployments")
 
         current_step_number = 1
-
         # Retrieve or create workflow
         workflow_create = WorkflowUtilCreate(
             workflow_type=WorkflowTypeEnum.CLUSTER_DELETION,
@@ -824,10 +946,43 @@ class ClusterService(SessionMixin):
         )
         logger.debug(f"Delete cluster workflow {db_workflow.id} created")
 
+        cloud_payload = None
+        # # Branch For Cloud & On Perm
+        if db_cluster.cluster_type == "CLOUD":
+            # Get Credentials
+            credential_id = db_cluster.credential_id
+            provider_id = db_cluster.cloud_provider_id
+
+            # Debug
+            logger.debug(f"+++ CLOUD +++ {credential_id}")
+            logger.debug(f"+++ CLOUD +++ {provider_id}")
+
+            cloud_credentials = await CloudProviderCredentialDataManager(self.session).retrieve_by_fields(
+                CloudCredentials,
+                fields={"id": credential_id, "provider_id": provider_id},
+                missing_ok=False,
+            )
+
+            if not cloud_credentials:
+                raise ClientException("Cloud provider credential not found")
+
+            credentials = cloud_credentials.credential
+            provider_unique_id = cloud_credentials.provider.unique_id
+
+            cloud_payload = {
+                "credentail_id": str(credential_id),
+                "provider_id": str(provider_id),
+                "region": db_cluster.region,
+                "credentials": credentials,
+                "provider_unique_id": str(provider_unique_id),
+                "cluster_type": db_cluster.cluster_type,
+                "name": db_cluster.name
+            }
+
         # Perform delete cluster request to bud_cluster app
         try:
             bud_cluster_response = await self._perform_bud_cluster_delete_request(
-                db_cluster.cluster_id, current_user_id, db_workflow.id
+                db_cluster.cluster_id, current_user_id, db_workflow.id, cloud_payload
             )
         except ClientException as e:
             await WorkflowDataManager(self.session).update_by_fields(
@@ -869,7 +1024,11 @@ class ClusterService(SessionMixin):
         return db_workflow
 
     async def _perform_bud_cluster_delete_request(
-        self, bud_cluster_id: UUID, current_user_id: UUID, workflow_id: UUID
+        self,
+        bud_cluster_id: UUID,
+        current_user_id: UUID,
+        workflow_id: UUID,
+        cloud_payload: Optional[Dict[str, Any]] = None,
     ) -> Dict:
         """Perform delete cluster request to bud_cluster app.
 
@@ -880,8 +1039,15 @@ class ClusterService(SessionMixin):
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/delete"
         )
 
+        cluster_type = (
+            cloud_payload.get("cluster_type", "ON_PREM")
+            if cloud_payload is not None
+            else "ON_PREM"
+        )
+
         payload = {
             "cluster_id": str(bud_cluster_id),
+            "cluster_type": cluster_type,
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
@@ -889,6 +1055,9 @@ class ClusterService(SessionMixin):
             },
             "source_topic": f"{app_settings.source_topic}",
         }
+
+        if cloud_payload:
+                payload["cloud_payload"] = json.dumps(cloud_payload)
 
         logger.debug(f"Performing delete cluster request to budcluster {payload}")
         try:
@@ -1210,26 +1379,24 @@ class ClusterService(SessionMixin):
             Dict containing the node-wise events
         """
         db_cluster = await self.get_cluster_details(cluster_id)
-        
+
         try:
             events_cluster_endpoint = (
                 f"{app_settings.dapr_base_url}v1.0/invoke"
                 f"/{app_settings.bud_cluster_app_id}/method"
                 f"/cluster/{db_cluster.cluster_id}/node-wise-events/{node_hostname}"
             )
-            
+
             async with aiohttp.ClientSession() as session, session.get(events_cluster_endpoint) as response:
                 response_data = await response.json()
-                
+
                 logger.debug(f"Node-wise events response: {response_data}")
-                
+
                 if response.status != 200 or response_data.get("object") == "error":
                     logger.error(f"Failed to get node-wise events: {response.status} {response_data}")
                     raise ClientException("Failed to get node-wise events")
-                
+
                 return response_data.get("data", {})
 
         except Exception as e:
             raise ClientException(f"Failed to get node-wise events: {str(e)}")
-
-

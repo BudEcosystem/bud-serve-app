@@ -36,7 +36,8 @@ class ClusterBase(BaseModel):
     """Cluster base schema."""
 
     name: str
-    ingress_url: str
+    ingress_url: Optional[str] = None  # Optional URL for cluster ingress since cloud clusters were introduced
+    cluster_type: str = Field(default="ON_PERM", description="Type of cluster: ON_PERM or CLOUD")
     icon: str
 
 
@@ -58,6 +59,11 @@ class ClusterCreate(ClusterBase):
     status_sync_at: datetime
     total_nodes: int
     available_nodes: int
+
+    # Optional
+    cloud_provider_id: Optional[UUID4] = None
+    credential_id: Optional[UUID4] = None
+    region: Optional[str] = None
 
 
 class ClusterResourcesInfo(BaseModel):
@@ -84,7 +90,8 @@ class ClusterResponse(BaseModel):
     id: UUID
     name: str
     icon: str
-    ingress_url: str
+    ingress_url: Optional[str] = None  # Optional URL for cluster ingress
+    cluster_type: Optional[str] = None
     created_at: datetime
     modified_at: datetime
     status: ClusterStatusEnum
@@ -143,6 +150,14 @@ class CreateClusterWorkflowRequest(BaseModel):
     step_number: int | None = None
     trigger_workflow: bool | None = None
 
+    cluster_type: str | None = "ON_PREM"
+
+    # Cloud
+    credential_id: UUID4 | None = None
+    provider_id: UUID4 | None = None
+    region: str | None = None
+
+
     @field_validator("icon", mode="before")
     @classmethod
     def icon_validate(cls, value: str | None) -> str | None:
@@ -159,6 +174,16 @@ class CreateClusterWorkflowSteps(BaseModel):
     icon: str | None = None
     ingress_url: AnyHttpUrl | None = None
     configuration_yaml: dict | None = None
+
+     # Cloud specific fields
+    cluster_type: str = "ON_PREM"  # "ON_PREM" or "CLOUD"
+    credential_id: UUID4 | None = None
+    provider_id: UUID4 | None = None
+    region: str | None = None
+
+    # Cloud Credentials
+    credentials: dict | None = None
+    cloud_provider_unique_id: str | None = None
 
 
 class EditClusterRequest(BaseModel):
@@ -454,6 +479,21 @@ class PrometheusConfig(BaseModel):
 
 class NodeMetricsResponse(SuccessResponse):
     """Node metrics response schema."""
-    
+
     nodes: Dict[str, Dict[str, object]]
 
+
+# Cloud Cluster Schemas
+class CreateCloudClusterRequest(BaseModel):
+    """Request schema for creating a cloud cluster."""
+
+    name: str = Field(min_length=1, max_length=100, description="Name of the cloud cluster")
+    icon: str = Field(min_length=1, max_length=100, description="Icon URL for the cloud cluster")
+    credential_id: UUID4 = Field(description="UUID of the CloudCredentials record to use for this cluster")
+    provider_id: UUID4 = Field(description="UUID of the CloudProviders record to use for this cluster")
+    region: str = Field(min_length=4, max_length=100, description="Region to create the cluster in")
+
+# class CloudClusterResponse(SuccessResponse):
+#     """Cloud cluster response schema."""
+
+#     cluster: CloudCluster

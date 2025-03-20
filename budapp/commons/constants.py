@@ -470,6 +470,7 @@ class PayloadType(str, Enum):
     DELETE_WORKER = "delete_worker"
     ADD_WORKER = "add_worker"
     FETCH_LICENSE_FAQS = "fetch_license_faqs"
+    DEPLOY_QUANTIZATION = "deploy_quantization"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -493,6 +494,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     DELETE_WORKER_EVENTS = "delete_worker_events"
     LICENSE_FAQ_EVENTS = "license_faq_events"
     QUANTIZATION_SIMULATION_EVENTS = "bud_simulator_events"
+    QUANTIZATION_DEPLOYMENT_EVENTS = "quantization_deployment_events"
 
 
 class ClusterStatusEnum(StrEnum):
@@ -2569,6 +2571,7 @@ class NotificationTypeEnum(StrEnum):
     UPDATE_PASSWORD_SUCCESS = auto()
     CLUSTER_DELETION_SUCCESS = auto()
     DEPLOYMENT_DELETION_SUCCESS = auto()
+    MODEL_QUANTIZATION_SUCCESS = auto()
 
 
 BENCHMARK_FIELDS_TYPE_MAPPER = {

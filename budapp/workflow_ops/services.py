@@ -128,6 +128,12 @@ class WorkflowService(SessionMixin):
                 BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value
             )
             bud_simulator_events = required_data.get(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value)
+            quantization_deployment_events = required_data.get(
+                BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value
+            )
+            quantization_simulation_events = required_data.get(
+                BudServeWorkflowStepEventName.QUANTIZATION_SIMULATION_EVENTS.value
+            )
             security_scan_result_id = required_data.get("security_scan_result_id")
             icon = required_data.get("icon")
             uri = required_data.get("uri")
@@ -145,6 +151,10 @@ class WorkflowService(SessionMixin):
                 method=required_data.get("method"),
                 weight_config=required_data.get("weight_config"),
                 activation_config=required_data.get("activation_config"),
+                cluster_id=required_data.get("cluster_id"),
+                simulation_id=required_data.get("simulation_id"),
+                quantization_data=required_data.get("quantization_data"),
+                quantized_model_id=required_data.get("quantized_model_id"),
             ) if quantized_model_name else None
 
             db_provider = (
@@ -234,7 +244,9 @@ class WorkflowService(SessionMixin):
                 bud_simulator_events=bud_simulator_events if bud_simulator_events else None,
                 project=db_project if db_project else None,
                 cluster=db_cluster if db_cluster else None,
-                quantization_config=quantization_config if quantization_config else None
+                quantization_config=quantization_config if quantization_config else None,
+                quantization_deployment_events=quantization_deployment_events if quantization_deployment_events else None,
+                quantization_simulation_events=quantization_simulation_events if quantization_simulation_events else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -319,7 +331,13 @@ class WorkflowService(SessionMixin):
                 "quantized_model_name",
                 "method",
                 "weight_config",
-                "activation_config"
+                "activation_config",
+                BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value,
+                BudServeWorkflowStepEventName.QUANTIZATION_SIMULATION_EVENTS.value,
+                "cluster_id",
+                "simulation_id",
+                "quantization_data",
+                "quantized_model_id",
             ]
         }
 

@@ -32,7 +32,14 @@ from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..project_ops.crud import ProjectDataManager
 from .crud import ChatSessionDataManager, MessageDataManager, ChatSettingDataManager, NoteDataManager
 from .models import ChatSession, Message, ChatSetting, Note
-from .schemas import ChatSessionCreate, ChatSessionListResponse, MessageResponse, ChatSettingListResponse, NoteResponse
+from .schemas import (
+    ChatSessionCreate,
+    ChatSessionListResponse,
+    MessageResponse,
+    ChatSettingListResponse,
+    NoteResponse,
+    EndpointListResponse,
+)
 
 
 logger = logging.get_logger(__name__)
@@ -66,9 +73,24 @@ class PlaygroundService(SessionMixin):
             order_by,
             search,
         )
-        logger.debug("found %s deployments", count)
+        db_deployments_list = []
+        for db_endpoint in db_endpoints:
+            deployment, input_cost, output_cost, context_length = db_endpoint
+            db_deployment = EndpointListResponse(
+                id=deployment.id,
+                name=deployment.name,
+                status=deployment.status,
+                model=deployment.model,
+                project=deployment.project,
+                created_at=deployment.created_at,
+                modified_at=deployment.modified_at,
+                input_cost=input_cost,
+                output_cost=output_cost,
+                context_length=context_length,
+            )
+            db_deployments_list.append(db_deployment)
 
-        return db_endpoints, count
+        return db_deployments_list, count
 
     async def _get_authorized_project_ids(
         self, current_user_id: Optional[UUID] = None, api_key: Optional[str] = None
@@ -191,7 +213,10 @@ class MessageService(SessionMixin):
 
         # If chat_session_id is not provided, create a new chat session first
         if not message_data.get("chat_session_id"):
-            chat_session_data = ChatSessionCreate(name=None, chat_setting_id=chat_setting_id).model_dump(
+            prompt = message_data.get("prompt")
+            chat_session_name = prompt[:20].strip()
+
+            chat_session_data = ChatSessionCreate(name=chat_session_name, chat_setting_id=chat_setting_id).model_dump(
                 exclude_unset=True, exclude_none=True
             )
             chat_session_data["user_id"] = user_id

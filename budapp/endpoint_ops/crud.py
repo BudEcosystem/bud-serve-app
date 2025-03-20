@@ -19,16 +19,18 @@
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, asc, desc, distinct, func, or_, select
+from sqlalchemy import and_, asc, desc, distinct, func, or_, select, case, literal, cast
 from sqlalchemy.dialects.postgresql import JSONB
 
 from budapp.cluster_ops.models import Cluster as ClusterModel
 from budapp.commons import logging
 from budapp.commons.constants import EndpointStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
-from budapp.model_ops.models import Model as Model
+from budapp.model_ops.models import Model as Model, CloudModel
 
 from ..commons.helpers import get_param_range
+from ..commons.constants import ModelProviderTypeEnum
+
 from ..project_ops.models import Project as ProjectModel
 from .models import Endpoint as EndpointModel
 
@@ -306,8 +308,33 @@ class EndpointDataManager(DataManagerUtils):
 
             search_conditions = await self.generate_search_stmt(EndpointModel, filters)
             stmt = (
-                select(EndpointModel)
+                select(
+                    EndpointModel,
+                    case(
+                        (Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL, cast(CloudModel.input_cost, JSONB)),
+                        else_=literal(None),
+                    ).label("input_cost"),
+                    case(
+                        (
+                            Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
+                            cast(CloudModel.output_cost, JSONB),
+                        ),
+                        else_=literal(None),
+                    ).label("output_cost"),
+                    case(
+                        (Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL, CloudModel.max_input_tokens),
+                        (
+                            Model.provider_type == ModelProviderTypeEnum.HUGGING_FACE,
+                            Model.architecture_text_config["context_length"].as_integer(),
+                        ),
+                        else_=literal(None),
+                    ).label("context_length"),
+                )
                 .join(Model, EndpointModel.model_id == Model.id)
+                .outerjoin(
+                    CloudModel,
+                    and_(Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL, Model.uri == CloudModel.uri),
+                )
                 .filter(or_(*search_conditions, *explicit_conditions))
                 .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
                 .filter(EndpointModel.project_id.in_(project_ids))
@@ -321,14 +348,38 @@ class EndpointDataManager(DataManagerUtils):
             )
         else:
             if explicit_filters["model_name"]:
-                # For filters, query using == operator
                 model_name_condition = Model.name == explicit_filters["model_name"]
                 explicit_conditions.append(model_name_condition)
 
             stmt = (
-                select((EndpointModel))
+                select(
+                    EndpointModel,
+                    case(
+                        (Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL, cast(CloudModel.input_cost, JSONB)),
+                        else_=literal(None),
+                    ).label("input_cost"),
+                    case(
+                        (
+                            Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
+                            cast(CloudModel.output_cost, JSONB),
+                        ),
+                        else_=literal(None),
+                    ).label("output_cost"),
+                    case(
+                        (Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL, CloudModel.max_input_tokens),
+                        (
+                            Model.provider_type == ModelProviderTypeEnum.HUGGING_FACE,
+                            Model.architecture_text_config["context_length"].as_integer(),
+                        ),
+                        else_=literal(None),
+                    ).label("context_length"),
+                )
                 .filter_by(**filters)
                 .join(Model, EndpointModel.model_id == Model.id)
+                .outerjoin(
+                    CloudModel,
+                    and_(Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL, Model.uri == CloudModel.uri),
+                )
                 .where(and_(*explicit_conditions))
                 .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
                 .filter(EndpointModel.project_id.in_(project_ids))
@@ -353,6 +404,6 @@ class EndpointDataManager(DataManagerUtils):
             sort_conditions = await self.generate_sorting_stmt(EndpointModel, order_by)
             stmt = stmt.order_by(*sort_conditions)
 
-        result = self.scalars_all(stmt)
+        result = self.execute_all(stmt)
 
         return result, count
