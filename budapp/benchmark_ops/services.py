@@ -7,8 +7,6 @@ from budapp.commons.db_utils import SessionMixin
 
 from ..cluster_ops.crud import ClusterDataManager
 from ..cluster_ops.models import Cluster as ClusterModel
-from ..credential_ops.crud import ProprietaryCredentialDataManager
-from ..credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
 from ..commons.config import app_settings
 from ..commons.constants import (
     APP_ICONS,
@@ -24,8 +22,11 @@ from ..commons.constants import (
 )
 from ..commons.exceptions import ClientException
 from ..core.schemas import NotificationPayload, NotificationResult
+from ..credential_ops.crud import ProprietaryCredentialDataManager
+from ..credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
 from ..model_ops.crud import ModelDataManager, ProviderDataManager
-from ..model_ops.models import Model, Provider as ProviderModel
+from ..model_ops.models import Model
+from ..model_ops.models import Provider as ProviderModel
 from ..model_ops.services import ModelServiceUtil
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
