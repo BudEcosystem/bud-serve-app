@@ -57,6 +57,9 @@ class BenchmarkService(SessionMixin):
         cluster_id = request.cluster_id
         credential_id = request.credential_id
 
+        # set user_id
+        request.user_id = current_user_id
+
         current_step_number = step_number
 
         # Retrieve or create workflow
@@ -214,6 +217,7 @@ class BenchmarkService(SessionMixin):
                 "credential_id",
                 "user_confirmation",
                 "run_as_simulation",
+                "user_id",
             ]
 
             # from workflow steps extract necessary information

@@ -20,6 +20,7 @@ class RunBenchmarkWorkflowStepData(BaseModel):
     description: str
     concurrent_requests: int
     eval_with: Literal["dataset", "configuration"]
+    user_id: Optional[UUID] = None
 
     # step 2
     datasets: Optional[list[UUID]] = None
