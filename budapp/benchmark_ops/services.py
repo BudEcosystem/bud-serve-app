@@ -7,8 +7,8 @@ from budapp.commons.db_utils import SessionMixin
 
 from ..cluster_ops.crud import ClusterDataManager
 from ..cluster_ops.models import Cluster as ClusterModel
-from ..credential_ops.crud import CredentialDataManager
-from ..credential_ops.models import Credential as CredentialModel
+from ..credential_ops.crud import ProprietaryCredentialDataManager
+from ..credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
 from ..commons.config import app_settings
 from ..commons.constants import (
     APP_ICONS,
@@ -118,8 +118,8 @@ class BenchmarkService(SessionMixin):
 
         # this section added to update request.model for cloud model providers
         if credential_id:
-            db_credential = await CredentialDataManager(self.session).retrieve_by_fields(
-                CredentialModel, fields={"id": credential_id}, missing_ok=True
+            db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_by_fields(
+                ProprietaryCredentialModel, fields={"id": credential_id}, missing_ok=True
             )
             if not db_credential:
                 raise ClientException("Credential does not exist")
