@@ -22,6 +22,7 @@ from typing import Annotated, Any, List, Optional
 
 from budmicroframe.commons.config import (
     BaseAppConfig,
+    BaseConfig,
     BaseSecretsConfig,
     enable_periodic_sync_from_store,
     register_settings,
@@ -147,7 +148,8 @@ class AppConfig(BaseAppConfig):
         return os.path.join(self.static_dir, "icons")
 
 
-class SecretsConfig(BaseSecretsConfig):
+# class SecretsConfig(BaseSecretsConfig):
+class SecretsConfig(BaseConfig):
     """Manages secret configurations for the microservice.
 
     This class handles the configuration of secrets required by the microservice. It supports secret management via
@@ -183,6 +185,8 @@ class SecretsConfig(BaseSecretsConfig):
     name: str = __version__.split("@")[0]
     version: str = __version__.split("@")[-1]
 
+    dapr_api_token: Optional[str] = Field(None, alias="DAPR_API_TOKEN")
+
     password_salt: str = Field("bud_password_salt", alias="PASSWORD_SALT")
     jwt_secret_key: str = Field(alias="JWT_SECRET_KEY")
     redis_password: Optional[str] = Field(
@@ -191,12 +195,22 @@ class SecretsConfig(BaseSecretsConfig):
     redis_uri: Optional[str] = Field(
         None, alias="REDIS_URI", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
     )
-    postgres_user: Optional[str] = Field(
+    # postgres_user: Optional[str] = Field(
+    #     None,
+    #     alias="POSTGRES_USER",
+    #     json_schema_extra=enable_periodic_sync_from_store(is_global=True),
+    # )
+    # postgres_password: Optional[str] = Field(
+    #     None,
+    #     alias="POSTGRES_PASSWORD",
+    #     json_schema_extra=enable_periodic_sync_from_store(is_global=True),
+    # )
+    psql_user: Optional[str] = Field(
         None,
         alias="POSTGRES_USER",
         json_schema_extra=enable_periodic_sync_from_store(is_global=True),
     )
-    postgres_password: Optional[str] = Field(
+    psql_password: Optional[str] = Field(
         None,
         alias="POSTGRES_PASSWORD",
         json_schema_extra=enable_periodic_sync_from_store(is_global=True),
@@ -229,7 +243,7 @@ logging.configure_logging(app_settings.log_dir, app_settings.log_level)
 
 app_settings.postgres_url = postgres_url(app_settings=app_settings, secrets_settings=secrets_settings)
 
-secrets_settings.psql_user = secrets_settings.postgres_user
-secrets_settings.psql_password = secrets_settings.postgres_password
+# secrets_settings.psql_user = secrets_settings.postgres_user
+# secrets_settings.psql_password = secrets_settings.postgres_password
 
 register_settings(app_settings, secrets_settings)
