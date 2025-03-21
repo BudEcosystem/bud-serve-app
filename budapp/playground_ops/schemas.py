@@ -19,7 +19,7 @@
 
 import re
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 
 from pydantic import UUID4, BaseModel, ConfigDict, field_validator, model_validator, Field
 
@@ -194,6 +194,34 @@ class MessageCreateRequest(MessageBase):
     def validate_prompt(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("Prompt cannot be empty.")
+        return value
+
+    @field_validator("response")
+    def validate_response(cls, value: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(value, dict):
+            raise ValueError("Response must be a dictionary.")
+
+        # Validate message structure
+        message = value.get("message")
+        if not message or not isinstance(message, dict):
+            raise ValueError("Response must contain a 'message' dictionary.")
+
+        required_message_keys = {"id", "createdAt", "role", "content"}
+        if not required_message_keys.issubset(message.keys()):
+            raise ValueError(f"'message' must contain keys: {required_message_keys}")
+
+        # Validate usage structure
+        usage = value.get("usage")
+        if not usage or not isinstance(usage, dict):
+            raise ValueError("Response must contain a 'usage' dictionary.")
+
+        required_usage_keys = {"promptTokens", "completionTokens", "totalTokens"}
+        if not required_usage_keys.issubset(usage.keys()):
+            raise ValueError(f"'usage' must contain keys: {required_usage_keys}")
+
+        if not all(isinstance(usage[k], int) for k in required_usage_keys):
+            raise ValueError("Usage values must be integers.")
+
         return value
 
 
