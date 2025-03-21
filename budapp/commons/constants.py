@@ -472,6 +472,7 @@ class PayloadType(str, Enum):
     ADD_WORKER = "add_worker"
     FETCH_LICENSE_FAQS = "fetch_license_faqs"
     DEPLOY_QUANTIZATION = "deploy_quantization"
+    RUN_BENCHMARK = "performance_benchmark"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
