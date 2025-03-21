@@ -21,8 +21,6 @@ from typing import List, Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
-from fastapi.exceptions import RequestValidationError
-from pydantic import AnyHttpUrl, ValidationError
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -33,12 +31,12 @@ from budapp.commons.dependencies import (
     parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
-from budapp.commons.schemas import ErrorResponse, SuccessResponse
+from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
-from .schemas import RunBenchmarkWorkflowRequest
+from .schemas import BenchmarkFilter, BenchmarkPaginatedResponse, RunBenchmarkWorkflowRequest
 from .services import BenchmarkService
 
 
@@ -86,3 +84,62 @@ async def run_benchmark_workflow(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to run benchmark workflow"
         ).to_http_response()
+
+
+@benchmark_router.get(
+    "",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": BenchmarkPaginatedResponse,
+            "description": "Successfully list all endpoints",
+        },
+    },
+    description="List all endpoints. \n\n order_by fields are: name, status, created_at, modified_at, cluster_name, model_name, modality",
+)
+async def list_all_endpoints(
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[BenchmarkFilter, Depends()],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[BenchmarkPaginatedResponse, ErrorResponse]:
+    """List all endpoints."""
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Construct filters
+    filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True)
+
+    try:
+        db_benchmarks, count = await BenchmarkService(session).get_benchmarks(
+            offset, limit, filters_dict, order_by, search
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to get all benchmarks: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get all benchmarks: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all benchmarks"
+        ).to_http_response()
+
+    return BenchmarkPaginatedResponse(
+        benchmarks=db_benchmarks,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="benchmarks.list",
+        code=status.HTTP_200_OK,
+        message="Successfully list all benchmarks",
+    ).to_http_response()
+

@@ -1,3 +1,4 @@
+from typing import Dict, List, Optional
 from uuid import UUID
 
 import aiohttp
@@ -35,7 +36,7 @@ from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .models import BenchmarkCRUD, BenchmarkSchema
-from .schemas import RunBenchmarkWorkflowRequest, RunBenchmarkWorkflowStepData
+from .schemas import RunBenchmarkWorkflowRequest, RunBenchmarkWorkflowStepData, BenchmarkResponse
 
 
 logger = logging.get_logger(__name__)
@@ -280,7 +281,6 @@ class BenchmarkService(SessionMixin):
         }
 
         logger.debug(f"Performing run benchmark request to budcluster {run_benchmark_payload}")
-
         run_benchmark_response = await self._perform_run_benchmark_request(run_benchmark_payload)
         # run_benchmark_response = {
         #     "object": "workflow_metadata",
@@ -439,3 +439,22 @@ class BenchmarkService(SessionMixin):
             .build()
         )
         await BudNotifyService().send_notification(notification_request)
+
+    async def get_benchmarks(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Optional[Dict] = None,
+        order_by: Optional[List] = None,
+        search: bool = False,
+    ) -> List[dict]:
+        """Get all benchmarks."""
+        with BenchmarkCRUD() as crud:
+            db_benchmarks, total_count = await crud.fetch_many_with_search(filters=filters, order_by=order_by, limit=limit, offset=offset, search=search)
+            benchmark_list = []
+            for db_benchmark in db_benchmarks:
+                benchmark_dict = {**db_benchmark.__dict__}
+                benchmark_dict["model"] = {**db_benchmark.model.__dict__}  # Ensure relationships are included
+                benchmark_dict["cluster"] = {**db_benchmark.cluster.__dict__}
+                benchmark_list.append(benchmark_dict)
+            return benchmark_list, total_count

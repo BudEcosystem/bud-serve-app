@@ -1,7 +1,14 @@
+from datetime import datetime
 from typing import Any, Literal, Optional
 from uuid import UUID
 
-from pydantic import UUID4, BaseModel, Field, model_validator
+from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator
+
+from budapp.commons.constants import BenchmarkStatusEnum
+from budapp.commons.schemas import PaginatedSuccessResponse
+
+from ..cluster_ops.schemas import ClusterResponse
+from ..model_ops.schemas import ModelResponse
 
 
 class RunBenchmarkWorkflowStepData(BaseModel):
@@ -71,3 +78,47 @@ class RunBenchmarkWorkflowRequest(RunBenchmarkWorkflowStepData):
         #     raise ValueError("embedding_model, eviction_policy and score_threshold must be provided if use_cache is True")
 
         return self
+
+
+class BenchmarkFilter(BaseModel):
+    name: str | None = None
+    model_name: str | None = None
+    cluster_name: str | None = None
+    min_concurrency: int | None = None
+    max_concurrency: int | None = None
+    min_tpot: float | None = None
+    max_tpot: float | None = None
+    min_ttft: float | None = None
+    max_ttft: float | None = None
+
+
+class BenchmarkResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    status: BenchmarkStatusEnum
+    model: ModelResponse
+    cluster: ClusterResponse
+    node_type: str
+    vendor_type: str
+    concurrency: int
+    tpot: float = 0.5
+    ttft: float = 0.5
+    created_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_node_info(cls, values):
+        """Extract Node type and Vendor type values."""
+        if not isinstance(values, dict):  # Ensure values is a dictionary
+            values = values.__dict__  # Convert object to dictionary
+
+        nodes = values.get("nodes", [])
+        values["node_type"] = ",".join({device["type"] for node in nodes for device in node.get("devices", [])})
+        values["vendor_type"] = ",".join({device["name"] for node in nodes for device in node.get("devices", [])})
+        return values
+
+
+class BenchmarkPaginatedResponse(PaginatedSuccessResponse):
+    benchmarks: list[BenchmarkResponse]

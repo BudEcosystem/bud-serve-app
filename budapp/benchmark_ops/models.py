@@ -1,12 +1,16 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Optional
 from uuid import UUID, uuid4
 
 from budmicroframe.shared.psql_service import CRUDMixin, PSQLBase, TimestampMixin
 from sqlalchemy import Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy import and_, asc, desc, distinct, func, or_, select, case, literal, cast
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..commons.constants import BenchmarkStatusEnum
+
+from ..model_ops.models import Model
+from ..cluster_ops.models import Cluster as ClusterModel
 
 
 if TYPE_CHECKING:
@@ -57,3 +61,77 @@ class BenchmarkCRUD(CRUDMixin[BenchmarkSchema, None, None]):
     def __init__(self):
         """Initialize benchmark crud methods."""
         super().__init__(model=self.__model__)
+
+    async def fetch_many_with_search(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Optional[Dict] = None,
+        order_by: Optional[List] = None,
+        search: bool = False,
+    ):
+        """Fetch many with search."""
+        filters = filters or {}
+        order_by = order_by or []
+
+        await self.validate_fields(self.model, filters)
+
+        # explicit conditions for order by model_name, cluster_name, modality
+        explicit_conditions = []
+        for field in order_by:
+            if field[0] == "model_name":
+                sorting_stmt = await self.generate_sorting_stmt(
+                    Model,
+                    [
+                        ("name", field[1]),
+                    ],
+                )
+                explicit_conditions.append(sorting_stmt[0])
+            elif field[0] == "cluster_name":
+                sorting_stmt = await self.generate_sorting_stmt(
+                    ClusterModel,
+                    [
+                        ("name", field[1]),
+                    ],
+                )
+                explicit_conditions.append(sorting_stmt[0])
+
+
+        if search:
+            search_conditions = await self.generate_search_stmt(self.model, filters)
+            stmt = (
+                select(self.model)
+                .join(Model)
+                .join(ClusterModel)
+                .filter(or_(*search_conditions))
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(self.model)
+                .join(Model)
+                .join(ClusterModel)
+                .filter(or_(*search_conditions))
+            )
+        else:
+            stmt = select(BenchmarkSchema).join(Model).join(ClusterModel)
+            count_stmt = select(func.count()).select_from(self.model).join(Model).join(ClusterModel)
+            for key, value in filters.items():
+                stmt = stmt.filter(getattr(self.model, key) == value)
+                count_stmt = count_stmt.filter(getattr(self.model, key) == value)
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(self.model, order_by)
+            # Extend sort conditions with explicit conditions
+            sort_conditions.extend(explicit_conditions)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.scalars_all(stmt)
+
+        return result, count
