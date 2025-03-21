@@ -191,6 +191,18 @@ class SecretsConfig(BaseSecretsConfig):
     redis_uri: Optional[str] = Field(
         None, alias="REDIS_URI", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
     )
+    postgres_user: Optional[str] = Field(
+        None,
+        alias="POSTGRES_USER",
+        json_schema_extra=enable_periodic_sync_from_store(is_global=True),
+    )
+    postgres_password: Optional[str] = Field(
+        None,
+        alias="POSTGRES_PASSWORD",
+        json_schema_extra=enable_periodic_sync_from_store(is_global=True),
+    )
+
+
 
     @computed_field
     def redis_url(self) -> str:
@@ -216,4 +228,8 @@ logging.configure_logging(app_settings.log_dir, app_settings.log_level)
 
 
 app_settings.postgres_url = postgres_url(app_settings=app_settings, secrets_settings=secrets_settings)
+
+secrets_settings.psql_user = secrets_settings.postgres_user
+secrets_settings.psql_password = secrets_settings.postgres_password
+
 register_settings(app_settings, secrets_settings)
