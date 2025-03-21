@@ -7,6 +7,8 @@ from budapp.commons.db_utils import SessionMixin
 
 from ..cluster_ops.crud import ClusterDataManager
 from ..cluster_ops.models import Cluster as ClusterModel
+from ..credential_ops.crud import CredentialDataManager
+from ..credential_ops.models import Credential as CredentialModel
 from ..commons.config import app_settings
 from ..commons.constants import (
     APP_ICONS,
@@ -22,8 +24,8 @@ from ..commons.constants import (
 )
 from ..commons.exceptions import ClientException
 from ..core.schemas import NotificationPayload, NotificationResult
-from ..model_ops.crud import ModelDataManager
-from ..model_ops.models import Model
+from ..model_ops.crud import ModelDataManager, ProviderDataManager
+from ..model_ops.models import Model, Provider as ProviderModel
 from ..model_ops.services import ModelServiceUtil
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
@@ -60,11 +62,16 @@ class BenchmarkService(SessionMixin):
             workflow_type=WorkflowTypeEnum.MODEL_BENCHMARK,
             title="Run model benchmark",
             total_steps=workflow_total_steps,
-            icon=APP_ICONS["general"]["deployment_mono"],
+            icon=APP_ICONS["general"]["model_mono"],
             tag="Benchmark",
         )
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
             workflow_id, workflow_create, current_user_id
+        )
+
+        # Get workflow steps
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": db_workflow.id}
         )
 
         # Validate resources
@@ -79,11 +86,27 @@ class BenchmarkService(SessionMixin):
                 model_source = db_model.source
                 if model_uri.startswith(f"{model_source}/"):
                     model_uri = model_uri.removeprefix(f"{model_source}/")
+                # Note: When model_id is given, credential_id is not present since credential_id is received in the next step
+                # if not credential_id condition will not work, therefore added another section
+                # if credential_id and updating request.model value there.
                 request.model = model_uri if not credential_id else f"{model_source}/{model_uri}"
                 request.provider_type = db_model.provider_type.value
             else:
                 request.model = db_model.local_path
                 request.provider_type = db_model.provider_type.value
+            # Update icon on workflow
+            if db_model.provider_type == ModelProviderTypeEnum.HUGGING_FACE:
+                db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                    ProviderModel, {"id": db_model.provider_id}
+                )
+                model_icon = db_provider.icon
+            else:
+                model_icon = db_model.icon
+            # Update title, icon on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": db_model.name, "icon": model_icon},
+            )
 
         if cluster_id:
             db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
@@ -93,13 +116,34 @@ class BenchmarkService(SessionMixin):
                 raise ClientException("Cluster does not exist")
             request.bud_cluster_id = db_cluster.cluster_id
 
+        # this section added to update request.model for cloud model providers
+        if credential_id:
+            db_credential = await CredentialDataManager(self.session).retrieve_by_fields(
+                CredentialModel, fields={"id": credential_id}, missing_ok=True
+            )
+            if not db_credential:
+                raise ClientException("Credential does not exist")
+            # find model_id in previous step data
+            model_id = None
+            for step_data in db_workflow_steps:
+                model_id = step_data.data.get("model_id")
+                if model_id:
+                    break
+            if model_id:
+                db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                    Model, fields={"id": model_id}, exclude_fields={"status": ModelStatusEnum.DELETED}
+                )
+                if not db_model:
+                    raise ClientException("Model does not exist")
+                if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+                    model_uri = db_model.uri
+                    model_source = db_model.source
+                    if model_uri.startswith(f"{model_source}/"):
+                        model_uri = model_uri.removeprefix(f"{model_source}/")
+                    request.model = f"{model_source}/{model_uri}"
+
         # Prepare workflow step data
         workflow_step_data = RunBenchmarkWorkflowStepData(**request.model_dump(exclude={"workflow_id", "workflow_total_steps", "step_number", "trigger_workflow"})).model_dump(mode="json", exclude_none=True)
-
-        # Get workflow steps
-        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
-            {"workflow_id": db_workflow.id}
-        )
 
         # For avoiding another db call for record retrieval, storing db object while iterating over db_workflow_steps
         db_current_workflow_step = None
