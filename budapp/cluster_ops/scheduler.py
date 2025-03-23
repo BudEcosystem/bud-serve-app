@@ -23,7 +23,6 @@ from typing import List, Optional
 from uuid import UUID
 
 import aiohttp
-from budmicroframe.shared.dapr_service import DaprService
 from fastapi import status
 from sqlalchemy.orm import Session
 
@@ -39,6 +38,7 @@ from ..commons.exceptions import ClientException
 from ..commons.schemas import BudNotificationMetadata
 from ..model_ops.crud import ModelDataManager
 from ..model_ops.models import Model
+from ..shared.dapr_service import DaprService
 from .crud import ModelClusterRecommendedDataManager
 from .models import ModelClusterRecommended
 from .schemas import BudSimulatorRequest
@@ -134,10 +134,12 @@ class RecommendedClusterScheduler:
 
                 try:
                     dapr_service = DaprService()
-                    dapr_service.save_to_statestore(
-                        store_name=app_settings.statestore_name,
-                        key=state_store_key,
-                        value=recommended_cluster_scheduler_state,
+                    asyncio.run(
+                        dapr_service.save_to_statestore(
+                            store_name=app_settings.statestore_name,
+                            key=state_store_key,
+                            value=recommended_cluster_scheduler_state,
+                        )
                     )
                 except Exception as e:
                     logger.exception("Failed to save state store %s", e)
@@ -151,7 +153,7 @@ class RecommendedClusterScheduler:
     async def _perform_bud_simulator_request(bud_simulator_request: BudSimulatorRequest) -> None:
         """Perform the bud simulator request."""
         bud_simulator_endpoint = (
-            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/simulator/run"
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/run"
         )
 
         payload = bud_simulator_request.model_dump()
@@ -160,7 +162,7 @@ class RecommendedClusterScheduler:
         try:
             async with (
                 aiohttp.ClientSession() as session,
-                session.post(bud_simulator_endpoint, json=payload) as response
+                session.post(bud_simulator_endpoint, json=payload) as response,
             ):
                 response_data = await response.json()
                 if response.status != 200:
