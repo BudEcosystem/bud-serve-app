@@ -30,6 +30,7 @@ from ..commons import logging
 from ..commons.config import app_settings
 from ..commons.constants import (
     BUD_INTERNAL_WORKFLOW,
+    RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY,
     ModelProviderTypeEnum,
     ModelStatusEnum,
 )
@@ -96,6 +97,29 @@ class RecommendedClusterScheduler:
 
     def execute_cluster_recommendation(self, model_id: Optional[UUID] = None) -> None:
         """Execute the cluster recommendation."""
+        dapr_service = DaprService()
+        state_store_key = RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY
+
+        # Create default state store if it doesn't exist
+        try:
+            recommended_cluster_scheduler_state = dapr_service.get_state(
+                store_name=app_settings.statestore_name, key=state_store_key
+            ).json()
+            logger.debug("State store %s already exists", state_store_key)
+        except Exception as e:
+            logger.error("Failed to get state store %s", e)
+            try:
+                asyncio.run(
+                    dapr_service.save_to_statestore(
+                        store_name=app_settings.statestore_name,
+                        key=state_store_key,
+                        value={},
+                    )
+                )
+                logger.debug("Created default state store %s", state_store_key)
+            except Exception as e:
+                logger.error("Failed to save state store %s", e)
+
         db_models = self.get_models(model_id)
         logger.debug("Found %s models to execute cluster recommendation", len(db_models))
 
@@ -124,13 +148,20 @@ class RecommendedClusterScheduler:
             if isinstance(response, dict) and "workflow_id" in response:
                 logger.debug("Successfully initiated bud simulator workflow %s", workflow_id)
 
+                # Get existing workflow details from state store
+                try:
+                    recommended_cluster_scheduler_state = dapr_service.get_state(
+                        store_name=app_settings.statestore_name, key=state_store_key
+                    ).json()
+                    logger.debug("State store %s already exists", state_store_key)
+                except Exception as e:
+                    logger.exception("Failed to get state store %s", e)
+                    continue
+
                 # Save workflow details in state store
-                recommended_cluster_scheduler_state = {
-                    str(workflow_id): {
-                        "model_id": str(db_model.id),
-                    }
+                recommended_cluster_scheduler_state[str(workflow_id)] = {
+                    "model_id": str(db_model.id),
                 }
-                state_store_key = "recommended_cluster_scheduler_state"
 
                 try:
                     dapr_service = DaprService()
@@ -141,6 +172,7 @@ class RecommendedClusterScheduler:
                             value=recommended_cluster_scheduler_state,
                         )
                     )
+                    logger.debug("State store %s updated", state_store_key)
                 except Exception as e:
                     logger.exception("Failed to save state store %s", e)
                     continue
