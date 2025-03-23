@@ -36,7 +36,7 @@ from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .models import BenchmarkCRUD, BenchmarkSchema
-from .schemas import RunBenchmarkWorkflowRequest, RunBenchmarkWorkflowStepData, BenchmarkResponse
+from .schemas import RunBenchmarkWorkflowRequest, RunBenchmarkWorkflowStepData
 
 
 logger = logging.get_logger(__name__)

@@ -74,11 +74,21 @@ class BenchmarkCRUD(CRUDMixin[BenchmarkSchema, None, None]):
         filters = filters or {}
         order_by = order_by or []
 
+        translated_filters = filters.copy()
+        translated_order_by = order_by.copy()
+        for field in translated_filters:
+            if field in ["model_name", "cluster_name"]:
+                filters.pop(field)
+
+        print(translated_filters)
+        print(translated_order_by)
+
+
         await self.validate_fields(self.model, filters)
 
         # explicit conditions for order by model_name, cluster_name, modality
         explicit_conditions = []
-        for field in order_by:
+        for field in translated_order_by:
             if field[0] == "model_name":
                 sorting_stmt = await self.generate_sorting_stmt(
                     Model,
@@ -86,7 +96,8 @@ class BenchmarkCRUD(CRUDMixin[BenchmarkSchema, None, None]):
                         ("name", field[1]),
                     ],
                 )
-                explicit_conditions.append(sorting_stmt[0])
+                explicit_conditions.extend(sorting_stmt)
+                order_by.remove(field)
             elif field[0] == "cluster_name":
                 sorting_stmt = await self.generate_sorting_stmt(
                     ClusterModel,
@@ -94,27 +105,42 @@ class BenchmarkCRUD(CRUDMixin[BenchmarkSchema, None, None]):
                         ("name", field[1]),
                     ],
                 )
-                explicit_conditions.append(sorting_stmt[0])
+                explicit_conditions.extend(sorting_stmt)
+                order_by.remove(field)
 
 
         if search:
-            search_conditions = await self.generate_search_stmt(self.model, filters)
+            search_conditions = []
+            for field, value in translated_filters.items():
+                if field == "model_name":
+                    search_conditions.extend(await self.generate_search_stmt(Model, {"name": value}))
+                elif field == "cluster_name":
+                    search_conditions.extend(await self.generate_search_stmt(ClusterModel, {"name": value}))
+            search_conditions.extend(await self.generate_search_stmt(self.model, filters))
+
             stmt = (
                 select(self.model)
                 .join(Model)
                 .join(ClusterModel)
-                .filter(or_(*search_conditions))
+                .filter(and_(*search_conditions))
             )
             count_stmt = (
                 select(func.count())
                 .select_from(self.model)
                 .join(Model)
                 .join(ClusterModel)
-                .filter(or_(*search_conditions))
+                .filter(and_(*search_conditions))
             )
         else:
             stmt = select(BenchmarkSchema).join(Model).join(ClusterModel)
             count_stmt = select(func.count()).select_from(self.model).join(Model).join(ClusterModel)
+            for key, value in translated_filters.items():
+                if key == "model_name":
+                    stmt = stmt.filter(Model.name == value)
+                    count_stmt = count_stmt.filter(Model.name == value)
+                elif key == "cluster_name":
+                    stmt = stmt.filter(ClusterModel.name == value)
+                    count_stmt = count_stmt.filter(ClusterModel.name == value)
             for key, value in filters.items():
                 stmt = stmt.filter(getattr(self.model, key) == value)
                 count_stmt = count_stmt.filter(getattr(self.model, key) == value)
@@ -126,11 +152,13 @@ class BenchmarkCRUD(CRUDMixin[BenchmarkSchema, None, None]):
         stmt = stmt.limit(limit).offset(offset)
 
         # Apply sorting
-        if order_by:
+        if translated_order_by:
             sort_conditions = await self.generate_sorting_stmt(self.model, order_by)
             # Extend sort conditions with explicit conditions
             sort_conditions.extend(explicit_conditions)
             stmt = stmt.order_by(*sort_conditions)
+
+        print(stmt)
 
         result = self.scalars_all(stmt)
 
