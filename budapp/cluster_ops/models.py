@@ -17,14 +17,14 @@
 """The cluster ops package, containing essential business logic, services, and routing configurations for the cluster ops."""
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Uuid
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from budapp.commons.constants import ClusterStatusEnum
+from budapp.commons.constants import ClusterHardwareTypeEnum, ClusterStatusEnum
 from budapp.commons.database import Base, TimestampMixin
 
 
@@ -79,9 +79,38 @@ class Cluster(Base, TimestampMixin):
         back_populates="cluster",
     )
     created_user: Mapped["User"] = relationship(back_populates="created_clusters", foreign_keys=[created_by])
+    model_cluster_recommended: Mapped[list["ModelClusterRecommended"]] = relationship(
+        "ModelClusterRecommended",
+        back_populates="cluster",
+    )
 
     @hybrid_property
     def kubernetes_info_dict(self):
         if not self.kubernetes_metadata:
             return {}
         return json.loads(self.kubernetes_metadata)
+
+
+class ModelClusterRecommended(Base):
+    """Model cluster recommended model."""
+
+    __tablename__ = "model_cluster_recommended"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
+    cluster_id: Mapped[UUID] = mapped_column(ForeignKey("cluster.id"), nullable=False)
+    hardware_type: Mapped[str] = mapped_column(
+        Enum(
+            ClusterHardwareTypeEnum,
+            name="cluster_hardware_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+    )
+    cost_per_million_tokens: Mapped[float] = mapped_column(Float, nullable=False)
+    last_updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
+
+    model: Mapped["Model"] = relationship("Model", back_populates="model_cluster_recommended")
+    cluster: Mapped["Cluster"] = relationship("Cluster", back_populates="model_cluster_recommended")

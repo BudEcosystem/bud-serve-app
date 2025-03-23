@@ -119,6 +119,10 @@ class Model(Base, TimestampMixin):
     model_security_scan_result: Mapped["ModelSecurityScanResult"] = relationship(
         "ModelSecurityScanResult", back_populates="model"
     )
+    model_cluster_recommended: Mapped[list["ModelClusterRecommended"]] = relationship(
+        "ModelClusterRecommended",
+        back_populates="model",
+    )
 
 
 class PaperPublished(Base, TimestampMixin):
