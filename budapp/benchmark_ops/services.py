@@ -384,7 +384,7 @@ class BenchmarkService(SessionMixin):
                     required_data[key] = db_workflow_step.data[key]
 
         logger.debug("Collected required data from workflow steps")
-
+        model_icon = APP_ICONS["general"]["model_mono"]
         # Get benchmark
         with BenchmarkCRUD() as crud:
             db_benchmark = crud.fetch_one(
@@ -403,11 +403,13 @@ class BenchmarkService(SessionMixin):
             else:
                 update_data = {"status": BenchmarkStatusEnum.FAILED, "reason": benchmark_response["result"]}
 
-            db_benchmark = crud.update(
+            crud.update(
                 data=update_data,
                 conditions={"id": db_benchmark.id},
             )
-            logger.debug(f"Updated benchmark: {db_benchmark}")
+
+            db_benchmark = crud.fetch_one(conditions={"id": db_benchmark.id}, raise_on_error=False)
+
 
         # Update current step number
         current_step_number = db_workflow.current_step + 1
@@ -432,7 +434,7 @@ class BenchmarkService(SessionMixin):
         )
 
         # Send notification to workflow creator
-        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_benchmark.model)
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(model_id=db_benchmark.model_id)
 
         notification_request = (
             NotificationBuilder()
@@ -440,7 +442,7 @@ class BenchmarkService(SessionMixin):
                 title=db_benchmark.name,
                 message="Benchmark completed",
                 icon=model_icon,
-                result=NotificationResult(target_id=db_benchmark.id, target_type="benchmark").model_dump(
+                result=NotificationResult(target_id=db_benchmark.id, target_type="model").model_dump(
                     exclude_none=True, exclude_unset=True
                 ),
             )
