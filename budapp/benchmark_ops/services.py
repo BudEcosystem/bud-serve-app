@@ -284,6 +284,11 @@ class BenchmarkService(SessionMixin):
             "source_topic": f"{app_settings.source_topic}",
         }
 
+        # Update current workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, run_benchmark_payload
+        )
+
         logger.debug(f"Performing run benchmark request to budcluster {run_benchmark_payload}")
         run_benchmark_response = await self._perform_run_benchmark_request(run_benchmark_payload)
         # run_benchmark_response = {
@@ -392,6 +397,7 @@ class BenchmarkService(SessionMixin):
                 return
 
             benchmark_response = payload.content.result
+            logger.info(f"Updating benchmark with response: {benchmark_response}")
             if benchmark_response["benchmark_status"]:
                 update_data = {"status": BenchmarkStatusEnum.SUCCESS, "bud_cluster_benchmark_id": benchmark_response["bud_cluster_benchmark_id"], "result": benchmark_response["result"]}
             else:
@@ -460,5 +466,7 @@ class BenchmarkService(SessionMixin):
                 benchmark_dict = {**db_benchmark.__dict__}
                 benchmark_dict["model"] = {**db_benchmark.model.__dict__}  # Ensure relationships are included
                 benchmark_dict["cluster"] = {**db_benchmark.cluster.__dict__}
+                benchmark_dict["tpot"] = benchmark_dict["result"].get("mean_tpot_ms", 0.0) if benchmark_dict["result"] else 0.0
+                benchmark_dict["ttft"] = benchmark_dict["result"].get("mean_ttft_ms", 0.0) if benchmark_dict["result"] else 0.0
                 benchmark_list.append(benchmark_dict)
             return benchmark_list, total_count
