@@ -24,7 +24,7 @@ from enum import Enum
 
 from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, Field, computed_field, field_validator, HttpUrl
 
-from budapp.commons.constants import ClusterStatusEnum, EndpointStatusEnum
+from budapp.commons.constants import ClusterStatusEnum, EndpointStatusEnum, ClusterHardwareTypeEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 
 from ..commons.helpers import validate_icon
@@ -514,3 +514,19 @@ class BudSimulatorRequest(BaseModel):
     notification_metadata: BudNotificationMetadata | None = None
     source_topic: str
     is_proprietary_model: bool
+
+
+# Model Recommended Cluster Schemas
+class ModelClusterRecommendedCreate(BaseModel):
+    """Model recommended cluster create schema."""
+
+    model_id: UUID4
+    cluster_id: UUID4
+    hardware_type: ClusterHardwareTypeEnum
+    cost_per_million_tokens: float
+
+
+class ModelClusterRecommendedUpdate(ModelClusterRecommendedCreate):
+    """Model recommended cluster update schema."""
+
+    pass

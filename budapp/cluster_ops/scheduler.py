@@ -81,7 +81,7 @@ class RecommendedClusterScheduler:
                         ModelClusterRecommendedDataManager(session).get_stale_model_recommendation(older_than)
                     )
                     if db_model_cluster_recommended:
-                        return [db_model_cluster_recommended.model_id]
+                        return [db_model_cluster_recommended.model]
                     else:
                         logger.error("No stale model cluster recommendation found in db")
                         return []
