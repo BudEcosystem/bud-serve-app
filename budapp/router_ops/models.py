@@ -53,6 +53,7 @@ class RouterEndpoint(Base, TimestampMixin):
     tpm: Mapped[float] = mapped_column(Float, nullable=True)
     rpm: Mapped[float] = mapped_column(Float, nullable=True)
     weight: Mapped[float] = mapped_column(Float, nullable=True)
+    # complexity_threshold: Mapped[float] = mapped_column(Float, nullable=True)
     cool_down_period: Mapped[int] = mapped_column(Integer, nullable=True)
 
     router: Mapped["Router"] = relationship("Router", back_populates="endpoints", foreign_keys=[router_id])

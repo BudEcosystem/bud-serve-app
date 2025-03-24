@@ -43,6 +43,7 @@ from .schemas import (
     ProprietaryCredentialResponseList,
     ProprietaryCredentialUpdate,
     RouterConfig,
+    RoutingPolicy,
 )
 
 
@@ -277,25 +278,23 @@ class CredentialService(SessionMixin):
         db_project = db_credential.project
         endpoints = db_project.endpoints
         db_endpoint = None
-        db_route = None
+        db_router = None
         for endpoint in endpoints:
             if endpoint.name == endpoint_name and endpoint.status == EndpointStatusEnum.RUNNING.value:
                 db_endpoint = endpoint
                 break
         if not db_endpoint:
-            pass
-            # for route in db_project.routes:
-            #     if route.name == endpoint_name:
-            #         db_route = route
-            #         break
-        if not db_endpoint and not db_route:
+            for router in db_project.routers:
+                if router.name == endpoint_name:
+                    db_router = router
+                    break
+        if not db_endpoint and not db_router:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endpoint or Route not found")
 
-        db_model = db_endpoint.model
-
-        if db_route:
-            router_config = await self.generate_route_config_from_route(db_route)
+        if db_router:
+            router_config = await self.generate_route_config_from_router(db_router)
         else:
+            db_model = db_endpoint.model
             router_config = await self.generate_route_config_from_endpoint(db_endpoint, db_model)
 
         return router_config
@@ -339,22 +338,101 @@ class CredentialService(SessionMixin):
                     "deploy_model_uri": deploy_model_uri,
                 },
             },
+            input_cost_per_token=None,
+            output_cost_per_token=None,
+            tpm=None,
+            rpm=None,
+            complexity_threshold=None,
+            weight=None,
+            cool_down_period=None,
+            fallback_endpoint_ids=None,
         )
 
         router_config = RouterConfig(
             project_id=db_project.id,
             project_name=db_project.name,
             endpoint_name=db_endpoint.name,
+            routing_policy=None,
             cache_configuration=CacheConfig(**json.loads(db_endpoint.cache_config))
             if db_endpoint.cache_enabled
             else None,
-            model_configuration=model_config,
+            model_configuration=[model_config],
         )
 
         return router_config
 
-    async def generate_route_config_from_route(self, db_route) -> RouterConfig:
-        pass
+    async def generate_route_config_from_router(self, db_router) -> RouterConfig:
+        db_project = db_router.project
+        model_configs = []
+
+        for db_router_endpoint in db_router.endpoints:
+            db_endpoint = db_router_endpoint.endpoint
+            db_model = db_endpoint.model
+            actual_model_name = f"openai/{db_endpoint.name}"
+            api_base = db_endpoint.url
+            if db_model.provider_type != ModelProviderTypeEnum.CLOUD_MODEL:
+                api_base = f"{db_endpoint.url}/v1"
+                deploy_model_uri = f"{app_settings.add_model_dir}/{db_model.local_path}"
+                actual_model_name = f"openai/{deploy_model_uri}"
+            else:
+                model_uri = db_model.uri
+                model_source = db_model.source
+                if model_uri.startswith(f"{model_source}/"):
+                    model_uri = model_uri.removeprefix(f"{model_source}/")
+                deploy_model_uri = f"{model_source}/{model_uri}"
+
+            # TODO: Take fallback endpoint ids from router
+            model_configs.append(
+                ModelConfig(
+                    model_name=db_endpoint.name,
+                    litellm_params={
+                        "model": actual_model_name,
+                        "api_base": api_base,
+                        "api_key": app_settings.litellm_proxy_master_key,
+                    },
+                    model_info={
+                        "id": db_model.id,
+                        "metadata": {
+                            "name": db_model.name,
+                            "provider": db_model.provider.name,
+                            "modality": db_model.modality.value,
+                            "endpoint_id": db_endpoint.id,
+                            "cloud": db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
+                            "deploy_model_uri": deploy_model_uri,
+                        },
+                        # "sequence_length": 4096,
+                        "tasks": db_model.tasks,
+                        "domains": db_model.tags,
+                        "languages": db_model.languages,
+                        "use_cases": db_model.use_cases,
+                        "evals": {},
+                    },
+                    input_cost_per_token=None,
+                    output_cost_per_token=None,
+                    tpm=db_router_endpoint.tpm,
+                    rpm=db_router_endpoint.rpm,
+                    complexity_threshold=None,
+                    weight=db_router_endpoint.weight,
+                    cool_down_period=db_router_endpoint.cool_down_period,
+                    fallback_endpoint_ids=db_router_endpoint.fallback_endpoint_ids,
+                )
+            )
+
+        router_config = RouterConfig(
+            project_id=db_project.id,
+            project_name=db_project.name,
+            endpoint_name=db_router.name,
+            routing_policy=RoutingPolicy(
+                name=db_router.name,
+                strategies=db_router.routing_strategy,
+                fallback_policies=[],
+                decision_mode="intersection",
+            ),
+            cache_configuration=None,  # TODO: add cache configuration per endpoint
+            model_configuration=model_configs,
+        )
+
+        return router_config
 
     @cache(
         key_func=lambda s, api_key: f"decrypted_key:{api_key}",

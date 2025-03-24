@@ -54,6 +54,7 @@ class RouterService(SessionMixin):
                 )
 
         router_data = request.model_dump()
+        router_data["routing_strategy"] = router_data["routing_strategy"] or []
         router_endpoints_data = router_data.pop("endpoints") or []
 
         router = Router(**router_data)
@@ -141,6 +142,7 @@ class RouterService(SessionMixin):
         db_router = await RouterDataManager(self.session).retrieve_by_fields({"id": router_id})
 
         router_data = request.model_dump()
+        router_data["routing_strategy"] = router_data["routing_strategy"] or []
         router_endpoints_data = router_data.pop("endpoints") or []
 
         if router_data.get("name", None):

@@ -307,6 +307,23 @@ class ModelConfig(BaseModel):
     model_name: str
     litellm_params: dict
     model_info: dict
+    input_cost_per_token: float | None
+    output_cost_per_token: float | None
+    tpm: float | None
+    rpm: float | None
+    complexity_threshold: float | None
+    weight: float | None
+    cool_down_period: int | None
+    fallback_endpoint_ids: List[UUID] | None
+
+
+class RoutingPolicy(BaseModel):
+    """Routing policy schema"""
+
+    name: str
+    strategies: List[Dict[str, Any]]
+    fallback_policies: List[Dict[str, Any]]
+    decision_mode: str
 
 
 class RouterConfig(BaseModel):
@@ -317,8 +334,9 @@ class RouterConfig(BaseModel):
     project_id: UUID
     project_name: str
     endpoint_name: str
+    routing_policy: RoutingPolicy | None
     cache_configuration: CacheConfig | None
-    model_configuration: ModelConfig | None
+    model_configuration: List[ModelConfig] | None
 
 
 # Cloud Providers

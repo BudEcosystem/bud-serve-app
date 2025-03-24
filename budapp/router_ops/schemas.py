@@ -37,7 +37,7 @@ class RouterRequest(BaseModel):
     name: str
     description: str
     tags: Optional[List[str]] = None
-    routing_strategy: Optional[Dict[str, Any]] = None
+    routing_strategy: Optional[List[Dict[str, Any]]] = None
     endpoints: List[RouterEndpoints]
 
 
@@ -47,7 +47,7 @@ class RouterResponse(BaseModel):
     name: str
     description: str
     tags: Optional[List[str]] = None
-    routing_strategy: Optional[Dict[str, Any]] = None
+    routing_strategy: Optional[List[Dict[str, Any]]] = None
     endpoints: List[RouterEndpoints]
 
 
