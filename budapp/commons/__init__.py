@@ -35,5 +35,7 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStep
 from ..playground_ops.models import ChatSession as ChatSession
 from ..playground_ops.models import Note as Note
 from ..playground_ops.models import Message as Message
+from budapp.router_ops.models import Router as Router
+from budapp.router_ops.models import RouterEndpoint as RouterEndpoint
 
 from .database import Base as Base

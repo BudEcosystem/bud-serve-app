@@ -19,18 +19,18 @@
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, asc, desc, distinct, func, or_, select, case, literal, cast
+from sqlalchemy import and_, asc, case, cast, desc, distinct, func, literal, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 
 from budapp.cluster_ops.models import Cluster as ClusterModel
 from budapp.commons import logging
 from budapp.commons.constants import EndpointStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
-from budapp.model_ops.models import Model as Model, CloudModel
+from budapp.model_ops.models import CloudModel
+from budapp.model_ops.models import Model as Model
 
-from ..commons.helpers import get_param_range
 from ..commons.constants import ModelProviderTypeEnum
-
+from ..commons.helpers import get_param_range
 from ..project_ops.models import Project as ProjectModel
 from .models import Endpoint as EndpointModel
 
@@ -40,6 +40,15 @@ logger = logging.get_logger(__name__)
 
 class EndpointDataManager(DataManagerUtils):
     """Data manager for the Endpoint model."""
+
+    async def get_missing_endpoints(self, endpoint_ids: List[UUID]):
+        stmt = select(EndpointModel).where(
+            and_(EndpointModel.id.in_(endpoint_ids), EndpointModel.status != EndpointStatusEnum.DELETED)
+        )
+        result = self.scalars_all(stmt)
+        existing_ids = {ep.id for ep in result}
+        missing_ids = set(endpoint_ids) - existing_ids
+        return list(missing_ids)
 
     async def get_all_active_endpoints(
         self,
