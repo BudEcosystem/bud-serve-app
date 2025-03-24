@@ -66,7 +66,7 @@ class NotificationService(SessionMixin):
 
             # Update progress in workflow
             await self._update_workflow_progress(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
-        except Exception as e:
+        except Exception:
             logger.error("Failed to update workflow step events")
 
         # Send number of recommended cluster as notification
