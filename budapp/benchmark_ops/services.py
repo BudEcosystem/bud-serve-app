@@ -468,7 +468,7 @@ class BenchmarkService(SessionMixin):
                 benchmark_dict = {**db_benchmark.__dict__}
                 benchmark_dict["model"] = {**db_benchmark.model.__dict__}  # Ensure relationships are included
                 benchmark_dict["cluster"] = {**db_benchmark.cluster.__dict__}
-                benchmark_dict["tpot"] = benchmark_dict["result"].get("mean_tpot_ms", 0.0) if benchmark_dict["result"] else 0.0
-                benchmark_dict["ttft"] = benchmark_dict["result"].get("mean_ttft_ms", 0.0) if benchmark_dict["result"] else 0.0
+                benchmark_dict["tpot"] = round(benchmark_dict["result"].get("mean_tpot_ms", 0.0), 2) if benchmark_dict["result"] else 0.0
+                benchmark_dict["ttft"] = round(benchmark_dict["result"].get("mean_ttft_ms", 0.0), 2) if benchmark_dict["result"] else 0.0
                 benchmark_list.append(benchmark_dict)
             return benchmark_list, total_count
