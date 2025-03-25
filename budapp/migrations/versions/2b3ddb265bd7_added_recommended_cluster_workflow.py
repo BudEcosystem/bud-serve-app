@@ -1,8 +1,8 @@
 """Added Recommended Cluster, Workflow
 
-Revision ID: 3a7347105b70
+Revision ID: 2b3ddb265bd7
 Revises: e5538df6a487
-Create Date: 2025-03-25 03:01:23.927989
+Create Date: 2025-03-25 03:27:30.073953
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '3a7347105b70'
+revision: str = '2b3ddb265bd7'
 down_revision: Union[str, None] = 'e5538df6a487'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -56,9 +56,9 @@ def upgrade() -> None:
     sa.Column('hardware_type', postgresql.ARRAY(sa.String()), nullable=False),
     sa.Column('cost_per_million_tokens', sa.Float(), nullable=False),
     sa.Column('last_updated_at', sa.DateTime(timezone=True), nullable=False),
-    sa.ForeignKeyConstraint(['cluster_id'], ['cluster.id'], ),
-    sa.ForeignKeyConstraint(['model_id'], ['model.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['cluster_id'], ['cluster.id'], name=op.f('fk_model_cluster_recommended_cluster_id_cluster')),
+    sa.ForeignKeyConstraint(['model_id'], ['model.id'], name=op.f('fk_model_cluster_recommended_model_id_model')),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_model_cluster_recommended'))
     )
     # ### end Alembic commands ###
 

@@ -28,10 +28,10 @@ from pydantic import (
     ConfigDict,
     Field,
     HttpUrl,
+    computed_field,
     field_serializer,
     field_validator,
     model_validator,
-    computed_field,
 )
 
 from budapp.commons.constants import (
