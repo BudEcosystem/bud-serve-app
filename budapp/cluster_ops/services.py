@@ -1114,6 +1114,8 @@ class ClusterService(SessionMixin):
         self, payload: NotificationPayload, recommended_cluster_scheduler_state: Dict[str, Any]
     ) -> None:
         """Handle recommended cluster scheduler workflow."""
+        from .workflows import ClusterRecommendedSchedulerWorkflows
+
         logger.debug("Received event of recommending cluster scheduler workflow")
 
         # Get workflow and steps
@@ -1203,7 +1205,8 @@ class ClusterService(SessionMixin):
         except Exception as e:
             logger.exception("Failed to save state store %s", e)
 
-        # TODO: trigger recommended cluster scheduler workflow
+        # Trigger recommended cluster scheduler workflow
+        await ClusterRecommendedSchedulerWorkflows().__call__()
 
     async def _cleanup_recommended_cluster_data(
         self, model_id: UUID, workflow_id: UUID, recommended_cluster_scheduler_state: Dict[str, Any]
