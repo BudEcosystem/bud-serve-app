@@ -83,6 +83,7 @@ class RunBenchmarkWorkflowRequest(RunBenchmarkWorkflowStepData):
 
 class BenchmarkFilter(BaseModel):
     name: str | None = None
+    status: BenchmarkStatusEnum | None = None
     model_name: str | None = None
     cluster_name: str | None = None
     min_concurrency: int | None = None
@@ -123,3 +124,55 @@ class BenchmarkResponse(BaseModel):
 
 class BenchmarkPaginatedResponse(PaginatedSuccessResponse):
     benchmarks: list[BenchmarkResponse]
+
+
+class BenchmarkResultResponse(BaseModel):
+    id: UUID4
+    benchmark_id: UUID4
+    duration: float
+    successful_requests: int
+    total_input_tokens: int
+    total_output_tokens: int
+    request_throughput: float
+    input_throughput: float
+    output_throughput: float
+    p25_throughput: float
+    p75_throughput: float
+    p95_throughput: float
+    p99_throughput: float
+    min_throughput: float
+    max_throughput: float
+    mean_ttft_ms: float
+    median_ttft_ms: float
+    p25_ttft_ms: float
+    p75_ttft_ms: float
+    p95_ttft_ms: float
+    p99_ttft_ms: float
+    min_ttft_ms: float
+    max_ttft_ms: float
+    mean_tpot_ms: float
+    median_tpot_ms: float
+    p25_tpot_ms: float
+    p75_tpot_ms: float
+    p95_tpot_ms: float
+    p99_tpot_ms: float
+    min_tpot_ms: float
+    max_tpot_ms: float
+    mean_itl_ms: float
+    median_itl_ms: float
+    p25_itl_ms: float
+    p75_itl_ms: float
+    p95_itl_ms: float
+    p99_itl_ms: float
+    min_itl_ms: float
+    max_itl_ms: float
+    mean_e2el_ms: float
+    median_e2el_ms: float
+    p25_e2el_ms: float
+    p75_e2el_ms: float
+    p95_e2el_ms: float
+    p99_e2el_ms: float
+    min_e2el_ms: float
+    max_e2el_ms: float
+    created_at: datetime
+    modified_at: datetime
