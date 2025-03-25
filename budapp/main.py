@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
 from budmicroframe.main import configure_app
+from budmicroframe.shared.dapr_workflow import DaprWorkflow
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
@@ -29,6 +30,7 @@ from fastapi.staticfiles import StaticFiles
 from .auth import auth_routes
 from .benchmark_ops import benchmark_routes
 from .cluster_ops import cluster_routes
+from .cluster_ops.workflows import ClusterRecommendedSchedulerWorkflows
 from .commons import logging
 from .commons.config import app_settings, secrets_settings
 from .core import common_routes, meta_routes, notify_routes
@@ -41,8 +43,6 @@ from .playground_ops import playground_routes
 from .project_ops import project_routes
 from .user_ops import user_routes
 from .workflow_ops import workflow_routes
-from budmicroframe.shared.dapr_workflow import DaprWorkflow
-from .cluster_ops.workflows import ClusterRecommendedSchedulerWorkflows
 
 
 logger = logging.get_logger(__name__)
