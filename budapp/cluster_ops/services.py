@@ -44,6 +44,7 @@ from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 from ..commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
+    RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY,
     BudServeWorkflowStepEventName,
     ClusterStatusEnum,
     EndpointStatusEnum,
@@ -51,7 +52,6 @@ from ..commons.constants import (
     NotificationTypeEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
-    RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY,
 )
 from ..commons.helpers import get_hardware_types
 from ..core.schemas import NotificationResult

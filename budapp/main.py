@@ -41,9 +41,36 @@ from .playground_ops import playground_routes
 from .project_ops import project_routes
 from .user_ops import user_routes
 from .workflow_ops import workflow_routes
+from budmicroframe.shared.dapr_workflow import DaprWorkflow
+from .cluster_ops.workflows import ClusterRecommendedSchedulerWorkflows
 
 
 logger = logging.get_logger(__name__)
+
+
+async def execute_initial_dapr_workflows() -> None:
+    """Execute the dapr workflows.
+
+    This function checks if the Dapr workflow is running and executes the dapr workflow.
+    """
+    POLLING_INTERVAL = 5
+    attempts = 0
+
+    # Start workflow runtime
+    dapr_workflow = DaprWorkflow()
+    dapr_workflow.start_workflow_runtime()
+
+    while True:
+        await asyncio.sleep(POLLING_INTERVAL)
+        if dapr_workflow.is_running:
+            logger.info("Dapr workflow runtime is ready. Initializing dapr workflows.")
+            break
+        else:
+            attempts += 1
+            logger.info("Waiting for Dapr workflow runtime to start... Attempt: %s", attempts)
+
+    response = await ClusterRecommendedSchedulerWorkflows().__call__()
+    logger.debug("Recommended cluster scheduler workflow response: %s", response)
 
 
 @asynccontextmanager
@@ -89,12 +116,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         except Exception as e:
             logger.error(f"Failed to seed {seeder_name}. Error: {e}")
 
+    # Execute initial dapr workflows
+    dapr_workflow_task = asyncio.create_task(execute_initial_dapr_workflows())
+
     yield
 
     try:
         task.cancel()
+        dapr_workflow_task.cancel()
     except asyncio.CancelledError:
         logger.exception("Failed to cleanup config & store sync.")
+
+    DaprWorkflow().shutdown_workflow_runtime()
 
 
 # app = FastAPI(
