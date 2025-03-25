@@ -121,6 +121,7 @@ class Model(Base, TimestampMixin):
         "ModelSecurityScanResult", back_populates="model"
     )
     model_cluster_recommended: Mapped["ModelClusterRecommended"] = relationship(
+        "ModelClusterRecommended",
         back_populates="model",
     )
 
