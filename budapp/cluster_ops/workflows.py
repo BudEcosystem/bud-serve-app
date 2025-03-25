@@ -19,6 +19,7 @@
 import uuid
 from datetime import timedelta
 from typing import Any, Dict, Optional
+from uuid import UUID
 
 import dapr.ext.workflow as wf
 from budmicroframe.commons.schemas import WorkflowStep
@@ -53,8 +54,10 @@ class ClusterRecommendedSchedulerWorkflows:
     @staticmethod
     def perform_cluster_recommended_scheduler(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> None:
         """Perform the recommended cluster schedule workflow."""
+        model_id = kwargs.get("model_id")
+        model_id = UUID(model_id) if model_id else None
         try:
-            RecommendedClusterScheduler().execute_cluster_recommendation(**kwargs)
+            RecommendedClusterScheduler().execute_cluster_recommendation(model_id=model_id)
             logger.info("Cluster recommended scheduler workflow activity completed")
         except Exception as e:
             logger.exception("Failed to perform cluster recommended scheduler workflow activity %s", e)
@@ -79,8 +82,9 @@ class ClusterRecommendedSchedulerWorkflows:
         logger.info("Recommended cluster schedule workflow completed")
         logger.info("Workflow %s with id %s completed", workflow_name, workflow_id)
 
-    def __call__(self, model_id: Optional[str] = None, workflow_id: Optional[str] = None):
+    def __call__(self, model_id: Optional[UUID] = None, workflow_id: Optional[str] = None):
         """Call the leaderboard cron workflow."""
+        model_id = str(model_id) if model_id else None
         response = dapr_workflow.schedule_workflow(
             workflow_name="run_recommended_cluster_schedule",
             workflow_input={"model_id": model_id},
