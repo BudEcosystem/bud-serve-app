@@ -95,10 +95,3 @@ class ClusterRecommendedSchedulerWorkflows:
         )
 
         return response
-
-
-if __name__ == "__main__":
-    print("Starting cluster recommended scheduler workflow")
-    # print("Is workflow replaying: %s", dapr_workflow.start_workflow_runtime())
-    # asyncio.run(ClusterRecommendedSchedulerWorkflows().__call__())
-    # python -m budapp.cluster_ops.workflows
