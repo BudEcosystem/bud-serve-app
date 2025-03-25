@@ -1153,8 +1153,12 @@ class ClusterService(SessionMixin):
             await self._cleanup_recommended_cluster_data(model_id, workflow_id, recommended_cluster_scheduler_state)
             return
 
-        hardware_type = recommended_cluster["metrics"]["device_types"][0]["device_type"]
-        cost_per_million_tokens = recommended_cluster["metrics"]["device_types"][0]["cost_per_million_tokens"]
+        device_types = [
+            device["device_type"].lower()
+            for device in recommended_cluster.get("metrics", {}).get("device_types", [])
+            if device.get("device_type")
+        ]
+        cost_per_million_tokens = recommended_cluster.get("metrics", {}).get("cost_per_million_tokens")
 
         # Check if model cluster recommended already exists
         db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).retrieve_by_fields(
@@ -1166,7 +1170,7 @@ class ClusterService(SessionMixin):
             model_cluster_recommended_update = ModelClusterRecommendedUpdate(
                 model_id=model_id,
                 cluster_id=db_cluster.id,
-                hardware_type=hardware_type,
+                hardware_type=device_types,
                 cost_per_million_tokens=cost_per_million_tokens,
             )
             db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).update_by_fields(
@@ -1178,7 +1182,7 @@ class ClusterService(SessionMixin):
             model_cluster_recommended_create = ModelClusterRecommendedCreate(
                 model_id=model_id,
                 cluster_id=db_cluster.id,
-                hardware_type=hardware_type,
+                hardware_type=device_types,
                 cost_per_million_tokens=cost_per_million_tokens,
             )
             db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).insert_one(

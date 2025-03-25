@@ -21,10 +21,11 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Uuid
+from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from budapp.commons.constants import ClusterHardwareTypeEnum, ClusterStatusEnum
+from budapp.commons.constants import ClusterStatusEnum
 from budapp.commons.database import Base, TimestampMixin
 
 
@@ -99,14 +100,7 @@ class ModelClusterRecommended(Base):
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
     cluster_id: Mapped[UUID] = mapped_column(ForeignKey("cluster.id"), nullable=False)
-    hardware_type: Mapped[str] = mapped_column(
-        Enum(
-            ClusterHardwareTypeEnum,
-            name="cluster_hardware_type_enum",
-            values_callable=lambda x: [e.value for e in x],
-        ),
-        nullable=False,
-    )
+    hardware_type: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=False)
     cost_per_million_tokens: Mapped[float] = mapped_column(Float, nullable=False)
     last_updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)

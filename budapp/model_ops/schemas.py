@@ -42,7 +42,6 @@ from budapp.commons.constants import (
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
     WorkflowStatusEnum,
-    ClusterHardwareTypeEnum,
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
 from budapp.user_ops.schemas import UserInfo
@@ -489,6 +488,7 @@ class EditModel(BaseModel):
     def str_paper_urls(self, urls: List[HttpUrl] | None) -> List[str]:
         return [str(url) for url in urls] if urls else urls
 
+
 class RecommendedCluster(BaseModel):
     """Recommended cluster schema."""
 
@@ -505,31 +505,21 @@ class RecommendedCluster(BaseModel):
     @computed_field
     def total_workers(self) -> int:
         """Get sum of all total workers."""
-        return (
-            self.cpu_total_workers +
-            self.gpu_total_workers +
-            self.hpu_total_workers
-        )
+        return self.cpu_total_workers + self.gpu_total_workers + self.hpu_total_workers
 
     @computed_field
     def available_workers(self) -> int:
         """Get sum of all available workers."""
-        return (
-            self.cpu_available_workers +
-            self.gpu_available_workers +
-            self.hpu_available_workers
-        )
-    
+        return self.cpu_available_workers + self.gpu_available_workers + self.hpu_available_workers
+
     @computed_field
     def availability_percentage(self) -> float:
         """Calculate overall availability percentage."""
         if self.total_workers == 0:
             return 0.0
-    
-        return round(
-            (self.available_workers / self.total_workers) * 100,
-            1
-        )
+
+        return round((self.available_workers / self.total_workers) * 100, 1)
+
 
 class ModelClusterRecommended(BaseModel):
     """Model cluster recommended schema."""
@@ -537,7 +527,7 @@ class ModelClusterRecommended(BaseModel):
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     cost_per_million_tokens: float
-    hardware_type: ClusterHardwareTypeEnum
+    hardware_type: list[str]
     cluster: RecommendedCluster
 
 

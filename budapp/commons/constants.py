@@ -516,20 +516,6 @@ class ClusterStatusEnum(StrEnum):
     DELETED = auto()
 
 
-class ClusterHardwareTypeEnum(StrEnum):
-    """Hardware type types.
-
-    Attributes:
-        CPU: Represents the cpu hardware type.
-        GPU: Represents the gpu hardware type.
-        HPU: Represents the hpu hardware type.
-    """
-
-    CPU = auto()
-    GPU = auto()
-    HPU = auto()
-
-
 class EndpointStatusEnum(StrEnum):
     """Status for endpoint.
 

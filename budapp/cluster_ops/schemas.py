@@ -24,7 +24,7 @@ from enum import Enum
 
 from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, Field, computed_field, field_validator, HttpUrl
 
-from budapp.commons.constants import ClusterStatusEnum, EndpointStatusEnum, ClusterHardwareTypeEnum
+from budapp.commons.constants import ClusterStatusEnum, EndpointStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 
 from ..commons.helpers import validate_icon
@@ -522,7 +522,7 @@ class ModelClusterRecommendedCreate(BaseModel):
 
     model_id: UUID4
     cluster_id: UUID4
-    hardware_type: ClusterHardwareTypeEnum
+    hardware_type: list[str]
     cost_per_million_tokens: float
 
 
