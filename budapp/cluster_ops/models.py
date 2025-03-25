@@ -102,9 +102,6 @@ class ModelClusterRecommended(Base):
     cluster_id: Mapped[UUID] = mapped_column(ForeignKey("cluster.id"), nullable=False)
     hardware_type: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=False)
     cost_per_million_tokens: Mapped[float] = mapped_column(Float, nullable=False)
-    last_updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
-    )
 
     model: Mapped["Model"] = relationship("Model", back_populates="model_cluster_recommended")
     cluster: Mapped["Cluster"] = relationship("Cluster", back_populates="model_cluster_recommended")

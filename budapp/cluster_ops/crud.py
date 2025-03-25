@@ -16,8 +16,7 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the cluster ops."""
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
 from sqlalchemy import and_, asc, case, desc, distinct, func, select
@@ -26,10 +25,8 @@ from budapp.cluster_ops.models import Cluster
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 
-from ..commons.constants import ClusterStatusEnum, EndpointStatusEnum, ModelStatusEnum
+from ..commons.constants import ClusterStatusEnum, EndpointStatusEnum
 from ..endpoint_ops.models import Endpoint
-from ..model_ops.models import Model
-from .models import ModelClusterRecommended
 
 
 logger = logging.get_logger(__name__)
@@ -256,26 +253,4 @@ class ClusterDataManager(DataManagerUtils):
 class ModelClusterRecommendedDataManager(DataManagerUtils):
     """Data manager for the ModelClusterRecommended model."""
 
-    async def get_stale_model_recommendation(self, older_than: datetime) -> Optional[ModelClusterRecommended]:
-        """Get model recommendation if it's older than the given time.
-
-        Args:
-            model_id: UUID of the model
-            older_than: datetime to compare against last_updated_at
-
-        Returns:
-            ModelClusterRecommended if found and stale, None otherwise
-        """
-        query = (
-            select(ModelClusterRecommended)
-            .join(Model, and_(ModelClusterRecommended.model_id == Model.id, Model.status != ModelStatusEnum.DELETED))
-            .join(
-                Cluster,
-                and_(ModelClusterRecommended.cluster_id == Cluster.id, Cluster.status != ClusterStatusEnum.DELETED),
-            )
-            .where(ModelClusterRecommended.last_updated_at < older_than)
-            .limit(1)
-        )
-        result = self.session.execute(query)
-
-        return result.scalar_one_or_none()
+    pass
