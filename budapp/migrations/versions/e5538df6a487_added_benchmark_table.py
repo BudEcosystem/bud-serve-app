@@ -20,10 +20,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.drop_table('benchmark_result')
-    op.drop_table('benchmark')
-    # command to delete benchmark_status_enum type
-    op.execute("DROP TYPE IF EXISTS benchmark_status_enum CASCADE")
     op.sync_enum_values('public', 'workflow_type_enum', ['model_deployment', 'model_security_scan', 'cluster_onboarding', 'cluster_deletion', 'endpoint_deletion', 'endpoint_worker_deletion', 'cloud_model_onboarding', 'local_model_onboarding', 'add_worker_to_endpoint', 'license_faq_fetch', 'local_model_quantization', 'model_benchmark'],
         [TableReference(table_schema='public', table_name='workflow', column_name='workflow_type')],
         enum_values_to_rename=[])

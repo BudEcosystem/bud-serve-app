@@ -28,6 +28,7 @@ from pydantic import (
     ConfigDict,
     Field,
     HttpUrl,
+    computed_field,
     field_serializer,
     field_validator,
     model_validator,
@@ -488,6 +489,48 @@ class EditModel(BaseModel):
         return [str(url) for url in urls] if urls else urls
 
 
+class RecommendedCluster(BaseModel):
+    """Recommended cluster schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    name: str
+    cpu_total_workers: int
+    cpu_available_workers: int
+    gpu_total_workers: int
+    gpu_available_workers: int
+    hpu_total_workers: int
+    hpu_available_workers: int
+
+    @computed_field
+    def total_workers(self) -> int:
+        """Get sum of all total workers."""
+        return self.cpu_total_workers + self.gpu_total_workers + self.hpu_total_workers
+
+    @computed_field
+    def available_workers(self) -> int:
+        """Get sum of all available workers."""
+        return self.cpu_available_workers + self.gpu_available_workers + self.hpu_available_workers
+
+    @computed_field
+    def availability_percentage(self) -> float:
+        """Calculate overall availability percentage."""
+        if self.total_workers == 0:
+            return 0.0
+
+        return round((self.available_workers / self.total_workers) * 100, 1)
+
+
+class ModelClusterRecommended(BaseModel):
+    """Model cluster recommended schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    cost_per_million_tokens: float
+    hardware_type: list[str]
+    cluster: RecommendedCluster
+
+
 class ModelResponse(BaseModel):
     """Model response schema."""
 
@@ -510,6 +553,7 @@ class ModelResponse(BaseModel):
     modified_at: datetime
     provider: Provider | None = None
     is_present_in_model: bool | None = None
+    model_cluster_recommended: ModelClusterRecommended | None = None
 
 
 class ModelListResponse(BaseModel):
