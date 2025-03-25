@@ -54,6 +54,7 @@ from .schemas import (
 )
 from .services import ClusterService
 from budapp.cluster_ops.schemas import CreateCloudClusterRequest
+from .workflows import ClusterRecommendedSchedulerWorkflows
 
 
 logger = logging.get_logger(__name__)
@@ -577,3 +578,27 @@ async def get_node_wise_events_by_hostname(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Error retrieving node-wise metrics by hostname",
         ).to_http_response()
+
+
+@cluster_router.post("/recommended-scheduler", tags=["Cluster"])
+async def recommended_scheduler():
+    """Recommended scheduler cron job.
+    This endpoint processes the recommended scheduler cron job.
+
+    Returns:
+        HTTP response containing the recommended scheduler.
+    """
+    response: Union[SuccessResponse, ErrorResponse]
+    try:
+        await ClusterRecommendedSchedulerWorkflows().__call__()
+        logger.debug("Recommended cluster scheduler triggered")
+        response = SuccessResponse(
+            message="Recommended cluster scheduler triggered",
+            code=status.HTTP_200_OK,
+            object="cluster.recommended-scheduler",
+        )
+    except Exception as e:
+        logger.exception("Error recommended scheduler: %s", str(e))
+        response = ErrorResponse(message="Error recommended scheduler", code=500)
+
+    return response.to_http_response()
