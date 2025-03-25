@@ -73,6 +73,10 @@ class NotificationService(SessionMixin):
         if payload.event == "results":
             await ClusterService(self.session).handle_recommended_cluster_events(payload)
 
+        # FAILURE status handled for recommended cluster scheduler
+        if payload.content.status == "FAILED":
+            await ClusterService(self.session).handle_recommended_cluster_failure_events(payload)
+
     async def update_model_deployment_events(self, payload: NotificationPayload) -> None:
         """Update the model deployment events for a workflow step.
 

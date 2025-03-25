@@ -1285,6 +1285,47 @@ class ClusterService(SessionMixin):
             await ClusterRecommendedSchedulerWorkflows().__call__()
             logger.debug("Recommended cluster scheduler workflow re-triggered")
 
+    async def handle_recommended_cluster_failure_events(self, payload: NotificationPayload) -> None:
+        """Handle recommended cluster failure events."""
+        from .workflows import ClusterRecommendedSchedulerWorkflows
+
+        logger.debug("Received failure event of recommending cluster")
+
+        workflow_id = payload.workflow_id
+        dapr_service = DaprService()
+        state_store_key = RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY
+
+        # Check the event belongs to recommended cluster scheduler workflow (Dapr state store)
+        try:
+            recommended_cluster_scheduler_state = dapr_service.get_state(
+                store_name=app_settings.statestore_name, key=state_store_key
+            ).json()
+            logger.debug("State store %s already exists", state_store_key)
+        except Exception as e:
+            logger.exception("Failed to get state store %s", e)
+            return
+
+        if workflow_id in recommended_cluster_scheduler_state:
+            logger.debug("Found failed events from bud simulator")
+
+            # Remove workflow specific state store data
+            recommended_cluster_scheduler_state.pop(str(workflow_id))
+
+            try:
+                dapr_service = DaprService()
+                await dapr_service.save_to_statestore(
+                    store_name=app_settings.statestore_name,
+                    key=RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY,
+                    value=recommended_cluster_scheduler_state,
+                )
+                logger.debug("State store %s updated", RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY)
+            except Exception as e:
+                logger.exception("Failed to save state store %s", e)
+
+            # Trigger recommended cluster scheduler workflow
+            await ClusterRecommendedSchedulerWorkflows().__call__()
+            logger.debug("Recommended cluster scheduler workflow re-triggered")
+
     async def _notify_recommended_cluster_from_notification_event(self, payload: NotificationPayload) -> None:
         logger.debug("Received event of recommending cluster")
 
