@@ -64,7 +64,8 @@ from ..shared.dapr_service import DaprService
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import ClusterDataManager, ModelClusterRecommendedDataManager
-from .models import Cluster as ClusterModel, ModelClusterRecommended as ModelClusterRecommendedModel
+from .models import Cluster as ClusterModel
+from .models import ModelClusterRecommended as ModelClusterRecommendedModel
 from .schemas import (
     ClusterCreate,
     ClusterDetailResponse,
@@ -1127,121 +1128,162 @@ class ClusterService(SessionMixin):
         # Get workflow and steps
         workflow_id = payload.workflow_id
 
-        # Get workflow data from state store
-        recommended_cluster_scheduler_data = recommended_cluster_scheduler_state.get(str(workflow_id))
-        model_id = UUID(recommended_cluster_scheduler_data["model_id"])
-
-        db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, fields={"id": model_id, "status": ModelStatusEnum.ACTIVE}, missing_ok=True
-        )
-
-        if not db_model:
-            logger.debug("Model not found")
-            await self._cleanup_recommended_cluster_data(model_id, workflow_id, recommended_cluster_scheduler_state)
-            return
-
-        recommended_clusters = payload.content.result.get("recommendations", [])
-
-        if not recommended_clusters:
-            logger.debug("No recommended clusters found")
-            await self._cleanup_recommended_cluster_data(model_id, workflow_id, recommended_cluster_scheduler_state)
-            return
-
-        recommended_cluster = recommended_clusters[0]
-        bud_cluster_id = recommended_cluster["cluster_id"]
-        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel,
-            fields={"cluster_id": bud_cluster_id},
-            exclude_fields={"status": ClusterStatusEnum.DELETED},
-            missing_ok=True,
-        )
-
-        if not db_cluster:
-            logger.debug("Cluster not found")
-            await self._cleanup_recommended_cluster_data(model_id, workflow_id, recommended_cluster_scheduler_state)
-            return
-
-        device_types = [
-            device["device_type"].lower()
-            for device in recommended_cluster.get("metrics", {}).get("device_types", [])
-            if device.get("device_type")
-        ]
-        cost_per_million_tokens = recommended_cluster.get("metrics", {}).get("cost_per_million_tokens")
-
-        # Check if model cluster recommended already exists
-        db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).retrieve_by_fields(
-            ModelClusterRecommendedModel, fields={"model_id": model_id}, missing_ok=True
-        )
-
-        if db_model_cluster_recommended:
-            # Update model cluster recommended
-            model_cluster_recommended_update = ModelClusterRecommendedUpdate(
-                model_id=model_id,
-                cluster_id=db_cluster.id,
-                hardware_type=device_types,
-                cost_per_million_tokens=cost_per_million_tokens,
-            )
-            db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).update_by_fields(
-                db_model_cluster_recommended, model_cluster_recommended_update.model_dump()
-            )
-            logger.debug("Updated model cluster recommended %s", db_model_cluster_recommended.id)
-        else:
-            # Create model cluster recommended
-            model_cluster_recommended_create = ModelClusterRecommendedCreate(
-                model_id=model_id,
-                cluster_id=db_cluster.id,
-                hardware_type=device_types,
-                cost_per_million_tokens=cost_per_million_tokens,
-            )
-            db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).insert_one(
-                ModelClusterRecommendedModel(**model_cluster_recommended_create.model_dump())
-            )
-            logger.debug("Created model cluster recommended %s", db_model_cluster_recommended.id)
-
-        # Remove workflow specific state store data
-        recommended_cluster_scheduler_state.pop(str(workflow_id))
         try:
-            dapr_service = DaprService()
-            await dapr_service.save_to_statestore(
-                store_name=app_settings.statestore_name,
-                key=RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY,
-                value=recommended_cluster_scheduler_state,
-            )
-            logger.debug("State store %s updated", RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY)
-        except Exception as e:
-            logger.exception("Failed to save state store %s", e)
+            # Get workflow data from state store
+            recommended_cluster_scheduler_data = recommended_cluster_scheduler_state.get(str(workflow_id))
+            model_id = UUID(recommended_cluster_scheduler_data["model_id"])
 
-        # Trigger recommended cluster scheduler workflow
-        await ClusterRecommendedSchedulerWorkflows().__call__()
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, fields={"id": model_id, "status": ModelStatusEnum.ACTIVE}, missing_ok=True
+            )
+
+            if not db_model:
+                logger.debug("Model not found")
+                await self._cleanup_recommended_cluster_data(
+                    model_id, workflow_id, recommended_cluster_scheduler_state
+                )
+                return
+
+            recommended_clusters = payload.content.result.get("recommendations", [])
+
+            if not recommended_clusters:
+                logger.debug("No recommended clusters found")
+                await self._cleanup_recommended_cluster_data(
+                    model_id, workflow_id, recommended_cluster_scheduler_state
+                )
+                return
+
+            recommended_cluster = recommended_clusters[0]
+            bud_cluster_id = recommended_cluster["cluster_id"]
+            db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+                ClusterModel,
+                fields={"cluster_id": bud_cluster_id},
+                exclude_fields={"status": ClusterStatusEnum.DELETED},
+                missing_ok=True,
+            )
+
+            if not db_cluster:
+                logger.debug("Cluster not found")
+                await self._cleanup_recommended_cluster_data(
+                    model_id, workflow_id, recommended_cluster_scheduler_state
+                )
+                return
+
+            device_types = [
+                device["device_type"].lower()
+                for device in recommended_cluster.get("metrics", {}).get("device_types", [])
+                if device.get("device_type")
+            ]
+            cost_per_million_tokens = recommended_cluster.get("metrics", {}).get("cost_per_million_tokens")
+
+            # Check if model cluster recommended already exists
+            db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).retrieve_by_fields(
+                ModelClusterRecommendedModel, fields={"model_id": model_id}, missing_ok=True
+            )
+
+            if db_model_cluster_recommended:
+                # Update model cluster recommended
+                model_cluster_recommended_update = ModelClusterRecommendedUpdate(
+                    model_id=model_id,
+                    cluster_id=db_cluster.id,
+                    hardware_type=device_types,
+                    cost_per_million_tokens=cost_per_million_tokens,
+                )
+                db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).update_by_fields(
+                    db_model_cluster_recommended, model_cluster_recommended_update.model_dump()
+                )
+                logger.debug("Updated model cluster recommended %s", db_model_cluster_recommended.id)
+            else:
+                # Create model cluster recommended
+                model_cluster_recommended_create = ModelClusterRecommendedCreate(
+                    model_id=model_id,
+                    cluster_id=db_cluster.id,
+                    hardware_type=device_types,
+                    cost_per_million_tokens=cost_per_million_tokens,
+                )
+                db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).insert_one(
+                    ModelClusterRecommendedModel(**model_cluster_recommended_create.model_dump())
+                )
+                logger.debug("Created model cluster recommended %s", db_model_cluster_recommended.id)
+
+            # Remove workflow specific state store data
+            recommended_cluster_scheduler_state.pop(str(workflow_id))
+            try:
+                dapr_service = DaprService()
+                await dapr_service.save_to_statestore(
+                    store_name=app_settings.statestore_name,
+                    key=RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY,
+                    value=recommended_cluster_scheduler_state,
+                )
+                logger.debug("State store %s updated", RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY)
+            except Exception as e:
+                logger.exception("Failed to save state store %s", e)
+
+            # Trigger recommended cluster scheduler workflow
+            await ClusterRecommendedSchedulerWorkflows().__call__()
+            logger.debug("Recommended cluster scheduler workflow re-triggered")
+        except Exception as e:
+            logger.error("Error occurred while handling recommended cluster scheduler workflow %s", e)
+
+            # Remove workflow specific state store data
+            recommended_cluster_scheduler_state.pop(str(workflow_id))
+
+            try:
+                dapr_service = DaprService()
+                await dapr_service.save_to_statestore(
+                    store_name=app_settings.statestore_name,
+                    key=RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY,
+                    value=recommended_cluster_scheduler_state,
+                )
+                logger.debug("State store %s updated", RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY)
+            except Exception as e:
+                logger.error("Failed to update state store data %s", e)
+
+            # Trigger recommended cluster scheduler workflow
+            await ClusterRecommendedSchedulerWorkflows().__call__()
+            logger.debug("Recommended cluster scheduler workflow re-triggered")
 
     async def _cleanup_recommended_cluster_data(
         self, model_id: UUID, workflow_id: UUID, recommended_cluster_scheduler_state: Dict[str, Any]
     ) -> None:
         """Cleanup recommended cluster data."""
+        from .workflows import ClusterRecommendedSchedulerWorkflows
+
         logger.debug("Cleaning up recommended cluster data for model %s", model_id)
 
-        # Check existing recommended cluster data
-        db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).retrieve_by_fields(
-            ModelClusterRecommendedModel, fields={"model_id": model_id}, missing_ok=True
-        )
-
-        # Delete model cluster recommended
-        if db_model_cluster_recommended:
-            await ModelClusterRecommendedDataManager(self.session).delete_one(db_model_cluster_recommended)
-            logger.debug("Deleted model cluster recommended %s", db_model_cluster_recommended.id)
-
-        # Remove workflow specific state store data
-        recommended_cluster_scheduler_state.pop(str(workflow_id))
         try:
-            dapr_service = DaprService()
-            await dapr_service.save_to_statestore(
-                store_name=app_settings.statestore_name,
-                key=RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY,
-                value=recommended_cluster_scheduler_state,
+            # Check existing recommended cluster data
+            db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).retrieve_by_fields(
+                ModelClusterRecommendedModel, fields={"model_id": model_id}, missing_ok=True
             )
-            logger.debug("State store %s updated", RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY)
+
+            # Delete model cluster recommended
+            if db_model_cluster_recommended:
+                await ModelClusterRecommendedDataManager(self.session).delete_one(db_model_cluster_recommended)
+                logger.debug("Deleted model cluster recommended %s", db_model_cluster_recommended.id)
+
+            # Remove workflow specific state store data
+            recommended_cluster_scheduler_state.pop(str(workflow_id))
+            try:
+                dapr_service = DaprService()
+                await dapr_service.save_to_statestore(
+                    store_name=app_settings.statestore_name,
+                    key=RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY,
+                    value=recommended_cluster_scheduler_state,
+                )
+                logger.debug("State store %s updated", RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY)
+            except Exception as e:
+                logger.exception("Failed to save state store %s", e)
+
+            # Trigger recommended cluster scheduler workflow
+            await ClusterRecommendedSchedulerWorkflows().__call__()
+            logger.debug("Recommended cluster scheduler workflow re-triggered")
         except Exception as e:
-            logger.exception("Failed to save state store %s", e)
+            logger.error("Error occurred while cleaning up recommended cluster workflow %s", e)
+
+            # Trigger recommended cluster scheduler workflow
+            await ClusterRecommendedSchedulerWorkflows().__call__()
+            logger.debug("Recommended cluster scheduler workflow re-triggered")
 
     async def _notify_recommended_cluster_from_notification_event(self, payload: NotificationPayload) -> None:
         logger.debug("Received event of recommending cluster")
