@@ -58,7 +58,7 @@ class RecommendedClusterScheduler:
         if model_id:
             db_model = asyncio.run(
                 ModelDataManager(session).retrieve_by_fields(
-                    {"id": model_id, "status": ModelStatusEnum.ACTIVE}, missing_ok=True
+                    Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}, missing_ok=True
                 )
             )
             if db_model:
