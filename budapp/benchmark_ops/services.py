@@ -1,3 +1,4 @@
+import json
 from typing import Dict, List, Optional
 from uuid import UUID
 
@@ -9,6 +10,7 @@ from budapp.commons.db_utils import SessionMixin
 
 from ..cluster_ops.crud import ClusterDataManager
 from ..cluster_ops.models import Cluster as ClusterModel
+from ..cluster_ops.services import ClusterService
 from ..commons.config import app_settings
 from ..commons.constants import (
     APP_ICONS,
@@ -26,10 +28,11 @@ from ..commons.exceptions import ClientException
 from ..core.schemas import NotificationPayload, NotificationResult
 from ..credential_ops.crud import ProprietaryCredentialDataManager
 from ..credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
+from ..endpoint_ops.schemas import ModelClusterDetail
 from ..model_ops.crud import ModelDataManager, ProviderDataManager
 from ..model_ops.models import Model
 from ..model_ops.models import Provider as ProviderModel
-from ..model_ops.services import ModelServiceUtil
+from ..model_ops.services import ModelService, ModelServiceUtil
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
@@ -518,3 +521,24 @@ class BenchmarkService(SessionMixin):
         bud_cluster_response = await self._perform_get_benchmark_result_request(db_benchmark.bud_cluster_benchmark_id)
 
         return bud_cluster_response["param"]
+
+    async def get_benchmark_model_cluster_detail(self, benchmark_id: UUID) -> dict:
+        """Get benchmark model cluster detail."""
+        with BenchmarkCRUD() as crud, crud.get_session() as session:
+            db_benchmark = crud.fetch_one(conditions={"id": benchmark_id}, session=session, raise_on_error=False)
+            if not db_benchmark:
+                raise HTTPException(
+                    detail=f"Benchmark not found: {benchmark_id}", status_code=status.HTTP_404_NOT_FOUND
+                )
+        model_id = db_benchmark.model_id
+        model_detail_json_response = await ModelService(self.session).retrieve_model(model_id)
+        model_detail = json.loads(model_detail_json_response.body.decode("utf-8"))
+        cluster_id = db_benchmark.cluster_id
+        cluster_detail = await ClusterService(self.session).get_cluster_details(cluster_id)
+        return ModelClusterDetail(
+            id=db_benchmark.id,
+            name=db_benchmark.name,
+            status=db_benchmark.status,
+            model=model_detail["model"],
+            cluster=cluster_detail,
+        )

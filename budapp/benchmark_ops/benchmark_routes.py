@@ -33,6 +33,7 @@ from budapp.commons.dependencies import (
 )
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
+from budapp.endpoint_ops.schemas import ModelClusterDetailResponse
 from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
@@ -167,7 +168,7 @@ async def get_benchmark_result(
     benchmark_id: UUID,
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> Union[BenchmarkPaginatedResponse, ErrorResponse]:
+) -> Union[SuccessResponse, ErrorResponse]:
     """Fetch benchmark result."""
     try:
         db_benchmark_result = await BenchmarkService(session).get_benchmark_result(benchmark_id)
@@ -191,3 +192,47 @@ async def get_benchmark_result(
     return response.to_http_response()
 
 
+@benchmark_router.get(
+    "/{benchmark_id}/model-cluster-detail",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ModelClusterDetailResponse,
+            "description": "Successfully fetch benchmark's model and cluster details",
+        },
+    },
+    description="Fetch benchmark's model and cluster details",
+)
+async def get_benchmark_model_cluster_detail(
+    benchmark_id: UUID,
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[ModelClusterDetailResponse, ErrorResponse]:
+    """Fetch benchmark result."""
+    try:
+        model_cluster_detail = await BenchmarkService(session).get_benchmark_model_cluster_detail(benchmark_id)
+        response = ModelClusterDetailResponse(
+            object="benchmark.model.cluster.detail",
+            result=model_cluster_detail,
+            message="Successfully fetched model cluster detail for the benchmark.",
+        )
+    except HTTPException as e:
+        logger.exception(f"Failed to get benchmark's model cluster detail': {e}")
+        response = ErrorResponse(code=e.status_code, message=e.detail)
+    except ClientException as e:
+        logger.exception(f"Failed to get benchmark's model cluster detail: {e}")
+        response = ErrorResponse(code=e.status_code, message=e.message)
+    except Exception as e:
+        logger.exception(f"Failed to get benchmark's model cluster detail: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get benchmark's model cluster detail"
+        )
+
+    return response.to_http_response()
