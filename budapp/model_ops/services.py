@@ -40,6 +40,7 @@ from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 from ..cluster_ops.crud import ModelClusterRecommendedDataManager
 from ..cluster_ops.models import ModelClusterRecommended as ModelClusterRecommendedModel
+from ..cluster_ops.workflows import ClusterRecommendedSchedulerWorkflows
 from ..commons.constants import (
     APP_ICONS,
     BENCHMARK_FIELDS_LABEL_MAPPER,
@@ -418,6 +419,9 @@ class CloudModelWorkflowService(SessionMixin):
                 db_workflow,
                 {"current_step": end_step_number, "status": WorkflowStatusEnum.COMPLETED},
             )
+
+            # Trigger recommended cluster scheduler workflow
+            await ClusterRecommendedSchedulerWorkflows().__call__(model_id=db_model.id)
 
             # Send notification to workflow creator
             model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
@@ -1119,6 +1123,9 @@ class LocalModelWorkflowService(SessionMixin):
         await WorkflowDataManager(self.session).update_by_fields(
             db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
         )
+
+        # Trigger recommended cluster scheduler workflow
+        await ClusterRecommendedSchedulerWorkflows().__call__(model_id=db_model.id)
 
         # Send notification to workflow creator
         model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
