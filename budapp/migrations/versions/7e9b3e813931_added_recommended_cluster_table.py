@@ -28,9 +28,9 @@ def upgrade() -> None:
     sa.Column('hardware_type', postgresql.ENUM('cpu', 'gpu', 'hpu', name='cluster_hardware_type_enum', create_type=False), nullable=False),
     sa.Column('cost_per_million_tokens', sa.Float(), nullable=False),
     sa.Column('last_updated_at', sa.DateTime(timezone=True), nullable=False),
-    sa.ForeignKeyConstraint(['cluster_id'], ['cluster.id'], ),
-    sa.ForeignKeyConstraint(['model_id'], ['model.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['cluster_id'], ['cluster.id'], name=op.f('fk_model_cluster_recommended_cluster_id_cluster')),
+    sa.ForeignKeyConstraint(['model_id'], ['model.id'], name=op.f('fk_model_cluster_recommended_model_id_model')),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_model_cluster_recommended'))
     )
     # ### end Alembic commands ###
 
