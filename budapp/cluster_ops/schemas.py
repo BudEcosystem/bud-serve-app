@@ -28,6 +28,7 @@ from budapp.commons.constants import ClusterStatusEnum, EndpointStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 
 from ..commons.helpers import validate_icon
+from ..commons.schemas import BudNotificationMetadata
 from ..project_ops.schemas import Project
 from ..model_ops.schemas import Model
 
@@ -497,3 +498,35 @@ class CreateCloudClusterRequest(BaseModel):
 #     """Cloud cluster response schema."""
 
 #     cluster: CloudCluster
+
+
+# Bud Simulator Schema
+class BudSimulatorRequest(BaseModel):
+    """Request schema for Bud Simulator."""
+
+    pretrained_model_uri: str
+    input_tokens: int
+    output_tokens: int
+    concurrency: int
+    target_ttft: int
+    target_throughput_per_user: int
+    target_e2e_latency: int
+    notification_metadata: BudNotificationMetadata | None = None
+    source_topic: str
+    is_proprietary_model: bool
+
+
+# Model Recommended Cluster Schemas
+class ModelClusterRecommendedCreate(BaseModel):
+    """Model recommended cluster create schema."""
+
+    model_id: UUID4
+    cluster_id: UUID4
+    hardware_type: list[str]
+    cost_per_million_tokens: float
+
+
+class ModelClusterRecommendedUpdate(ModelClusterRecommendedCreate):
+    """Model recommended cluster update schema."""
+
+    pass

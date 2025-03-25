@@ -2626,3 +2626,7 @@ class BenchmarkStatusEnum(Enum):
     SUCCESS = "success"
     FAILED = "failed"
     PROCESSING = "processing"
+
+
+# Recommended cluster scheduler state store key
+RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY = "recommended_cluster_scheduler_state"
