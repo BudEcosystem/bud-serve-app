@@ -1,13 +1,17 @@
+import json
 from typing import Dict, List, Optional
 from uuid import UUID
 
 import aiohttp
+from fastapi import HTTPException, status
+from sqlalchemy import text
 
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
 
 from ..cluster_ops.crud import ClusterDataManager
 from ..cluster_ops.models import Cluster as ClusterModel
+from ..cluster_ops.services import ClusterService
 from ..commons.config import app_settings
 from ..commons.constants import (
     APP_ICONS,
@@ -25,10 +29,11 @@ from ..commons.exceptions import ClientException
 from ..core.schemas import NotificationPayload, NotificationResult
 from ..credential_ops.crud import ProprietaryCredentialDataManager
 from ..credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
+from ..endpoint_ops.schemas import ModelClusterDetail
 from ..model_ops.crud import ModelDataManager, ProviderDataManager
 from ..model_ops.models import Model
 from ..model_ops.models import Provider as ProviderModel
-from ..model_ops.services import ModelServiceUtil
+from ..model_ops.services import ModelService, ModelServiceUtil
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
@@ -472,3 +477,97 @@ class BenchmarkService(SessionMixin):
                 benchmark_dict["ttft"] = round(benchmark_dict["result"].get("mean_ttft_ms", 0.0), 2) if benchmark_dict["result"] else 0.0
                 benchmark_list.append(benchmark_dict)
             return benchmark_list, total_count
+
+    async def _perform_get_benchmark_result_request(self, benchmark_id: UUID) -> dict:
+        """Perform run benchmark request to budcluster service."""
+        get_benchmark_result_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/benchmark/result"
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get(get_benchmark_result_endpoint, params={"benchmark_id": str(benchmark_id)}) as response:
+                    response_data = await response.json()
+                    logger.debug(f"Response from budcluster service: {response_data}")
+
+                    if response.status != 200 or response_data.get("object") == "error":
+                        error_message = response_data.get("message", "Failed to get benchmark result")
+                        logger.error(
+                            f"Failed to get benchmark result with external service: {error_message}"
+                        )
+                        raise ClientException(error_message, status_code=response.status)
+
+                    logger.debug("Successfully fetched benchmark result with budcluster service")
+                    return response_data
+
+            except ClientException as e:
+                raise e
+
+            except Exception as e:
+                logger.error(f"Failed to make get benchmark result call to budcluster service: {e}")
+                raise ClientException("Unable to get benchmark result with external service") from e
+
+
+    async def get_benchmark_result(self, benchmark_id: UUID) -> dict:
+        """Get benchmark result."""
+        with BenchmarkCRUD() as crud:  # noqa: SIM117
+            with crud.get_session() as session:
+                db_benchmark = crud.fetch_one(conditions={"id": benchmark_id}, session=session, raise_on_error=False)
+
+                if not db_benchmark:
+                    raise HTTPException(
+                        detail=f"Benchmark not found: {benchmark_id}", status_code=status.HTTP_404_NOT_FOUND
+                    )
+                if db_benchmark.status in [BenchmarkStatusEnum.PROCESSING, BenchmarkStatusEnum.FAILED]:
+                    raise HTTPException(
+                        detail=f"Benchmark {db_benchmark.name} is {db_benchmark.status}", status_code=status.HTTP_400_BAD_REQUEST
+                    )
+        bud_cluster_response = await self._perform_get_benchmark_result_request(db_benchmark.bud_cluster_benchmark_id)
+
+        return bud_cluster_response["param"]
+
+    async def get_benchmark_model_cluster_detail(self, benchmark_id: UUID) -> dict:
+        """Get benchmark model cluster detail."""
+        with BenchmarkCRUD() as crud, crud.get_session() as session:
+            db_benchmark = crud.fetch_one(conditions={"id": benchmark_id}, session=session, raise_on_error=False)
+            if not db_benchmark:
+                raise HTTPException(
+                    detail=f"Benchmark not found: {benchmark_id}", status_code=status.HTTP_404_NOT_FOUND
+                )
+        model_id = db_benchmark.model_id
+        model_detail_json_response = await ModelService(self.session).retrieve_model(model_id)
+        model_detail = json.loads(model_detail_json_response.body.decode("utf-8"))
+        cluster_id = db_benchmark.cluster_id
+        cluster_detail = await ClusterService(self.session).get_cluster_details(cluster_id)
+        return ModelClusterDetail(
+            id=db_benchmark.id,
+            name=db_benchmark.name,
+            status=db_benchmark.status,
+            model=model_detail["model"],
+            cluster=cluster_detail,
+        )
+
+    def get_field1_vs_field2_data(self, field1: str, field2: str, model_ids: Optional[List[str]] = None) -> dict:
+        """Get field1 vs field2 data."""
+        GET_DATA_QUERY = f"""
+            SELECT
+                b.model_id,
+                m.uri,
+                b.result->>'{field1}' AS {field1},
+                b.result->>'{field2}' AS {field2}
+            FROM benchmark as b
+            JOIN model m ON b.model_id = m.id
+            WHERE b.result is not NULL AND b.result->>'{field1}' is not NULL AND b.result->>'{field2}' is not NULL
+        """
+        if model_ids:
+            GET_DATA_QUERY += " AND m.id = ANY(:model_ids)"
+        print(GET_DATA_QUERY)
+        with BenchmarkCRUD() as crud:
+            analysis_data = crud.execute_raw_query(query=text(GET_DATA_QUERY), params={"model_ids": model_ids})
+
+        analysis_data_list = []
+        for row in analysis_data:
+            analysis_data_list.append({
+                "model_id": str(row[0]),
+                "model_uri": row[1],
+                field1: row[2],
+                field2: row[3],
+            })
+        return analysis_data_list

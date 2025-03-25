@@ -20,7 +20,8 @@
 from typing import List, Optional, Union
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from budmicroframe.commons.schemas import SuccessResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -32,6 +33,7 @@ from budapp.commons.dependencies import (
 )
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
+from budapp.endpoint_ops.schemas import ModelClusterDetailResponse
 from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
@@ -99,12 +101,12 @@ async def run_benchmark_workflow(
         },
         status.HTTP_200_OK: {
             "model": BenchmarkPaginatedResponse,
-            "description": "Successfully list all endpoints",
+            "description": "Successfully list all benchmarks",
         },
     },
-    description="List all endpoints. \n\n order_by fields are: name, status, created_at, modified_at, cluster_name, model_name, modality",
+    description="List all benchmarks. \n\n order_by fields are: name, status, created_at, cluster_name, model_name",
 )
-async def list_all_endpoints(
+async def list_all_benchmarks(
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     filters: Annotated[BenchmarkFilter, Depends()],
@@ -113,7 +115,7 @@ async def list_all_endpoints(
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
     search: bool = False,
 ) -> Union[BenchmarkPaginatedResponse, ErrorResponse]:
-    """List all endpoints."""
+    """List all benchmarks."""
     # Calculate offset
     offset = (page - 1) * limit
 
@@ -143,3 +145,136 @@ async def list_all_endpoints(
         message="Successfully list all benchmarks",
     ).to_http_response()
 
+
+@benchmark_router.get(
+    "/result",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully fetch benchmark result",
+        },
+    },
+    description="Fetch benchmark result",
+)
+async def get_benchmark_result(
+    benchmark_id: UUID,
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Fetch benchmark result."""
+    try:
+        db_benchmark_result = await BenchmarkService(session).get_benchmark_result(benchmark_id)
+        response = SuccessResponse(
+            object="benchmark.result",
+            param=db_benchmark_result,
+            message="Successfully fetched benchmark result",
+        )
+    except HTTPException as e:
+        logger.exception(f"Failed to get benchmark result: {e}")
+        response = ErrorResponse(code=e.status_code, message=e.detail)
+    except ClientException as e:
+        logger.exception(f"Failed to get benchmark result: {e}")
+        response = ErrorResponse(code=e.status_code, message=e.message)
+    except Exception as e:
+        logger.exception(f"Failed to get benchmark result: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get benchmark result"
+        )
+
+    return response.to_http_response()
+
+
+@benchmark_router.get(
+    "/{benchmark_id}/model-cluster-detail",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ModelClusterDetailResponse,
+            "description": "Successfully fetch benchmark's model and cluster details",
+        },
+    },
+    description="Fetch benchmark's model and cluster details",
+)
+async def get_benchmark_model_cluster_detail(
+    benchmark_id: UUID,
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[ModelClusterDetailResponse, ErrorResponse]:
+    """Fetch benchmark result."""
+    try:
+        model_cluster_detail = await BenchmarkService(session).get_benchmark_model_cluster_detail(benchmark_id)
+        response = ModelClusterDetailResponse(
+            object="benchmark.model.cluster.detail",
+            result=model_cluster_detail,
+            message="Successfully fetched model cluster detail for the benchmark.",
+        )
+    except HTTPException as e:
+        logger.exception(f"Failed to get benchmark's model cluster detail': {e}")
+        response = ErrorResponse(code=e.status_code, message=e.detail)
+    except ClientException as e:
+        logger.exception(f"Failed to get benchmark's model cluster detail: {e}")
+        response = ErrorResponse(code=e.status_code, message=e.message)
+    except Exception as e:
+        logger.exception(f"Failed to get benchmark's model cluster detail: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get benchmark's model cluster detail"
+        )
+
+    return response.to_http_response()
+
+
+@benchmark_router.post(
+    "/analysis/field1_vs_field2",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully fetched analysis data",
+        },
+    },
+    description="Fetchetched analysis data",
+)
+async def get_field1_vs_field2_data(
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    field1: str,
+    field2: str,
+    model_ids: Optional[List[UUID]] = None,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Fetch field1 vs field2 analysis."""
+    try:
+        field1_vs_field2_data = BenchmarkService(session).get_field1_vs_field2_data(field1, field2, model_ids)
+        response = SuccessResponse(
+            object="benchmark.model.cluster.detail",
+            param={"result": field1_vs_field2_data},
+            message=f"Successfully fetched {field1} vs {field2} analysis data.",
+        )
+    except Exception as e:
+        logger.exception(f"Failed to fetch {field1} vs {field2} data: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=f"Failed to fetch {field1} vs {field2} data: {e}"
+        )
+
+    return response.to_http_response()

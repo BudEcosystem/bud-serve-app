@@ -163,7 +163,7 @@ class ModelClusterDetail(BaseModel):
     status: str
     model: ModelDetailResponse
     cluster: ClusterResponse
-    deployment_config: dict
+    deployment_config: Optional[dict] = None
 
 
 class ModelClusterDetailResponse(SuccessResponse):
