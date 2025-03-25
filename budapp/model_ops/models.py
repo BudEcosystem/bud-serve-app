@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid, Numeric
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import JSONB
@@ -109,9 +109,7 @@ class Model(Base, TimestampMixin):
     local_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     provider_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("provider.id"), nullable=True)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
-    recommended_cluster_sync_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    recommended_cluster_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     endpoints: Mapped[list["Endpoint"]] = relationship(back_populates="model")
     benchmarks: Mapped[list["BenchmarkSchema"]] = relationship(back_populates="model")
