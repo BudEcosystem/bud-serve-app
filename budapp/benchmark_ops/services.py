@@ -4,6 +4,7 @@ from uuid import UUID
 
 import aiohttp
 from fastapi import HTTPException, status
+from sqlalchemy import text
 
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
@@ -542,3 +543,28 @@ class BenchmarkService(SessionMixin):
             model=model_detail["model"],
             cluster=cluster_detail,
         )
+
+    def get_ttft_vs_tpot_data(self, model_ids: Optional[List[str]] = None) -> dict:
+        """Get ttft vs tpot."""
+        TTFT_VS_TPOT_QUERY = """
+            SELECT
+                b.model_id,
+                m.uri,
+                b.result->>'mean_ttft_ms' AS mean_ttft_ms,
+                b.result->>'mean_tpot_ms' AS mean_tpot_ms
+            FROM benchmark as b
+            JOIN model m ON b.model_id = m.id AND b.result is not NULL
+            WHERE m.id = ANY(:model_ids)
+        """
+        with BenchmarkCRUD() as crud:
+            ttft_vs_tpot_data = crud.execute_raw_query(query=text(TTFT_VS_TPOT_QUERY), params={"model_ids": model_ids})
+
+        ttft_vs_tpot_list = []
+        for row in ttft_vs_tpot_data:
+            ttft_vs_tpot_list.append({
+                "model_id": str(row[0]),
+                "model_uri": row[1],
+                "mean_ttft_ms": row[2],
+                "mean_tpot_ms": row[3],
+            })
+        return ttft_vs_tpot_list

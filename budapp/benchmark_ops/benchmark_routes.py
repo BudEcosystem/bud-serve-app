@@ -236,3 +236,43 @@ async def get_benchmark_model_cluster_detail(
         )
 
     return response.to_http_response()
+
+
+@benchmark_router.post(
+    "/analysis/ttft_vs_tpot",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully fetched ttft vs tpot analysis",
+        },
+    },
+    description="Fetchetched ttft vs tpot analysis",
+)
+async def get_ttft_vs_tpot_data(
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    model_ids: Optional[List[UUID]] = None,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Fetch ttft vs tpot analysis."""
+    try:
+        ttft_vs_tpot_data = BenchmarkService(session).get_ttft_vs_tpot_data(model_ids)
+        response = SuccessResponse(
+            object="benchmark.model.cluster.detail",
+            param={"result": ttft_vs_tpot_data},
+            message="Successfully fetched ttft vs tpot analysis data.",
+        )
+    except Exception as e:
+        logger.exception(f"Failed to fetch ttft vs tpot data: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=f"Failed to fetch ttft vs tpot data: {e}"
+        )
+
+    return response.to_http_response()
