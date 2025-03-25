@@ -239,7 +239,7 @@ async def get_benchmark_model_cluster_detail(
 
 
 @benchmark_router.post(
-    "/analysis/ttft_vs_tpot",
+    "/analysis/field1_vs_field2",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
@@ -251,28 +251,30 @@ async def get_benchmark_model_cluster_detail(
         },
         status.HTTP_200_OK: {
             "model": SuccessResponse,
-            "description": "Successfully fetched ttft vs tpot analysis",
+            "description": "Successfully fetched analysis data",
         },
     },
-    description="Fetchetched ttft vs tpot analysis",
+    description="Fetchetched analysis data",
 )
-async def get_ttft_vs_tpot_data(
+async def get_field1_vs_field2_data(
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    field1: str,
+    field2: str,
     model_ids: Optional[List[UUID]] = None,
 ) -> Union[SuccessResponse, ErrorResponse]:
-    """Fetch ttft vs tpot analysis."""
+    """Fetch field1 vs field2 analysis."""
     try:
-        ttft_vs_tpot_data = BenchmarkService(session).get_ttft_vs_tpot_data(model_ids)
+        field1_vs_field2_data = BenchmarkService(session).get_field1_vs_field2_data(field1, field2, model_ids)
         response = SuccessResponse(
             object="benchmark.model.cluster.detail",
-            param={"result": ttft_vs_tpot_data},
-            message="Successfully fetched ttft vs tpot analysis data.",
+            param={"result": field1_vs_field2_data},
+            message=f"Successfully fetched {field1} vs {field2} analysis data.",
         )
     except Exception as e:
-        logger.exception(f"Failed to fetch ttft vs tpot data: {e}")
+        logger.exception(f"Failed to fetch {field1} vs {field2} data: {e}")
         response = ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=f"Failed to fetch ttft vs tpot data: {e}"
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=f"Failed to fetch {field1} vs {field2} data: {e}"
         )
 
     return response.to_http_response()

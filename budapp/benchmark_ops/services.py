@@ -544,27 +544,30 @@ class BenchmarkService(SessionMixin):
             cluster=cluster_detail,
         )
 
-    def get_ttft_vs_tpot_data(self, model_ids: Optional[List[str]] = None) -> dict:
-        """Get ttft vs tpot."""
-        TTFT_VS_TPOT_QUERY = """
+    def get_field1_vs_field2_data(self, field1: str, field2: str, model_ids: Optional[List[str]] = None) -> dict:
+        """Get field1 vs field2 data."""
+        GET_DATA_QUERY = f"""
             SELECT
                 b.model_id,
                 m.uri,
-                b.result->>'mean_ttft_ms' AS mean_ttft_ms,
-                b.result->>'mean_tpot_ms' AS mean_tpot_ms
+                b.result->>'{field1}' AS {field1},
+                b.result->>'{field2}' AS {field2}
             FROM benchmark as b
-            JOIN model m ON b.model_id = m.id AND b.result is not NULL
-            WHERE m.id = ANY(:model_ids)
+            JOIN model m ON b.model_id = m.id
+            WHERE b.result is not NULL AND b.result->>'{field1}' is not NULL AND b.result->>'{field2}' is not NULL
         """
+        if model_ids:
+            GET_DATA_QUERY += " AND m.id = ANY(:model_ids)"
+        print(GET_DATA_QUERY)
         with BenchmarkCRUD() as crud:
-            ttft_vs_tpot_data = crud.execute_raw_query(query=text(TTFT_VS_TPOT_QUERY), params={"model_ids": model_ids})
+            analysis_data = crud.execute_raw_query(query=text(GET_DATA_QUERY), params={"model_ids": model_ids})
 
-        ttft_vs_tpot_list = []
-        for row in ttft_vs_tpot_data:
-            ttft_vs_tpot_list.append({
+        analysis_data_list = []
+        for row in analysis_data:
+            analysis_data_list.append({
                 "model_id": str(row[0]),
                 "model_uri": row[1],
-                "mean_ttft_ms": row[2],
-                "mean_tpot_ms": row[3],
+                field1: row[2],
+                field2: row[3],
             })
-        return ttft_vs_tpot_list
+        return analysis_data_list
