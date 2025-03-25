@@ -725,6 +725,12 @@ class ClusterService(SessionMixin):
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
         logger.debug(f"Workflow {db_workflow.id} marked as completed")
 
+        # Remove from recommended clusters
+        await ModelClusterRecommendedDataManager(self.session).delete_by_fields(
+            ModelClusterRecommendedModel, {"cluster_id": db_cluster.id}
+        )
+        logger.debug(f"Model recommended cluster data for cluster {db_cluster.id} deleted")
+
         # Send notification to workflow creator
         notification_request = (
             NotificationBuilder()

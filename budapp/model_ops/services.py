@@ -38,6 +38,8 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
+from ..cluster_ops.crud import ModelClusterRecommendedDataManager
+from ..cluster_ops.models import ModelClusterRecommended as ModelClusterRecommendedModel
 from ..commons.constants import (
     APP_ICONS,
     BENCHMARK_FIELDS_LABEL_MAPPER,
@@ -2139,6 +2141,12 @@ class ModelService(SessionMixin):
             logger.debug(f"Model deletion successful for {db_model.local_path}")
 
         db_model = await ModelDataManager(self.session).update_by_fields(db_model, {"status": ModelStatusEnum.DELETED})
+
+        # Remove from recommended models
+        await ModelClusterRecommendedDataManager(self.session).delete_by_fields(
+            ModelClusterRecommendedModel, {"model_id": db_model.id}
+        )
+        logger.debug(f"Model recommended cluster data for model {db_model.id} deleted")
 
         return db_model
 
