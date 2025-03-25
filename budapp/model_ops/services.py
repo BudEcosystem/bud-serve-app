@@ -2531,7 +2531,7 @@ class ModelService(SessionMixin):
 class ModelServiceUtil(SessionMixin):
     """Model util service."""
 
-    async def get_model_icon(self, db_model: Model) -> Optional[str]:
+    async def get_model_icon(self, db_model: Optional[Model] = None, model_id: Optional[UUID] = None) -> Optional[str]:
         """Get model icon.
 
         Args:
@@ -2540,6 +2540,12 @@ class ModelServiceUtil(SessionMixin):
         Returns:
             The model icon.
         """
+        if db_model is None and model_id is None:
+            raise ValueError("Atleast one of model instance or model id must be provided")
+        if db_model is None:
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
+            )
         if db_model.provider_type in [ModelProviderTypeEnum.CLOUD_MODEL, ModelProviderTypeEnum.HUGGING_FACE]:
             return db_model.provider.icon
         else:

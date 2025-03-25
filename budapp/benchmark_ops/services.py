@@ -36,7 +36,7 @@ from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .models import BenchmarkCRUD, BenchmarkSchema
-from .schemas import RunBenchmarkWorkflowRequest, RunBenchmarkWorkflowStepData, BenchmarkResponse
+from .schemas import RunBenchmarkWorkflowRequest, RunBenchmarkWorkflowStepData
 
 
 logger = logging.get_logger(__name__)
@@ -284,6 +284,11 @@ class BenchmarkService(SessionMixin):
             "source_topic": f"{app_settings.source_topic}",
         }
 
+        # Update current workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, run_benchmark_payload
+        )
+
         logger.debug(f"Performing run benchmark request to budcluster {run_benchmark_payload}")
         run_benchmark_response = await self._perform_run_benchmark_request(run_benchmark_payload)
         # run_benchmark_response = {
@@ -379,7 +384,7 @@ class BenchmarkService(SessionMixin):
                     required_data[key] = db_workflow_step.data[key]
 
         logger.debug("Collected required data from workflow steps")
-
+        model_icon = APP_ICONS["general"]["model_mono"]
         # Get benchmark
         with BenchmarkCRUD() as crud:
             db_benchmark = crud.fetch_one(
@@ -392,16 +397,19 @@ class BenchmarkService(SessionMixin):
                 return
 
             benchmark_response = payload.content.result
+            logger.info(f"Updating benchmark with response: {benchmark_response}")
             if benchmark_response["benchmark_status"]:
                 update_data = {"status": BenchmarkStatusEnum.SUCCESS, "bud_cluster_benchmark_id": benchmark_response["bud_cluster_benchmark_id"], "result": benchmark_response["result"]}
             else:
                 update_data = {"status": BenchmarkStatusEnum.FAILED, "reason": benchmark_response["result"]}
 
-            db_benchmark = crud.update(
+            crud.update(
                 data=update_data,
                 conditions={"id": db_benchmark.id},
             )
-            logger.debug(f"Updated benchmark: {db_benchmark}")
+
+            db_benchmark = crud.fetch_one(conditions={"id": db_benchmark.id}, raise_on_error=False)
+
 
         # Update current step number
         current_step_number = db_workflow.current_step + 1
@@ -426,7 +434,7 @@ class BenchmarkService(SessionMixin):
         )
 
         # Send notification to workflow creator
-        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_benchmark.model)
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(model_id=db_benchmark.model_id)
 
         notification_request = (
             NotificationBuilder()
@@ -434,7 +442,7 @@ class BenchmarkService(SessionMixin):
                 title=db_benchmark.name,
                 message="Benchmark completed",
                 icon=model_icon,
-                result=NotificationResult(target_id=db_benchmark.id, target_type="benchmark").model_dump(
+                result=NotificationResult(target_id=db_benchmark.id, target_type="model").model_dump(
                     exclude_none=True, exclude_unset=True
                 ),
             )
@@ -460,5 +468,7 @@ class BenchmarkService(SessionMixin):
                 benchmark_dict = {**db_benchmark.__dict__}
                 benchmark_dict["model"] = {**db_benchmark.model.__dict__}  # Ensure relationships are included
                 benchmark_dict["cluster"] = {**db_benchmark.cluster.__dict__}
+                benchmark_dict["tpot"] = round(benchmark_dict["result"].get("mean_tpot_ms", 0.0), 2) if benchmark_dict["result"] else 0.0
+                benchmark_dict["ttft"] = round(benchmark_dict["result"].get("mean_ttft_ms", 0.0), 2) if benchmark_dict["result"] else 0.0
                 benchmark_list.append(benchmark_dict)
             return benchmark_list, total_count
