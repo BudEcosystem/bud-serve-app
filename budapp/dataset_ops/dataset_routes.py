@@ -18,10 +18,8 @@
 """The benchmark ops package, containing essential business logic, services, and routing configurations for the benchmark ops."""
 
 from typing import List, Optional, Union
-from uuid import UUID
 
-from budmicroframe.commons.schemas import SuccessResponse
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -82,9 +80,6 @@ async def list_all_datasets(
         db_datasets, count = await DatasetService(session).get_datasets(
             offset, limit, filters_dict, order_by, search
         )
-    except ClientException as e:
-        logger.exception(f"Failed to get all datasets: {e}")
-        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to get all datasets: {e}")
         return ErrorResponse(
@@ -92,7 +87,7 @@ async def list_all_datasets(
         ).to_http_response()
 
     return DatasetPaginatedResponse(
-        benchmarks=db_datasets,
+        datasets=db_datasets,
         total_record=count,
         page=page,
         limit=limit,
