@@ -38,6 +38,9 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
+from ..cluster_ops.crud import ModelClusterRecommendedDataManager
+from ..cluster_ops.models import ModelClusterRecommended as ModelClusterRecommendedModel
+from ..cluster_ops.workflows import ClusterRecommendedSchedulerWorkflows
 from ..commons.constants import (
     APP_ICONS,
     BENCHMARK_FIELDS_LABEL_MAPPER,
@@ -416,6 +419,9 @@ class CloudModelWorkflowService(SessionMixin):
                 db_workflow,
                 {"current_step": end_step_number, "status": WorkflowStatusEnum.COMPLETED},
             )
+
+            # Trigger recommended cluster scheduler workflow
+            await ClusterRecommendedSchedulerWorkflows().__call__(model_id=db_model.id)
 
             # Send notification to workflow creator
             model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
@@ -1117,6 +1123,9 @@ class LocalModelWorkflowService(SessionMixin):
         await WorkflowDataManager(self.session).update_by_fields(
             db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
         )
+
+        # Trigger recommended cluster scheduler workflow
+        await ClusterRecommendedSchedulerWorkflows().__call__(model_id=db_model.id)
 
         # Send notification to workflow creator
         model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
@@ -2139,6 +2148,12 @@ class ModelService(SessionMixin):
             logger.debug(f"Model deletion successful for {db_model.local_path}")
 
         db_model = await ModelDataManager(self.session).update_by_fields(db_model, {"status": ModelStatusEnum.DELETED})
+
+        # Remove from recommended models
+        await ModelClusterRecommendedDataManager(self.session).delete_by_fields(
+            ModelClusterRecommendedModel, {"model_id": db_model.id}
+        )
+        logger.debug(f"Model recommended cluster data for model {db_model.id} deleted")
 
         return db_model
 

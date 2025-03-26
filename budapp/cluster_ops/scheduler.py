@@ -58,7 +58,7 @@ class RecommendedClusterScheduler:
         if model_id:
             db_model = asyncio.run(
                 ModelDataManager(session).retrieve_by_fields(
-                    {"id": model_id, "status": ModelStatusEnum.ACTIVE}, missing_ok=True
+                    Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}, missing_ok=True
                 )
             )
             if db_model:
@@ -79,6 +79,8 @@ class RecommendedClusterScheduler:
 
     def execute_cluster_recommendation(self, model_id: Optional[UUID] = None) -> None:
         """Execute the cluster recommendation."""
+        from .workflows import ClusterRecommendedSchedulerWorkflows
+
         dapr_service = DaprService()
         state_store_key = RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY
 
@@ -110,57 +112,76 @@ class RecommendedClusterScheduler:
                 logger.debug("All models are up to date with recommended clusters")
                 return
 
+            total_models = len(db_models)
+            remaining_models = total_models
             for db_model in db_models:
+                remaining_models -= 1
                 logger.debug("Executing cluster recommendation for model %s", db_model.id)
 
-                # Create Bud Simulator Request for cloud/local models
-                workflow_id = str(uuid.uuid4())
-                bud_simulator_request = self._build_bud_simulator_request(db_model)
-                bud_simulator_request.notification_metadata = BudNotificationMetadata(
-                    workflow_id=workflow_id,
-                    name=BUD_INTERNAL_WORKFLOW,
-                    subscriber_ids=str(db_model.created_by),
-                )
-
                 try:
-                    response = asyncio.run(self._perform_bud_simulator_request(bud_simulator_request))
-                except ClientException:
-                    logger.error("Failed to initiate bud simulator workflow %s", workflow_id)
-                    continue
-
-                if isinstance(response, dict) and "workflow_id" in response:
-                    logger.debug("Successfully initiated bud simulator workflow %s", workflow_id)
-
-                    # Get existing workflow details from state store
-                    try:
-                        recommended_cluster_scheduler_state = dapr_service.get_state(
-                            store_name=app_settings.statestore_name, key=state_store_key
-                        ).json()
-                        logger.debug("State store %s already exists", state_store_key)
-                    except Exception as e:
-                        logger.exception("Failed to get state store %s", e)
-                        continue
-
-                    # Save workflow details in state store
-                    recommended_cluster_scheduler_state[str(workflow_id)] = {
-                        "model_id": str(db_model.id),
-                    }
+                    # Create Bud Simulator Request for cloud/local models
+                    workflow_id = str(uuid.uuid4())
+                    bud_simulator_request = self._build_bud_simulator_request(db_model)
+                    bud_simulator_request.notification_metadata = BudNotificationMetadata(
+                        workflow_id=workflow_id,
+                        name=BUD_INTERNAL_WORKFLOW,
+                        subscriber_ids=str(db_model.created_by),
+                    )
 
                     try:
-                        dapr_service = DaprService()
-                        asyncio.run(
-                            dapr_service.save_to_statestore(
-                                store_name=app_settings.statestore_name,
-                                key=state_store_key,
-                                value=recommended_cluster_scheduler_state,
+                        response = asyncio.run(self._perform_bud_simulator_request(bud_simulator_request))
+                    except ClientException as e:
+                        logger.error("Failed to initiate bud simulator workflow %s", workflow_id)
+                        raise e
+
+                    if isinstance(response, dict) and "workflow_id" in response:
+                        logger.debug("Successfully initiated bud simulator workflow %s", workflow_id)
+
+                        # Get existing workflow details from state store
+                        try:
+                            recommended_cluster_scheduler_state = dapr_service.get_state(
+                                store_name=app_settings.statestore_name, key=state_store_key
+                            ).json()
+                            logger.debug("State store %s already exists", state_store_key)
+                        except Exception as e:
+                            logger.exception("Failed to get state store %s", e)
+                            raise e
+
+                        # Save workflow details in state store
+                        recommended_cluster_scheduler_state[str(workflow_id)] = {
+                            "model_id": str(db_model.id),
+                        }
+
+                        try:
+                            dapr_service = DaprService()
+                            asyncio.run(
+                                dapr_service.save_to_statestore(
+                                    store_name=app_settings.statestore_name,
+                                    key=state_store_key,
+                                    value=recommended_cluster_scheduler_state,
+                                )
+                            )
+                            logger.debug("State store %s updated", state_store_key)
+                        except Exception as e:
+                            logger.exception("Failed to save state store %s", e)
+                            raise e
+
+                        logger.debug("data pushed to dapr state store %s", recommended_cluster_scheduler_state)
+
+                        # Update model recommended cluster sync at
+                        db_model = asyncio.run(
+                            ModelDataManager(session).update_by_fields(
+                                db_model, {"recommended_cluster_sync_at": datetime.now(UTC)}
                             )
                         )
-                        logger.debug("State store %s updated", state_store_key)
-                    except Exception as e:
-                        logger.exception("Failed to save state store %s", e)
-                        continue
-
-                    logger.debug("data pushed to dapr state store %s", recommended_cluster_scheduler_state)
+                        logger.debug(
+                            "Updated model recommended cluster sync at %s", db_model.recommended_cluster_sync_at
+                        )
+                    else:
+                        logger.error("Failed to initiate bud simulator workflow")
+                        raise ClientException("Failed to initiate bud simulator workflow")
+                except Exception:
+                    logger.error("Error occurred while executing cluster recommendation for model %s", db_model.id)
 
                     # Update model recommended cluster sync at
                     db_model = asyncio.run(
@@ -169,8 +190,11 @@ class RecommendedClusterScheduler:
                         )
                     )
                     logger.debug("Updated model recommended cluster sync at %s", db_model.recommended_cluster_sync_at)
-                else:
-                    logger.error("Failed to initiate bud simulator workflow")
+
+                    if remaining_models == 0:
+                        # Trigger recommended cluster scheduler workflow
+                        asyncio.run(ClusterRecommendedSchedulerWorkflows().__call__())
+                        logger.debug("Recommended cluster scheduler workflow re-triggered")
 
     @staticmethod
     async def _perform_bud_simulator_request(bud_simulator_request: BudSimulatorRequest) -> None:
