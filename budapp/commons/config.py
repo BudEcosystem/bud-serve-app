@@ -215,8 +215,7 @@ class SecretsConfig(BaseConfig):
         alias="POSTGRES_PASSWORD",
         json_schema_extra=enable_periodic_sync_from_store(is_global=True),
     )
-
-
+    hf_token: Optional[str] = Field(None, alias="HF_TOKEN", json_schema_extra=enable_periodic_sync_from_store(is_global=True))
 
     @computed_field
     def redis_url(self) -> str:

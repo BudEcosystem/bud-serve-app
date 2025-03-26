@@ -35,6 +35,7 @@ from .commons import logging
 from .commons.config import app_settings, secrets_settings
 from .core import common_routes, meta_routes, notify_routes
 from .credential_ops import credential_routes
+from .dataset_ops import dataset_routes
 from .endpoint_ops import endpoint_routes
 from .initializers.seeder import seeders
 from .metric_ops import metric_routes
@@ -164,6 +165,7 @@ internal_router.include_router(benchmark_routes.benchmark_router)
 internal_router.include_router(cluster_routes.cluster_router)
 internal_router.include_router(common_routes.common_router)
 internal_router.include_router(credential_routes.credential_router)
+internal_router.include_router(dataset_routes.dataset_router)
 internal_router.include_router(endpoint_routes.endpoint_router)
 internal_router.include_router(meta_routes.meta_router)
 internal_router.include_router(metric_routes.metric_router)

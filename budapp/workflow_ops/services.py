@@ -142,6 +142,14 @@ class WorkflowService(SessionMixin):
             description = required_data.get("description")
             additional_concurrency = required_data.get("additional_concurrency")
             quantized_model_name = required_data.get("quantized_model_name")
+            eval_with = required_data.get("eval_with")
+            max_input_tokens = required_data.get("max_input_tokens")
+            max_output_tokens = required_data.get("max_output_tokens")
+            datasets = required_data.get("datasets")
+            nodes = required_data.get("nodes")
+            credential_id = required_data.get("credential_id")
+            user_confirmation = required_data.get("user_confirmation")
+            run_as_simulation = required_data.get("run_as_simulation")
 
             quantization_config = QuantizeModelWorkflowStepData(
                 model_id=model_id,
@@ -247,6 +255,14 @@ class WorkflowService(SessionMixin):
                 quantization_config=quantization_config if quantization_config else None,
                 quantization_deployment_events=quantization_deployment_events if quantization_deployment_events else None,
                 quantization_simulation_events=quantization_simulation_events if quantization_simulation_events else None,
+                eval_with=eval_with,
+                max_input_tokens=max_input_tokens,
+                max_output_tokens=max_output_tokens,
+                datasets=datasets,
+                nodes=nodes,
+                credential_id=credential_id,
+                user_confirmation=user_confirmation,
+                run_as_simulation=run_as_simulation,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -338,6 +354,25 @@ class WorkflowService(SessionMixin):
                 "simulation_id",
                 "quantization_data",
                 "quantized_model_id",
+            ],
+            "model_benchmark": [
+                "name",
+                "tags",
+                "description",
+                "concurrent_requests",
+                "eval_with",
+                "datasets",
+                "max_input_tokens",
+                "max_output_tokens",
+                "cluster_id",
+                "bud_cluster_id",
+                "nodes",
+                "model_id",
+                "model",
+                "provider_type",
+                "credential_id",
+                "user_confirmation",
+                "run_as_simulation",
             ]
         }
 
