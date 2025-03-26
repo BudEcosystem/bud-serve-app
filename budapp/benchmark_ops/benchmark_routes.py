@@ -15,7 +15,7 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""The cluster ops package, containing essential business logic, services, and routing configurations for the cluster ops."""
+"""The benchmark ops package, containing essential business logic, services, and routing configurations for the benchmark ops."""
 
 from typing import List, Optional, Union
 from uuid import UUID
