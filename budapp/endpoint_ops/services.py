@@ -18,7 +18,7 @@
 
 import json
 from datetime import datetime, timezone
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 from uuid import UUID
 
 import aiohttp
@@ -572,7 +572,7 @@ class EndpointService(SessionMixin):
         headers = {
             "accept": "application/json",
         }
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession() as session:  # noqa: SIM117
             async with session.get(get_workers_endpoint, params=payload, headers=headers) as response:
                 response_data = await response.json()
                 if response.status != 200 or response_data.get("object") == "error":
@@ -583,6 +583,24 @@ class EndpointService(SessionMixin):
                 logger.debug("Successfully retrieved endpoint workers")
                 return response_data
 
+    async def get_endpoint_worker_logs(self, endpoint_id: UUID, worker_id: UUID) -> Dict[str, Any]:
+        """Get endpoint worker logs."""
+        _ = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})
+        get_worker_logs_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/worker-info/{worker_id}/logs"
+        headers = {
+            "accept": "application/json",
+        }
+
+        async with aiohttp.ClientSession() as session, session.get(get_worker_logs_endpoint, headers=headers) as response:
+            response_data = await response.json()
+            if response.status != 200 or response_data.get("object") == "error":
+                error_message = response_data.get("message", "Failed to get endpoint worker logs")
+                logger.error(f"Failed to get endpoint worker logs: {error_message}")
+                raise ClientException(error_message)
+
+            logger.debug("Successfully retrieved endpoint worker logs")
+            return response_data.get("logs", [])
+
     async def get_endpoint_worker_detail(self, endpoint_id: UUID, worker_id: UUID, reload: bool) -> dict:
         """Get endpoint worker detail."""
         _ = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})
@@ -590,7 +608,7 @@ class EndpointService(SessionMixin):
         headers = {
             "accept": "application/json",
         }
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession() as session: # noqa: SIM117
             async with session.get(
                 get_worker_detail_endpoint, headers=headers, params={"reload": str(reload).lower()}
             ) as response:

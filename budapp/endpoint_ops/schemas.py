@@ -144,12 +144,18 @@ class WorkerInfoResponse(PaginatedSuccessResponse):
 
     workers: list[WorkerInfo]
 
+class WorkerLogsResponse(SuccessResponse):
+    """Worker logs response."""
+
+    model_config = ConfigDict(extra="allow")
+
+    logs: list[str]
+
 
 class WorkerDetailResponse(SuccessResponse):
     """Worker detail response."""
 
     model_config = ConfigDict(extra="allow")
-
     worker: WorkerInfo
 
 
