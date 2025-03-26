@@ -613,6 +613,9 @@ class EndpointService(SessionMixin):
         """Get worker metrics history."""
         _ = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})
         get_worker_logs_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/worker-info/{worker_id}/metrics"
+
+        logger.debug(f"Getting worker metrics history for worker {worker_id} at endpoint {endpoint_id}")
+
         headers = {
             "accept": "application/json",
         }
