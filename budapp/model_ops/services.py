@@ -24,6 +24,8 @@ from uuid import UUID, uuid4
 import aiohttp
 from fastapi import UploadFile, status
 from pydantic import HttpUrl
+import requests
+from urllib.parse import urlparse
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
@@ -44,6 +46,7 @@ from ..commons.constants import (
     BENCHMARK_FIELDS_TYPE_MAPPER,
     BUD_INTERNAL_WORKFLOW,
     LICENSE_DIR,
+    HF_AUTHORS_DIR,
     BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     CloudModelStatusEnum,
@@ -768,13 +771,13 @@ class LocalModelWorkflowService(SessionMixin):
             # Update icon, title on workflow
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
                 db_workflow,
-                {"icon": APP_ICONS["general"]["model_mono"], "title": "URL"},
+                {"icon": APP_ICONS["general"]["default_url_model"], "title": "URL"},
             )
         elif provider_type == ModelProviderTypeEnum.DISK:
             # Update icon, title on workflow
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
                 db_workflow,
-                {"icon": APP_ICONS["general"]["model_mono"], "title": "Disk"},
+                {"icon": APP_ICONS["general"]["default_disk_model"], "title": "Disk"},
             )
 
         # Prepare workflow step data
@@ -1035,16 +1038,27 @@ class LocalModelWorkflowService(SessionMixin):
         minimum_requirements = {"device_name": "Xenon Dev", "core": 3, "memory": "32 GB", "RAM": "32 GB"}
 
         # Set provider id and icon
+        author_icon = model_info.get("logo_url")
+        if author_icon:
+            author_icon = LocalModelWorkflowService.save_author_logo(author_icon)
         provider_id = None
-        icon = required_data.get("icon")
+        icon = required_data.get("icon") if required_data.get("icon") else author_icon
         if required_data["provider_type"] == ModelProviderTypeEnum.HUGGING_FACE.value:
             # icon is not supported for hugging face models
             # Add provider id for hugging face models to retrieve icon for frontend
-            icon = None
+            if not icon:
+                icon = APP_ICONS["providers"]["default_hugging_face_model"]
             db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
                 ProviderModel, {"type": "huggingface"}
             )
             provider_id = db_provider.id
+
+        elif required_data["provider_type"] == ModelProviderTypeEnum.DISK:
+            if not icon:
+                icon = APP_ICONS["general"]["default_disk_model"]
+        elif required_data["provider_type"] == ModelProviderTypeEnum.URL:
+            if not icon:
+                icon = APP_ICONS["general"]["default_url_model"]
 
         model_data = ModelCreate(
             name=required_data["name"],
@@ -1780,6 +1794,63 @@ class LocalModelWorkflowService(SessionMixin):
             return ModelSecurityScanStatusEnum.LOW
         else:
             return ModelSecurityScanStatusEnum.SAFE  # Default to SAFE if no issues are found
+
+    @staticmethod
+    def save_author_logo(img_url: str) -> str:
+        """
+        Downloads and saves the logo from the given image URL locally with a unique name.
+
+        Args:
+            img_url (str): The URL of the logo image.
+
+        Returns:
+            str: The local file path of the saved logo.
+        """
+        # Create logo directory if it doesn't exist
+        logo_dir = os.path.join(app_settings.icon_dir, HF_AUTHORS_DIR)
+        os.makedirs(logo_dir, exist_ok=True)
+
+        try:
+            # Parse the URL
+            parsed_url = urlparse(img_url)
+            path_parts = parsed_url.path.strip("/").split("/")
+
+            # Use the last two parts as the filename
+            logo_name = f"{path_parts[-2]}_{path_parts[-1]}"
+
+        except Exception:
+            # Fallback to entire URL path with `/` replaced by `_`
+            logo_name = parsed_url.path.strip("/").replace("/", "_")
+
+        # Ensure the filename ends with .png
+        if not logo_name.endswith(".png"):
+            logo_name += ".png"
+
+        # Construct the local logo path
+        logo_path = os.path.join(logo_dir, logo_name)
+        icon_index = logo_path.find("/icons/")
+        formatted_logo_path = logo_path[icon_index + 1 :]
+
+        # Check if the logo already exists
+        if os.path.exists(logo_path):
+            print(f"Logo already saved at: {logo_path}")
+            return formatted_logo_path
+
+        # Download and save the image
+        try:
+            response = requests.get(img_url)
+            response.raise_for_status()
+
+            # Save the image locally
+            with open(logo_path, "wb") as f:
+                f.write(response.content)
+
+            print(f"Logo saved at: {logo_path}")
+            return formatted_logo_path
+
+        except Exception as e:
+            print(f"Failed to download logo: {e}")
+            return ""
 
 
 class CloudModelService(SessionMixin):
