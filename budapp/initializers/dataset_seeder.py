@@ -73,6 +73,8 @@ class DatasetSeeder(BaseSeeder):
                     datasets_data[existing_dataset.name]["status"] = DatasetStatusEnum.ACTIVE
                     if not datasets_data[existing_dataset.name].get("split"):
                         datasets_data[existing_dataset.name]["split"] = "train"
+                if not datasets_data[existing_dataset.name].get("formatting"):
+                    datasets_data[existing_dataset.name]["formatting"] = "alpaca"
                 update_dataset_object = DatasetUpdate(**datasets_data[existing_dataset.name])
                 with DatasetCRUD() as crud:
                     crud.update(data=update_dataset_object.model_dump(mode="json", exclude_none=True), conditions={"id": existing_dataset.id})
@@ -100,6 +102,8 @@ class DatasetSeeder(BaseSeeder):
                 if hf_info["splits"] and hf_info["splits"].get(dataset_info["split"]):  # noqa: SIM102
                     if hasattr(hf_info["splits"][dataset_info["split"]], "num_examples"):
                         dataset_info["num_samples"] = hf_info["splits"][dataset_info["split"]].num_examples
+            if not dataset_info.get("formatting"):
+                dataset_info["formatting"] = "alpaca"
             create_dataset_object = DatasetCreate(**dataset_info)
             data_to_be_inserted.append(create_dataset_object.model_dump(mode="json"))
 
