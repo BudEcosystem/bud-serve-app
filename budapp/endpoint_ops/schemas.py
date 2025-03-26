@@ -16,7 +16,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Union
+from typing import Any, Optional, Union
 from uuid import UUID
 
 from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator
@@ -222,4 +222,4 @@ class WorkerMetricsResponse(SuccessResponse):
 
     model_config = ConfigDict(extra="allow")
 
-    metrics: Union[list[dict], None] = None
+    metrics: Union[dict[str,Any], None] = None
