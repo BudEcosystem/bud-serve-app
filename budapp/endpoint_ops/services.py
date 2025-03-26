@@ -630,6 +630,7 @@ class EndpointService(SessionMixin):
                 raise ClientException(error_message)
 
             logger.debug("Successfully retrieved endpoint worker logs")
+            logger.debug(f" ::METRIC:: Response data: {response_data}")
             return response_data.get("data", None)
 
     async def get_endpoint_worker_detail(self, endpoint_id: UUID, worker_id: UUID, reload: bool) -> dict:
