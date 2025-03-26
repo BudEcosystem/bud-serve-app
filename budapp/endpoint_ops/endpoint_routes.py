@@ -264,7 +264,12 @@ async def get_endpoint_worker_metrics(
     """Get endpoint worker metrics."""
     try:
         worker_metrics = await EndpointService(session).get_worker_metrics_history(endpoint_id, worker_id)
-        response = WorkerMetricsResponse(metrics=worker_metrics)
+        response = WorkerMetricsResponse(
+            metrics=worker_metrics,
+            object="endpoint.worker.metrics",
+            message="Successfully fetched endpoint worker metrics",
+            code=status.HTTP_200_OK,
+        )
     except ClientException as e:
         logger.exception(f"Failed to get endpoint worker metrics: {e}")
         response = ErrorResponse(message=e.message, code=e.status_code)
