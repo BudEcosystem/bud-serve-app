@@ -16,6 +16,7 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the model ops."""
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -28,8 +29,9 @@ from budapp.commons.constants import CloudModelStatusEnum, EndpointStatusEnum, M
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.commons.exceptions import DatabaseException
 from budapp.endpoint_ops.models import Endpoint
-from budapp.model_ops.models import CloudModel, Model, PaperPublished, QuantizationMethod as QuantizationMethodModel
+from budapp.model_ops.models import CloudModel, Model, PaperPublished
 from budapp.model_ops.models import Provider as ProviderModel
+from budapp.model_ops.models import QuantizationMethod as QuantizationMethodModel
 
 
 logger = logging.get_logger(__name__)
@@ -442,6 +444,35 @@ class ModelDataManager(DataManagerUtils):
         """Get models by uris."""
         stmt = select(Model).filter(Model.uri.in_(uris), Model.status == ModelStatusEnum.ACTIVE)
         return self.scalars_all(stmt)
+
+    async def get_stale_model_recommendation(self, older_than: datetime) -> Optional[Model]:
+        """Get model that needs cluster recommendation update.
+
+        Args:
+            older_than: datetime to compare against recommended_cluster_sync_at
+
+        Returns:
+            Model if found and needs update (stale or never synced), None otherwise
+        """
+        query = (
+            select(Model)
+            .where(
+                and_(
+                    Model.status == ModelStatusEnum.ACTIVE,
+                    or_(
+                        Model.recommended_cluster_sync_at.is_(None),  # Never synced
+                        Model.recommended_cluster_sync_at < older_than,
+                    ),
+                )
+            )
+            .order_by(
+                Model.recommended_cluster_sync_at.asc().nulls_first()  # Prioritize never synced models
+            )
+            .limit(1)
+        )
+
+        result = self.session.execute(query)
+        return result.scalar_one_or_none()
 
 
 class CloudModelDataManager(DataManagerUtils):

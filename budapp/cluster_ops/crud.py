@@ -248,3 +248,9 @@ class ClusterDataManager(DataManagerUtils):
         result = self.session.execute(stmt)
 
         return result, count
+
+
+class ModelClusterRecommendedDataManager(DataManagerUtils):
+    """Data manager for the ModelClusterRecommended model."""
+
+    pass

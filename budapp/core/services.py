@@ -61,14 +61,21 @@ class NotificationService(SessionMixin):
             None
         """
         # Update workflow step data event
-        await self._update_workflow_step_events(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
+        try:
+            await self._update_workflow_step_events(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
 
-        # Update progress in workflow
-        await self._update_workflow_progress(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
+            # Update progress in workflow
+            await self._update_workflow_progress(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
+        except Exception:
+            logger.error("Failed to update workflow step events")
 
         # Send number of recommended cluster as notification
         if payload.event == "results":
-            await ClusterService(self.session)._notify_recommended_cluster_from_notification_event(payload)
+            await ClusterService(self.session).handle_recommended_cluster_events(payload)
+
+        # FAILURE status handled for recommended cluster scheduler
+        if payload.content.status == "FAILED":
+            await ClusterService(self.session).handle_recommended_cluster_failure_events(payload)
 
     async def update_model_deployment_events(self, payload: NotificationPayload) -> None:
         """Update the model deployment events for a workflow step.
