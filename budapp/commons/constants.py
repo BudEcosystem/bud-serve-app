@@ -2628,5 +2628,12 @@ class BenchmarkStatusEnum(Enum):
     PROCESSING = "processing"
 
 
+class DatasetStatusEnum(Enum):
+    """Dataset status."""
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
 # Recommended cluster scheduler state store key
 RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY = "recommended_cluster_scheduler_state"

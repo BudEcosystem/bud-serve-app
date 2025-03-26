@@ -10,14 +10,8 @@ from sqlalchemy import (
     String,
     Uuid,
     and_,
-    asc,
-    case,
     cast,
-    desc,
-    distinct,
     func,
-    literal,
-    or_,
     select,
 )
 from sqlalchemy.dialects.postgresql import JSONB
