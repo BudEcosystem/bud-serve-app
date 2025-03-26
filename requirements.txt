@@ -17,6 +17,7 @@ cachetools >= 5.4.0
 ujson >= 5.10.0
 PyYAML>=6.0.2
 huggingface-hub>=0.26.5
+datasets
 
 # Database
 SQLAlchemy>=2.0.36
