@@ -16,7 +16,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Optional, Union
 from uuid import UUID
 
 from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator
@@ -215,3 +215,11 @@ class DeleteWorkerRequest(BaseModel):
     endpoint_id: UUID4
     worker_id: UUID4
     worker_name: str
+
+
+class WorkerMetricsResponse(SuccessResponse):
+    """Worker metrics response."""
+
+    model_config = ConfigDict(extra="allow")
+
+    metrics: Union[list[dict], None] = None

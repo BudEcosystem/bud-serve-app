@@ -45,6 +45,7 @@ from .schemas import (
     WorkerInfoFilter,
     WorkerInfoResponse,
     WorkerLogsResponse,
+    WorkerMetricsResponse,
 )
 from .services import EndpointService
 
@@ -236,6 +237,41 @@ async def get_endpoint_worker_logs(
         )
     return response.to_http_response()
 
+
+@endpoint_router.get(
+    "/{endpoint_id}/workers/{worker_id}/metrics",
+    responses={
+        status.HTTP_200_OK: {
+            "model": WorkerMetricsResponse,  # noqa: F821
+            "description": "Successfully get endpoint worker metrics",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Worker not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to get endpoint worker metrics",
+        },
+    },
+)
+async def get_endpoint_worker_metrics(
+    endpoint_id: UUID,
+    worker_id: UUID,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> Union[WorkerMetricsResponse, ErrorResponse]:
+    """Get endpoint worker metrics."""
+    try:
+        worker_metrics = await EndpointService(session).get_worker_metrics_history(endpoint_id, worker_id)
+        response = WorkerMetricsResponse(metrics=worker_metrics)
+    except ClientException as e:
+        logger.exception(f"Failed to get endpoint worker metrics: {e}")
+        response = ErrorResponse(message=e.message, code=e.status_code)
+    except Exception as e:
+        logger.exception(f"Failed to get endpoint worker metrics: {e}")
+        response = ErrorResponse(message="Failed to get endpoint worker metrics", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return response.to_http_response()
 
 
 @endpoint_router.get(
