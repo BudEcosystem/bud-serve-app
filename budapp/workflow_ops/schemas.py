@@ -49,6 +49,14 @@ class RetrieveWorkflowStepData(BaseModel):
     quantization_config: QuantizeModelWorkflowStepData | None = None
     quantization_deployment_events: dict | None = None
     quantization_simulation_events: dict | None = None
+    eval_with: str | None = None
+    max_input_tokens: int | None = None
+    max_output_tokens: int | None = None
+    datasets: list | None = None
+    nodes: list | None = None
+    credential_id: UUID4 | None = None
+    user_confirmation: bool | None = None
+    run_as_simulation: bool | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
