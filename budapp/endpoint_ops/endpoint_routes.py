@@ -226,7 +226,12 @@ async def get_endpoint_worker_logs(
     """Get endpoint worker logs."""
     try:
         worker_log = await EndpointService(session).get_endpoint_worker_logs(endpoint_id, worker_id)
-        response = WorkerLogsResponse(logs=worker_log)
+        response = WorkerLogsResponse(
+            logs=worker_log,
+            object="endpoint.worker.logs",
+            message="Successfully fetched endpoint worker logs",
+            code=status.HTTP_200_OK,
+        )
     except ClientException as e:
         logger.exception(f"Failed to get endpoint worker detail: {e}")
         response = ErrorResponse(message=e.message, code=e.status_code)
