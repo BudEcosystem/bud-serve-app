@@ -149,7 +149,7 @@ class WorkerLogsResponse(SuccessResponse):
 
     model_config = ConfigDict(extra="allow")
 
-    logs: list[str]
+    logs: Any
 
 
 class WorkerDetailResponse(SuccessResponse):
