@@ -18,7 +18,7 @@
 
 import json
 from datetime import datetime, timezone
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 from uuid import UUID
 
 import aiohttp
@@ -372,7 +372,7 @@ class EndpointService(SessionMixin):
             active_replicas=active_replicas,
             total_replicas=total_replicas,
             deployment_config=required_data["deploy_config"],
-            node_list=[node["name"] for node in node_list]
+            node_list=[node["name"] for node in node_list],
         )
 
         db_endpoint = await EndpointDataManager(self.session).insert_one(
@@ -483,7 +483,13 @@ class EndpointService(SessionMixin):
         logger.debug(f"Number of workers : {total_replicas}")
 
         # Get node list
-        node_list = list({worker["node_name"] for worker in payload.content.result.get("worker_data_list", []) if worker["status"] == "Running"})
+        node_list = list(
+            {
+                worker["node_name"]
+                for worker in payload.content.result.get("worker_data_list", [])
+                if worker["status"] == "Running"
+            }
+        )
         logger.debug(f"Node list: {node_list}")
 
         # Calculate the active replicas with status "Running"
@@ -572,7 +578,7 @@ class EndpointService(SessionMixin):
         headers = {
             "accept": "application/json",
         }
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession() as session:  # noqa: SIM117
             async with session.get(get_workers_endpoint, params=payload, headers=headers) as response:
                 response_data = await response.json()
                 if response.status != 200 or response_data.get("object") == "error":
@@ -583,6 +589,50 @@ class EndpointService(SessionMixin):
                 logger.debug("Successfully retrieved endpoint workers")
                 return response_data
 
+    async def get_endpoint_worker_logs(self, endpoint_id: UUID, worker_id: UUID) -> Dict[str, Any]:
+        """Get endpoint worker logs."""
+        _ = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})
+        get_worker_logs_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/worker-info/{worker_id}/logs"
+        headers = {
+            "accept": "application/json",
+        }
+
+        async with aiohttp.ClientSession() as session, session.get(
+            get_worker_logs_endpoint, headers=headers
+        ) as response:
+            response_data = await response.json()
+            if response.status != 200 or response_data.get("object") == "error":
+                error_message = response_data.get("message", "Failed to get endpoint worker logs")
+                logger.error(f"Failed to get endpoint worker logs: {error_message}")
+                raise ClientException(error_message)
+
+            logger.debug("Successfully retrieved endpoint worker logs")
+            return response_data.get("logs", [])
+
+    async def get_worker_metrics_history(self, endpoint_id: UUID, worker_id: UUID) -> Dict[str, Any]:
+        """Get worker metrics history."""
+        _ = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})
+        get_worker_logs_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/worker-info/{worker_id}/metrics"
+
+        logger.debug(f"Getting worker metrics history for worker {worker_id} at endpoint {endpoint_id}")
+
+        headers = {
+            "accept": "application/json",
+        }
+
+        async with aiohttp.ClientSession() as session, session.get(
+            get_worker_logs_endpoint, headers=headers
+        ) as response:
+            response_data = await response.json()
+            if response.status != 200 or response_data.get("object") == "error":
+                error_message = response_data.get("message", "Failed to get endpoint worker metrics history")
+                logger.error(f"Failed to get endpoint worker metrics history: {error_message}")
+                raise ClientException(error_message)
+
+            logger.debug("Successfully retrieved endpoint worker logs")
+            logger.debug(f" ::METRIC:: Response data: {response_data}")
+            return response_data.get("data", None)
+
     async def get_endpoint_worker_detail(self, endpoint_id: UUID, worker_id: UUID, reload: bool) -> dict:
         """Get endpoint worker detail."""
         _ = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})
@@ -590,7 +640,7 @@ class EndpointService(SessionMixin):
         headers = {
             "accept": "application/json",
         }
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession() as session:  # noqa: SIM117
             async with session.get(
                 get_worker_detail_endpoint, headers=headers, params={"reload": str(reload).lower()}
             ) as response:
@@ -1248,7 +1298,12 @@ class EndpointService(SessionMixin):
 
         self.session.refresh(db_endpoint)
         db_endpoint = await EndpointDataManager(self.session).update_by_fields(
-            db_endpoint, {"deployment_config": deployment_config, "total_replicas": total_replicas, "node_list": list(set(db_endpoint_node_list + add_worker_node_list))}
+            db_endpoint,
+            {
+                "deployment_config": deployment_config,
+                "total_replicas": total_replicas,
+                "node_list": list(set(db_endpoint_node_list + add_worker_node_list)),
+            },
         )
         logger.debug(f"Updated deployment config: {deployment_config}")
 
