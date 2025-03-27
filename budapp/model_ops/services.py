@@ -1842,7 +1842,7 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Check if the logo already exists
         if os.path.exists(logo_path):
-            print(f"Logo already saved at: {logo_path}")
+            logger.debug(f"Logo already saved at: {logo_path}")
             return formatted_logo_path
 
         # Download and save the image
@@ -1854,11 +1854,11 @@ class LocalModelWorkflowService(SessionMixin):
             with open(logo_path, "wb") as f:
                 f.write(response.content)
 
-            print(f"Logo saved at: {logo_path}")
+            logger.debug(f"Logo saved at: {logo_path}")
             return formatted_logo_path
 
         except Exception as e:
-            print(f"Failed to download logo: {e}")
+            logger.debug(f"Failed to download logo: {e}")
             return ""
 
 
