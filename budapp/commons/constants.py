@@ -682,8 +682,13 @@ APP_ICONS = {
         "model_mono": "icons/general/model_mono.png",
         "cluster_mono": "icons/general/cluster_mono.png",
         "deployment_mono": "icons/general/deployment_mono.png",
-    }
+        "default_url_model": "icons/general/default_url_model.png",
+        "default_disk_model": "icons/general/default_disk_model.png",
+    },
+    "providers": {"default_hugging_face_model": "icons/providers/huggingface.png"},
 }
+
+HF_AUTHORS_DIR = "hf_authors"
 
 EMOJIS = [
     "😀",
