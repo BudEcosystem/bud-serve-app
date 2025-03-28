@@ -2622,6 +2622,13 @@ BENCHMARK_FIELDS_LABEL_MAPPER = {
     "lmsys_areana": "LMSYS Areana",
     "bcfl": "BCFL",
     "live_code_bench": "Live Code Bench",
+    "lc_win_rate": "LC Win Rate",
+    "win_rate": "Win Rate",
+    "ugi_score": "UGI Score",
+    "w_10_score": "W/10 Score",
+    "unruly_score": "Unruly Score",
+    "internet_score": "Internet Score",
+    "polcontro_score": "Polcontro Score",
 }
 
 

@@ -886,6 +886,8 @@ class TopLeaderboardRequest(BaseModel):
 
     benchmarks: list[
         Literal[
+            "lc_win_rate",
+            "win_rate",
             "bcfl",
             "live_code_bench",
             "classification",
@@ -895,7 +897,7 @@ class TopLeaderboardRequest(BaseModel):
             "retrieval",
             "semantic",
             "summarization",
-            "mmbench",
+            "ugi_score" "w_10_score" "unruly_score" "internet_score" "polcontro_score" "mmbench",
             "mmstar",
             "mmmu",
             "math_vista",
