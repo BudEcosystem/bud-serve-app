@@ -2601,6 +2601,13 @@ BENCHMARK_FIELDS_TYPE_MAPPER = {
     "lmsys_areana": "Human Preference",
     "bcfl": "Tool Use",
     "live_code_bench": "Code Generation",
+    "lc_win_rate": "Instruction Following",
+    "win_rate": "Instruction Following",  # not there in excel sheet
+    "ugi_score": "Uncensored",
+    "w_10_score": "Uncensored",  # not there in excel sheet
+    "unruly_score": "Uncensored",  # not there in excel sheet
+    "internet_score": "Uncensored",  # not there in excel sheet
+    "polcontro_score": "Uncensored",  # not there in excel sheet
 }
 
 BENCHMARK_FIELDS_LABEL_MAPPER = {
@@ -2622,13 +2629,13 @@ BENCHMARK_FIELDS_LABEL_MAPPER = {
     "lmsys_areana": "LMSYS Areana",
     "bcfl": "BCFL",
     "live_code_bench": "Live Code Bench",
-    "lc_win_rate": "LC Win Rate",
-    "win_rate": "Win Rate",
-    "ugi_score": "UGI Score",
-    "w_10_score": "W/10 Score",
-    "unruly_score": "Unruly Score",
-    "internet_score": "Internet Score",
-    "polcontro_score": "Polcontro Score",
+    "lc_win_rate": "AlpacaEval2.0",
+    "win_rate": "Win Rate",  # not there in excel sheet
+    "ugi_score": "UGI",
+    "w_10_score": "W/10 Score",  # not there in excel sheet
+    "unruly_score": "Unruly Score",  # not there in excel sheet
+    "internet_score": "Internet Score",  # not there in excel sheet
+    "polcontro_score": "Polcontro Score",  # not there in excel sheet
 }
 
 
