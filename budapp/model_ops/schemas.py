@@ -603,7 +603,6 @@ class Leaderboard(BaseModel):
 
     # APAC Eval Leaderboard fields
     lc_win_rate: float | None = None
-    win_rate: float | None = None
 
     # Berkeley Leaderboard fields
     bcfl: float | None = None
@@ -622,13 +621,6 @@ class Leaderboard(BaseModel):
 
     # UGI Leaderboard fields (with _score suffixes)
     ugi_score: float | None = None
-    w_10_score: float | None = None
-    # i_10_score: str | None = None  # TODO: Uncomment this column when scraper bug is fixed
-    unruly_score: float | None = None
-    internet_score: float | None = None
-    # stats_score: str | None = None  # TODO: Uncomment this column when scraper bug is fixed
-    # writing_score: str | None = None  # TODO: Uncomment this column when scraper bug is fixed
-    polcontro_score: float | None = None
 
     # VLLM Leaderboard fields
     mmbench: float | None = None
@@ -887,7 +879,6 @@ class TopLeaderboardRequest(BaseModel):
     benchmarks: list[
         Literal[
             "lc_win_rate",
-            "win_rate",
             "bcfl",
             "live_code_bench",
             "classification",
@@ -898,10 +889,6 @@ class TopLeaderboardRequest(BaseModel):
             "semantic",
             "summarization",
             "ugi_score",
-            "w_10_score",
-            "unruly_score",
-            "internet_score",
-            "polcontro_score",
             "mmbench",
             "mmstar",
             "mmmu",
