@@ -2601,6 +2601,8 @@ BENCHMARK_FIELDS_TYPE_MAPPER = {
     "lmsys_areana": "Human Preference",
     "bcfl": "Tool Use",
     "live_code_bench": "Code Generation",
+    "lc_win_rate": "Instruction Following",
+    "ugi_score": "Uncensored",
 }
 
 BENCHMARK_FIELDS_LABEL_MAPPER = {
@@ -2622,6 +2624,8 @@ BENCHMARK_FIELDS_LABEL_MAPPER = {
     "lmsys_areana": "LMSYS Areana",
     "bcfl": "BCFL",
     "live_code_bench": "Live Code Bench",
+    "lc_win_rate": "AlpacaEval2.0",
+    "ugi_score": "UGI",
 }
 
 

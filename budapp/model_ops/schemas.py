@@ -601,6 +601,9 @@ class ModelFilter(BaseModel):
 class Leaderboard(BaseModel):
     """Leaderboard schema."""
 
+    # APAC Eval Leaderboard fields
+    lc_win_rate: float | None = None
+
     # Berkeley Leaderboard fields
     bcfl: float | None = None
 
@@ -615,6 +618,9 @@ class Leaderboard(BaseModel):
     retrieval: float | None = None
     semantic: float | None = None
     summarization: float | None = None
+
+    # UGI Leaderboard fields (with _score suffixes)
+    ugi_score: float | None = None
 
     # VLLM Leaderboard fields
     mmbench: float | None = None
@@ -872,6 +878,7 @@ class TopLeaderboardRequest(BaseModel):
 
     benchmarks: list[
         Literal[
+            "lc_win_rate",
             "bcfl",
             "live_code_bench",
             "classification",
@@ -881,6 +888,7 @@ class TopLeaderboardRequest(BaseModel):
             "retrieval",
             "semantic",
             "summarization",
+            "ugi_score",
             "mmbench",
             "mmstar",
             "mmmu",
@@ -901,12 +909,14 @@ class TopLeaderboardRequest(BaseModel):
             raise ValueError("Benchmarks are required")
         return self
 
+
 class QuantizeConfig(BaseModel):
     """Quantize config schema."""
 
     bit: Literal[8, 4, 2]
     granularity: Literal["per_tensor", "per_channel", "per_group", "per_head", "per_token"]
     symmetric: bool
+
 
 class QuantizeModelWorkflowRequest(BaseModel):
     """Quantize model workflow request schema."""
@@ -951,6 +961,7 @@ class QuantizeModelWorkflowStepData(BaseModel):
     quantization_data: dict | None = None
     quantized_model_id: UUID4 | None = None
 
+
 class QuantizationMethod(BaseModel):
     """Quantization method schema."""
 
@@ -962,10 +973,12 @@ class QuantizationMethod(BaseModel):
     method_type: list[str]
     runtime_hardware_support: list[str]
 
+
 class QuantizationMethodResponse(PaginatedSuccessResponse):
     """Quantization method response schema."""
 
     quantization_methods: list[QuantizationMethod] = []
+
 
 class QuantizationMethodFilter(BaseModel):
     """Quantization method filter schema."""
