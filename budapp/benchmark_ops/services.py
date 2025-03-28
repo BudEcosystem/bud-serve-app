@@ -40,8 +40,8 @@ from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
-from .models import BenchmarkCRUD, BenchmarkSchema
-from .schemas import RunBenchmarkWorkflowRequest, RunBenchmarkWorkflowStepData
+from .models import BenchmarkCRUD, BenchmarkRequestMetricsCRUD, BenchmarkRequestMetricsSchema, BenchmarkSchema
+from .schemas import AddRequestMetricsRequest, RunBenchmarkWorkflowRequest, RunBenchmarkWorkflowStepData
 
 
 logger = logging.get_logger(__name__)
@@ -571,3 +571,14 @@ class BenchmarkService(SessionMixin):
                 field2: row[3],
             })
         return analysis_data_list
+
+
+class BenchmarkRequestMetricsService(SessionMixin):
+    """Benchmark request metrics service."""
+
+    async def add_request_metrics(self, request: AddRequestMetricsRequest) -> None:
+        """Add request metrics."""
+        if request.metrics:
+            metrics_data = [BenchmarkRequestMetricsSchema(**metric.model_dump(mode="json")) for metric in request.metrics]
+            with BenchmarkRequestMetricsCRUD() as crud:
+                crud.bulk_insert(metrics_data, session=self.session)

@@ -38,8 +38,8 @@ from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
-from .schemas import BenchmarkFilter, BenchmarkPaginatedResponse, RunBenchmarkWorkflowRequest
-from .services import BenchmarkService
+from .schemas import AddRequestMetricsRequest, BenchmarkFilter, BenchmarkPaginatedResponse, RunBenchmarkWorkflowRequest
+from .services import BenchmarkService, BenchmarkRequestMetricsService
 
 
 logger = logging.get_logger(__name__)
@@ -275,6 +275,48 @@ async def get_field1_vs_field2_data(
         logger.exception(f"Failed to fetch {field1} vs {field2} data: {e}")
         response = ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=f"Failed to fetch {field1} vs {field2} data: {e}"
+        )
+
+    return response.to_http_response()
+
+
+@benchmark_router.post(
+    "/request-metrics",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully added request metrics",
+        },
+    },
+    description="Add request metrics",
+)
+async def add_request_metrics(
+    session: Annotated[Session, Depends(get_session)],
+    request: AddRequestMetricsRequest,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Add request metrics."""
+    try:
+        await BenchmarkRequestMetricsService(session).add_request_metrics(request)
+        response = SuccessResponse(
+            object="benchmark.request.metrics",
+            param=None,
+            message="Successfully added request metrics",
+        )
+    except ValueError as e:
+        logger.exception(f"Failed to add request metrics: {e}")
+        response = ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=str(e))
+    except Exception as e:
+        logger.exception(f"Failed to add request metrics: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add request metrics"
         )
 
     return response.to_http_response()
