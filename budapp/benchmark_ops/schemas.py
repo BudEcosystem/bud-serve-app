@@ -176,3 +176,23 @@ class BenchmarkResultResponse(BaseModel):
     max_e2el_ms: float
     created_at: datetime
     modified_at: datetime
+
+
+class BenchmarkRequestMetrics(BaseModel):
+    benchmark_id: UUID
+    dataset_id: UUID | None = None
+    latency: float | None = None
+    success: bool | None = None
+    error: str | None = None
+    prompt_len: int | None = None
+    output_len: int | None = None
+    req_output_throughput: float | None = None
+    ttft: float | None = None
+    tpot: float | None = None
+    itl: list | None = None
+
+    model_config = ConfigDict(extra="allow")
+
+
+class AddRequestMetricsRequest(BaseModel):
+    metrics: list[BenchmarkRequestMetrics]

@@ -3,6 +3,7 @@ from uuid import UUID, uuid4
 
 from budmicroframe.shared.psql_service import CRUDMixin, PSQLBase, TimestampMixin
 from sqlalchemy import (
+    Boolean,
     Enum,
     Float,
     ForeignKey,
@@ -62,6 +63,7 @@ class BenchmarkSchema(PSQLBase, TimestampMixin):
     model: Mapped["Model"] = relationship("Model", back_populates="benchmarks")
     cluster: Mapped["Cluster"] = relationship("Cluster", back_populates="benchmarks")
     user: Mapped["User"] = relationship("User", back_populates="benchmarks")
+    request_metrics: Mapped[list["BenchmarkRequestMetricsSchema"]] = relationship("BenchmarkRequestMetricsSchema", back_populates="benchmark")
 
 
 class BenchmarkCRUD(CRUDMixin[BenchmarkSchema, None, None]):
@@ -202,3 +204,33 @@ class BenchmarkCRUD(CRUDMixin[BenchmarkSchema, None, None]):
         result = self.scalars_all(stmt)
 
         return result, count
+
+
+class BenchmarkRequestMetricsSchema(PSQLBase, TimestampMixin):
+    """BenchmarkRequestMetricsSchema model."""
+
+    __tablename__ = "benchmark_request_metrics"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    benchmark_id: Mapped[UUID] = mapped_column(ForeignKey("benchmark.id", ondelete="CASCADE"), nullable=False)
+    dataset_id: Mapped[UUID] = mapped_column(ForeignKey("dataset.id"), nullable=True)
+
+    # benchmark results
+    latency: Mapped[float] = mapped_column(Float, nullable=True)
+    success: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    error: Mapped[str] = mapped_column(String, nullable=True)
+    prompt_len: Mapped[int] = mapped_column(Integer, nullable=False)
+    output_len: Mapped[int] = mapped_column(Integer, nullable=True)
+    req_output_throughput: Mapped[float] = mapped_column(Float, nullable=True)
+    ttft: Mapped[float] = mapped_column(Float, nullable=True)
+    tpot: Mapped[float] = mapped_column(Float, nullable=True)
+    itl: Mapped[list] = mapped_column(JSONB, nullable=True)
+
+    benchmark: Mapped["BenchmarkSchema"] = relationship("BenchmarkSchema", back_populates="request_metrics")
+
+
+class BenchmarkRequestMetricsCRUD(CRUDMixin[BenchmarkRequestMetricsSchema, None, None]):
+    __model__ = BenchmarkRequestMetricsSchema
+
+    def __init__(self):
+        """Initialize benchmark request metrics crud methods."""
+        super().__init__(model=self.__model__)
