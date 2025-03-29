@@ -27,6 +27,7 @@ from fastapi import status
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.schemas import BudNotificationMetadata
+from budapp.model_ops.schemas import Model
 from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.models import Project as ProjectModel
 
@@ -37,16 +38,18 @@ from ..commons.config import app_settings
 from ..commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
+    BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     EndpointStatusEnum,
     ModelProviderTypeEnum,
+    ModelStatusEnum,
     NotificationTypeEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
 from ..commons.exceptions import ClientException, RedisException
 from ..core.schemas import NotificationPayload, NotificationResult
-from ..model_ops.crud import ProviderDataManager
+from ..model_ops.crud import ModelDataManager, ProviderDataManager
 from ..model_ops.models import Provider as ProviderModel
 from ..model_ops.services import ModelService, ModelServiceUtil
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
@@ -58,7 +61,15 @@ from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .crud import EndpointDataManager
 from .models import Endpoint as EndpointModel
-from .schemas import AddWorkerRequest, AddWorkerWorkflowStepData, EndpointCreate, ModelClusterDetail, WorkerInfoFilter
+from .schemas import (
+    AddAdapterRequest,
+    AddAdapterWorkflowStepData,
+    AddWorkerRequest,
+    AddWorkerWorkflowStepData,
+    EndpointCreate,
+    ModelClusterDetail,
+    WorkerInfoFilter,
+)
 
 
 logger = logging.get_logger(__name__)
@@ -1347,3 +1358,250 @@ class EndpointService(SessionMixin):
             .build()
         )
         await BudNotifyService().send_notification(notification_request)
+
+    async def add_adapter_workflow(self, current_user_id: UUID, request: AddAdapterRequest) -> None:
+        """Add adapter workflow."""
+
+        step_number = request.step_number
+        workflow_id = request.workflow_id
+        workflow_total_steps = request.workflow_total_steps
+        endpoint_id = request.endpoint_id
+        adapter_name = request.adapter_name
+        adapter_model_id = request.adapter_model_id
+        trigger_workflow = request.trigger_workflow
+
+        current_step_number = step_number
+
+        # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.LOCAL_MODEL_QUANTIZATION,
+            title="Add Adapter",
+            total_steps=workflow_total_steps,
+            icon=APP_ICONS["general"]["deployment_mono"],
+            tag="Deployment",
+        )
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id, workflow_create, current_user_id
+        )
+
+        # Validate endpoint id
+        project_id = None
+        if endpoint_id:
+            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel, {"id": endpoint_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+            )
+
+            # Get icon from provider or model
+            if db_endpoint.model.provider_type in [
+                ModelProviderTypeEnum.CLOUD_MODEL,
+                ModelProviderTypeEnum.HUGGING_FACE,
+            ]:
+                db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                    ProviderModel, {"id": db_endpoint.model.provider_id}
+                )
+                model_icon = db_provider.icon
+            else:
+                model_icon = db_endpoint.model.icon
+
+            # Update title, icon and tag on workflow
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"title": db_endpoint.name, "icon": model_icon, "tag": db_endpoint.project.name},
+            )
+
+            # Assign project_id
+            project_id = db_endpoint.project_id
+
+        #validate base model id
+        if adapter_model_id:
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model,
+                {
+                    "id": adapter_model_id,
+                    "status": ModelStatusEnum.ACTIVE,
+                    "base_model_relation": BaseModelRelationEnum.ADAPTER,
+                    "base_model": [db_endpoint.model_id],
+                }
+            )
+            if not db_model:
+                raise ClientException("Adapter model not found")
+
+        if adapter_name:
+            #TODO: validate adapter name to be unique
+            logger.info(f"Adapter name: {adapter_name}")
+
+        # Prepare workflow step data
+        workflow_step_data = AddAdapterWorkflowStepData(
+            endpoint_id=endpoint_id,
+            project_id=project_id,
+            adapter_name=adapter_name,
+            adapter_model_id=adapter_model_id,
+        ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+
+        # NOTE: If endpoint_id is provided, then need to add project_id to workflow step data
+        # Required for frontend integration
+        if endpoint_id:
+            workflow_step_data["project_id"] = str(project_id)
+
+        # Get workflow steps
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": db_workflow.id}
+        )
+
+        # For avoiding another db call for record retrieval, storing db object while iterating over db_workflow_steps
+        db_current_workflow_step = None
+
+        if db_workflow_steps:
+            for db_step in db_workflow_steps:
+                # Get current workflow step
+                if db_step.step_number == current_step_number:
+                    db_current_workflow_step = db_step
+
+        if db_current_workflow_step:
+            logger.info(f"Workflow {db_workflow.id} step {current_step_number} already exists")
+
+            # Update workflow step data in db
+            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                db_current_workflow_step,
+                {"data": workflow_step_data},
+            )
+            logger.info(f"Workflow {db_workflow.id} step {current_step_number} updated")
+        else:
+            logger.info(f"Creating workflow step {current_step_number} for workflow {db_workflow.id}")
+
+            # Insert step details in db
+            db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+                WorkflowStepModel(
+                    workflow_id=db_workflow.id,
+                    step_number=current_step_number,
+                    data=workflow_step_data,
+                )
+            )
+
+        # Update workflow current step as the highest step_number
+        db_max_workflow_step_number = max(step.step_number for step in db_workflow_steps) if db_workflow_steps else 0
+        workflow_current_step = max(current_step_number, db_max_workflow_step_number)
+        logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
+
+        # This will ensure workflow step number is updated to the latest step number
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": workflow_current_step},
+        )
+
+        # Trigger workflow
+        if trigger_workflow:
+            # query workflow steps again to get latest data
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": db_workflow.id}
+            )
+
+            # Define the keys required for model extraction
+            keys_of_interest = [
+                "endpoint_id",
+                "adapter_name",
+                "adapter_model_id"
+            ]
+
+            # from workflow steps extract necessary information
+            required_data = {}
+            for db_workflow_step in db_workflow_steps:
+                for key in keys_of_interest:
+                    if key in db_workflow_step.data:
+                        required_data[key] = db_workflow_step.data[key]
+
+            # Check if all required keys are present
+            required_keys = ["endpoint_id", "adapter_name", "adapter_model_id"]
+            missing_keys = [key for key in required_keys if key not in required_data]
+            if missing_keys:
+                raise ClientException(f"Missing required data for add worker to deployment: {', '.join(missing_keys)}")
+
+            # Get base model
+            required_data["adapter_model_uri"] = db_model.local_path
+            required_data["simulator_id"] = str(db_endpoint.cluster_id)
+            required_data["cluster_id"] = str(db_endpoint.cluster_id)
+            required_data["namespace"] = db_endpoint.namespace
+            required_data["endpoint_name"] = db_endpoint.name
+
+            db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+                ClusterModel, {"id": db_endpoint.cluster_id}
+            )
+            required_data["ingress_url"] = db_cluster.ingress_url
+
+            try:
+                # Perform model quantization
+                await self._trigger_adapter_deployment(
+                    current_step_number, required_data, db_workflow, current_user_id
+                )
+            except ClientException as e:
+                raise e
+
+        return db_workflow
+
+    async def _trigger_adapter_deployment(self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID) -> Dict:
+        """Trigger adapter deployment."""
+
+        # Create request payload
+        payload = {
+            "endpoint_name": data["endpoint_name"],
+            "ingress_url": data["ingress_url"],
+            "adapter_path": data["adapter_model_uri"],
+            "adapters": data["adapters"],
+            "namespace": data["namespace"],
+            "simulator_id": data["simulator_id"],
+            "cluster_id": str(data["cluster_id"]),
+            "notification_metadata": {
+                "name": BUD_INTERNAL_WORKFLOW,
+                "subscriber_ids": str(current_user_id),
+                "workflow_id": str(db_workflow.id),
+            },
+            "source_topic": f"{app_settings.source_topic}",
+        }
+
+        # Perform adapter deployment request
+        deployment_response = await self._perform_adapter_deployment_request(payload)
+
+        # Add payload dict to response
+        for step in deployment_response["steps"]:
+            step["payload"] = {}
+
+        deployment_events = {BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value: deployment_response}
+
+        current_step_number = current_step_number + 1
+        workflow_current_step = current_step_number
+
+        # Update or create next workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, deployment_events
+        )
+        logger.debug(f"Workflow step created with id {db_workflow_step.id}")
+
+        # Update progress in workflow
+        deployment_response["progress_type"] = BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": deployment_response, "current_step": workflow_current_step}
+        )
+
+    async def _perform_adapter_deployment_request(
+        self, payload: Dict
+    ) -> None:
+        """Perform adapter deployment request."""
+
+        quantize_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/add-adapter"
+        )
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(quantize_endpoint, json=payload) as response:
+                    response_data = await response.json()
+                    if response.status >= 400 or response_data.get("object") == "error":
+                        logger.error(f"Failed to perform adapter deployment request: {response_data}")
+                        raise ClientException("Unable to perform adapter deployment")
+
+                    return response_data
+        except ClientException as e:
+            raise e
+        except Exception as e:
+            logger.error(f"Failed to perform adapter deployment request: {e}")
+            raise ClientException("Unable to perform adapter quantization") from e

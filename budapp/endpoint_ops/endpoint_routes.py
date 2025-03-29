@@ -36,6 +36,7 @@ from ..commons.schemas import ErrorResponse, SuccessResponse
 from ..workflow_ops.schemas import RetrieveWorkflowDataResponse
 from ..workflow_ops.services import WorkflowService
 from .schemas import (
+    AddAdapterRequest,
     AddWorkerRequest,
     DeleteWorkerRequest,
     EndpointFilter,
@@ -442,5 +443,45 @@ async def add_worker_to_endpoint(
         logger.exception(f"Failed to add worker to endpoint: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add worker to endpoint"
+        ).to_http_response()
+
+@endpoint_router.post(
+    "/add-adapter",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RetrieveWorkflowDataResponse,
+            "description": "Successfully updated Add Adapter workflow",
+        },
+    },
+    description="Add worker to endpoint",
+)
+async def add_adapter_to_endpoint(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: AddAdapterRequest,
+) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
+    """Add worker to endpoint."""
+    try:
+        db_workflow = await EndpointService(session).add_adapter_workflow(
+            current_user_id=current_user.id,
+            request=request,
+        )
+
+        return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
+    except ClientException as e:
+        logger.exception(f"Failed to add adapter to endpoint: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to add adapter to endpoint: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add adapter to endpoint"
         ).to_http_response()
 
