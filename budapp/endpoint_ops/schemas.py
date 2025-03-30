@@ -22,7 +22,7 @@ from uuid import UUID
 from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator
 
 from budapp.cluster_ops.schemas import ClusterResponse
-from budapp.commons.constants import EndpointStatusEnum
+from budapp.commons.constants import AdapterStatusEnum, EndpointStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from budapp.model_ops.schemas import ModelDetailResponse, ModelResponse
 
@@ -253,3 +253,25 @@ class AddAdapterWorkflowStepData(BaseModel):
     project_id: UUID4 | None = None
     adapter_name: str | None = None
     adapter_model_id: UUID4 | None = None
+
+class AdapterFilter(BaseModel):
+    """Adapter filter."""
+
+    name: str | None = None
+    status: AdapterStatusEnum | None = None
+
+
+class AdapterResponse(BaseModel):
+    """Adapter response."""
+
+    id: UUID4
+    name: str
+    status: AdapterStatusEnum
+    model: ModelResponse
+    created_at: datetime
+
+
+class AdapterPaginatedResponse(PaginatedSuccessResponse):
+    """Adapter paginated response."""
+
+    adapters: list[AdapterResponse] = []

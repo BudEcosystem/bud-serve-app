@@ -60,7 +60,8 @@ from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
-from .crud import EndpointDataManager
+from .crud import AdapterDataManager, EndpointDataManager
+from .models import Adapter as AdapterModel
 from .models import Endpoint as EndpointModel
 from .schemas import (
     AddAdapterRequest,
@@ -1375,7 +1376,7 @@ class EndpointService(SessionMixin):
 
         # Retrieve or create workflow
         workflow_create = WorkflowUtilCreate(
-            workflow_type=WorkflowTypeEnum.LOCAL_MODEL_QUANTIZATION,
+            workflow_type=WorkflowTypeEnum.ADD_ADAPTER,
             title="Add Adapter",
             total_steps=workflow_total_steps,
             icon=APP_ICONS["general"]["deployment_mono"],
@@ -1528,7 +1529,7 @@ class EndpointService(SessionMixin):
             required_data["simulator_id"] = str(db_endpoint.cluster_id)
             required_data["namespace"] = db_endpoint.namespace
             required_data["endpoint_name"] = db_endpoint.name
-            required_data["adapters"] = []
+            required_data["adapters"] = await self._get_adapters_by_endpoint(db_endpoint.id)
 
             db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
                 ClusterModel, {"id": db_endpoint.cluster_id}
@@ -1545,6 +1546,13 @@ class EndpointService(SessionMixin):
                 raise e
 
         return db_workflow
+
+    async def _get_adapters_by_endpoint(self, endpoint_id: UUID) -> List[AdapterModel]:
+        db_adapters, _ = await self.get_adapters_by_endpoint(endpoint_id)
+
+        adapters = [{"name": adapter.name, "artifactURL": adapter.model.local_path} for adapter in db_adapters]
+
+        return adapters
 
     async def _trigger_adapter_deployment(self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID) -> Dict:
         """Trigger adapter deployment."""
@@ -1611,3 +1619,29 @@ class EndpointService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to perform adapter deployment request: {e}")
             raise ClientException("Unable to perform adapter quantization") from e
+    
+    async def get_adapters_by_endpoint(
+        self,
+        endpoint_id: UUID,
+        filters: Dict[str, Any] = {},
+        offset: int = 0,
+        limit: int = 10,
+        order_by: List[Tuple[str, str]] = [],
+        search: bool = False
+    ) -> List[AdapterModel]:
+        """Get all active adapters for a given endpoint.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+            filters (Dict[str, Any], optional): Filters to apply. Defaults to {}.
+            offset (int, optional): The offset for pagination. Defaults to 0.
+            limit (int, optional): The limit for pagination. Defaults to 10.
+            order_by (List[Tuple[str, str]], optional): The order by conditions. Defaults to [].
+            search (bool, optional): Whether to perform a search. Defaults to False.
+
+        Returns:
+            List[AdapterModel]: A list of active adapters.
+        """
+        return await AdapterDataManager(self.session).get_all_active_adapters(
+            endpoint_id, offset, limit, filters, order_by, search
+        )

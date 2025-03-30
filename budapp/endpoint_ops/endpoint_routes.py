@@ -36,6 +36,8 @@ from ..commons.schemas import ErrorResponse, SuccessResponse
 from ..workflow_ops.schemas import RetrieveWorkflowDataResponse
 from ..workflow_ops.services import WorkflowService
 from .schemas import (
+    AdapterFilter,
+    AdapterPaginatedResponse,
     AddAdapterRequest,
     AddWorkerRequest,
     DeleteWorkerRequest,
@@ -485,3 +487,59 @@ async def add_adapter_to_endpoint(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add adapter to endpoint"
         ).to_http_response()
 
+
+@endpoint_router.get(
+    "/{endpoint_id}/adapters",
+    responses={
+        status.HTTP_200_OK: {
+            "model": AdapterPaginatedResponse,
+            "description": "Successfully get endpoint adapters",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to get endpoint workers",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Endpoint not found",
+        },
+    },
+    description="Get endpoint adapters",
+)
+async def get_endpoint_adapters(
+    endpoint_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[AdapterFilter, Depends()],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = Query(False),
+) -> Union[AdapterPaginatedResponse, ErrorResponse]:
+    """Get endpoint adapters."""
+    offset = (page - 1) * limit
+
+    # Construct filters
+    filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True)
+
+    try:
+        adapters, count = await EndpointService(session).get_adapters_by_endpoint(
+            endpoint_id, filters_dict, offset, limit, order_by, search
+        )
+        response = AdapterPaginatedResponse(
+            adapters=adapters,
+            total_record=count,
+            page=page,
+            limit=limit,
+            object="adapters.list",
+            code=status.HTTP_200_OK,
+            message="Successfully list all adapters",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to get endpoint adapters: {e}")
+        response = ErrorResponse(message=e.message, code=e.status_code)
+    except Exception as e:
+        logger.exception(f"Failed to get endpoint adapters: {e}")
+        response = ErrorResponse(message="Failed to get endpoint adapters", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return response.to_http_response()

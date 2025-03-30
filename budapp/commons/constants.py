@@ -423,6 +423,7 @@ class WorkflowTypeEnum(StrEnum):
     LICENSE_FAQ_FETCH = auto()
     LOCAL_MODEL_QUANTIZATION = auto()
     MODEL_BENCHMARK = auto()
+    ADD_ADAPTER = auto()
 
 
 class NotificationType(Enum):
@@ -519,6 +520,27 @@ class ClusterStatusEnum(StrEnum):
 
 class EndpointStatusEnum(StrEnum):
     """Status for endpoint.
+
+    Attributes:
+        RUNNING: Represents the running endpoint status.
+        FAILURE: Represents the failure endpoint status.
+        DEPLOYING: Represents the deploying endpoint status.
+        UNHEALTHY: Represents the unhealthy endpoint status.
+        DELETING: Represents the deleting endpoint status.
+        DELETED: Represents the deleted endpoint status.
+        PENDING: Represents the pending endpoint status.
+    """
+
+    RUNNING = auto()
+    FAILURE = auto()
+    DEPLOYING = auto()
+    UNHEALTHY = auto()
+    DELETING = auto()
+    DELETED = auto()
+    PENDING = auto()
+
+class AdapterStatusEnum(StrEnum):
+    """Adapter status types.
 
     Attributes:
         RUNNING: Represents the running endpoint status.

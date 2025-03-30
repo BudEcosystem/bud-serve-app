@@ -112,6 +112,7 @@ class Model(Base, TimestampMixin):
     recommended_cluster_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     endpoints: Mapped[list["Endpoint"]] = relationship(back_populates="model")
+    adapters: Mapped[list["Adapter"]] = relationship(back_populates="model")
     benchmarks: Mapped[list["BenchmarkSchema"]] = relationship(back_populates="model")
     created_user: Mapped["User"] = relationship(back_populates="created_models", foreign_keys=[created_by])
     paper_published: Mapped[List["PaperPublished"]] = relationship("PaperPublished", back_populates="model")
