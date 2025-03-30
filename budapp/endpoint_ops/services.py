@@ -50,6 +50,7 @@ from ..commons.constants import (
 from ..commons.exceptions import ClientException, RedisException
 from ..core.schemas import NotificationPayload, NotificationResult
 from ..model_ops.crud import ModelDataManager, ProviderDataManager
+from ..model_ops.models import Model as ModelsModel
 from ..model_ops.models import Provider as ProviderModel
 from ..model_ops.services import ModelService, ModelServiceUtil
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
@@ -1415,12 +1416,12 @@ class EndpointService(SessionMixin):
         #validate base model id
         if adapter_model_id:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                Model,
+                ModelsModel,
                 {
                     "id": adapter_model_id,
                     "status": ModelStatusEnum.ACTIVE,
                     "base_model_relation": BaseModelRelationEnum.ADAPTER,
-                    "base_model": [db_endpoint.model_id],
+                    # "base_model": [db_endpoint.model_id],
                 }
             )
             if not db_model:
@@ -1516,17 +1517,24 @@ class EndpointService(SessionMixin):
             if missing_keys:
                 raise ClientException(f"Missing required data for add worker to deployment: {', '.join(missing_keys)}")
 
+            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel, {"id": required_data["endpoint_id"]}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+            )
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                ModelsModel,{"id": required_data["adapter_model_id"]}
+            )
             # Get base model
             required_data["adapter_model_uri"] = db_model.local_path
             required_data["simulator_id"] = str(db_endpoint.cluster_id)
-            required_data["cluster_id"] = str(db_endpoint.cluster_id)
             required_data["namespace"] = db_endpoint.namespace
             required_data["endpoint_name"] = db_endpoint.name
+            required_data["adapters"] = []
 
             db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
                 ClusterModel, {"id": db_endpoint.cluster_id}
             )
             required_data["ingress_url"] = db_cluster.ingress_url
+            required_data["cluster_id"] = str(db_cluster.cluster_id)
 
             try:
                 # Perform model quantization
@@ -1540,7 +1548,6 @@ class EndpointService(SessionMixin):
 
     async def _trigger_adapter_deployment(self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID) -> Dict:
         """Trigger adapter deployment."""
-
         # Create request payload
         payload = {
             "endpoint_name": data["endpoint_name"],
@@ -1586,7 +1593,6 @@ class EndpointService(SessionMixin):
         self, payload: Dict
     ) -> None:
         """Perform adapter deployment request."""
-
         quantize_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/add-adapter"
         )

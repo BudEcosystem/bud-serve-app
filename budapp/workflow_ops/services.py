@@ -47,6 +47,7 @@ from ..cluster_ops.crud import ClusterDataManager
 from ..cluster_ops.models import Cluster as ClusterModel
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..endpoint_ops.schemas import AddAdapterWorkflowStepData
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
 from .crud import WorkflowDataManager, WorkflowStepDataManager
@@ -134,6 +135,7 @@ class WorkflowService(SessionMixin):
             quantization_simulation_events = required_data.get(
                 BudServeWorkflowStepEventName.QUANTIZATION_SIMULATION_EVENTS.value
             )
+            adapter_deployment_events = required_data.get(BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value)
             security_scan_result_id = required_data.get("security_scan_result_id")
             icon = required_data.get("icon")
             uri = required_data.get("uri")
@@ -150,6 +152,7 @@ class WorkflowService(SessionMixin):
             credential_id = required_data.get("credential_id")
             user_confirmation = required_data.get("user_confirmation")
             run_as_simulation = required_data.get("run_as_simulation")
+            adapter_model_id = required_data.get("adapter_model_id")
 
             quantization_config = QuantizeModelWorkflowStepData(
                 model_id=model_id,
@@ -164,6 +167,12 @@ class WorkflowService(SessionMixin):
                 quantization_data=required_data.get("quantization_data"),
                 quantized_model_id=required_data.get("quantized_model_id"),
             ) if quantized_model_name else None
+
+            adapter_config = AddAdapterWorkflowStepData(
+                adapter_model_id=adapter_model_id,
+                adapter_name=required_data.get("adapter_name"),
+                endpoint_id=required_data.get("endpoint_id")
+            ) if adapter_model_id else None
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -263,6 +272,8 @@ class WorkflowService(SessionMixin):
                 credential_id=credential_id,
                 user_confirmation=user_confirmation,
                 run_as_simulation=run_as_simulation,
+                adapter_config=adapter_config if adapter_config else None,
+                adapter_deployment_events=adapter_deployment_events if adapter_deployment_events else None
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -373,6 +384,12 @@ class WorkflowService(SessionMixin):
                 "credential_id",
                 "user_confirmation",
                 "run_as_simulation",
+            ],
+            "add_adapter": [
+                "adapter_model_id",
+                "adapter_name",
+                "endpoint_id",
+                BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value,
             ]
         }
 

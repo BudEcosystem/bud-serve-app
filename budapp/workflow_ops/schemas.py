@@ -6,7 +6,7 @@ from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Ta
 
 from ..cluster_ops.schemas import ClusterResponse
 from ..commons.constants import ModelProviderTypeEnum, VisibilityEnum, WorkflowStatusEnum, WorkflowTypeEnum
-from ..endpoint_ops.schemas import EndpointResponse
+from ..endpoint_ops.schemas import AddAdapterWorkflowStepData, EndpointResponse
 from ..model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider, QuantizeModelWorkflowStepData
 from ..project_ops.schemas import ProjectResponse
 
@@ -57,6 +57,8 @@ class RetrieveWorkflowStepData(BaseModel):
     credential_id: UUID4 | None = None
     user_confirmation: bool | None = None
     run_as_simulation: bool | None = None
+    adapter_config: AddAdapterWorkflowStepData | None = None
+    adapter_deployment_events: dict | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
