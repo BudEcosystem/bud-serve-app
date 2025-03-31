@@ -588,3 +588,80 @@ class BenchmarkRequestMetricsService(SessionMixin):
             metrics_data = [BenchmarkRequestMetricsSchema(**metric.model_dump(mode="json")) for metric in request.metrics]
             with BenchmarkRequestMetricsCRUD() as crud:
                 crud.bulk_insert(metrics_data, session=self.session)
+
+    def _get_distribution_bins(self, distribution_type: str, dataset_id: UUID, benchmark_id: Optional[UUID]=None, num_bins: int=10) -> list:
+        """Get distribution bins."""
+        bins = []
+        with BenchmarkRequestMetricsCRUD() as crud:
+            params = {"dataset_id": dataset_id}
+            query = f"SELECT MAX({distribution_type}) FROM benchmark_request_metrics WHERE dataset_id = :dataset_id"
+            if benchmark_id:
+                query += " AND benchmark_id = :benchmark_id"
+                params["benchmark_id"] = benchmark_id
+            metrics_data = crud.execute_raw_query(
+                query=text(query),
+                params=params,
+            )
+        if metrics_data:
+            max_value = metrics_data[0][0]
+            bin_width = max_value / num_bins
+            bins = bins = [(i+1, round(i*bin_width, 1), round((i+1)*bin_width, 1)) for i in range(num_bins)]
+            # Adjust the bin range to make them exclusive
+            bins = [(bin_id, bin_start, bin_end + 0.1 if bin_id == num_bins else bin_end) for bin_id, bin_start, bin_end in bins]
+            print(bins)
+        return bins
+
+    async def get_dataset_distribution_metrics(self, distribution_type: str, dataset_id: UUID, benchmark_id: Optional[UUID]=None, num_bins: int=10) -> list:
+        """Get dataset distribution metrics."""
+        graph_data_list = []
+        # calculate distribution bins
+        bins = self._get_distribution_bins(distribution_type, dataset_id, benchmark_id, num_bins)
+
+        if not bins:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Dataset distribution not found: {dataset_id}",
+            )
+
+        with BenchmarkRequestMetricsCRUD() as crud:
+            params={"dataset_id": dataset_id}
+            query = f"""
+                    WITH bins AS (
+                        SELECT * FROM (VALUES
+                            {', '.join([f"({bin_id}, {bin_start}, {bin_end})" for bin_id, bin_start, bin_end in bins])}
+                        ) AS t(bin_id, bin_start, bin_end)
+                    )
+                    SELECT
+                        b.bin_id,
+                        b.bin_start || '-' || b.bin_end AS bin_range,
+                        ROUND(COALESCE(AVG(m.ttft)::numeric, 0), 2) AS avg_ttft,
+                        ROUND(COALESCE(AVG(m.tpot)::numeric, 0), 2) AS avg_tpot,
+                        ROUND(COALESCE(AVG(m.latency)::numeric, 0), 2) AS avg_latency
+                    FROM bins b
+                    LEFT JOIN benchmark_request_metrics m
+                        ON m.{distribution_type} >= b.bin_start
+                        AND m.{distribution_type} < b.bin_end
+                    WHERE m.dataset_id = :dataset_id AND m.success is true
+                """
+            if benchmark_id:
+                query += " AND m.benchmark_id = :benchmark_id"
+                params["benchmark_id"] = benchmark_id
+            query += """
+                    GROUP BY b.bin_id, b.bin_start, b.bin_end
+                    ORDER BY b.bin_id;
+                """
+            print(query)
+            graph_data = crud.execute_raw_query(
+                query=text(query),
+                params={"dataset_id": dataset_id, "benchmark_id": benchmark_id},
+            )
+            for row in graph_data:
+                graph_data_list.append({
+                    "bin_id": row[0],
+                    "bin_range": row[1],
+                    "avg_ttft": float(row[2]),
+                    "avg_tpot": float(row[3]),
+                    "avg_latency": float(row[4]),
+                })
+            print(graph_data_list)
+        return graph_data_list
