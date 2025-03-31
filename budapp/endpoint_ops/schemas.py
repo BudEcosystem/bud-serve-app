@@ -264,6 +264,8 @@ class AdapterFilter(BaseModel):
 class AdapterResponse(BaseModel):
     """Adapter response."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID4
     name: str
     status: AdapterStatusEnum

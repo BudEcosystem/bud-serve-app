@@ -1429,9 +1429,21 @@ class EndpointService(SessionMixin):
             if not db_model:
                 raise ClientException("Adapter model not found")
 
+            db_adapters = await AdapterDataManager(self.session).retrieve_by_fields(
+                AdapterModel, {"id": adapter_model_id, "endpoint_id": endpoint_id},
+                exclude_fields={"status": AdapterStatusEnum.DELETED}
+            )
+
+            if db_adapters:
+                raise ClientException("Adapter is already added in the endpoint")
+
         if adapter_name:
-            #TODO: validate adapter name to be unique
-            logger.info(f"Adapter name: {adapter_name}")
+            db_adapters = await AdapterDataManager(self.session).retrieve_by_fields(
+                AdapterModel, {"name": adapter_name, "endpoint_id": endpoint_id},
+                exclude_fields={"status": AdapterStatusEnum.DELETED}
+            )
+            if db_adapters:
+                raise ClientException("Adapter name is already taken in the endpoint")
 
         # Prepare workflow step data
         workflow_step_data = AddAdapterWorkflowStepData(
@@ -1684,7 +1696,7 @@ class EndpointService(SessionMixin):
         # Check for adapter with duplicate name
         db_adapter = await AdapterDataManager(self.session).retrieve_by_fields(
             AdapterModel,
-            {"name": required_data["adapter_name"], "endpoint_id": required_data["endpoint_id"], "status": AdapterStatusEnum.ACTIVE},
+            {"name": required_data["adapter_name"], "endpoint_id": required_data["endpoint_id"], "status": AdapterStatusEnum.RUNNING},
             missing_ok=True,
             case_sensitive=False
         )
@@ -1698,7 +1710,7 @@ class EndpointService(SessionMixin):
             endpoint_id=required_data["endpoint_id"],
             model_id=required_data["adapter_model_id"],
             created_by=db_workflow.created_by,
-            status=AdapterStatusEnum.ACTIVE,
+            status=AdapterStatusEnum.RUNNING,
             status_sync_at=datetime.now()
         )
 
@@ -1721,7 +1733,7 @@ class EndpointService(SessionMixin):
         logger.debug(f"Workflow step created with id {db_workflow_step.id}")
 
         db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"id": required_data["adapter_model_id"]}
+            ModelsModel, {"id": required_data["adapter_model_id"]}
         )
         # Send notification to workflow creator
         model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
@@ -1731,7 +1743,7 @@ class EndpointService(SessionMixin):
                 title=db_adapter.name,
                 message="Adapter Added",
                 icon=model_icon,
-                result=NotificationResult(target_id=db_adapter.id, target_type="adapter").model_dump(
+                result=NotificationResult(target_id=db_adapter.id, target_type="endpoint").model_dump(
                     exclude_none=True, exclude_unset=True
                 )
             )

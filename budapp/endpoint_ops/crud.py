@@ -421,8 +421,7 @@ class AdapterDataManager(DataManagerUtils):
         order_by: List[Tuple[str, str]] = [],
         search: bool = False,
     ) -> List[AdapterModel]:
-        """
-        Get all active adapters for a given endpoint.
+        """Get all active adapters for a given endpoint.
 
         Args:
             endpoint_id (UUID): The ID of the endpoint.
@@ -437,21 +436,9 @@ class AdapterDataManager(DataManagerUtils):
         """
         await self.validate_fields(AdapterModel, filters)
 
-        # explicit conditions for order by model_name, cluster_name, modality
-        explicit_conditions = []
-        for field in order_by:
-            if field[0] == "name":
-                sorting_stmt = await self.generate_sorting_stmt(
-                    AdapterModel,
-                    [
-                        ("name", field[1]),
-                    ],
-                )
-                explicit_conditions.append(sorting_stmt[0])
-
         # Generate statements according to search or filters
         if search:
-            search_conditions = await self.generate_search_stmt(EndpointModel, filters)
+            search_conditions = await self.generate_search_stmt(AdapterModel, filters)
             stmt = (select(AdapterModel)
                 .join(EndpointModel)
                 .join(Model)
@@ -464,16 +451,16 @@ class AdapterDataManager(DataManagerUtils):
             count_stmt = (
                 select(func.count())
                 .select_from(AdapterModel)
-                .join(Model)
                 .join(EndpointModel)
+                .join(Model)
                 .filter(or_(*search_conditions))
                 .filter(
                     and_(AdapterModel.endpoint_id == endpoint_id, AdapterModel.status != AdapterStatusEnum.DELETED)
                 )
             )
         else:
-            stmt = select(AdapterModel).join(Model).join(EndpointModel)
-            count_stmt = select(func.count()).select_from(AdapterModel).join(Model).join(EndpointModel)
+            stmt = select(AdapterModel).join(EndpointModel).join(Model)
+            count_stmt = select(func.count()).select_from(AdapterModel).join(EndpointModel).join(Model)
             for key, value in filters.items():
                 stmt = stmt.filter(getattr(AdapterModel, key) == value)
                 count_stmt = count_stmt.filter(getattr(AdapterModel, key) == value)
@@ -491,11 +478,9 @@ class AdapterDataManager(DataManagerUtils):
 
         # Apply sorting
         if order_by:
-            sort_conditions = await self.generate_sorting_stmt(EndpointModel, order_by)
-            # Extend sort conditions with explicit conditions
-            sort_conditions.extend(explicit_conditions)
+            sort_conditions = await self.generate_sorting_stmt(AdapterModel, order_by)
             stmt = stmt.order_by(*sort_conditions)
-
+        
         result = self.scalars_all(stmt)
-
+        logger.info("all adapters result: %s", result)
         return result, count
