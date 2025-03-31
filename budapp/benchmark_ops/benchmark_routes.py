@@ -39,7 +39,7 @@ from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
 from .schemas import AddRequestMetricsRequest, BenchmarkFilter, BenchmarkPaginatedResponse, RunBenchmarkWorkflowRequest
-from .services import BenchmarkService, BenchmarkRequestMetricsService
+from .services import BenchmarkRequestMetricsService, BenchmarkService
 
 
 logger = logging.get_logger(__name__)
@@ -317,6 +317,94 @@ async def add_request_metrics(
         logger.exception(f"Failed to add request metrics: {e}")
         response = ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add request metrics"
+        )
+
+    return response.to_http_response()
+
+
+@benchmark_router.post(
+   "/dataset/input-distribution",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully fetched dataset metrics",
+        },
+    },
+    description="Get dataset vs input-distribution",
+)
+async def get_dataset_input_distribution(
+    dataset_id: UUID,
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    benchmark_id: Optional[UUID]=None,
+    num_bins: int=10,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Get dataset input distribution."""
+    try:
+        dataset_input_distribution = await BenchmarkRequestMetricsService(session).get_dataset_distribution_metrics(
+            distribution_type="prompt_len", dataset_id=dataset_id, benchmark_id=benchmark_id, num_bins=num_bins
+        )
+        response = SuccessResponse(
+            object="benchmark.dataset.input.distribution",
+            param={"result": dataset_input_distribution},
+            message="Successfully fetched dataset input distribution",
+        )
+    except Exception as e:
+        logger.exception(f"Failed to fetch dataset input distribution: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to fetch dataset input distribution"
+        )
+
+    return response.to_http_response()
+
+
+@benchmark_router.post(
+   "/dataset/output-distribution",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully fetched dataset metrics",
+        },
+    },
+    description="Get dataset vs output-distribution",
+)
+async def get_dataset_output_distribution(
+    dataset_id: UUID,
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    benchmark_id: Optional[UUID]=None,
+    num_bins: int=10,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Get dataset output distribution."""
+    try:
+        dataset_output_distribution = await BenchmarkRequestMetricsService(session).get_dataset_distribution_metrics(
+            distribution_type="output_len", dataset_id=dataset_id, benchmark_id=benchmark_id, num_bins=num_bins
+        )
+        response = SuccessResponse(
+            object="benchmark.dataset.input.distribution",
+            param={"result": dataset_output_distribution},
+            message="Successfully fetched dataset output distribution",
+        )
+    except Exception as e:
+        logger.exception(f"Failed to fetch dataset output distribution: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to fetch dataset output distribution"
         )
 
     return response.to_http_response()
