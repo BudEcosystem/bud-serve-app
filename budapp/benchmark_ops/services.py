@@ -637,6 +637,12 @@ class BenchmarkRequestMetricsService(SessionMixin):
                         ROUND(COALESCE(AVG(m.ttft)::numeric, 0), 2) AS avg_ttft,
                         ROUND(COALESCE(AVG(m.tpot)::numeric, 0), 2) AS avg_tpot,
                         ROUND(COALESCE(AVG(m.latency)::numeric, 0), 2) AS avg_latency
+                    """
+            if distribution_type == "prompt_len":
+                query += """
+                        ,ROUND(COALESCE(AVG(m.output_len)::numeric, 0), 2) AS avg_output_len
+                """
+            query += f"""
                     FROM bins b
                     LEFT JOIN benchmark_request_metrics m
                         ON m.{distribution_type} >= b.bin_start
@@ -656,12 +662,15 @@ class BenchmarkRequestMetricsService(SessionMixin):
                 params={"dataset_id": dataset_id, "benchmark_id": benchmark_id},
             )
             for row in graph_data:
-                graph_data_list.append({
+                temp_data = {
                     "bin_id": row[0],
                     "bin_range": row[1],
                     "avg_ttft": float(row[2]),
                     "avg_tpot": float(row[3]),
                     "avg_latency": float(row[4]),
-                })
+                }
+                if distribution_type == "prompt_len":
+                    temp_data["avg_output_len"] = float(row[5])
+                graph_data_list.append(temp_data)
             print(graph_data_list)
         return graph_data_list
