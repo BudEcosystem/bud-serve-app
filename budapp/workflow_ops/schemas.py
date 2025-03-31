@@ -44,7 +44,6 @@ class RetrieveWorkflowStepData(BaseModel):
     security_scan_result: ModelSecurityScanResult | None = None
     endpoint: EndpointResponse | None = None
     additional_concurrency: int | None = None
-    bud_serve_cluster_events: dict | None = None
     project: ProjectResponse | None = None
     cluster: ClusterResponse | None = None
     quantization_config: QuantizeModelWorkflowStepData | None = None

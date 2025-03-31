@@ -251,7 +251,7 @@ class WorkflowService(SessionMixin):
                 description=description if description else None,
                 security_scan_result_id=security_scan_result_id if security_scan_result_id else None,
                 model_security_scan_events=model_security_scan_events if model_security_scan_events else None,
-                bud_serve_cluster_events=bud_serve_cluster_events if bud_serve_cluster_events else None,
+                budserve_cluster_events=bud_serve_cluster_events if bud_serve_cluster_events else None,
                 security_scan_result=db_model_security_scan_result if db_model_security_scan_result else None,
                 delete_cluster_events=delete_cluster_events if delete_cluster_events else None,
                 delete_endpoint_events=delete_endpoint_events if delete_endpoint_events else None,
