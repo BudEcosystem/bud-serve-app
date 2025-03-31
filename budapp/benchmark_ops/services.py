@@ -240,7 +240,7 @@ class BenchmarkService(SessionMixin):
                 required_keys.remove("max_output_tokens")
             elif required_data.get("eval_with", "") == "configuration":
                 required_keys.remove("datasets")
-            if required_data.get("provider_type", "") == "local":
+            if required_data.get("provider_type", "") in ["hugging_face", "url", "disk"]:
                 required_keys.remove("credential_id")
 
             missing_keys = [key for key in required_keys if key not in required_data]
