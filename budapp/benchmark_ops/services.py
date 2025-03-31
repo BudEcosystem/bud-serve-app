@@ -636,7 +636,10 @@ class BenchmarkRequestMetricsService(SessionMixin):
                         b.bin_start || '-' || b.bin_end AS bin_range,
                         ROUND(COALESCE(AVG(m.ttft)::numeric, 0), 2) AS avg_ttft,
                         ROUND(COALESCE(AVG(m.tpot)::numeric, 0), 2) AS avg_tpot,
-                        ROUND(COALESCE(AVG(m.latency)::numeric, 0), 2) AS avg_latency
+                        ROUND(COALESCE(AVG(m.latency)::numeric, 0), 2) AS avg_latency,
+                        ROUND(COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY m.ttft)::numeric, 0), 2) AS p95_ttft,
+                        ROUND(COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY m.tpot)::numeric, 0), 2) AS p95_tpot,
+                        ROUND(COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY m.latency)::numeric, 0), 2) AS p95_latency
                     """
             if distribution_type == "prompt_len":
                 query += """
@@ -668,9 +671,12 @@ class BenchmarkRequestMetricsService(SessionMixin):
                     "avg_ttft": float(row[2]),
                     "avg_tpot": float(row[3]),
                     "avg_latency": float(row[4]),
+                    "p95_ttft": float(row[5]),
+                    "p95_tpot": float(row[6]),
+                    "p95_latency": float(row[7]),
                 }
                 if distribution_type == "prompt_len":
-                    temp_data["avg_output_len"] = float(row[5])
+                    temp_data["avg_output_len"] = float(row[8])
                 graph_data_list.append(temp_data)
             print(graph_data_list)
         return graph_data_list
