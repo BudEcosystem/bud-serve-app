@@ -38,6 +38,7 @@ from ..commons.config import app_settings
 from ..commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
+    AdapterStatusEnum,
     BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     EndpointStatusEnum,
@@ -1529,7 +1530,12 @@ class EndpointService(SessionMixin):
             required_data["simulator_id"] = str(db_endpoint.cluster_id)
             required_data["namespace"] = db_endpoint.namespace
             required_data["endpoint_name"] = db_endpoint.name
-            required_data["adapters"] = await self._get_adapters_by_endpoint(db_endpoint.id)
+            required_data["adapters"], required_data['adapter_name'] = await self._get_adapters_by_endpoint(
+                db_endpoint.id,
+                required_data["namespace"],
+                required_data["adapter_name"],
+                required_data["adapter_model_uri"]
+            )
 
             db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
                 ClusterModel, {"id": db_endpoint.cluster_id}
@@ -1547,12 +1553,15 @@ class EndpointService(SessionMixin):
 
         return db_workflow
 
-    async def _get_adapters_by_endpoint(self, endpoint_id: UUID) -> List[AdapterModel]:
+    async def _get_adapters_by_endpoint(self, endpoint_id: UUID, endpoint_name: str, adapter_name: str, adapter_model_uri: str) -> Tuple[List[AdapterModel], str]:
         db_adapters, _ = await self.get_adapters_by_endpoint(endpoint_id)
 
         adapters = [{"name": adapter.name, "artifactURL": adapter.model.local_path} for adapter in db_adapters]
 
-        return adapters
+        adapter_name = endpoint_name + "-" + adapter_name
+        adapters.append({"name": adapter_name, "artifactURL": adapter_model_uri})
+
+        return adapters, adapter_name
 
     async def _trigger_adapter_deployment(self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID) -> Dict:
         """Trigger adapter deployment."""
@@ -1561,6 +1570,7 @@ class EndpointService(SessionMixin):
             "endpoint_name": data["endpoint_name"],
             "ingress_url": data["ingress_url"],
             "adapter_path": data["adapter_model_uri"],
+            "adapter_name": data["adapter_name"],
             "adapters": data["adapters"],
             "namespace": data["namespace"],
             "simulator_id": data["simulator_id"],
@@ -1645,3 +1655,88 @@ class EndpointService(SessionMixin):
         return await AdapterDataManager(self.session).get_all_active_adapters(
             endpoint_id, offset, limit, filters, order_by, search
         )
+    
+    async def add_adapter_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Add adapter from notification event."""
+        logger.debug("Received event for adding adapter")
+
+        # Get workflow and steps
+        workflow_id = payload.workflow_id
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for model extraction
+        keys_of_interest = [
+            "endpoint_id",
+            "adapter_name",
+            "adapter_model_id"
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        # Check for adapter with duplicate name
+        db_adapter = await AdapterDataManager(self.session).retrieve_by_fields(
+            AdapterModel,
+            {"name": required_data["adapter_name"], "endpoint_id": required_data["endpoint_id"], "status": AdapterStatusEnum.ACTIVE},
+            missing_ok=True,
+            case_sensitive=False
+        )
+        if db_adapter:
+            logger.error(f"Unable to create adapter with name {required_data['adapter_name']} as it already exists")
+            required_data["adapter_name"] = f"{required_data['adapter_name']}_adapter"
+
+        # Create a new adapter instance with the adapter data
+        adapter_create = AdapterModel(
+            name=required_data["adapter_name"],
+            endpoint_id=required_data["endpoint_id"],
+            model_id=required_data["adapter_model_id"],
+            created_by=db_workflow.created_by,
+            status=AdapterStatusEnum.ACTIVE,
+            status_sync_at=datetime.now()
+        )
+
+        # Insert the adapter into the database
+        db_adapter = await AdapterDataManager(self.session).insert_one(adapter_create)
+
+        # Update workflow step data
+        workflow_step_data = {
+            "adapter_id": str(db_adapter.id),
+            "adapter_name": db_adapter.name,
+        }
+
+        current_step_number = db_workflow.current_step + 1
+        workflow_current_step = current_step_number
+
+        # Update or create next workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, workflow_step_data
+        )
+        logger.debug(f"Workflow step created with id {db_workflow_step.id}")
+
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": required_data["adapter_model_id"]}
+        )
+        # Send notification to workflow creator
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
+        notification_request = (
+            NotificationBuilder()
+            .set_content(
+                title=db_adapter.name,
+                message="Adapter Added",
+                icon=model_icon,
+                result=NotificationResult(target_id=db_adapter.id, target_type="adapter").model_dump(
+                    exclude_none=True, exclude_unset=True
+                )
+            )
+            .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.ADAPTER_DEPLOYMENT_SUCCESS.value)
+            .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)

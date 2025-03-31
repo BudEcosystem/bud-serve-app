@@ -474,6 +474,7 @@ class PayloadType(str, Enum):
     FETCH_LICENSE_FAQS = "fetch_license_faqs"
     DEPLOY_QUANTIZATION = "deploy_quantization"
     RUN_BENCHMARK = "performance_benchmark"
+    ADD_ADAPTER = "add_adapter"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -2603,7 +2604,7 @@ class NotificationTypeEnum(StrEnum):
     DEPLOYMENT_DELETION_SUCCESS = auto()
     MODEL_QUANTIZATION_SUCCESS = auto()
     MODEL_BENCHMARK_SUCCESS = auto()
-
+    ADAPTER_DEPLOYMENT_SUCCESS = auto()
 
 BENCHMARK_FIELDS_TYPE_MAPPER = {
     "classification": "Classification",
