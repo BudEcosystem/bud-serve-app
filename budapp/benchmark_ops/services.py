@@ -29,6 +29,7 @@ from ..commons.exceptions import ClientException
 from ..core.schemas import NotificationPayload, NotificationResult
 from ..credential_ops.crud import ProprietaryCredentialDataManager
 from ..credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
+from ..dataset_ops.models import DatasetCRUD
 from ..endpoint_ops.schemas import ModelClusterDetail
 from ..model_ops.crud import ModelDataManager, ProviderDataManager
 from ..model_ops.models import Model
@@ -247,6 +248,9 @@ class BenchmarkService(SessionMixin):
                 raise ClientException(f"Missing required data for run benchmark workflow: {', '.join(missing_keys)}")
 
             try:
+                if "datasets" in required_data:
+                    with DatasetCRUD() as crud:
+                        required_data["datasets"] = await crud.get_datasets_by_ids(required_data["datasets"])
                 # Perform add worker deployment
                 await self._add_run_benchmark_workflow_step(
                     current_step_number, required_data, db_workflow, current_user_id
