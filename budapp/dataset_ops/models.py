@@ -107,3 +107,9 @@ class DatasetCRUD(CRUDMixin[DatasetSchema, None, None]):
         result = self.scalars_all(stmt)
 
         return result, count
+
+
+    async def get_datatsets_by_ids(self, ids: List[UUID]):
+        """Get datasets by ids."""
+        stmt = select(self.model).filter(self.model.id.in_(ids))
+        return self.scalars_all(stmt)
