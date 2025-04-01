@@ -20,7 +20,7 @@
 from typing import List, Optional, Union
 from uuid import UUID
 
-from budmicroframe.commons.schemas import SuccessResponse
+from budmicroframe.commons.schemas import PaginatedResponse, SuccessResponse
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
@@ -432,14 +432,17 @@ async def get_request_metrics(
     benchmark_id: UUID,
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Get benchmark request metrics."""
     try:
-        request_metrics = await BenchmarkRequestMetricsService(session).get_request_metrics(benchmark_id=benchmark_id)
-        response = SuccessResponse(
-            object="benchmark.request.metrics",
-            param={"result": request_metrics},
-            message="Successfully fetched benchmark request metrics",
+        request_metrics, count = await BenchmarkRequestMetricsService(session).get_request_metrics(benchmark_id=benchmark_id, offset=(page-1)*limit, limit=limit)
+        response = PaginatedResponse(
+            items=request_metrics,
+            page=page,
+            limit=limit,
+            total_items=count,
         )
     except Exception as e:
         logger.exception(f"Failed to fetch benchmark request metricsn: {e}")
