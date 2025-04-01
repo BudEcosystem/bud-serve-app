@@ -408,3 +408,43 @@ async def get_dataset_output_distribution(
         )
 
     return response.to_http_response()
+
+
+@benchmark_router.get(
+   "/request-metrics",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully fetched benchmark request metrics",
+        },
+    },
+    description="Get benchmark request metrics",
+)
+async def get_request_metrics(
+    benchmark_id: UUID,
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Get benchmark request metrics."""
+    try:
+        request_metrics = await BenchmarkRequestMetricsService(session).get_request_metrics(benchmark_id=benchmark_id)
+        response = SuccessResponse(
+            object="benchmark.request.metrics",
+            param={"result": request_metrics},
+            message="Successfully fetched benchmark request metrics",
+        )
+    except Exception as e:
+        logger.exception(f"Failed to fetch benchmark request metricsn: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to fetch benchmark request metrics"
+        )
+
+    return response.to_http_response()
