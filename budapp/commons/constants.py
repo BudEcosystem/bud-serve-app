@@ -2646,13 +2646,3 @@ class DatasetStatusEnum(Enum):
 
 # Recommended cluster scheduler state store key
 RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY = "recommended_cluster_scheduler_state"
-
-# Keycloak
-class KeycloakBudRoles(StrEnum):
-    """Keycloak <-> Bud Roles Mapping."""
-
-    ADMIN = "admin"
-    DEVELOPER = "developer"
-    TESTER = "tester"
-    DEVOPS = "devops"
-

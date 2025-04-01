@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 
 from keycloak import KeycloakAdmin
 
-from budapp.commons.constants import KeycloakBudRoles
+from budapp.commons.constants import UserRoleEnum
 
 from . import logging
 from .config import app_settings
@@ -97,7 +97,13 @@ class KeycloakManager:
 
             # MAP Roles
             relam_admin = self.get_realm_admin(realm_name)
-            roles = [KeycloakBudRoles.ADMIN.value, KeycloakBudRoles.DEVELOPER.value, KeycloakBudRoles.TESTER.value, KeycloakBudRoles.DEVOPS.value]
+            roles = [
+                UserRoleEnum.ADMIN.value,
+                UserRoleEnum.DEVELOPER.value,
+                UserRoleEnum.TESTER.value,
+                UserRoleEnum.DEVOPS.value,
+                UserRoleEnum.SUPER_ADMIN.value,
+            ]
             for role in roles:
                 relam_admin.create_realm_role({"name": role, "description": f"Organization {role}"}, skip_exists=True)
 
@@ -121,7 +127,7 @@ class KeycloakManager:
             "enabled": True,
             "protocol": "openid-connect",
             "publicClient": False,
-            "redirectUris": [f"{base_url}/*"], # todo update to backend if required
+            "redirectUris": [f"{base_url}/*"],  # todo update to backend if required
             "webOrigins": [base_url],
         }
 
@@ -133,7 +139,9 @@ class KeycloakManager:
             logger.error(f"Error creating client {client_id} in realm {realm_name}: {str(e)}")
             raise
 
-    async def create_user(self, username: str, email: str, password: str, realm_name: str, role: KeycloakBudRoles) -> str:
+    async def create_user(
+        self, username: str, email: str, password: str, realm_name: str, role: KeycloakBudRoles
+    ) -> str:
         """Create a new user in Keycloak.
 
         Args:
@@ -146,11 +154,11 @@ class KeycloakManager:
             str: User ID of the created user
         """
         user_representation = {
-            "username": username, # email is treated as username
+            "username": username,  # email is treated as username
             "email": email,
             "enabled": True,
             "emailVerified": True,
-            "credentials": [{"type": "password", "value": password,"temporary": False}],
+            "credentials": [{"type": "password", "value": password, "temporary": False}],
         }
 
         try:
@@ -184,12 +192,12 @@ class KeycloakManager:
             "email": email,
             "enabled": True,
             "emailVerified": True,
-            "credentials": [{"type": "password", "value": password,"temporary": False}],
+            "credentials": [{"type": "password", "value": password, "temporary": False}],
         }
 
         try:
             realm_admin = self.get_realm_admin()
-            user_id = realm_admin.create_user(payload=user_representation)
+            user_id = realm_admin.create_user(payload=user_representation, exist_ok=True)
             logger.info(f"Realm admin {username} created successfully")
 
             # Assign role to user
@@ -201,3 +209,18 @@ class KeycloakManager:
             logger.error(f"Error creating realm admin {username} in realm {realm_name}: {str(e)}")
             raise
 
+    def realm_exists(self, realm_name: str) -> bool:
+        """Check if a realm exists in Keycloak.
+
+        Args:
+            realm_name: Name of the realm to check
+
+        Returns:
+            bool: True if the realm exists, False otherwise
+        """
+        try:
+            realms = self.admin_client.get_realms()
+            return any(realm["realm"] == realm_name for realm in realms)
+        except Exception as e:
+            logger.error(f"Error checking if realm {realm_name} exists: {str(e)}")
+            return False

@@ -107,6 +107,9 @@ class AppConfig(BaseAppConfig):
     superuser_email: str = Field(alias="SUPER_USER_EMAIL")
     superuser_password: str = Field(alias="SUPER_USER_PASSWORD")
 
+    # default non master realm name
+    default_realm_name: str = Field(alias="DEFAULT_REALM_NAME", default="bud")
+
     # Token
     access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_minutes: int = Field(60 * 24 * 7, alias="REFRESH_TOKEN_EXPIRE_MINUTES")
@@ -140,8 +143,6 @@ class AppConfig(BaseAppConfig):
     keycloak_admin_username: str = Field(alias="KEYCLOAK_ADMIN_USERNAME")
     keycloak_admin_password: str = Field(alias="KEYCLOAK_ADMIN_PASSWORD")
     keycloak_realm_name: str = Field(alias="KEYCLOAK_REALM_NAME")
-    # keycloak_client_id: str = Field(alias="KEYCLOAK_CLIENT_ID")
-    # keycloak_client_secret: str = Field(alias="KEYCLOAK_CLIENT_SECRET")
     keycloak_verify_ssl: bool = Field(True, alias="KEYCLOAK_VERIFY_SSL")
 
     @computed_field
@@ -156,8 +157,6 @@ class AppConfig(BaseAppConfig):
     def icon_dir(self) -> DirectoryPath:
         """Directory for icon."""
         return os.path.join(self.static_dir, "icons")
-
-
 
 
 # class SecretsConfig(BaseSecretsConfig):

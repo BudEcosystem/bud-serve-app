@@ -36,7 +36,7 @@ class User(Base, TimestampMixin):
     __tablename__ = "user"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    auth_id: Mapped[UUID] = mapped_column(Uuid, unique=True, default=uuid4)
+    auth_id: Mapped[UUID] = mapped_column(Uuid, unique=True, default=uuid4) # repurpose the auth_id to store keycloak id
     name: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     role: Mapped[str] = mapped_column(
@@ -75,3 +75,4 @@ class User(Base, TimestampMixin):
     created_projects: Mapped[list[Project]] = relationship(back_populates="created_user")
     created_clusters: Mapped[list[Cluster]] = relationship(back_populates="created_user")
     created_endpoints: Mapped[list[Endpoint]] = relationship(back_populates="created_user")
+
