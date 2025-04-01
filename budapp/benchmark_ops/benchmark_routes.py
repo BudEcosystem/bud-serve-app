@@ -439,6 +439,7 @@ async def get_request_metrics(
     try:
         request_metrics, count = await BenchmarkRequestMetricsService(session).get_request_metrics(benchmark_id=benchmark_id, offset=(page-1)*limit, limit=limit)
         response = PaginatedResponse(
+            object="benchmark.request.metrics.list",
             items=request_metrics,
             page=page,
             limit=limit,
