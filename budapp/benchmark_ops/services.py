@@ -655,6 +655,7 @@ class BenchmarkRequestMetricsService(SessionMixin):
     async def get_request_metrics(self, benchmark_id: UUID, offset: int = 0, limit: int = 10) -> dict:
         """Get benchmark request metrics."""
         with BenchmarkRequestMetricsCRUD() as crud:
-            db_request_metrics, count = crud.fetch_many(conditions={"benchmark_id": benchmark_id}, limit=limit, offset=offset)
+            db_request_metrics, _ = crud.fetch_many(conditions={"benchmark_id": benchmark_id}, limit=limit, offset=offset)
+            total_count = crud.fetch_count(conditions={"benchmark_id": benchmark_id})
             request_metrics = [BenchmarkRequestMetrics.model_validate(request_metric, from_attributes=True) for request_metric in db_request_metrics]
-        return request_metrics, count
+        return request_metrics, total_count

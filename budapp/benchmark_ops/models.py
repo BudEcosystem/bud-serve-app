@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 from budmicroframe.shared.psql_service import CRUDMixin, PSQLBase, TimestampMixin
@@ -234,3 +234,8 @@ class BenchmarkRequestMetricsCRUD(CRUDMixin[BenchmarkRequestMetricsSchema, None,
     def __init__(self):
         """Initialize benchmark request metrics crud methods."""
         super().__init__(model=self.__model__)
+
+    def fetch_count(self, conditions: Dict[str, Any]):
+        """Fetch count of benchmark request metrics based on conditions."""
+        stmt = select(func.count()).select_from(self.model).filter_by(**conditions)
+        return self.execute_scalar(stmt)
