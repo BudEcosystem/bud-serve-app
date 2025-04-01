@@ -424,6 +424,7 @@ class WorkflowTypeEnum(StrEnum):
     LOCAL_MODEL_QUANTIZATION = auto()
     MODEL_BENCHMARK = auto()
     ADD_ADAPTER = auto()
+    DELETE_ADAPTER = auto()
 
 
 class NotificationType(Enum):
@@ -475,6 +476,7 @@ class PayloadType(str, Enum):
     DEPLOY_QUANTIZATION = "deploy_quantization"
     RUN_BENCHMARK = "performance_benchmark"
     ADD_ADAPTER = "add_adapter"
+    DELETE_ADAPTER = "delete_adapter"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -500,6 +502,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     QUANTIZATION_SIMULATION_EVENTS = "bud_simulator_events"
     QUANTIZATION_DEPLOYMENT_EVENTS = "quantization_deployment_events"
     ADAPTER_DEPLOYMENT_EVENTS = "adapter_deployment_events"
+    ADAPTER_DELETE_EVENTS = "adapter_delete_events"
 
 
 class ClusterStatusEnum(StrEnum):
@@ -2605,6 +2608,7 @@ class NotificationTypeEnum(StrEnum):
     MODEL_QUANTIZATION_SUCCESS = auto()
     MODEL_BENCHMARK_SUCCESS = auto()
     ADAPTER_DEPLOYMENT_SUCCESS = auto()
+    ADAPTER_DELETION_SUCCESS = auto()
 
 BENCHMARK_FIELDS_TYPE_MAPPER = {
     "classification": "Classification",

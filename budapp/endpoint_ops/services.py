@@ -1431,6 +1431,7 @@ class EndpointService(SessionMixin):
 
             db_adapters = await AdapterDataManager(self.session).retrieve_by_fields(
                 AdapterModel, {"id": adapter_model_id, "endpoint_id": endpoint_id},
+                missing_ok=True,
                 exclude_fields={"status": AdapterStatusEnum.DELETED}
             )
 
@@ -1440,6 +1441,7 @@ class EndpointService(SessionMixin):
         if adapter_name:
             db_adapters = await AdapterDataManager(self.session).retrieve_by_fields(
                 AdapterModel, {"name": adapter_name, "endpoint_id": endpoint_id},
+                missing_ok=True,
                 exclude_fields={"status": AdapterStatusEnum.DELETED}
             )
             if db_adapters:
@@ -1531,6 +1533,9 @@ class EndpointService(SessionMixin):
             if missing_keys:
                 raise ClientException(f"Missing required data for add worker to deployment: {', '.join(missing_keys)}")
 
+            if not required_data['adapter_name']:
+                raise ClientException("Adapter name is required")
+
             db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
                 EndpointModel, {"id": required_data["endpoint_id"]}, exclude_fields={"status": EndpointStatusEnum.DELETED}
             )
@@ -1539,7 +1544,6 @@ class EndpointService(SessionMixin):
             )
             # Get base model
             required_data["adapter_model_uri"] = db_model.local_path
-            required_data["simulator_id"] = str(db_endpoint.cluster_id)
             required_data["namespace"] = db_endpoint.namespace
             required_data["endpoint_name"] = db_endpoint.name
             required_data["adapters"], required_data['adapter_name'] = await self._get_adapters_by_endpoint(
@@ -1565,13 +1569,26 @@ class EndpointService(SessionMixin):
 
         return db_workflow
 
-    async def _get_adapters_by_endpoint(self, endpoint_id: UUID, endpoint_name: str, adapter_name: str, adapter_model_uri: str) -> Tuple[List[AdapterModel], str]:
-        db_adapters, _ = await self.get_adapters_by_endpoint(endpoint_id)
+    async def _get_adapters_by_endpoint(
+        self,
+        endpoint_id: UUID,
+        endpoint_name: str,
+        adapter_name: str,
+        adapter_model_uri: str,
+        adapter_id: UUID = None
+    ) -> Tuple[List[AdapterModel], str]:
+        db_adapters = await AdapterDataManager(self.session).retrieve_by_fields(
+            AdapterModel, {"endpoint_id": endpoint_id}, exclude_fields={"id": adapter_id}, missing_ok=True
+        )
 
-        adapters = [{"name": adapter.name, "artifactURL": adapter.model.local_path} for adapter in db_adapters]
+        adapters = []
+        if db_adapters:
+            adapters = [{"name": adapter.deployment_name, "artifactURL": adapter.model.local_path} for adapter in db_adapters]
 
-        adapter_name = endpoint_name + "-" + adapter_name
-        adapters.append({"name": adapter_name, "artifactURL": adapter_model_uri})
+        adapter_name = ''
+        if not adapter_id:
+            adapter_name = endpoint_name + "-" + adapter_name
+            adapters.append({"name": adapter_name, "artifactURL": adapter_model_uri})
 
         return adapters, adapter_name
 
@@ -1585,8 +1602,8 @@ class EndpointService(SessionMixin):
             "adapter_name": data["adapter_name"],
             "adapters": data["adapters"],
             "namespace": data["namespace"],
-            "simulator_id": data["simulator_id"],
             "cluster_id": str(data["cluster_id"]),
+            "action": "add",
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
@@ -1624,7 +1641,7 @@ class EndpointService(SessionMixin):
     ) -> None:
         """Perform adapter deployment request."""
         quantize_endpoint = (
-            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/add-adapter"
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/deploy-adapter"
         )
 
         try:
@@ -1672,6 +1689,8 @@ class EndpointService(SessionMixin):
         """Add adapter from notification event."""
         logger.debug("Received event for adding adapter")
 
+        deployment_name = payload.content.result["result"]["deployment_name"]
+
         # Get workflow and steps
         workflow_id = payload.workflow_id
         db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
@@ -1707,6 +1726,7 @@ class EndpointService(SessionMixin):
         # Create a new adapter instance with the adapter data
         adapter_create = AdapterModel(
             name=required_data["adapter_name"],
+            deployment_name=deployment_name,
             endpoint_id=required_data["endpoint_id"],
             model_id=required_data["adapter_model_id"],
             created_by=db_workflow.created_by,
@@ -1721,6 +1741,7 @@ class EndpointService(SessionMixin):
         workflow_step_data = {
             "adapter_id": str(db_adapter.id),
             "adapter_name": db_adapter.name,
+            "deployment_name": deployment_name,
         }
 
         current_step_number = db_workflow.current_step + 1
@@ -1748,6 +1769,166 @@ class EndpointService(SessionMixin):
                 )
             )
             .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.ADAPTER_DEPLOYMENT_SUCCESS.value)
+            .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)
+
+
+    async def delete_adapter_workflow(self, current_user_id: UUID, adapter_id: UUID) -> None:
+        """Delete an adapter."""
+        step_number = 1
+        workflow_total_steps = 2
+        workflow_id = None
+
+        # Validate adapter id
+        db_adapter = await AdapterDataManager(self.session).retrieve_by_fields(
+            AdapterModel, {"id": adapter_id}, exclude_fields={"status": AdapterStatusEnum.DELETED}
+        )
+        if not db_adapter:
+            logger.error(f"Adapter {adapter_id} not found")
+            raise ClientException("Adapter not found")
+
+        if db_adapter.status == AdapterStatusEnum.DELETING:
+            raise ClientException("Adapter is already deleting")
+
+        # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.DELETE_ADAPTER,
+            title="Delete Adapter",
+            total_steps=workflow_total_steps,
+            icon=APP_ICONS["general"]["deployment_mono"],
+            tag="Deployment",
+        )
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id, workflow_create, current_user_id
+        )
+
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel, {"id": db_adapter.endpoint_id}
+        )
+
+        adapters, _ = await self._get_adapters_by_endpoint(db_adapter.endpoint_id, db_endpoint.name, db_adapter.name, db_adapter.model.local_path, db_adapter.id)
+        # Create request payload
+        payload = {
+            "endpoint_name": db_endpoint.name,
+            "ingress_url": db_endpoint.cluster.ingress_url,
+            "adapter_path": db_adapter.model.local_path,
+            "adapter_name": db_adapter.deployment_name,
+            "adapters": adapters,
+            "namespace": db_endpoint.namespace,
+            "cluster_id": db_endpoint.bud_cluster_id,
+            "action": "delete",
+            "notification_metadata": {
+                "name": BUD_INTERNAL_WORKFLOW,
+                "subscriber_ids": str(current_user_id),
+                "workflow_id": str(db_workflow.id),
+            },
+            "source_topic": f"{app_settings.source_topic}",
+        }
+        try:
+            # Perform delete adapter request to bud_cluster app
+            bud_cluster_response = await self._perform_adapter_deployment_request(payload)
+        except ClientException as e:
+            await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"status": WorkflowStatusEnum.FAILED}
+            )
+            raise e
+
+        # Add payload dict to response
+        for step in bud_cluster_response["steps"]:
+            step["payload"] = {}
+
+        delete_adapter_workflow_id = bud_cluster_response.get("workflow_id")
+        delete_adapter_events = {
+            BudServeWorkflowStepEventName.ADAPTER_DELETE_EVENTS.value: bud_cluster_response,
+            "delete_adapter_workflow_id": delete_adapter_workflow_id,
+            "adapter_id": str(db_adapter.id),
+        }
+
+        # Insert step details in db
+        db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+            WorkflowStepModel(
+                workflow_id=db_workflow.id,
+                step_number=step_number,
+                data=delete_adapter_events,
+            )
+        )
+        logger.debug(f"Created workflow step {step_number} for workflow {db_workflow.id}")
+
+        # Update progress in workflow
+        bud_cluster_response["progress_type"] = BudServeWorkflowStepEventName.ADAPTER_DELETE_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": bud_cluster_response, "current_step": step_number}
+        )
+
+        # Update adapter status to deleting
+        await AdapterDataManager(self.session).update_by_fields(db_adapter, {"status": AdapterStatusEnum.DELETING})
+
+        return db_workflow
+
+    async def delete_adapter_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Delete adapter from notification event."""
+        logger.debug("Received event for deleting adapter")
+
+        # Get workflow and steps
+        workflow_id = payload.workflow_id
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for model extraction
+        keys_of_interest = [
+            "adapter_id"
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        db_adapter = await AdapterDataManager(self.session).retrieve_by_fields(
+            AdapterModel, {"id": required_data["adapter_id"]}
+        )
+
+        #Mark adapter as deleted
+        await AdapterDataManager(self.session).update_by_fields(
+            db_adapter, {"status": AdapterStatusEnum.DELETED}
+        )
+        logger.debug(f"Adapter {db_adapter.id} marked as deleted")
+
+        #TODO: Check if this is the correct way to delete adapter details from redis
+        # Delete adapter details with pattern “router_config:*:<_name>“,
+        # try:
+        #     redis_service = RedisService()
+        #     endpoint_redis_keys = await redis_service.keys(f"router_config:*:{db_adapter.name}")
+        #     logger.debug(f"Endpoint redis keys: {endpoint_redis_keys}")
+        #     endpoint_redis_keys_count = await redis_service.delete(*endpoint_redis_keys)
+        #     logger.debug(f"Deleted endpoint data from redis: {endpoint_redis_keys_count} keys")
+        # except (RedisException, Exception) as e:
+        #     logger.error(f"Failed to delete endpoint details from redis: {e}")
+
+        # Mark workflow as completed
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"status": WorkflowStatusEnum.COMPLETED}
+        )
+
+        # Send notification to workflow creator
+        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_adapter.model)
+        notification_request = (
+            NotificationBuilder()
+            .set_content(
+                title=db_adapter.name,
+                message="Adapter Deleted",
+                icon=model_icon,
+                result=NotificationResult(target_id=db_adapter.id, target_type="endpoint").model_dump(
+                    exclude_none=True, exclude_unset=True
+                ),
+            )
+            .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.ADAPTER_DELETION_SUCCESS.value)
             .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
             .build()
         )

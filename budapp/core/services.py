@@ -319,7 +319,17 @@ class NotificationService(SessionMixin):
         if payload.event == "results":
             await EndpointService(self.session).add_adapter_from_notification_event(payload)
 
+    async def update_delete_adapter_events(self, payload: NotificationPayload) -> None:
+        """Update the delete adapter events for a workflow step."""
+        # Update workflow step data event
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.ADAPTER_DELETE_EVENTS.value, payload)
 
+        # Update progress in workflow
+        await self._update_workflow_progress(BudServeWorkflowStepEventName.ADAPTER_DELETE_EVENTS.value, payload)
+
+        # Delete adapter from database
+        if payload.event == "results":
+            await EndpointService(self.session).delete_adapter_from_notification_event(payload)
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
         """Update the workflow step events for a workflow step.
 
@@ -483,6 +493,7 @@ class SubscriberHandler:
             PayloadType.DEPLOY_QUANTIZATION: self._handle_deploy_quantization,
             PayloadType.RUN_BENCHMARK: self._handle_run_benchmark,
             PayloadType.ADD_ADAPTER: self._handle_deploy_adapter,
+            PayloadType.DELETE_ADAPTER: self._handle_delete_adapter,
         }
 
         handler = handlers.get(payload.type)
@@ -614,6 +625,13 @@ class SubscriberHandler:
             message="Updated run adapter event in workflow step",
         ).to_http_response()
 
+    async def _handle_delete_adapter(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the adapter deletion event."""
+        await NotificationService(self.session).update_delete_adapter_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated delete adapter event in workflow step",
+        ).to_http_response()
 class IconService(SessionMixin):
     """Service for managing icons."""
 
