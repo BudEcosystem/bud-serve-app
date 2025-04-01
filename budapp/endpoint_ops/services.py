@@ -1585,12 +1585,12 @@ class EndpointService(SessionMixin):
         if db_adapters:
             adapters = [{"name": adapter.deployment_name, "artifactURL": adapter.model.local_path} for adapter in db_adapters]
 
-        adapter_name = ''
+        deployment_name = ''
         if not adapter_id:
-            adapter_name = endpoint_name + "-" + adapter_name
-            adapters.append({"name": adapter_name, "artifactURL": adapter_model_uri})
+            deployment_name = endpoint_name + "-" + adapter_name
+            adapters.append({"name": deployment_name, "artifactURL": adapter_model_uri})
 
-        return adapters, adapter_name
+        return adapters, deployment_name
 
     async def _trigger_adapter_deployment(self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID) -> Dict:
         """Trigger adapter deployment."""
@@ -1611,7 +1611,7 @@ class EndpointService(SessionMixin):
             },
             "source_topic": f"{app_settings.source_topic}",
         }
-
+        logger.debug(f"Adapter deployment payload: {payload}")
         # Perform adapter deployment request
         deployment_response = await self._perform_adapter_deployment_request(payload)
 
@@ -1684,12 +1684,12 @@ class EndpointService(SessionMixin):
         return await AdapterDataManager(self.session).get_all_active_adapters(
             endpoint_id, offset, limit, filters, order_by, search
         )
-    
+
     async def add_adapter_from_notification_event(self, payload: NotificationPayload) -> None:
         """Add adapter from notification event."""
         logger.debug("Received event for adding adapter")
 
-        deployment_name = payload.content.result["result"]["deployment_name"]
+        deployment_name = payload.content.result["deployment_name"]
 
         # Get workflow and steps
         workflow_id = payload.workflow_id
