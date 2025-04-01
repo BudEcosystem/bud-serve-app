@@ -1355,7 +1355,7 @@ class LocalModelWorkflowService(SessionMixin):
         updated_license_faqs = []
         if license_faqs:
             for faq in license_faqs:
-                license_description = " ".join(faq.get("reason", [])).strip()
+                faq_description = " ".join(faq.get("reason", [])).strip()
                 impact = faq.get("impact", "")
                 if impact == "POSITIVE":
                     answer = "YES"
@@ -1364,14 +1364,15 @@ class LocalModelWorkflowService(SessionMixin):
                 updated_license_faqs.append(
                     {
                         "question": faq.get("question"),
-                        "description": license_description,
+                        "description": faq_description,
                         "answer": answer,
                     }
                 )
+
         license_data = ModelLicensesCreate(
             name=license_name,
             url=license_url,
-            faqs=updated_license_faqs,
+            faqs=updated_license_faqs if updated_license_faqs else None,
             model_id=model_id,
             license_type=license_type,
             description=license_description,
