@@ -151,6 +151,9 @@ class ModelLicenses(Base, TimestampMixin):
     path: Mapped[str] = mapped_column(String, nullable=True)
     faqs: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
+    license_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    suitability: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     model: Mapped["Model"] = relationship("Model", back_populates="model_licenses")
 
