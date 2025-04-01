@@ -43,7 +43,7 @@ from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .models import BenchmarkCRUD, BenchmarkRequestMetricsCRUD, BenchmarkRequestMetricsSchema, BenchmarkSchema
-from .schemas import AddRequestMetricsRequest, RunBenchmarkWorkflowRequest, RunBenchmarkWorkflowStepData
+from .schemas import AddRequestMetricsRequest, RunBenchmarkWorkflowRequest, RunBenchmarkWorkflowStepData, BenchmarkRequestMetrics
 
 
 logger = logging.get_logger(__name__)
@@ -651,3 +651,10 @@ class BenchmarkRequestMetricsService(SessionMixin):
                 graph_data_list.append(temp_data)
             print(graph_data_list)
         return graph_data_list
+
+    async def get_request_metrics(self, benchmark_id: UUID) -> dict:
+        """Get benchmark request metrics."""
+        with BenchmarkRequestMetricsCRUD() as crud:
+            db_request_metrics, count = crud.fetch_many(conditions={"benchmark_id": benchmark_id})
+            request_metrics = [BenchmarkRequestMetrics.model_validate(request_metric, from_attributes=True).model_dump(mode="json") for request_metric in db_request_metrics]
+        return request_metrics
