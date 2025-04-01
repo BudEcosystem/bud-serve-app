@@ -253,6 +253,7 @@ class AddAdapterWorkflowStepData(BaseModel):
     project_id: UUID4 | None = None
     adapter_name: str | None = None
     adapter_model_id: UUID4 | None = None
+    adapter_id: UUID4 | None = None
 
 class AdapterFilter(BaseModel):
     """Adapter filter."""

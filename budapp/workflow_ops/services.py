@@ -171,7 +171,8 @@ class WorkflowService(SessionMixin):
             adapter_config = AddAdapterWorkflowStepData(
                 adapter_model_id=adapter_model_id,
                 adapter_name=required_data.get("adapter_name"),
-                endpoint_id=required_data.get("endpoint_id")
+                endpoint_id=required_data.get("endpoint_id"),
+                adapter_id=required_data.get("adapter_id")
             ) if adapter_model_id else None
 
             db_provider = (
@@ -390,6 +391,7 @@ class WorkflowService(SessionMixin):
                 "adapter_name",
                 "endpoint_id",
                 BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value,
+                "adapter_id",
             ]
         }
 

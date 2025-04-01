@@ -543,3 +543,48 @@ async def get_endpoint_adapters(
         response = ErrorResponse(message="Failed to get endpoint adapters", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     return response.to_http_response()
+
+
+@endpoint_router.post(
+    "/delete-adapter/{adapter_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RetrieveWorkflowDataResponse,
+            "description": "Successfully updated delete adapter workflow",
+        },
+    },
+    description="Add worker to endpoint",
+)
+async def delete_adapter_from_endpoint(
+    adapter_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
+    """Add worker to endpoint."""
+    try:
+        db_workflow = await EndpointService(session).delete_adapter_workflow(
+            current_user_id=current_user.id,
+            adapter_id=adapter_id,
+        )
+        response = SuccessResponse(
+            message="Adapter deleting initiated successfully",
+            code=status.HTTP_200_OK,
+            object="adapter.delete",
+        )
+        return response.to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to delete adapter from endpoint: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete adapter from endpoint: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete adapter from endpoint"
+        ).to_http_response()

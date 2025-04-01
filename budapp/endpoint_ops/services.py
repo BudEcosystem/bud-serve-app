@@ -1364,7 +1364,6 @@ class EndpointService(SessionMixin):
 
     async def add_adapter_workflow(self, current_user_id: UUID, request: AddAdapterRequest) -> None:
         """Add adapter workflow."""
-
         step_number = request.step_number
         workflow_id = request.workflow_id
         workflow_total_steps = request.workflow_total_steps
@@ -1430,10 +1429,11 @@ class EndpointService(SessionMixin):
                 raise ClientException("Adapter model not found")
 
             db_adapters = await AdapterDataManager(self.session).retrieve_by_fields(
-                AdapterModel, {"id": adapter_model_id, "endpoint_id": endpoint_id},
+                AdapterModel, {"model_id": adapter_model_id, "endpoint_id": endpoint_id},
                 missing_ok=True,
                 exclude_fields={"status": AdapterStatusEnum.DELETED}
             )
+            logger.debug(f"db_adapters: {db_adapters}")
 
             if db_adapters:
                 raise ClientException("Adapter is already added in the endpoint")
@@ -1577,8 +1577,8 @@ class EndpointService(SessionMixin):
         adapter_model_uri: str,
         adapter_id: UUID = None
     ) -> Tuple[List[AdapterModel], str]:
-        db_adapters = await AdapterDataManager(self.session).retrieve_by_fields(
-            AdapterModel, {"endpoint_id": endpoint_id}, exclude_fields={"id": adapter_id}, missing_ok=True
+        db_adapters = await AdapterDataManager(self.session).get_all_by_fields(
+            AdapterModel, {"endpoint_id": endpoint_id}, exclude_fields={"id": adapter_id}
         )
 
         adapters = []
@@ -1657,7 +1657,7 @@ class EndpointService(SessionMixin):
             raise e
         except Exception as e:
             logger.error(f"Failed to perform adapter deployment request: {e}")
-            raise ClientException("Unable to perform adapter quantization") from e
+            raise ClientException("Unable to perform adapter deployment") from e
     
     async def get_adapters_by_endpoint(
         self,
@@ -1817,7 +1817,8 @@ class EndpointService(SessionMixin):
             "adapter_name": db_adapter.deployment_name,
             "adapters": adapters,
             "namespace": db_endpoint.namespace,
-            "cluster_id": db_endpoint.bud_cluster_id,
+            "cluster_id": str(db_endpoint.bud_cluster_id),
+            "adapter_id": str(adapter_id),
             "action": "delete",
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
