@@ -1349,6 +1349,9 @@ class LocalModelWorkflowService(SessionMixin):
         license_name = normalize_value(extracted_license.get("name"))
         license_url = normalize_value(extracted_license.get("url"))
         license_faqs = normalize_value(extracted_license.get("faqs", []))
+        license_type = normalize_value(extracted_license.get("type"))
+        license_description = normalize_value(extracted_license.get("description"))
+        license_suitability = normalize_value(extracted_license.get("suitability"))
         updated_license_faqs = []
         if license_faqs:
             for faq in license_faqs:
@@ -1370,6 +1373,9 @@ class LocalModelWorkflowService(SessionMixin):
             url=license_url,
             faqs=updated_license_faqs,
             model_id=model_id,
+            license_type=license_type,
+            description=license_description,
+            suitability=license_suitability,
         )
         return await ModelLicensesDataManager(self.session).insert_one(
             ModelLicenses(**license_data.model_dump(exclude_none=True))

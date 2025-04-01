@@ -123,6 +123,9 @@ class ModelLicensesModel(BaseModel):
     url: str | None = None
     path: str | None = None
     faqs: list[dict] | None = None
+    license_type: str | None = None
+    description: str | None = None
+    suitability: str | None = None
     model_id: UUID4
 
     class Config:
@@ -828,6 +831,9 @@ class ModelLicensesCreate(BaseModel):
     url: str | None = None
     path: str | None = None
     faqs: list[dict] | None = None
+    license_type: str | None = None
+    description: str | None = None
+    suitability: str | None = None
     model_id: UUID4
 
 
