@@ -302,35 +302,6 @@ class BenchmarkService(SessionMixin):
 
         logger.debug(f"Performing run benchmark request to budcluster {run_benchmark_payload}")
         run_benchmark_response = await self._perform_run_benchmark_request(run_benchmark_payload)
-        # run_benchmark_response = {
-        #     "object": "workflow_metadata",
-        #     "workflow_id": "d54dece7-b1d9-4bc0-a43f-40fca695a74d",
-        #     "workflow_name": "create_cloud_deployment",
-        #     "steps": [
-        #         {
-        #         "id": "verify_cluster_connection",
-        #         "title": "Verifying cluster connection",
-        #         "description": "Verify the cluster connection"
-        #         },
-        #         {
-        #         "id": "deploy_to_engine",
-        #         "title": "Deploying model to engine",
-        #         "description": "Deploy the model to the engine"
-        #         },
-        #         {
-        #         "id": "verify_deployment_status",
-        #         "title": "Verifying deployment status",
-        #         "description": "Verify the deployment status"
-        #         },
-        #         {
-        #         "id": "run_performance_benchmark",
-        #         "title": "Running performance benchmark",
-        #         "description": "Run the performance benchmark"
-        #         }
-        #     ],
-        #     "status": "PENDING",
-        #     "eta": 1800
-        # }
 
         # Add payload dict to response
         for step in run_benchmark_response["steps"]:
