@@ -656,5 +656,5 @@ class BenchmarkRequestMetricsService(SessionMixin):
         """Get benchmark request metrics."""
         with BenchmarkRequestMetricsCRUD() as crud:
             db_request_metrics, count = crud.fetch_many(conditions={"benchmark_id": benchmark_id}, limit=limit, offset=offset)
-            request_metrics = [BenchmarkRequestMetrics.model_validate(request_metric, from_attributes=True).model_dump(mode="json") for request_metric in db_request_metrics]
+            request_metrics = [BenchmarkRequestMetrics.model_validate(request_metric, from_attributes=True) for request_metric in db_request_metrics]
         return request_metrics, count

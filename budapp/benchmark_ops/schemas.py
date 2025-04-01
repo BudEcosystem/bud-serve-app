@@ -193,7 +193,7 @@ class BenchmarkRequestMetrics(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    @computed_field
+    @computed_field(return_type=float)
     @property
     def itl_sum(self) -> float:
         """Compute sum of inter-token latencies (itl) if available."""
