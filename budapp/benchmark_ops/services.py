@@ -607,8 +607,8 @@ class BenchmarkService(SessionMixin):
 
         # Create request payload
         deployment_config = {
-            "max_input_tokens": data.get("max_input_tokens"),
-            "max_output_tokens": data.get("max_output_tokens"),
+            "max_input_tokens": data.get("max_input_tokens", 2000),
+            "max_output_tokens": data.get("max_output_tokens", 512),
             "concurrent_requests": data["concurrent_requests"],
         }
         payload = {
