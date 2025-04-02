@@ -27,9 +27,9 @@ from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
 from budapp.user_ops.schemas import TenantClientSchema
 
-from .schemas import UserLogin, UserLoginData
+from .schemas import UserLogin, UserLoginData, LogoutRequest
 from .token import TokenService
-
+from budapp.commons.config import app_settings
 
 logger = logging.get_logger(__name__)
 
@@ -123,3 +123,47 @@ class AuthService(SessionMixin):
             first_login=db_user.first_login,
             is_reset_password=db_user.is_reset_password,
         )
+
+    async def logout_user(self, logout_data: LogoutRequest) -> None:
+        """Logout a user by invalidating their refresh token."""
+        # Get tenant information
+        tenant = None
+        if logout_data.tenant_id:
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"id": logout_data.tenant_id}, missing_ok=True
+            )
+            if not tenant:
+                raise ClientException("Invalid tenant ID")
+        else:
+            # fetch default tenant
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+            )
+            if not tenant:
+                raise ClientException("Default tenant not found")
+
+        # Get tenant client credentials
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient,
+            {"tenant_id": tenant.id},
+            missing_ok=True
+        )
+        if not tenant_client:
+            raise ClientException("Tenant client configuration not found")
+
+        # Logout from Keycloak
+        keycloak_manager = KeycloakManager()
+        credentials = TenantClientSchema(
+            id=tenant_client.id,
+            client_id=tenant_client.client_id,
+            client_secret=tenant_client.client_secret
+        )
+
+        success = await keycloak_manager.logout_user(
+            refresh_token=logout_data.refresh_token,
+            realm_name=tenant.realm_name,
+            credentials=credentials
+        )
+
+        if not success:
+            raise ClientException("Failed to logout user")
