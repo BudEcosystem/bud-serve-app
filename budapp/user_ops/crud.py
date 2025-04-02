@@ -16,8 +16,16 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the user ops."""
 
+from typing import List
+from uuid import UUID
+
+from sqlalchemy import select, or_
+
 from budapp.commons import logging
+from budapp.commons.constants import UserStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
+
+from .models import User
 
 
 logger = logging.get_logger(__name__)
@@ -26,4 +34,20 @@ logger = logging.get_logger(__name__)
 class UserDataManager(DataManagerUtils):
     """Data manager for the User model."""
 
-    pass
+    async def get_active_invited_users_by_ids(self, user_ids: List[UUID]) -> List[User]:
+        """Get users by ids from database."""
+
+        stmt = select(User).filter(
+            User.id.in_(user_ids),
+            or_(
+                User.status == UserStatusEnum.ACTIVE,
+                User.status == UserStatusEnum.INVITED,
+            ),
+        )
+        return self.scalars_all(stmt)
+
+    async def get_users_by_emails(self, emails: List[str]) -> List[User]:
+        """Get users by emails from database."""
+
+        stmt = select(User).filter(User.email.in_(emails))
+        return self.scalars_all(stmt)
