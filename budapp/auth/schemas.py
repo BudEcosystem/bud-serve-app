@@ -56,16 +56,17 @@ class TokenCreate(BaseModel):
 
 
 class UserLogin(BaseModel):
-    """Login user schema."""
+    """User login schema."""
 
     email: EmailStr = Field(min_length=1, max_length=100)
     password: str = Field(min_length=8, max_length=100)
+    tenant_id: UUID4 | None = None # if not provided, the user will be logged in to the first tenant they belong to
 
 
 class UserLoginData(BaseModel):
     """User login data schema."""
 
-    token: AuthToken
+    token: any
     first_login: bool
     is_reset_password: bool
 

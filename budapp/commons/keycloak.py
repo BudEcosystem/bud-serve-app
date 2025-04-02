@@ -240,23 +240,37 @@ class KeycloakManager:
             logger.error(f"Error checking if realm {realm_name} exists: {str(e)}")
             return False
     
-    async def authenticate_user(self, username: str, password: str, realm_name: str, credentials: TenantClientSchema) -> str:
-        """Authenticate a user in Keycloak.
+    async def authenticate_user(self, username: str, password: str, realm_name: str, credentials: TenantClientSchema) -> dict:
+        """Authenticate a user and return access & refresh tokens.
 
         Args:
             username: Username of the user to authenticate
             password: Password of the user to authenticate
             realm_name: Name of the realm to authenticate the user in
+            credentials: Contains client_id and (optional) client_secret
 
         Returns:
-            str: User ID of the authenticated user
+            dict: Contains access_token, refresh_token, etc.
+            
+        Example:
+            {
+                "access_token": "eyJhbGciOiJSUzI1NiIsInR...",
+                "expires_in": 300,
+                "refresh_expires_in": 1800,
+                "refresh_token": "eyJhbGciOiJIUzI1NiIsInR...",
+                "token_type": "Bearer",
+                "not-before-policy": 0,
+                "session_state": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                "scope": "email profile"
+            }
         """
         try:
-            self._openid_client.token(username, password)
-            return True
+            openid_client = self.get_keycloak_openid_client(realm_name, credentials)
+            token = openid_client.token(username, password)
+            return token 
         except KeycloakAuthenticationError:
             logger.warning(f"Invalid credentials for user {username}")
-            return False
+            return {}
         except Exception as e:
             logger.error(f"Error verifying password for user {username}: {str(e)}")
-            return False
+            return {}
