@@ -23,6 +23,7 @@ PROVIDERS_SEEDER_FILE_PATH = os.path.join(CURRENT_FILE_PATH, "data", "providers_
 
 MODEL_SOURCES = [member.value for member in ModelSourceEnum]
 
+
 class ProviderSeeder(BaseSeeder):
     """Seeder for the Provider model."""
 
@@ -67,7 +68,16 @@ class ProviderSeeder(BaseSeeder):
             logger.debug(f"Seeded {len(db_providers)} new providers")
 
     @staticmethod
-    async def _get_providers_data() -> Dict[str, Any]:
+    async def _async_get_providers_data() -> Dict[str, Any]:
+        """Get providers data from the database."""
+        try:
+            with open(PROVIDERS_SEEDER_FILE_PATH, "r") as file:
+                return json.load(file)
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"File not found: {PROVIDERS_SEEDER_FILE_PATH}") from e
+
+    @staticmethod
+    def _get_providers_data() -> Dict[str, Any]:
         """Get providers data from the database."""
         try:
             with open(PROVIDERS_SEEDER_FILE_PATH, "r") as file:

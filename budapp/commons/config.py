@@ -18,6 +18,16 @@
 
 import os
 from pathlib import Path
+
+from typing import Annotated, Any, Dict, List, Optional
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.types import (
+    PrivateKeyTypes,
+    PublicKeyTypes,
+)
+from dapr.conf import settings as dapr_settings
+
 from typing import Annotated, Any, List, Optional
 
 from budmicroframe.commons.config import (
@@ -28,6 +38,7 @@ from budmicroframe.commons.config import (
     register_settings,
 )
 from dotenv import load_dotenv
+
 from pydantic import (
     AnyHttpUrl,
     AnyUrl,
@@ -138,8 +149,16 @@ class AppConfig(BaseAppConfig):
     # Add model directory
     add_model_dir: DirectoryPath = Field(os.path.expanduser("~/.cache"), alias="ADD_MODEL_DIR")
 
+    # Bud Proxy
+    cache_embedding_model: Optional[str] = Field(alias="CACHE_EMBEDDING_MODEL", default=None)
+    cache_eviction_policy: str = Field(alias="CACHE_EVICTION_POLICY", default="LRU")
+    cache_max_size: int = Field(alias="CACHE_MAX_SIZE", default=1000)
+    cache_ttl: Optional[int] = Field(alias="CACHE_TTL", default=None)
+    cache_score_threshold: float = Field(alias="CACHE_SCORE_THRESHOLD", default=0.1)
+    litellm_proxy_master_key: str = Field(alias="LITELLM_PROXY_MASTER_KEY", default="sk-1234")
+
     # Frontend URL
-    frontend_url: str = Field(alias="FRONTEND_URL", default="http://localhost:3000")
+    frontend_url: AnyUrl = Field(alias="FRONTEND_URL", default="http://localhost:3000")
 
     @computed_field
     def static_dir(self) -> str:
@@ -227,10 +246,56 @@ class SecretsConfig(BaseConfig):
         None, alias="HF_TOKEN", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
     )
 
+    base_dir: DirectoryPath = Field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
+    vault_path: DirectoryPath = base_dir
+
+    # Encryption
+    private_key_password: str = "bud_encryption_password"
+    aes_key_hex: str = ""
+
     @computed_field
     def redis_url(self) -> str:
         """Construct and returns a Redis connection URL."""
         return f"redis://:{self.redis_password}@{self.redis_uri}"
+
+    @property
+    def public_key(self) -> PublicKeyTypes:
+        """Return Public key loaded from the PEM file"""
+        try:
+            # Read the public key from PEM file
+            public_pem_bytes = Path(os.path.join(self.vault_path, "public_key.pem")).read_bytes()
+
+            # Load the public key
+            public_key_from_pem = serialization.load_pem_public_key(public_pem_bytes)
+
+            return public_key_from_pem
+        except (ValueError, UnboundLocalError, FileNotFoundError):
+            raise RuntimeError("Could not load public key") from None
+
+    @property
+    def private_key(self) -> PrivateKeyTypes:
+        """Return Private key loaded from the PEM file"""
+        try:
+            # Read the private key from PEM file
+            private_pem_bytes = Path(os.path.join(self.vault_path, "private_key.pem")).read_bytes()
+
+            # Load the private key
+            private_key_from_pem = serialization.load_pem_private_key(
+                private_pem_bytes, password=self.private_key_password.encode("utf-8")
+            )
+
+            return private_key_from_pem
+        except (ValueError, UnboundLocalError, FileNotFoundError):
+            raise RuntimeError("Could not load private key") from None
+
+    @property
+    def aes_key(self) -> bytes:
+        """Return AES key loaded from the HEX format"""
+
+        if not self.aes_key_hex:
+            raise RuntimeError("AES key is not set")
+
+        return bytes.fromhex(self.aes_key_hex)
 
 
 app_settings = AppConfig()

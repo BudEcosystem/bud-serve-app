@@ -17,14 +17,16 @@
 """The crud package, containing essential business logic, services, and routing configurations for the user ops."""
 
 from typing import List
-from sqlalchemy import or_, update, select
 from uuid import UUID
 
-from budapp.commons import logging
-from budapp.commons.db_utils import DataManagerUtils
-from budapp.commons.constants import UserStatusEnum
+from sqlalchemy import select, or_, update
 
-from .models import User as UserModel
+from budapp.commons import logging
+from budapp.commons.constants import UserStatusEnum
+from budapp.commons.db_utils import DataManagerUtils
+
+from .models import User
+
 
 logger = logging.get_logger(__name__)
 
@@ -32,22 +34,22 @@ logger = logging.get_logger(__name__)
 class UserDataManager(DataManagerUtils):
     """Data manager for the User model."""
 
-    async def get_users_by_emails(self, emails: List[str]) -> List[UserModel]:
-        """Get users by emails from database."""
-
-        stmt = select(UserModel).filter(UserModel.email.in_(emails))
-        return self.scalars_all(stmt)
-
-    async def get_active_invited_users_by_ids(self, user_ids: List[UUID]) -> List[UserModel]:
+    async def get_active_invited_users_by_ids(self, user_ids: List[UUID]) -> List[User]:
         """Get users by ids from database."""
 
-        stmt = select(UserModel).filter(
-            UserModel.id.in_(user_ids),
+        stmt = select(User).filter(
+            User.id.in_(user_ids),
             or_(
-                UserModel.status == UserStatusEnum.ACTIVE,
-                UserModel.status == UserStatusEnum.INVITED,
+                User.status == UserStatusEnum.ACTIVE,
+                User.status == UserStatusEnum.INVITED,
             ),
         )
+        return self.scalars_all(stmt)
+
+    async def get_users_by_emails(self, emails: List[str]) -> List[User]:
+        """Get users by emails from database."""
+
+        stmt = select(User).filter(User.email.in_(emails))
         return self.scalars_all(stmt)
 
     async def update_subscriber_status(self, user_ids: List[int], is_subscriber: bool) -> None:
@@ -56,7 +58,7 @@ class UserDataManager(DataManagerUtils):
         if not user_ids:
             raise ValueError("The list of user IDs must not be empty.")
 
-        stmt = update(UserModel).where(UserModel.id.in_(user_ids)).values(is_subscriber=is_subscriber)
+        stmt = update(User).where(User.id.in_(user_ids)).values(is_subscriber=is_subscriber)
 
         self.session.execute(stmt)
         self.session.commit()

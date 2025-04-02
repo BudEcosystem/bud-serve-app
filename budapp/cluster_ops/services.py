@@ -1086,7 +1086,6 @@ class ClusterService(SessionMixin):
         except Exception as e:
             logger.exception(f"Failed to send delete cluster request: {e}")
             raise ClientException("Failed to delete cluster", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR) from e
-        
 
     async def handle_recommended_cluster_events(self, payload: NotificationPayload) -> None:
         """Handle recommended cluster events."""
@@ -1611,6 +1610,13 @@ class ClusterService(SessionMixin):
         try:
             client = PrometheusMetricsClient(config)
             nodes_status = client.get_nodes_status()
+            nodes_data = await self._perform_get_cluster_nodes_request(db_cluster.cluster_id)
+            node_name_id_mapping = {node["name"]: {"id": node["id"], "devices": node["hardware_info"]} for node in nodes_data.get("nodes", [])}
+            for _, value in nodes_status.get("nodes", {}).items():
+                hostname = value["hostname"]
+                node_map = node_name_id_mapping.get(hostname)
+                value["id"] = node_map["id"]
+                value["devices"] = node_map["devices"]
         except Exception as e:
             raise ClientException(f"Failed to get node metrics: {str(e)}")
 
@@ -1650,3 +1656,31 @@ class ClusterService(SessionMixin):
 
         except Exception as e:
             raise ClientException(f"Failed to get node-wise events: {str(e)}")
+
+    async def _perform_get_cluster_nodes_request(self, cluster_id: UUID) -> Dict:
+        """Perform get cluster nodes request to bud_cluster app.
+
+        Args:
+            cluster_id: The ID of the cluster to update.
+        """
+        get_cluster_node_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/{cluster_id}/nodes"
+
+        try:
+            logger.debug(
+                f"Performing get cluster node request. endpoint: {get_cluster_node_endpoint}"
+            )
+            async with aiohttp.ClientSession() as session, session.get(get_cluster_node_endpoint) as response:
+                response_data = await response.json()
+                if response.status != 200 or response_data.get("object") == "error":
+                    logger.error(f"Failed to get cluster nodes: {response.status} {response_data}")
+                    raise ClientException(
+                        "Failed to get cluster nodes", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+
+                logger.debug("Successfully fetched cluster nodes")
+                return response_data["param"]
+        except Exception as e:
+            logger.exception(f"Failed to send get cluster nodes request: {e}")
+            raise ClientException(
+                "Failed to get cluster nodes", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e

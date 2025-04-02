@@ -32,6 +32,7 @@ from ..credential_ops.models import ProprietaryCredential as ProprietaryCredenti
 from ..dataset_ops.models import DatasetCRUD
 from ..dataset_ops.schemas import DatasetResponse
 from ..endpoint_ops.schemas import ModelClusterDetail
+from ..endpoint_ops.services import EndpointService
 from ..model_ops.crud import ModelDataManager, ProviderDataManager
 from ..model_ops.models import Model
 from ..model_ops.models import Provider as ProviderModel
@@ -43,7 +44,12 @@ from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
 from .models import BenchmarkCRUD, BenchmarkRequestMetricsCRUD, BenchmarkRequestMetricsSchema, BenchmarkSchema
-from .schemas import AddRequestMetricsRequest, RunBenchmarkWorkflowRequest, RunBenchmarkWorkflowStepData
+from .schemas import (
+    AddRequestMetricsRequest,
+    BenchmarkRequestMetrics,
+    RunBenchmarkWorkflowRequest,
+    RunBenchmarkWorkflowStepData,
+)
 
 
 logger = logging.get_logger(__name__)
@@ -197,6 +203,47 @@ class BenchmarkService(SessionMixin):
             {"current_step": workflow_current_step},
         )
 
+        # Perform bud simulation
+        if model_id:
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": db_workflow.id}
+            )
+
+            # Define the keys required for model security scan
+            keys_of_interest = [
+                "model_id",
+                "cluster_id",
+                "bud_cluster_id",
+                "nodes",
+                "eval_with",
+                "concurrent_requests",
+                "max_input_tokens",
+                "max_output_tokens",
+            ]
+
+            # from workflow steps extract necessary information
+            required_data = {}
+            for db_workflow_step in db_workflow_steps:
+                for key in keys_of_interest:
+                    if key in db_workflow_step.data:
+                        required_data[key] = db_workflow_step.data[key]
+
+            # Check if all required keys are present
+            required_keys = ["model_id", "cluster_id", "bud_cluster_id","nodes", "eval_with", "concurrent_requests"]
+            if required_data.get("eval_with", "") == "configuration":
+                required_keys.extend(["max_input_tokens", "max_output_tokens"])
+            missing_keys = [key for key in required_keys if key not in required_data]
+            if missing_keys:
+                raise ClientException(f"Missing required data for bud simulation: {', '.join(missing_keys)}")
+            # Perform add worker bud simulation
+            try:
+                await self._perform_add_worker_simulation(
+                    current_step_number, required_data, db_workflow, current_user_id
+                )
+            except ClientException as e:
+                raise e
+
+
         # Trigger workflow
         if trigger_workflow:
             # query workflow steps again to get latest data
@@ -225,6 +272,7 @@ class BenchmarkService(SessionMixin):
                 "user_confirmation",
                 "run_as_simulation",
                 "user_id",
+                "simulator_id",
             ]
 
             # from workflow steps extract necessary information
@@ -302,35 +350,6 @@ class BenchmarkService(SessionMixin):
 
         logger.debug(f"Performing run benchmark request to budcluster {run_benchmark_payload}")
         run_benchmark_response = await self._perform_run_benchmark_request(run_benchmark_payload)
-        # run_benchmark_response = {
-        #     "object": "workflow_metadata",
-        #     "workflow_id": "d54dece7-b1d9-4bc0-a43f-40fca695a74d",
-        #     "workflow_name": "create_cloud_deployment",
-        #     "steps": [
-        #         {
-        #         "id": "verify_cluster_connection",
-        #         "title": "Verifying cluster connection",
-        #         "description": "Verify the cluster connection"
-        #         },
-        #         {
-        #         "id": "deploy_to_engine",
-        #         "title": "Deploying model to engine",
-        #         "description": "Deploy the model to the engine"
-        #         },
-        #         {
-        #         "id": "verify_deployment_status",
-        #         "title": "Verifying deployment status",
-        #         "description": "Verify the deployment status"
-        #         },
-        #         {
-        #         "id": "run_performance_benchmark",
-        #         "title": "Running performance benchmark",
-        #         "description": "Run the performance benchmark"
-        #         }
-        #     ],
-        #     "status": "PENDING",
-        #     "eta": 1800
-        # }
 
         # Add payload dict to response
         for step in run_benchmark_response["steps"]:
@@ -578,6 +597,92 @@ class BenchmarkService(SessionMixin):
             })
         return analysis_data_list
 
+    async def _perform_add_worker_simulation(
+        self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID
+    ) -> None:
+        """Perform bud simulation."""
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, fields={"id": data["model_id"]}, exclude_fields={"status": ModelStatusEnum.DELETED}
+        )
+
+        # Create request payload
+        deployment_config = {
+            "max_input_tokens": data.get("max_input_tokens", 2000),
+            "max_output_tokens": data.get("max_output_tokens", 512),
+            "concurrent_requests": data["concurrent_requests"],
+        }
+        payload = {
+            "pretrained_model_uri": db_model.uri,
+            "input_tokens": deployment_config["max_input_tokens"],
+            "output_tokens": deployment_config["max_output_tokens"],
+            "concurrency": deployment_config["concurrent_requests"],
+            "cluster_id": str(data["bud_cluster_id"]),
+            "nodes": [node["hostname"] for node in data["nodes"]],
+            "notification_metadata": {
+                "name": BUD_INTERNAL_WORKFLOW,
+                "subscriber_ids": str(current_user_id),
+                "workflow_id": str(db_workflow.id),
+            },
+            "source_topic": f"{app_settings.source_topic}",
+        }
+        if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            payload["is_proprietary_model"] = True
+        else:
+            payload["is_proprietary_model"] = False
+
+        # Perform bud simulation request
+        # bud_simulation_response = await EndpointService(self.session)._perform_bud_simulation_request(payload)
+        bud_simulation_response = {
+            "eta": 0,
+            "steps": [
+                {
+                    "id": "performance_estimation",
+                    "title": "Generating best configuration for each cluster",
+                    "description": "Analyze and estimate the optimal performance for each cluster"
+                },
+                {
+                    "id": "ranking",
+                    "title": "Ranking the cluster based on performance",
+                    "description": "Rank the clusters to find the best configuration"
+                }
+            ],
+            "object": "workflow_metadata",
+            "status": "PENDING",
+            "workflow_name": "run_simulation",
+        }
+
+        # Add payload dict to response
+        for step in bud_simulation_response["steps"]:
+            step["payload"] = {}
+
+        simulator_id = bud_simulation_response.get("workflow_id")
+
+        # NOTE: Dependency with recommended cluster api (GET /clusters/recommended/{workflow_id})
+        # NOTE: Replace concurrent_requests with additional_concurrency
+        # Required to compare with concurrent_requests in simulator response
+        bud_simulation_events = {
+            "simulator_id": simulator_id,
+            BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value: bud_simulation_response,
+            "deploy_config": deployment_config,
+            "model_id": str(db_model.id),
+        }
+
+        # Increment current step number
+        current_step_number = current_step_number + 1
+        workflow_current_step = current_step_number
+
+        # Update or create next workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, bud_simulation_events
+        )
+        logger.debug(f"Workflow step created with id {db_workflow_step.id}")
+
+        # Update progress in workflow
+        bud_simulation_response["progress_type"] = BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": bud_simulation_response, "current_step": workflow_current_step}
+        )
+
 
 class BenchmarkRequestMetricsService(SessionMixin):
     """Benchmark request metrics service."""
@@ -585,7 +690,11 @@ class BenchmarkRequestMetricsService(SessionMixin):
     async def add_request_metrics(self, request: AddRequestMetricsRequest) -> None:
         """Add request metrics."""
         if request.metrics:
-            metrics_data = [BenchmarkRequestMetricsSchema(**metric.model_dump(mode="json")) for metric in request.metrics]
+            valid_keys = {column.name for column in BenchmarkRequestMetricsSchema.__table__.columns}
+            metrics_data = [
+                BenchmarkRequestMetricsSchema(**{k: v for k, v in metric.model_dump(mode="json").items() if k in valid_keys})
+                for metric in request.metrics
+            ]
             with BenchmarkRequestMetricsCRUD() as crud:
                 crud.bulk_insert(metrics_data, session=self.session)
 
@@ -680,3 +789,11 @@ class BenchmarkRequestMetricsService(SessionMixin):
                 graph_data_list.append(temp_data)
             print(graph_data_list)
         return graph_data_list
+
+    async def get_request_metrics(self, benchmark_id: UUID, offset: int = 0, limit: int = 10) -> dict:
+        """Get benchmark request metrics."""
+        with BenchmarkRequestMetricsCRUD() as crud:
+            db_request_metrics, _ = crud.fetch_many(conditions={"benchmark_id": benchmark_id}, limit=limit, offset=offset)
+            total_count = crud.fetch_count(conditions={"benchmark_id": benchmark_id})
+            request_metrics = [BenchmarkRequestMetrics.model_validate(request_metric, from_attributes=True) for request_metric in db_request_metrics]
+        return request_metrics, total_count

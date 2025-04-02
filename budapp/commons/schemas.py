@@ -20,7 +20,7 @@ import datetime
 import math
 import re
 from http import HTTPStatus
-from typing import Any, ClassVar, Dict, Optional, Set, Tuple, Type, Union
+from typing import Any, ClassVar, Dict, Generic, Optional, Set, Tuple, Type, TypeVar, Union
 
 from fastapi.responses import JSONResponse
 from pydantic import (
@@ -37,6 +37,8 @@ from typing_extensions import Annotated
 
 
 lowercase_string = Annotated[str, StringConstraints(to_lower=True)]
+
+ContentType = TypeVar("ContentType")
 
 
 class CloudEventBase(BaseModel):
@@ -245,6 +247,14 @@ class ResponseBase(BaseModel):
         return JSONResponse(content=details, status_code=status_code)
 
 
+class SingleResponse(BaseModel, Generic[ContentType]):
+    """Single Response Schema."""
+
+    success: bool = True
+    result: Union[ContentType, list[ContentType]]
+    message: Optional[str] = None
+
+
 class SuccessResponse(ResponseBase):
     """Define a success response with optional message and parameters.
 
@@ -375,7 +385,7 @@ class Task(Tag):
 
 
 class BudNotificationMetadata(BaseModel):
-    """Recommended cluster notification metadata"""
+    """Recommended cluster notification metadata."""
 
     workflow_id: str
     subscriber_ids: str

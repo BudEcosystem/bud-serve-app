@@ -112,6 +112,7 @@ class Model(Base, TimestampMixin):
     recommended_cluster_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     endpoints: Mapped[list["Endpoint"]] = relationship(back_populates="model")
+    adapters: Mapped[list["Adapter"]] = relationship(back_populates="model")
     benchmarks: Mapped[list["BenchmarkSchema"]] = relationship(back_populates="model")
     created_user: Mapped["User"] = relationship(back_populates="created_models", foreign_keys=[created_by])
     paper_published: Mapped[List["PaperPublished"]] = relationship("PaperPublished", back_populates="model")
@@ -151,6 +152,9 @@ class ModelLicenses(Base, TimestampMixin):
     path: Mapped[str] = mapped_column(String, nullable=True)
     faqs: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
+    license_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    suitability: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     model: Mapped["Model"] = relationship("Model", back_populates="model_licenses")
 

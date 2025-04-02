@@ -23,6 +23,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.database import Base, TimestampMixin
+from budapp.permissions.models import ProjectPermission
 
 from ..commons.constants import ProjectStatusEnum
 from ..permissions.models import ProjectPermission
@@ -60,6 +61,10 @@ class Project(Base, TimestampMixin):
     users: Mapped[list["User"]] = relationship("User", secondary=project_user_association, back_populates="projects")
     endpoints: Mapped[list["Endpoint"]] = relationship(
         "Endpoint",
+        back_populates="project",
+    )
+    routers: Mapped[list["Router"]] = relationship(
+        "Router",
         back_populates="project",
     )
     project_permissions: Mapped[list[ProjectPermission]] = relationship(
