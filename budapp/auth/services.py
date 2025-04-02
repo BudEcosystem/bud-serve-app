@@ -22,6 +22,7 @@ from budapp.commons.config import secrets_settings
 from budapp.commons.constants import UserStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
+from budapp.commons.keycloak import KeycloakManager
 from budapp.commons.security import HashManager
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import User as UserModel
@@ -45,6 +46,13 @@ class AuthService(SessionMixin):
         if not db_user:
             logger.debug(f"User not found in database: {user.email}")
             raise ClientException("This email is not registered")
+        
+        # Password verification with keycloak
+        keycloak_manager = KeycloakManager()
+        keycloak_user = await keycloak_manager.get_user(db_user.auth_id)
+        if not await keycloak_manager.verify_password(keycloak_user, user.password):
+            logger.debug(f"Password incorrect for {user.email}")
+            raise ClientException("Incorrect email or password")
 
         # Check if password is correct
         salted_password = user.password + secrets_settings.password_salt

@@ -2,9 +2,10 @@
 
 from typing import Optional, Tuple
 
-from keycloak import KeycloakAdmin
+from keycloak import KeycloakAdmin, KeycloakAuthenticationError, KeycloakOpenID
 
 from budapp.commons.constants import UserRoleEnum
+from budapp.user_ops.schemas import  TenantClientSchema
 
 from . import logging
 from .config import app_settings
@@ -68,7 +69,18 @@ class KeycloakManager:
         except Exception as e:
             logger.error(f"Failed to create realm admin for realm {realm_name}: {str(e)}")
             raise
+    def get_keycloak_openid_client(self, realm_name: str, credentials: TenantClientSchema) -> KeycloakAdmin:
+        """Get the keycloak openid client.
 
+        Args:
+            realm_name: Name of the realm
+        """
+        return KeycloakOpenID(
+            server_url=app_settings.keycloak_server_url,
+            client_id=credentials.client_id,
+            realm_name=realm_name,
+            client_secret_key=credentials.client_secret,
+        )
     async def create_realm(self, realm_name: str) -> dict:
         """Create a new realm in Keycloak.
 
@@ -121,26 +133,29 @@ class KeycloakManager:
         Returns:
             Tuple[str, str]: Tuple containing (client_id, client_secret)
         """
+        
         base_url = self._get_base_url()
         client_representation = {
             "clientId": client_id,
             "enabled": True,
             "protocol": "openid-connect",
             "publicClient": False,
-            "redirectUris": [f"{base_url}/*"],  # todo update to backend if required
+            "redirectUris": [f"{base_url}/*"],
             "webOrigins": [base_url],
         }
 
         try:
-            new_client_id = self.admin_client.create_client(payload=client_representation)
-            client_secret = self.admin_client.get_client_secrets(new_client_id)["value"]
+            
+            realm_admin = self.get_realm_admin(realm_name)
+            new_client_id = realm_admin.create_client(payload=client_representation)
+            client_secret = realm_admin.get_client_secrets(new_client_id)["value"]
             return new_client_id, client_secret
         except Exception as e:
             logger.error(f"Error creating client {client_id} in realm {realm_name}: {str(e)}")
             raise
 
     async def create_user(
-        self, username: str, email: str, password: str, realm_name: str, role: KeycloakBudRoles
+        self, username: str, email: str, password: str, realm_name: str, role: UserRoleEnum
     ) -> str:
         """Create a new user in Keycloak.
 
@@ -162,7 +177,7 @@ class KeycloakManager:
         }
 
         try:
-            realm_admin = self.get_realm_admin()
+            realm_admin = self.get_realm_admin(realm_name)
             user_id = realm_admin.create_user(payload=user_representation)
             logger.info(f"User {username} created successfully")
 
@@ -201,8 +216,8 @@ class KeycloakManager:
             logger.info(f"Realm admin {username} created successfully")
 
             # Assign role to user
-            realm_admin.assign_realm_roles(user_id=user_id, roles=[KeycloakBudRoles.ADMIN.value])
-            logger.info(f"Role {KeycloakBudRoles.ADMIN.value} assigned to realm admin {username}")
+            realm_admin.assign_realm_roles(user_id=user_id, roles=[UserRoleEnum.ADMIN.value])
+            logger.info(f"Role {UserRoleEnum.ADMIN.value} assigned to realm admin {username}")
 
             return user_id
         except Exception as e:
@@ -223,4 +238,25 @@ class KeycloakManager:
             return any(realm["realm"] == realm_name for realm in realms)
         except Exception as e:
             logger.error(f"Error checking if realm {realm_name} exists: {str(e)}")
+            return False
+    
+    async def authenticate_user(self, username: str, password: str, realm_name: str, credentials: TenantClientSchema) -> str:
+        """Authenticate a user in Keycloak.
+
+        Args:
+            username: Username of the user to authenticate
+            password: Password of the user to authenticate
+            realm_name: Name of the realm to authenticate the user in
+
+        Returns:
+            str: User ID of the authenticated user
+        """
+        try:
+            self._openid_client.token(username, password)
+            return True
+        except KeycloakAuthenticationError:
+            logger.warning(f"Invalid credentials for user {username}")
+            return False
+        except Exception as e:
+            logger.error(f"Error verifying password for user {username}: {str(e)}")
             return False

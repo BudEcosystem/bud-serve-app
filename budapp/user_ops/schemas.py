@@ -59,3 +59,10 @@ class UserResponse(SuccessResponse):
     model_config = ConfigDict(from_attributes=True)
 
     user: UserInfo
+
+class TenantClientSchema(BaseModel):
+    """Tenant client schema."""
+
+    id: UUID4
+    client_id: UUID4
+    client_secret: str

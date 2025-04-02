@@ -8,10 +8,12 @@ from budapp.commons.database import engine
 from budapp.commons.keycloak import KeycloakManager
 from budapp.initializers.base_seeder import BaseSeeder
 from budapp.user_ops.crud import UserDataManager
+from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
 
 
 logger = logging.get_logger(__name__)
+
 
 class BaseKeycloakSeeder(BaseSeeder):
     """Base class for keycloak seeder."""
@@ -32,26 +34,42 @@ class BaseKeycloakSeeder(BaseSeeder):
 
         # Get the default realm name
         default_realm_name = app_settings.default_realm_name
+        default_client_id = "default-internal-client"
 
         # check if its already exisits
         if not keycloak_manager.realm_exists(default_realm_name):
             await keycloak_manager.create_realm(default_realm_name)
 
-        # # Create the default client if it doesn't exist
-        # await keycloak_manager.create_client(default_realm_name)
-        # above is skipped as we don't have organizations implemented yet , required when in multi-tenant mode and save credentials with map
+            # Save The Tenant in DB
+            tenant = Tenant(
+                name="Default Tenant",
+                realm_name=default_realm_name,
+                tenant_identifier=default_realm_name,
+                description="Default tenant for superuser",
+                is_active=True,
+            )
+            await UserDataManager(session).insert_one(tenant)
 
-        # create super user
-        keycloak_user_id = await keycloak_manager.create_realm_admin(
-            username=app_settings.superuser_email,
-            email=app_settings.superuser_email,
-            password=app_settings.superuser_password,
-            realm_name=default_realm_name
+        # check if the client exists for the tenant
+        tenant_client = await UserDataManager(session).retrieve_by_fields(
+            TenantClient,
+            {"tenant_id": tenant.id, "client_id": default_client_id},
+            missing_ok=True,
         )
 
-        logger.info(f"Keycloak user {app_settings.superuser_email} created with id {keycloak_user_id}")
+        if not tenant_client:
+            # Create the default client if it doesn't exist
+            new_client_id, client_secret = await keycloak_manager.create_client(default_client_id)
 
-        # Create / Update the user in the database
+            # Save The Tenant Client in DB
+            tenant_client = TenantClient(
+                tenant_id=tenant.id,
+                client_id=new_client_id,
+                client_secret=client_secret,  # TODO: perform encryption before saving
+            )
+            await UserDataManager(session).insert_one(tenant_client)
+
+        # check if the user exists for the tenant, make sure the user auth_id is used for keycloak id
         db_user = await UserDataManager(session).retrieve_by_fields(
             UserModel,
             {"email": app_settings.superuser_email, "status": UserStatusEnum.ACTIVE, "is_superuser": True},
@@ -59,12 +77,19 @@ class BaseKeycloakSeeder(BaseSeeder):
         )
 
         if not db_user:
-            # Create super user
-            super_user = UserModel(
+            # create super user
+            keycloak_user_id = await keycloak_manager.create_realm_admin(
+                username=app_settings.superuser_email,
+                email=app_settings.superuser_email,
+                password=app_settings.superuser_password,
+                realm_name=default_realm_name,
+            )
+
+            # Save The User in DB
+            db_user = UserModel(
                 name="admin",
                 auth_id=UUID(keycloak_user_id),
                 email=app_settings.superuser_email,
-                #password=hashed_password, #TODO: remove password field as we are using keycloak
                 is_superuser=True,
                 color=UserColorEnum.get_random_color(),
                 is_reset_password=False,
@@ -72,7 +97,13 @@ class BaseKeycloakSeeder(BaseSeeder):
                 status=UserStatusEnum.ACTIVE.value,
                 role=UserRoleEnum.SUPER_ADMIN.value,
             )
-            db_user = await UserDataManager(session).insert_one(super_user)
-            logger.debug("Inserted super user in database")
+            await UserDataManager(session).insert_one(db_user)
 
-        pass
+            # also add to the user mapping table
+            tenant_user_mapping = TenantUserMapping(
+                tenant_id=tenant.id,
+                user_id=db_user.auth_id,
+            )
+            await UserDataManager(session).insert_one(tenant_user_mapping)
+
+            logger.info(f"Keycloak user {app_settings.superuser_email} created with id {keycloak_user_id}")
