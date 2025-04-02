@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 from keycloak import KeycloakAdmin, KeycloakAuthenticationError, KeycloakOpenID
 
 from budapp.commons.constants import UserRoleEnum
-from budapp.user_ops.schemas import  TenantClientSchema
+from budapp.user_ops.schemas import TenantClientSchema
 
 from . import logging
 from .config import app_settings
@@ -133,7 +133,6 @@ class KeycloakManager:
         Returns:
             Tuple[str, str]: Tuple containing (client_id, client_secret)
         """
-        
         base_url = self._get_base_url()
         client_representation = {
             "clientId": client_id,
@@ -145,7 +144,7 @@ class KeycloakManager:
         }
 
         try:
-            
+
             realm_admin = self.get_realm_admin(realm_name)
             new_client_id = realm_admin.create_client(payload=client_representation)
             client_secret = realm_admin.get_client_secrets(new_client_id)["value"]
@@ -239,7 +238,7 @@ class KeycloakManager:
         except Exception as e:
             logger.error(f"Error checking if realm {realm_name} exists: {str(e)}")
             return False
-    
+
     async def authenticate_user(self, username: str, password: str, realm_name: str, credentials: TenantClientSchema) -> dict:
         """Authenticate a user and return access & refresh tokens.
 
@@ -267,10 +266,69 @@ class KeycloakManager:
         try:
             openid_client = self.get_keycloak_openid_client(realm_name, credentials)
             token = openid_client.token(username, password)
-            return token 
+            return token
         except KeycloakAuthenticationError:
             logger.warning(f"Invalid credentials for user {username}")
             return {}
         except Exception as e:
             logger.error(f"Error verifying password for user {username}: {str(e)}")
             return {}
+
+    async def logout_user(self, refresh_token: str, realm_name: str, credentials: TenantClientSchema) -> bool:
+        """Log out a user by invalidating the refresh token.
+
+        Args:
+            refresh_token: The refresh token to invalidate
+            realm_name: The realm the user belongs to
+            credentials: Contains client_id and (optional) client_secret
+
+        Returns:
+            bool: True if logout was successful, False otherwise
+        """
+        try:
+            openid_client = self.get_keycloak_openid_client(realm_name, credentials)
+            openid_client.logout(refresh_token)
+            logger.info(f"User successfully logged out from realm {realm_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error logging out user from realm {realm_name}: {str(e)}")
+            return False
+
+    async def validate_token(
+        self,
+        token: str,
+        realm_name: str,
+        credentials: TenantClientSchema
+    ) -> dict:
+        """Validate a JWT token and return the decoded claims if valid.
+
+        Args:
+            token: JWT access token
+            realm_name: Realm name the token belongs to
+            credentials: Client info (used to initialize OpenID client)
+
+        Returns:
+            dict: Decoded token claims if valid, else raises exception
+        """
+        try:
+            openid_client = self.get_keycloak_openid_client(realm_name, credentials)
+
+            # Optional: Validate token signature and claims
+            options = {
+                "verify_signature": True,
+                "verify_aud": True,
+                "verify_exp": True,
+            }
+
+            decoded_token = openid_client.decode_token(
+                token,
+                key=None,  # auto-fetch from /certs
+                options=options,
+            )
+
+            logger.info(f"Token successfully validated for realm {realm_name}")
+            return decoded_token
+
+        except Exception as e:
+            logger.error(f"Failed to validate token: {str(e)}")
+            raise
