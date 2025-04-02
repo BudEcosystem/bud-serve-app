@@ -18,22 +18,20 @@
 
 from collections.abc import AsyncGenerator
 from typing import List
-from uuid import UUID
 
 from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
-from budapp.auth.schemas import AccessTokenData
 from budapp.commons import logging
-from budapp.commons.config import secrets_settings
-from budapp.commons.constants import JWT_ALGORITHM, TokenTypeEnum, UserStatusEnum
+from budapp.commons.config import app_settings
+from budapp.commons.constants import UserStatusEnum
 from budapp.commons.database import SessionLocal
+from budapp.commons.keycloak import KeycloakManager
 from budapp.user_ops.crud import UserDataManager
-from budapp.user_ops.models import User as UserModel
-from budapp.user_ops.schemas import User
+from budapp.user_ops.models import Tenant, TenantClient
+from budapp.user_ops.schemas import TenantClientSchema, User
 
 
 logger = logging.get_logger(__name__)
@@ -79,40 +77,49 @@ async def get_current_user(
         detail="Invalid authentication credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+
     try:
-        # Decode the token and verify its validity
-        payload = jwt.decode(
-            token.credentials,
-            secrets_settings.jwt_secret_key,
-            algorithms=[JWT_ALGORITHM],
+        realm_name = app_settings.default_realm_name
+
+        # get the tenant from db with name as realm_name
+        tenant = await UserDataManager(session).retrieve_by_fields(
+            Tenant, {"realm_name": realm_name, "is_active": True}, missing_ok=True
         )
 
-        # Raise an exception if the token is not an access token
-        if payload.get("type") != TokenTypeEnum.ACCESS.value:
-            raise credentials_exception from None
+        if not tenant:
+            raise credentials_exception
 
-        # Extract the user ID from the payload. Raise an exception if it can't be found
+        # get the credentials for the realm
+        tenant_client = await UserDataManager(session).retrieve_by_fields(
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+        )
+
+        if not tenant_client:
+            raise credentials_exception
+
+        credentials = TenantClientSchema(client_id=tenant_client.client_id, client_secret=tenant_client.client_secret)
+
+        manager = KeycloakManager()
+        payload = manager.validate_token(token.credentials, realm_name, credentials)
+
         auth_id: str = payload.get("sub")
         if not auth_id:
-            raise credentials_exception from None
+            raise credentials_exception
 
-        # Create AccessTokenData instance with user auth ID
-        token_data = AccessTokenData(sub=auth_id)
-    except JWTError:
-        logger.info("Invalid access token found")
-        # Raise an exception if there's an issue decoding the token
-        raise credentials_exception from None
+        # get the user from db with auth_id
+        db_user = await UserDataManager(session).retrieve_by_fields(
+            User, {"auth_id": auth_id}, missing_ok=True
+        )
 
-    # Retrieve the user from the database
-    db_user = await UserDataManager(session).retrieve_by_fields(
-        UserModel, {"auth_id": UUID(token_data.sub)}, missing_ok=True
-    )
+        if not db_user:
+            raise credentials_exception
 
-    # Raise an exception if the user is not found
-    if not db_user:
-        raise credentials_exception from None
+        return db_user
+    except Exception as e:
+        logger.error(f"Error getting current user: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user") from e
 
-    return db_user
 
 
 async def get_current_active_user(current_user: Annotated[User, Depends(get_current_user)]) -> User:

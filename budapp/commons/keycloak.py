@@ -309,6 +309,35 @@ class KeycloakManager:
 
         Returns:
             dict: Decoded token claims if valid, else raises exception
+            
+        Example:
+        {
+            "exp": 1712180647,
+            "iat": 1712180347,
+            "auth_time": 1712180345,
+            "jti": "abc123-def456",
+            "iss": "https://keycloak.example.com/realms/myrealm",
+            "aud": "my-client-id",
+            "sub": "bf7acff1-2b9c-4936-bde2-3f607f3e3c67",
+            "typ": "Bearer",
+            "azp": "my-client-id",
+            "session_state": "b928e15b-b3ff-4f18-9ff9-f19dd29d5142",
+            "acr": "1",
+            "realm_access": {
+                "roles": [
+                "user",
+                "admin"
+                ]
+            },
+            "resource_access": {
+                "my-client-id": {
+                "roles": ["reader", "writer"]
+                }
+            },
+            "scope": "email profile",
+            "email_verified": True,
+            "preferred_username": "john.doe"
+            }
         """
         try:
             openid_client = self.get_keycloak_openid_client(realm_name, credentials)
