@@ -1611,11 +1611,12 @@ class ClusterService(SessionMixin):
             client = PrometheusMetricsClient(config)
             nodes_status = client.get_nodes_status()
             nodes_data = await self._perform_get_cluster_nodes_request(db_cluster.cluster_id)
-            node_name_id_mapping = {node["name"]: node["id"] for node in nodes_data.get("nodes", [])}
+            node_name_id_mapping = {node["name"]: {"id": node["id"], "devices": node["hardware_info"]} for node in nodes_data.get("nodes", [])}
             for _, value in nodes_status.get("nodes", {}).items():
                 hostname = value["hostname"]
-                node_id = node_name_id_mapping.get(hostname)
-                value["id"] = node_id
+                node_map = node_name_id_mapping.get(hostname)
+                value["id"] = node_map["id"]
+                value["devices"] = node_map["devices"]
         except Exception as e:
             raise ClientException(f"Failed to get node metrics: {str(e)}")
 
