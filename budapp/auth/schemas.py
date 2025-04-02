@@ -75,6 +75,6 @@ class UserLoginResponse(SuccessResponse):
     """User login response schema."""
 
     model_config = ConfigDict(extra="ignore")
-    token: AuthToken
+    token: any
     first_login: bool
     is_reset_password: bool
