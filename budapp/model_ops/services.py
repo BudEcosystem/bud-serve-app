@@ -24,6 +24,8 @@ from uuid import UUID, uuid4
 import aiohttp
 from fastapi import UploadFile, status
 from pydantic import HttpUrl
+import requests
+from urllib.parse import urlparse
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
@@ -38,12 +40,16 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
+from ..cluster_ops.crud import ModelClusterRecommendedDataManager
+from ..cluster_ops.models import ModelClusterRecommended as ModelClusterRecommendedModel
+from ..cluster_ops.workflows import ClusterRecommendedSchedulerWorkflows
 from ..commons.constants import (
     APP_ICONS,
     BENCHMARK_FIELDS_LABEL_MAPPER,
     BENCHMARK_FIELDS_TYPE_MAPPER,
     BUD_INTERNAL_WORKFLOW,
     LICENSE_DIR,
+    HF_AUTHORS_DIR,
     BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     CloudModelStatusEnum,
@@ -417,6 +423,9 @@ class CloudModelWorkflowService(SessionMixin):
                 {"current_step": end_step_number, "status": WorkflowStatusEnum.COMPLETED},
             )
 
+            # Trigger recommended cluster scheduler workflow
+            await ClusterRecommendedSchedulerWorkflows().__call__(model_id=db_model.id)
+
             # Send notification to workflow creator
             model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
             notification_request = (
@@ -768,13 +777,13 @@ class LocalModelWorkflowService(SessionMixin):
             # Update icon, title on workflow
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
                 db_workflow,
-                {"icon": APP_ICONS["general"]["model_mono"], "title": "URL"},
+                {"icon": APP_ICONS["general"]["default_url_model"], "title": "URL"},
             )
         elif provider_type == ModelProviderTypeEnum.DISK:
             # Update icon, title on workflow
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
                 db_workflow,
-                {"icon": APP_ICONS["general"]["model_mono"], "title": "Disk"},
+                {"icon": APP_ICONS["general"]["default_disk_model"], "title": "Disk"},
             )
 
         # Prepare workflow step data
@@ -1035,16 +1044,27 @@ class LocalModelWorkflowService(SessionMixin):
         minimum_requirements = {"device_name": "Xenon Dev", "core": 3, "memory": "32 GB", "RAM": "32 GB"}
 
         # Set provider id and icon
+        author_icon = model_info.get("logo_url")
+        if author_icon:
+            author_icon = LocalModelWorkflowService.save_author_logo(author_icon)
         provider_id = None
-        icon = required_data.get("icon")
+        icon = required_data.get("icon") if required_data.get("icon") else author_icon
         if required_data["provider_type"] == ModelProviderTypeEnum.HUGGING_FACE.value:
             # icon is not supported for hugging face models
             # Add provider id for hugging face models to retrieve icon for frontend
-            icon = None
+            if not icon:
+                icon = APP_ICONS["providers"]["default_hugging_face_model"]
             db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
                 ProviderModel, {"type": "huggingface"}
             )
             provider_id = db_provider.id
+
+        elif required_data["provider_type"] == ModelProviderTypeEnum.DISK:
+            if not icon:
+                icon = APP_ICONS["general"]["default_disk_model"]
+        elif required_data["provider_type"] == ModelProviderTypeEnum.URL:
+            if not icon:
+                icon = APP_ICONS["general"]["default_url_model"]
 
         model_data = ModelCreate(
             name=required_data["name"],
@@ -1117,6 +1137,9 @@ class LocalModelWorkflowService(SessionMixin):
         await WorkflowDataManager(self.session).update_by_fields(
             db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
         )
+
+        # Trigger recommended cluster scheduler workflow
+        await ClusterRecommendedSchedulerWorkflows().__call__(model_id=db_model.id)
 
         # Send notification to workflow creator
         model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
@@ -1325,12 +1348,35 @@ class LocalModelWorkflowService(SessionMixin):
         """Create model licenses from model info."""
         license_name = normalize_value(extracted_license.get("name"))
         license_url = normalize_value(extracted_license.get("url"))
-        license_faqs = normalize_value(extracted_license.get("faqs"))
+        license_faqs = normalize_value(extracted_license.get("faqs", []))
+        license_type = normalize_value(extracted_license.get("type"))
+        license_description = normalize_value(extracted_license.get("description"))
+        license_suitability = normalize_value(extracted_license.get("suitability"))
+        updated_license_faqs = []
+        if license_faqs:
+            for faq in license_faqs:
+                faq_description = " ".join(faq.get("reason", [])).strip()
+                impact = faq.get("impact", "")
+                if impact == "POSITIVE":
+                    answer = "YES"
+                else:
+                    answer = "NO"
+                updated_license_faqs.append(
+                    {
+                        "question": faq.get("question"),
+                        "description": faq_description,
+                        "answer": answer,
+                    }
+                )
+
         license_data = ModelLicensesCreate(
             name=license_name,
             url=license_url,
-            faqs=license_faqs,
+            faqs=updated_license_faqs if updated_license_faqs else None,
             model_id=model_id,
+            license_type=license_type,
+            description=license_description,
+            suitability=license_suitability,
         )
         return await ModelLicensesDataManager(self.session).insert_one(
             ModelLicenses(**license_data.model_dump(exclude_none=True))
@@ -1781,6 +1827,63 @@ class LocalModelWorkflowService(SessionMixin):
         else:
             return ModelSecurityScanStatusEnum.SAFE  # Default to SAFE if no issues are found
 
+    @staticmethod
+    def save_author_logo(img_url: str) -> str:
+        """
+        Downloads and saves the logo from the given image URL locally with a unique name.
+
+        Args:
+            img_url (str): The URL of the logo image.
+
+        Returns:
+            str: The local file path of the saved logo.
+        """
+        # Create logo directory if it doesn't exist
+        logo_dir = os.path.join(app_settings.icon_dir, HF_AUTHORS_DIR)
+        os.makedirs(logo_dir, exist_ok=True)
+
+        try:
+            # Parse the URL
+            parsed_url = urlparse(img_url)
+            path_parts = parsed_url.path.strip("/").split("/")
+
+            # Use the last two parts as the filename
+            logo_name = f"{path_parts[-2]}_{path_parts[-1]}"
+
+        except Exception:
+            # Fallback to entire URL path with `/` replaced by `_`
+            logo_name = parsed_url.path.strip("/").replace("/", "_")
+
+        # Ensure the filename ends with .png
+        if not logo_name.endswith(".png"):
+            logo_name += ".png"
+
+        # Construct the local logo path
+        logo_path = os.path.join(logo_dir, logo_name)
+        icon_index = logo_path.find("/icons/")
+        formatted_logo_path = logo_path[icon_index + 1 :]
+
+        # Check if the logo already exists
+        if os.path.exists(logo_path):
+            logger.debug(f"Logo already saved at: {logo_path}")
+            return formatted_logo_path
+
+        # Download and save the image
+        try:
+            response = requests.get(img_url)
+            response.raise_for_status()
+
+            # Save the image locally
+            with open(logo_path, "wb") as f:
+                f.write(response.content)
+
+            logger.debug(f"Logo saved at: {logo_path}")
+            return formatted_logo_path
+
+        except Exception as e:
+            logger.debug(f"Failed to download logo: {e}")
+            return ""
+
 
 class CloudModelService(SessionMixin):
     """Cloud model service."""
@@ -2139,6 +2242,12 @@ class ModelService(SessionMixin):
             logger.debug(f"Model deletion successful for {db_model.local_path}")
 
         db_model = await ModelDataManager(self.session).update_by_fields(db_model, {"status": ModelStatusEnum.DELETED})
+
+        # Remove from recommended models
+        await ModelClusterRecommendedDataManager(self.session).delete_by_fields(
+            ModelClusterRecommendedModel, {"model_id": db_model.id}
+        )
+        logger.debug(f"Model recommended cluster data for model {db_model.id} deleted")
 
         return db_model
 
@@ -2531,7 +2640,7 @@ class ModelService(SessionMixin):
 class ModelServiceUtil(SessionMixin):
     """Model util service."""
 
-    async def get_model_icon(self, db_model: Model) -> Optional[str]:
+    async def get_model_icon(self, db_model: Optional[Model] = None, model_id: Optional[UUID] = None) -> Optional[str]:
         """Get model icon.
 
         Args:
@@ -2540,6 +2649,12 @@ class ModelServiceUtil(SessionMixin):
         Returns:
             The model icon.
         """
+        if db_model is None and model_id is None:
+            raise ValueError("Atleast one of model instance or model id must be provided")
+        if db_model is None:
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
+            )
         if db_model.provider_type in [ModelProviderTypeEnum.CLOUD_MODEL, ModelProviderTypeEnum.HUGGING_FACE]:
             return db_model.provider.icon
         else:

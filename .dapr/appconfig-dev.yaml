@@ -7,9 +7,9 @@ spec:
   tracing:
     samplingRate: "1"
     stdout: true
-  features:
-    - name: SchedulerReminders
-      enabled: true
+  # features:
+  #   - name: SchedulerReminders
+  #     enabled: true
   secrets:
     scopes:
       - storeName: secretstore-local

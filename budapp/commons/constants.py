@@ -422,6 +422,9 @@ class WorkflowTypeEnum(StrEnum):
     ADD_WORKER_TO_ENDPOINT = auto()
     LICENSE_FAQ_FETCH = auto()
     LOCAL_MODEL_QUANTIZATION = auto()
+    MODEL_BENCHMARK = auto()
+    ADD_ADAPTER = auto()
+    DELETE_ADAPTER = auto()
 
 
 class NotificationType(Enum):
@@ -471,6 +474,9 @@ class PayloadType(str, Enum):
     ADD_WORKER = "add_worker"
     FETCH_LICENSE_FAQS = "fetch_license_faqs"
     DEPLOY_QUANTIZATION = "deploy_quantization"
+    RUN_BENCHMARK = "performance_benchmark"
+    ADD_ADAPTER = "add_adapter"
+    DELETE_ADAPTER = "delete_adapter"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -495,6 +501,8 @@ class BudServeWorkflowStepEventName(str, Enum):
     LICENSE_FAQ_EVENTS = "license_faq_events"
     QUANTIZATION_SIMULATION_EVENTS = "bud_simulator_events"
     QUANTIZATION_DEPLOYMENT_EVENTS = "quantization_deployment_events"
+    ADAPTER_DEPLOYMENT_EVENTS = "adapter_deployment_events"
+    ADAPTER_DELETE_EVENTS = "adapter_delete_events"
 
 
 class ClusterStatusEnum(StrEnum):
@@ -516,6 +524,27 @@ class ClusterStatusEnum(StrEnum):
 
 class EndpointStatusEnum(StrEnum):
     """Status for endpoint.
+
+    Attributes:
+        RUNNING: Represents the running endpoint status.
+        FAILURE: Represents the failure endpoint status.
+        DEPLOYING: Represents the deploying endpoint status.
+        UNHEALTHY: Represents the unhealthy endpoint status.
+        DELETING: Represents the deleting endpoint status.
+        DELETED: Represents the deleted endpoint status.
+        PENDING: Represents the pending endpoint status.
+    """
+
+    RUNNING = auto()
+    FAILURE = auto()
+    DEPLOYING = auto()
+    UNHEALTHY = auto()
+    DELETING = auto()
+    DELETED = auto()
+    PENDING = auto()
+
+class AdapterStatusEnum(StrEnum):
+    """Adapter status types.
 
     Attributes:
         RUNNING: Represents the running endpoint status.
@@ -680,8 +709,13 @@ APP_ICONS = {
         "model_mono": "icons/general/model_mono.png",
         "cluster_mono": "icons/general/cluster_mono.png",
         "deployment_mono": "icons/general/deployment_mono.png",
-    }
+        "default_url_model": "icons/general/default_url_model.png",
+        "default_disk_model": "icons/general/default_disk_model.png",
+    },
+    "providers": {"default_hugging_face_model": "icons/providers/huggingface.png"},
 }
+
+HF_AUTHORS_DIR = "hf_authors"
 
 EMOJIS = [
     "😀",
@@ -2572,7 +2606,9 @@ class NotificationTypeEnum(StrEnum):
     CLUSTER_DELETION_SUCCESS = auto()
     DEPLOYMENT_DELETION_SUCCESS = auto()
     MODEL_QUANTIZATION_SUCCESS = auto()
-
+    MODEL_BENCHMARK_SUCCESS = auto()
+    ADAPTER_DEPLOYMENT_SUCCESS = auto()
+    ADAPTER_DELETION_SUCCESS = auto()
 
 BENCHMARK_FIELDS_TYPE_MAPPER = {
     "classification": "Classification",
@@ -2593,6 +2629,8 @@ BENCHMARK_FIELDS_TYPE_MAPPER = {
     "lmsys_areana": "Human Preference",
     "bcfl": "Tool Use",
     "live_code_bench": "Code Generation",
+    "lc_win_rate": "Instruction Following",
+    "ugi_score": "Uncensored",
 }
 
 BENCHMARK_FIELDS_LABEL_MAPPER = {
@@ -2614,4 +2652,25 @@ BENCHMARK_FIELDS_LABEL_MAPPER = {
     "lmsys_areana": "LMSYS Areana",
     "bcfl": "BCFL",
     "live_code_bench": "Live Code Bench",
+    "lc_win_rate": "AlpacaEval2.0",
+    "ugi_score": "UGI",
 }
+
+
+class BenchmarkStatusEnum(Enum):
+    """Benchmark status."""
+
+    SUCCESS = "success"
+    FAILED = "failed"
+    PROCESSING = "processing"
+
+
+class DatasetStatusEnum(Enum):
+    """Dataset status."""
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
+# Recommended cluster scheduler state store key
+RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY = "recommended_cluster_scheduler_state"

@@ -67,7 +67,7 @@ class User(Base, TimestampMixin):
     created_models: Mapped[list[Model]] = relationship(back_populates="created_user")
 
     # TODO: uncomment when implement individual fields
-    # benchmarks: Mapped[list["Benchmark"]] = relationship(back_populates="user")
+    benchmarks: Mapped[list["BenchmarkSchema"]] = relationship(back_populates="user")
     # benchmark_results: Mapped[list["BenchmarkResult"]] = relationship(back_populates="user")
     projects: Mapped[list[Project]] = relationship(secondary=project_user_association, back_populates="users")
     project_permissions: Mapped[list[ProjectPermission]] = relationship(

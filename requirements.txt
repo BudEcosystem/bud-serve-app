@@ -17,6 +17,8 @@ cachetools >= 5.4.0
 ujson >= 5.10.0
 PyYAML>=6.0.2
 huggingface-hub>=0.26.5
+datasets
+lxml
 
 # Database
 SQLAlchemy>=2.0.36
@@ -33,3 +35,6 @@ python-jose[cryptography]>=3.3.0
 
 # Redis
 redis>=5.2.1
+
+# Service
+budmicroframe @ git+https://github.com/BudEcosystem/bud-microframe.git

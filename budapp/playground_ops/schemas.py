@@ -19,7 +19,7 @@
 
 import re
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 
 from pydantic import UUID4, BaseModel, ConfigDict, field_validator, model_validator, Field
 
@@ -100,12 +100,9 @@ class ChatSettingResponse(BaseModel):
     temperature: float
     limit_response_length: bool
     sequence_length: int
-    context_overflow_policy: str | None = None
     stop_strings: list[str] | None = None
-    top_k_sampling: int
     repeat_penalty: float
     top_p_sampling: float
-    min_p_sampling: float
     structured_json_schema: dict | None = None
 
     created_at: datetime
@@ -194,6 +191,34 @@ class MessageCreateRequest(MessageBase):
     def validate_prompt(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("Prompt cannot be empty.")
+        return value
+
+    @field_validator("response")
+    def validate_response(cls, value: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(value, dict):
+            raise ValueError("Response must be a dictionary.")
+
+        # Validate message structure
+        message = value.get("message")
+        if not message or not isinstance(message, dict):
+            raise ValueError("Response must contain a 'message' dictionary.")
+
+        required_message_keys = {"id", "createdAt", "role", "content"}
+        if not required_message_keys.issubset(message.keys()):
+            raise ValueError(f"'message' must contain keys: {required_message_keys}")
+
+        # Validate usage structure
+        usage = value.get("usage")
+        if not usage or not isinstance(usage, dict):
+            raise ValueError("Response must contain a 'usage' dictionary.")
+
+        required_usage_keys = {"promptTokens", "completionTokens", "totalTokens"}
+        if not required_usage_keys.issubset(usage.keys()):
+            raise ValueError(f"'usage' must contain keys: {required_usage_keys}")
+
+        if not all(isinstance(usage[k], int) for k in required_usage_keys):
+            raise ValueError("Usage values must be integers.")
+
         return value
 
 
@@ -292,12 +317,9 @@ class ChatSettingCreate(BaseModel):
     temperature: float = 1
     limit_response_length: bool = False
     sequence_length: int | None = 1000
-    context_overflow_policy: str | None = None
     stop_strings: list[str] | None = None
-    top_k_sampling: int | None = 40
     repeat_penalty: float | None = 0
     top_p_sampling: float | None = 1
-    min_p_sampling: float | None = 0.05
     structured_json_schema: dict | None = None
 
 
@@ -336,12 +358,9 @@ class ChatSettingEditRequest(BaseModel):
     temperature: float | None = None
     limit_response_length: bool | None = None
     sequence_length: int | None = None
-    context_overflow_policy: str | None = None  # Enum validation can be added if needed
     stop_strings: list[str] | None = None
-    top_k_sampling: int | None = None
     repeat_penalty: float | None = None
     top_p_sampling: float | None = None
-    min_p_sampling: float | None = None
     structured_json_schema: dict | None = None
 
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())

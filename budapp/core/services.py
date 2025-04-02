@@ -34,6 +34,7 @@ from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManage
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
+from ..benchmark_ops.services import BenchmarkService
 from ..endpoint_ops.services import EndpointService
 from ..model_ops.services import LocalModelWorkflowService, ModelService
 from .crud import IconDataManager
@@ -60,14 +61,21 @@ class NotificationService(SessionMixin):
             None
         """
         # Update workflow step data event
-        await self._update_workflow_step_events(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
+        try:
+            await self._update_workflow_step_events(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
 
-        # Update progress in workflow
-        await self._update_workflow_progress(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
+            # Update progress in workflow
+            await self._update_workflow_progress(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
+        except Exception:
+            logger.error("Failed to update workflow step events")
 
         # Send number of recommended cluster as notification
         if payload.event == "results":
-            await ClusterService(self.session)._notify_recommended_cluster_from_notification_event(payload)
+            await ClusterService(self.session).handle_recommended_cluster_events(payload)
+
+        # FAILURE status handled for recommended cluster scheduler
+        if payload.content.status == "FAILED":
+            await ClusterService(self.session).handle_recommended_cluster_failure_events(payload)
 
     async def update_model_deployment_events(self, payload: NotificationPayload) -> None:
         """Update the model deployment events for a workflow step.
@@ -282,6 +290,46 @@ class NotificationService(SessionMixin):
         if payload.event == "results":
             await QuantizationService(self.session).add_quantization_to_model_from_notification_event(payload)
 
+    async def update_run_benchmark_events(self, payload: NotificationPayload) -> None:
+        """Update the run benchmark events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        # Update workflow step data event
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value, payload)
+
+        # Update progress in workflow
+        await self._update_workflow_progress(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value, payload)
+
+        if payload.event == "results":
+            await BenchmarkService(self.session).update_benchmark_status_from_notification_event(payload)
+
+    async def update_adapter_deployment_events(self, payload: NotificationPayload) -> None:
+        """Update the quantization deployment events for a workflow step."""
+         # Update workflow step data event
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value, payload)
+
+        # Update progress in workflow
+        await self._update_workflow_progress(BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value, payload)
+
+        if payload.event == "results":
+            await EndpointService(self.session).add_adapter_from_notification_event(payload)
+
+    async def update_delete_adapter_events(self, payload: NotificationPayload) -> None:
+        """Update the delete adapter events for a workflow step."""
+        # Update workflow step data event
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.ADAPTER_DELETE_EVENTS.value, payload)
+
+        # Update progress in workflow
+        await self._update_workflow_progress(BudServeWorkflowStepEventName.ADAPTER_DELETE_EVENTS.value, payload)
+
+        # Delete adapter from database
+        if payload.event == "results":
+            await EndpointService(self.session).delete_adapter_from_notification_event(payload)
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
         """Update the workflow step events for a workflow step.
 
@@ -443,6 +491,9 @@ class SubscriberHandler:
             PayloadType.ADD_WORKER: self._handle_add_worker_to_deployment,
             PayloadType.FETCH_LICENSE_FAQS: self._handle_license_faqs_update,
             PayloadType.DEPLOY_QUANTIZATION: self._handle_deploy_quantization,
+            PayloadType.RUN_BENCHMARK: self._handle_run_benchmark,
+            PayloadType.ADD_ADAPTER: self._handle_deploy_adapter,
+            PayloadType.DELETE_ADAPTER: self._handle_delete_adapter,
         }
 
         handler = handlers.get(payload.type)
@@ -558,6 +609,29 @@ class SubscriberHandler:
             message="Updated deploy quantization event in workflow step",
         ).to_http_response()
 
+    async def _handle_run_benchmark(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the run benchmark event."""
+        await NotificationService(self.session).update_run_benchmark_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated run benchmark event in workflow step",
+        ).to_http_response()
+
+    async def _handle_deploy_adapter(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the adapter deployment event."""
+        await NotificationService(self.session).update_adapter_deployment_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated run adapter event in workflow step",
+        ).to_http_response()
+
+    async def _handle_delete_adapter(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the adapter deletion event."""
+        await NotificationService(self.session).update_delete_adapter_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated delete adapter event in workflow step",
+        ).to_http_response()
 class IconService(SessionMixin):
     """Service for managing icons."""
 

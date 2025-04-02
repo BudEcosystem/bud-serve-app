@@ -20,9 +20,9 @@ import os
 
 from alembic import command
 from alembic.config import Config
-from datetime import datetime, UTC
-from sqlalchemy import Engine, MetaData, create_engine, DateTime
-from sqlalchemy.orm import declarative_base, sessionmaker, Mapped, mapped_column
+from budmicroframe.shared.psql_service import PSQLBase, TimestampMixin  # noqa: F401
+from sqlalchemy import Engine, MetaData, create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 from . import logging
 from .config import app_settings
@@ -67,20 +67,7 @@ metadata_obj = MetaData(naming_convention=convention)
 
 # Create base class for creating models
 Base = declarative_base(metadata=metadata_obj)
-
-
-class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=lambda: datetime.now(UTC)
-    )
-    modified_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC)
-    )
+Base = PSQLBase
 
 
 def run_migrations() -> None:

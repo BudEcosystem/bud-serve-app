@@ -28,6 +28,7 @@ from pydantic import (
     ConfigDict,
     Field,
     HttpUrl,
+    computed_field,
     field_serializer,
     field_validator,
     model_validator,
@@ -122,6 +123,9 @@ class ModelLicensesModel(BaseModel):
     url: str | None = None
     path: str | None = None
     faqs: list[dict] | None = None
+    license_type: str | None = None
+    description: str | None = None
+    suitability: str | None = None
     model_id: UUID4
 
     class Config:
@@ -488,6 +492,48 @@ class EditModel(BaseModel):
         return [str(url) for url in urls] if urls else urls
 
 
+class RecommendedCluster(BaseModel):
+    """Recommended cluster schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    name: str
+    cpu_total_workers: int
+    cpu_available_workers: int
+    gpu_total_workers: int
+    gpu_available_workers: int
+    hpu_total_workers: int
+    hpu_available_workers: int
+
+    @computed_field
+    def total_workers(self) -> int:
+        """Get sum of all total workers."""
+        return self.cpu_total_workers + self.gpu_total_workers + self.hpu_total_workers
+
+    @computed_field
+    def available_workers(self) -> int:
+        """Get sum of all available workers."""
+        return self.cpu_available_workers + self.gpu_available_workers + self.hpu_available_workers
+
+    @computed_field
+    def availability_percentage(self) -> float:
+        """Calculate overall availability percentage."""
+        if self.total_workers == 0:
+            return 0.0
+
+        return round((self.available_workers / self.total_workers) * 100, 1)
+
+
+class ModelClusterRecommended(BaseModel):
+    """Model cluster recommended schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    cost_per_million_tokens: float
+    hardware_type: list[str]
+    cluster: RecommendedCluster
+
+
 class ModelResponse(BaseModel):
     """Model response schema."""
 
@@ -510,6 +556,7 @@ class ModelResponse(BaseModel):
     modified_at: datetime
     provider: Provider | None = None
     is_present_in_model: bool | None = None
+    model_cluster_recommended: ModelClusterRecommended | None = None
 
 
 class ModelListResponse(BaseModel):
@@ -557,6 +604,9 @@ class ModelFilter(BaseModel):
 class Leaderboard(BaseModel):
     """Leaderboard schema."""
 
+    # APAC Eval Leaderboard fields
+    lc_win_rate: float | None = None
+
     # Berkeley Leaderboard fields
     bcfl: float | None = None
 
@@ -571,6 +621,9 @@ class Leaderboard(BaseModel):
     retrieval: float | None = None
     semantic: float | None = None
     summarization: float | None = None
+
+    # UGI Leaderboard fields (with _score suffixes)
+    ugi_score: float | None = None
 
     # VLLM Leaderboard fields
     mmbench: float | None = None
@@ -778,6 +831,9 @@ class ModelLicensesCreate(BaseModel):
     url: str | None = None
     path: str | None = None
     faqs: list[dict] | None = None
+    license_type: str | None = None
+    description: str | None = None
+    suitability: str | None = None
     model_id: UUID4
 
 
@@ -828,6 +884,7 @@ class TopLeaderboardRequest(BaseModel):
 
     benchmarks: list[
         Literal[
+            "lc_win_rate",
             "bcfl",
             "live_code_bench",
             "classification",
@@ -837,6 +894,7 @@ class TopLeaderboardRequest(BaseModel):
             "retrieval",
             "semantic",
             "summarization",
+            "ugi_score",
             "mmbench",
             "mmstar",
             "mmmu",
@@ -857,12 +915,14 @@ class TopLeaderboardRequest(BaseModel):
             raise ValueError("Benchmarks are required")
         return self
 
+
 class QuantizeConfig(BaseModel):
     """Quantize config schema."""
 
     bit: Literal[8, 4, 2]
     granularity: Literal["per_tensor", "per_channel", "per_group", "per_head", "per_token"]
     symmetric: bool
+
 
 class QuantizeModelWorkflowRequest(BaseModel):
     """Quantize model workflow request schema."""
@@ -907,6 +967,7 @@ class QuantizeModelWorkflowStepData(BaseModel):
     quantization_data: dict | None = None
     quantized_model_id: UUID4 | None = None
 
+
 class QuantizationMethod(BaseModel):
     """Quantization method schema."""
 
@@ -918,10 +979,12 @@ class QuantizationMethod(BaseModel):
     method_type: list[str]
     runtime_hardware_support: list[str]
 
+
 class QuantizationMethodResponse(PaginatedSuccessResponse):
     """Quantization method response schema."""
 
     quantization_methods: list[QuantizationMethod] = []
+
 
 class QuantizationMethodFilter(BaseModel):
     """Quantization method filter schema."""

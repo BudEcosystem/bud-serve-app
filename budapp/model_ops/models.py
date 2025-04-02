@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid, Numeric
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import JSONB
@@ -109,15 +109,21 @@ class Model(Base, TimestampMixin):
     local_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     provider_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("provider.id"), nullable=True)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
+    recommended_cluster_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     endpoints: Mapped[list["Endpoint"]] = relationship(back_populates="model")
-    # benchmarks: Mapped[list["Benchmark"]] = relationship(back_populates="model")
+    adapters: Mapped[list["Adapter"]] = relationship(back_populates="model")
+    benchmarks: Mapped[list["BenchmarkSchema"]] = relationship(back_populates="model")
     created_user: Mapped["User"] = relationship(back_populates="created_models", foreign_keys=[created_by])
     paper_published: Mapped[List["PaperPublished"]] = relationship("PaperPublished", back_populates="model")
     model_licenses: Mapped["ModelLicenses"] = relationship("ModelLicenses", back_populates="model")
     provider: Mapped[Optional["Provider"]] = relationship("Provider", back_populates="models")
     model_security_scan_result: Mapped["ModelSecurityScanResult"] = relationship(
         "ModelSecurityScanResult", back_populates="model"
+    )
+    model_cluster_recommended: Mapped["ModelClusterRecommended"] = relationship(
+        "ModelClusterRecommended",
+        back_populates="model",
     )
 
 
@@ -146,6 +152,9 @@ class ModelLicenses(Base, TimestampMixin):
     path: Mapped[str] = mapped_column(String, nullable=True)
     faqs: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
+    license_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    suitability: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     model: Mapped["Model"] = relationship("Model", back_populates="model_licenses")
 
