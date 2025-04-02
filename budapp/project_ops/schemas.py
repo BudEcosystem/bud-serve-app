@@ -24,13 +24,15 @@ from pydantic import (
     UUID4,
     BaseModel,
     ConfigDict,
+    EmailStr,
     Field,
     field_validator,
+    model_validator,
 )
 
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 
-from ..commons.constants import ClusterStatusEnum
+from ..commons.constants import ClusterStatusEnum, PermissionEnum
 from ..commons.helpers import validate_icon
 
 
@@ -39,6 +41,22 @@ class ProjectBase(BaseModel):
     description: str | None = None
     tags: List[Tag] | None = None
     icon: str | None = None
+
+
+class ProjectRequest(ProjectBase):
+    benchmark: bool = False
+
+    @field_validator("icon", mode="before")
+    @classmethod
+    def icon_validate(cls, value: str | None) -> str | None:
+        """Validate the icon."""
+        if value is not None and not validate_icon(value):
+            raise ValueError("invalid icon")
+        return value
+
+
+class ProjectCreate(ProjectRequest):
+    created_by: UUID4
 
 
 class EditProjectRequest(BaseModel):
@@ -62,6 +80,40 @@ class EditProjectRequest(BaseModel):
         if value is not None and not validate_icon(value):
             raise ValueError("invalid icon")
         return value
+
+
+class ProjectUserAdd(BaseModel):
+    """User to add to project"""
+
+    user_id: UUID4 | None = None
+    email: EmailStr | None = None
+    scopes: list[str]
+
+    @field_validator("scopes")
+    @classmethod
+    def validate_scopes(cls, v: list[str]) -> list[str]:
+        valid_scopes = {
+            PermissionEnum.ENDPOINT_VIEW.value,
+            PermissionEnum.ENDPOINT_MANAGE.value,
+        }
+        if not all(scope in valid_scopes for scope in v):
+            raise ValueError(f"Found invalid scopes. Valid scopes are: {valid_scopes}")
+
+        # If ENDPOINT_MANAGE is present, ensure ENDPOINT_VIEW is also included
+        if PermissionEnum.ENDPOINT_MANAGE.value in v:
+            v = list(set(v + [PermissionEnum.ENDPOINT_VIEW.value]))
+
+        return v
+
+    @model_validator(mode="after")
+    def check_user_id_or_email(self) -> "ProjectUserAdd":
+        user_id = self.user_id
+        email = self.email
+        if user_id is not None and email is not None:
+            raise ValueError("Either user_id or email must be provided, but not both")
+        elif user_id is None and email is None:
+            raise ValueError("Either user_id or email must be provided")
+        return self
 
 
 class ProjectResponse(ProjectBase):
@@ -103,6 +155,7 @@ class ProjectClusterFilter(BaseModel):
 
     name: str | None = None
     status: ClusterStatusEnum | None = None
+
 
 class Project(ProjectBase):
     """Project response to client schema"""

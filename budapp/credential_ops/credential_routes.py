@@ -1,40 +1,60 @@
-from typing import Annotated
+import json
+import uuid
+from typing import Annotated, List, Optional
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Path, Query, status
+from sqlalchemy.orm import Session
 from typing_extensions import Union
 
-from fastapi import APIRouter, Depends, status, Query
-from sqlalchemy.orm import Session
-
 from budapp.commons import logging
-from budapp.commons.dependencies import (
-    get_session,
-    get_current_active_user
-)
+from budapp.commons.api_utils import pubsub_api_endpoint
+from budapp.commons.constants import CredentialTypeEnum
+from budapp.commons.dependencies import get_current_active_user, get_session, parse_ordering_fields
 from budapp.commons.exceptions import ClientException
-
-from ..commons.api_utils import pubsub_api_endpoint
-from ..commons.schemas import ErrorResponse, SuccessResponse
-from .crud import CredentialDataManager, CredentialDataManager, CloudProviderDataManager
-from .models import Credential, CloudProviders
-from .schemas import CredentialUpdateRequest,CloudProvidersListResponse
-from budapp.credential_ops.schemas import CloudProvidersCreateRequest
-from .services import ClusterProviderService
-from budapp.credential_ops.schemas import CloudProvidersSchema
-import uuid
-import json
+from budapp.commons.schemas import (
+    ErrorResponse,
+    SingleResponse,
+    SuccessResponse,
+)
+from budapp.commons.security import RSAHandler
 from budapp.user_ops.schemas import User
-from budapp.credential_ops.schemas import CloudCredentialResponse
-from budapp.credential_ops.crud import CloudProviderCredentialDataManager
-from budapp.credential_ops.schemas import CloudCredentialSchema
 
-from fastapi import Path
-from uuid import UUID
-from budapp.credential_ops.models import CloudCredentials
-from typing import Optional
-from budapp.credential_ops.schemas import CloudProviderRegionsResponse
+from .crud import CloudProviderCredentialDataManager, CloudProviderDataManager, CredentialDataManager
+from .models import CloudCredentials, CloudProviders, Credential
+from .schemas import (
+    PROPRIETARY_CREDENTIAL_DATA,
+    CloudCredentialResponse,
+    CloudCredentialSchema,
+    CloudProviderRegionsResponse,
+    CloudProvidersCreateRequest,
+    CloudProvidersListResponse,
+    CloudProvidersSchema,
+    CredentialDetails,
+    CredentialFilter,
+    CredentialRequest,
+    CredentialResponse,
+    CredentialUpdate,
+    CredentialUpdateRequest,
+    PaginatedCredentialResponse,
+    ProprietaryCredentialDetailedView,
+    ProprietaryCredentialFilter,
+    ProprietaryCredentialRequest,
+    ProprietaryCredentialResponse,
+    ProprietaryCredentialUpdate,
+    RouterConfig,
+)
+from .services import ClusterProviderService, CredentialService, ProprietaryCredentialService
+
 
 logger = logging.get_logger(__name__)
 
 credential_router = APIRouter(prefix="/credentials", tags=["credential"])
+proprietary_credential_router = APIRouter(prefix="/proprietary/credentials", tags=["proprietary credential"])
+error_responses = {
+    401: {"model": ErrorResponse},
+    422: {"model": ErrorResponse},
+}
 
 
 @credential_router.post("/update")
@@ -67,6 +87,311 @@ async def update_credential(
         ).to_http_response()
 
 
+@credential_router.get(
+    "/router-config",
+    response_model=SingleResponse[RouterConfig],
+    responses=error_responses,
+    description="Get router config for the given API key and endpoint name",
+)
+async def get_router_config(api_key: str, endpoint_name: str, session: Annotated[Session, Depends(get_session)]):
+    router_config = await CredentialService(session).get_router_config(api_key, endpoint_name)
+    return SingleResponse(message="Router config retrieved successfully", result=router_config)
+
+
+@credential_router.post(
+    "/",
+    status_code=status.HTTP_201_CREATED,
+    response_model=SingleResponse[CredentialResponse],
+    responses={
+        **error_responses,
+        500: {"model": ErrorResponse},
+    },
+    description=f"""Add or generate a new credential for user. Valid credential types: 
+    {", ".join([value.value for value in CredentialTypeEnum])}.
+    For budserve credential type, project_id, expiry(None or 30, 60) are required.""",
+)
+async def add_credential(
+    credential: CredentialRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    credential_response = await CredentialService(session).add_credential(current_user.id, credential)
+    logger.info(f"API-Key credential added: {credential_response.key}")
+
+    return SingleResponse(message="Credential added successfully", result=credential_response)
+
+
+@credential_router.get(
+    "/",
+    response_model=PaginatedCredentialResponse,
+    responses=error_responses,
+    description="Get saved credentials of user",
+)
+async def retrieve_credentials(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],  # noqa: B008
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    filters: CredentialFilter = Depends(),  # noqa: B008
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),  # noqa: B008
+    search: bool = False,
+):
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Convert Filter to dictionary
+    filters_dict = filters.model_dump(exclude_none=True)
+    filters_dict["user_id"] = current_user.id
+    results, count = await CredentialService(session).get_credentials(offset, limit, filters_dict, order_by, search)
+
+    return PaginatedCredentialResponse(
+        message="Credentials listed successfully",
+        credentials=results,
+        total_record=count,
+        page=page,
+        limit=limit,
+    )
+
+
+@credential_router.put(
+    "/{credential_id}",
+    response_model=SingleResponse[CredentialResponse],
+    response_model_exclude_none=True,
+    responses={
+        **error_responses,
+        404: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+    description="Update saved credential of user.",
+)
+async def update_credential(
+    credential_id: UUID,
+    credential_data: CredentialUpdate,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    db_credential = await CredentialService(session).update_credential(credential_data, credential_id, current_user.id)
+    logger.info(f"Credential updated: {db_credential.id}")
+
+    credential_response = CredentialResponse(
+        name=db_credential.name,
+        project_id=db_credential.project_id,
+        key=await RSAHandler().encrypt(db_credential.key),
+        expiry=db_credential.expiry,
+        max_budget=db_credential.max_budget,
+        model_budgets=db_credential.model_budgets,
+        id=db_credential.id,
+    )
+
+    return SingleResponse(message="Credential updated successfully", result=credential_response)
+
+
+@credential_router.delete(
+    "/{credential_id}",
+    response_model=SuccessResponse,
+    responses={
+        **error_responses,
+        404: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+    description="Delete saved credential of user",
+)
+async def delete_credential(
+    credential_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    await CredentialService(session).delete_credential(credential_id, current_user.id)
+    logger.info("Credential deleted")
+
+    return SuccessResponse(message="Credential deleted successfully")
+
+
+@credential_router.get(
+    "/details/{api_key}",
+    response_model=SingleResponse[CredentialDetails],
+    responses=error_responses,
+    description="Get credential details for the given API key",
+)
+async def retrieve_credential_details(
+    api_key: str,
+    session: Annotated[Session, Depends(get_session)],
+):
+    credential_detail = await CredentialService(session).retrieve_credential_details(api_key)
+    logger.info("Credentials fetched successfully")
+
+    return SingleResponse(message="Credentials retrieved successfully", result=credential_detail)
+
+
+@credential_router.get(
+    "/decrypt/{api_key}",
+    response_model=SingleResponse[str],
+    responses=error_responses,
+    description="Get credential details for the given API key",
+)
+async def decrypt_credential(
+    api_key: str,
+    session: Annotated[Session, Depends(get_session)],
+):
+    decrypted_key = await CredentialService(session).decrypt_credential(api_key)
+    logger.info("Credentials decrypted successfully")
+
+    return SingleResponse(message="Credentials decrypted successfully", result=decrypted_key)
+
+
+@proprietary_credential_router.post(
+    "/",
+    status_code=status.HTTP_201_CREATED,
+    response_model=SingleResponse[ProprietaryCredentialResponse],
+    responses={
+        **error_responses,
+        500: {"model": ErrorResponse},
+    },
+    description=f"""Add or generate a new credential for proprietary models.
+    Valid credential types: {", ".join([value.value for value in CredentialTypeEnum])}.
+    For budserve credential type, project_id, expiry(None or 30, 60) are required.""",
+)
+async def add_proprietary_credential(
+    credential: ProprietaryCredentialRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    credential_response = await ProprietaryCredentialService(session).add_credential(current_user.id, credential)
+    logger.info(f"{credential.type.value} credential added: {credential_response}")
+
+    return SingleResponse(message="Credential added successfully", result=credential_response)
+
+
+@proprietary_credential_router.get(
+    "/",
+    response_model=PaginatedCredentialResponse,
+    responses=error_responses,
+    description="Get proprietary credentials of user",
+)
+async def retrieve_proprietary_credentials(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],  # noqa: B008
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    filters: ProprietaryCredentialFilter = Depends(),  # noqa: B008
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),  # noqa: B008
+    search: bool = False,
+):
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Convert Filter to dictionary
+    filters_dict = filters.model_dump(exclude_none=True)
+    filters_dict["user_id"] = current_user.id
+    results, count = await ProprietaryCredentialService(session).get_all_credentials(
+        offset, limit, filters_dict, order_by, search
+    )
+
+    return PaginatedCredentialResponse(
+        message="Proprietary credentials listed successfully",
+        credentials=results,
+        total_record=count,
+        page=page,
+        limit=limit,
+    )
+
+
+@proprietary_credential_router.put(
+    "/{credential_id}",
+    response_model=SingleResponse[ProprietaryCredentialResponse],
+    response_model_exclude_none=True,
+    responses={
+        **error_responses,
+        404: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+    description="Update saved proprietary credential of user.",
+)
+async def update_proprietary_credential(
+    credential_id: UUID,
+    credential_data: ProprietaryCredentialUpdate,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    db_credential = await ProprietaryCredentialService(session).update_credential(
+        credential_id, credential_data, current_user.id
+    )
+    logger.info(f"Credential updated: {db_credential.id}")
+
+    return SingleResponse(message="Credential updated successfully", result=db_credential)
+
+
+@proprietary_credential_router.delete(
+    "/{credential_id}",
+    response_model=SuccessResponse,
+    responses={
+        **error_responses,
+        404: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+    description="Delete saved proprietary credential of user",
+)
+async def delete_proprietary_credential(
+    credential_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    await ProprietaryCredentialService(session).delete_credential(credential_id, current_user.id)
+    logger.info("Credential deleted")
+
+    return SuccessResponse(message="Credential deleted successfully")
+
+
+@proprietary_credential_router.get(
+    "/provider-info",
+    response_model=SingleResponse,
+    responses={
+        **error_responses,
+        500: {"model": ErrorResponse},
+    },
+    description="Different proprietary provider information",
+)
+async def get_provider_info(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    provider_name: CredentialTypeEnum,
+):
+    result = PROPRIETARY_CREDENTIAL_DATA.get(
+        provider_name.value if provider_name else None, PROPRIETARY_CREDENTIAL_DATA
+    )
+    return SingleResponse(
+        message="Provider info retrieved successfully",
+        result=result,
+    )
+
+
+@proprietary_credential_router.get(
+    "/{credential_id}/detailed-view",
+    response_model=SingleResponse[ProprietaryCredentialDetailedView],
+    responses=error_responses,
+    description="Get details of a proprietary credential",
+)
+async def get_proprietary_credential_detailed_view(
+    credential_id: UUID,
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    credential_details = await ProprietaryCredentialService(session).get_credential_details(
+        credential_id, detailed_view=True
+    )
+    return SingleResponse(message="Credential details fetched successfully", result=credential_details)
+
+
+@proprietary_credential_router.get(
+    "/{credential_id}/details",
+    response_model=SingleResponse[ProprietaryCredentialResponse],
+    responses=error_responses,
+    description="Get details of a proprietary credential",
+)
+async def get_proprietary_credential_details(credential_id: UUID, session: Annotated[Session, Depends(get_session)]):
+    credential_details = await ProprietaryCredentialService(session).get_credential_details(credential_id)
+    return SingleResponse(message="Credential details fetched successfully", result=credential_details)
+
+
 @credential_router.get("/cloud-providers")
 async def get_cloud_providers(
     session: Annotated[Session, Depends(get_session)],
@@ -81,7 +406,8 @@ async def get_cloud_providers(
         provider_schemas = []
         for provider in providers:
             provider_dict = {
-                column.name: str(getattr(provider, column.name)) if isinstance(getattr(provider, column.name), uuid.UUID)
+                column.name: str(getattr(provider, column.name))
+                if isinstance(getattr(provider, column.name), uuid.UUID)
                 else getattr(provider, column.name)
                 for column in provider.__table__.columns
             }
@@ -103,16 +429,13 @@ async def get_cloud_providers(
 
         # Create response
         response = CloudProvidersListResponse(
-            providers=provider_schemas,
-            code=status.HTTP_200_OK,
-            message="Cloud providers retrieved successfully"
+            providers=provider_schemas, code=status.HTTP_200_OK, message="Cloud providers retrieved successfully"
         )
         return response
     except Exception as e:
         logger.exception(f"Failed to get cloud providers: {e}")
         return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message="Failed to get cloud providers"
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get cloud providers"
         ).to_http_response()
 
 
@@ -128,39 +451,33 @@ async def create_cloud_provider(
     try:
         # Validate the provider id in the database
         provider = await CloudProviderDataManager(session).retrieve_by_fields(
-            CloudProviders,
-            {"id": cloud_provider_requst.provider_id}
+            CloudProviders, {"id": cloud_provider_requst.provider_id}
         )
         if not provider:
-            return ErrorResponse(
-                code=status.HTTP_400_BAD_REQUEST,
-                message="Provider ID is invalid"
-            ).to_http_response()
+            return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message="Provider ID is invalid").to_http_response()
 
         # Save credentials via service
         await ClusterProviderService(session).create_provider_credential(cloud_provider_requst, current_user.id)
 
         return SuccessResponse(
-            code=status.HTTP_201_CREATED,
-            message="Cloud provider created successfully"
+            code=status.HTTP_201_CREATED, message="Cloud provider created successfully"
         ).to_http_response()
 
     except Exception as e:
         logger.exception(f"Failed to create cloud provider: {e}")
         return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message="Failed to create cloud provider"
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to create cloud provider"
         ).to_http_response()
+
 
 @credential_router.get("/cloud-providers/credentials", response_model=CloudCredentialResponse)
 async def get_user_cloud_credentials(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    provider_id: Annotated[Optional[str], Query(
-        title="Provider ID",
-        description="Filter credentials by cloud provider ID",
-        required=False
-    )] = None,
+    provider_id: Annotated[
+        Optional[str],
+        Query(title="Provider ID", description="Filter credentials by cloud provider ID", required=False),
+    ] = None,
 ):
     """Retrieve cloud provider credentials for the current user.
 
@@ -171,8 +488,10 @@ async def get_user_cloud_credentials(
         CloudCredentialResponse: List of cloud provider credentials for the user,
             filtered by provider_id if specified.
     """
-    logger.debug(f"Retrieving cloud credentials for user: {current_user.id}" +
-                    (f" filtered by provider: {provider_id}" if provider_id else ""))
+    logger.debug(
+        f"Retrieving cloud credentials for user: {current_user.id}"
+        + (f" filtered by provider: {provider_id}" if provider_id else "")
+    )
     try:
         # Convert provider_id to UUID if provided
         provider_uuid = None
@@ -181,14 +500,12 @@ async def get_user_cloud_credentials(
                 provider_uuid = UUID(provider_id)
             except ValueError:
                 return ErrorResponse(
-                    code=status.HTTP_400_BAD_REQUEST,
-                    message="Invalid provider ID format"
+                    code=status.HTTP_400_BAD_REQUEST, message="Invalid provider ID format"
                 ).to_http_response()
 
         # Use the CloudProviderCredentialDataManager to get user credentials
         credentials = await CloudProviderCredentialDataManager(session).get_credentials_by_user(
-            current_user.id,
-            provider_uuid
+            current_user.id, provider_uuid
         )
 
         # Convert database models to response schemas
@@ -204,12 +521,14 @@ async def get_user_cloud_credentials(
                 id=str(cred.id),
                 provider_id=str(cred.provider_id),
                 provider_name=provider.name if provider else "Unknown Provider",
-                icon=provider.logo_url, #type: ignore
+                icon=provider.logo_url,  # type: ignore
                 provider_description=provider.description if provider else "No Description Available",
                 created_at=cred.created_at,
                 credential_name=cred.credential_name,
                 # Mask sensitive information in credential values
-                credential_summary=_get_masked_credential_summary(cred.credential, provider.schema_definition if provider else {})
+                credential_summary=_get_masked_credential_summary(
+                    cred.credential, provider.schema_definition if provider else {}
+                ),
             )
             credential_schemas.append(credential_schema)
 
@@ -219,14 +538,14 @@ async def get_user_cloud_credentials(
         return CloudCredentialResponse(
             credentials=credential_schemas,
             code=status.HTTP_200_OK,
-            message="Cloud provider credentials retrieved successfully"
+            message="Cloud provider credentials retrieved successfully",
         )
     except Exception as e:
         logger.exception(f"Failed to retrieve cloud credentials: {e}")
         return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message="Failed to retrieve cloud provider credentials"
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve cloud provider credentials"
         ).to_http_response()
+
 
 @credential_router.get("/cloud-providers/credentials/{credential_id}", response_model=CloudCredentialResponse)
 async def get_user_cloud_credential(
@@ -250,26 +569,19 @@ async def get_user_cloud_credential(
             cred_uuid = UUID(credential_id)
         except ValueError:
             return ErrorResponse(
-                code=status.HTTP_400_BAD_REQUEST,
-                message="Invalid credential ID format"
+                code=status.HTTP_400_BAD_REQUEST, message="Invalid credential ID format"
             ).to_http_response()
 
         # Query the specific credential
-        credential = await CloudProviderDataManager(session).retrieve_by_fields(
-            CloudCredentials, {"id": cred_uuid}
-        )
+        credential = await CloudProviderDataManager(session).retrieve_by_fields(CloudCredentials, {"id": cred_uuid})
 
         if not credential:
-            return ErrorResponse(
-                code=status.HTTP_404_NOT_FOUND,
-                message="Credential not found"
-            ).to_http_response()
+            return ErrorResponse(code=status.HTTP_404_NOT_FOUND, message="Credential not found").to_http_response()
 
         # Verify the credential belongs to the current user
         if credential.user_id != current_user.id:
             return ErrorResponse(
-                code=status.HTTP_403_FORBIDDEN,
-                message="You don't have permission to access this credential"
+                code=status.HTTP_403_FORBIDDEN, message="You don't have permission to access this credential"
             ).to_http_response()
 
         # Get provider information
@@ -280,7 +592,7 @@ async def get_user_cloud_credential(
         # Create credential schema
         credential_schema = CloudCredentialSchema(
             id=str(credential.id),
-            icon=provider.logo_url, #type: ignore
+            icon=provider.logo_url,  # type: ignore
             provider_id=str(credential.provider_id),
             credential_name=credential.credential_name,
             provider_description=provider.description if provider else "No Description Available",
@@ -288,22 +600,19 @@ async def get_user_cloud_credential(
             created_at=credential.created_at,
             # For individual credential view, provide more detailed but still masked info
             credential_summary=_get_masked_credential_summary(
-                credential.credential,
-                provider.schema_definition if provider else {},
-                detailed=True
-            )
+                credential.credential, provider.schema_definition if provider else {}, detailed=True
+            ),
         )
 
         return CloudCredentialResponse(
             credentials=[credential_schema],
             code=status.HTTP_200_OK,
-            message="Cloud provider credential retrieved successfully"
+            message="Cloud provider credential retrieved successfully",
         )
     except Exception as e:
         logger.exception(f"Failed to retrieve cloud credential: {e}")
         return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message="Failed to retrieve cloud provider credential"
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve cloud provider credential"
         ).to_http_response()
 
 
@@ -332,37 +641,31 @@ async def get_provider_regions(
             provider_uuid = UUID(provider_id)
         except ValueError:
             return ErrorResponse(
-                code=status.HTTP_400_BAD_REQUEST,
-                message="Invalid provider ID format"
+                code=status.HTTP_400_BAD_REQUEST, message="Invalid provider ID format"
             ).to_http_response()
 
         # Get the provider from the database
-        provider = await CloudProviderDataManager(session).retrieve_by_fields(
-                    CloudProviders, {"id": provider_uuid}
-                )
+        provider = await CloudProviderDataManager(session).retrieve_by_fields(CloudProviders, {"id": provider_uuid})
 
         if not provider:
-            return ErrorResponse(
-                code=status.HTTP_404_NOT_FOUND,
-                message="Cloud provider not found"
-            ).to_http_response()
+            return ErrorResponse(code=status.HTTP_404_NOT_FOUND, message="Cloud provider not found").to_http_response()
 
         # Use provider service to get regions for this specific provider
-        regions = await ClusterProviderService(session).get_provider_regions(provider.unique_id) # type: ignore
+        regions = await ClusterProviderService(session).get_provider_regions(provider.unique_id)  # type: ignore
 
         return CloudProviderRegionsResponse(
-                    provider_id=str(provider.id), # type: ignore
-                    regions=regions,
-                    code=status.HTTP_200_OK,
-                    message=f"Retrieved {len(regions)} regions for {provider.name}" # type: ignore
-                )
+            provider_id=str(provider.id),  # type: ignore
+            regions=regions,
+            code=status.HTTP_200_OK,
+            message=f"Retrieved {len(regions)} regions for {provider.name}",  # type: ignore
+        )
 
     except Exception as e:
         logger.error(f"Failed to retrieve regions for cloud provider: {provider_id} {e}", exc_info=True)
         return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message="Failed to retrieve cloud provider credential"
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve cloud provider credential"
         ).to_http_response()
+
 
 # Helper function for masking sensitive data
 def _get_masked_credential_summary(credential_values: dict, schema_definition: dict, detailed: bool = False) -> dict:
@@ -390,12 +693,12 @@ def _get_masked_credential_summary(credential_values: dict, schema_definition: d
         property_info = properties.get(key, {})
         # Check if this is a secret field (look for hints in the schema)
         is_secret = (
-            property_info.get("format") == "password" or
-            property_info.get("x-sensitive") == True or
-            "secret" in key.lower() or
-            "password" in key.lower() or
-            "key" in key.lower() or
-            "token" in key.lower()
+            property_info.get("format") == "password"
+            or property_info.get("x-sensitive") == True
+            or "secret" in key.lower()
+            or "password" in key.lower()
+            or "key" in key.lower()
+            or "token" in key.lower()
         )
 
         if is_secret:

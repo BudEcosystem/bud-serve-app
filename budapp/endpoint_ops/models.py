@@ -80,6 +80,10 @@ class Endpoint(Base, TimestampMixin):
     credential: Mapped[Optional["ProprietaryCredential"]] = relationship(
         "ProprietaryCredential", back_populates="endpoints"
     )
+    routers: Mapped[list["RouterEndpoint"]] = relationship(
+        "RouterEndpoint",
+        back_populates="endpoint",
+    )
 
     @hybrid_property
     def cache_config_dict(self):

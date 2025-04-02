@@ -17,8 +17,29 @@
 """Provides utility functions for managing security tasks."""
 
 import hashlib
+from typing import Any
 
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric.types import (
+    PrivateKeyTypes,
+    PublicKeyTypes,
+)
 from passlib.context import CryptContext
+
+from .config import secrets_settings
+from . import logging
+
+
+logger = logging.get_logger(__name__)
+
+
+def hash_token(token: str):
+    # Hash the string using SHA-256
+    hashed_token = hashlib.sha256(token.encode()).hexdigest()
+
+    return hashed_token
 
 
 class HashManager:
@@ -76,3 +97,70 @@ class HashManager:
 
         # Get the hexadecimal representation of the hash
         return sha_256_hash.hexdigest()
+
+
+class RSAHandler:
+    @staticmethod
+    async def encrypt(message: Any, public_key: PublicKeyTypes = secrets_settings.public_key) -> str:
+        encoded_message = message.encode("utf-8")
+        encrypted_message = public_key.encrypt(
+            encoded_message,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None,
+            ),
+        )
+
+        # Convert the encrypted message to a hex string to store it in the database
+        return encrypted_message.hex()
+
+    @staticmethod
+    async def decrypt(message_encrypted: Any, private_key: PrivateKeyTypes = secrets_settings.private_key) -> str:
+        # Convert the encrypted message from a hex string to bytes
+        message_encrypted_bytes = bytes.fromhex(message_encrypted)
+
+        try:
+            # Decrypt the encrypted message using the private key
+            message_decrypted = private_key.decrypt(
+                message_encrypted_bytes,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None,
+                ),
+            )
+        except ValueError:
+            logger.error("Could not decrypt message")
+
+        # Convert the decrypted message to a string
+        message_decrypted = message_decrypted.decode("utf-8")
+
+        return message_decrypted
+
+
+class AESHandler:
+    def __init__(self, key: bytes = secrets_settings.aes_key):
+        self.fernet = Fernet(key)
+
+    async def encrypt(self, message: Any) -> str:
+        """Encrypt a message using the symmetric key."""
+
+        encoded_message = message.encode("utf-8")
+        encrypted_message = self.fernet.encrypt(encoded_message)
+
+        # Convert the encrypted message to a hex string for storage
+        return encrypted_message.hex()
+
+    async def decrypt(self, encrypted_message: str) -> str:
+        """Decrypt a message using the symmetric key."""
+
+        try:
+            # Convert the encrypted message from a hex string to bytes
+            encrypted_message_bytes = bytes.fromhex(encrypted_message)
+            decrypted_message = self.fernet.decrypt(encrypted_message_bytes)
+        except Exception as e:
+            logger.error(f"Could not decrypt message: {e}")
+
+        # Convert the decrypted message back to a string
+        return decrypted_message.decode("utf-8")
