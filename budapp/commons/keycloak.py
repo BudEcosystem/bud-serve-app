@@ -107,17 +107,36 @@ class KeycloakManager:
             self.admin_client.create_realm(payload=realm_representation, skip_exists=True)
             logger.info(f"Realm {realm_name} created successfully")
 
-            # MAP Roles
+            # MAP Roles ad Groups
             relam_admin = self.get_realm_admin(realm_name)
-            roles = [
+            groups = [
                 UserRoleEnum.ADMIN.value,
                 UserRoleEnum.DEVELOPER.value,
                 UserRoleEnum.TESTER.value,
                 UserRoleEnum.DEVOPS.value,
                 UserRoleEnum.SUPER_ADMIN.value,
             ]
-            for role in roles:
-                relam_admin.create_realm_role({"name": role, "description": f"Organization {role}"}, skip_exists=True)
+            
+            for group in groups:
+                relam_admin.create_group({"name": group, "path": f"/{group}"}, skip_exists=True)
+                
+            # Create permission roles in Keycloak
+            role_names = [
+                "model:view", "model:manage",
+                "cluster:view", "cluster:manage",
+                "user:view", "user:manage",
+                "projects:view", "projects:manage",
+            ]
+            
+            for role_name in role_names:
+                relam_admin.create_realm_role({"name": role_name, "description": f"Permission role: {role_name}"}, skip_exists=True)
+                
+           # Assign roles to all groups
+            # group_objs = relam_admin.get_groups()
+            # for group in group_objs:
+            #     relam_admin.add_group_realm_roles(group_id=group["id"], roles=role_names)
+            
+           
 
         except Exception as e:
             logger.error(f"Failed to create realm {realm_name}: {str(e)}")
