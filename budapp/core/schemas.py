@@ -18,8 +18,9 @@
 """Contains core Pydantic schemas used for data validation and serialization within the core services."""
 
 from typing import Any, Dict, List, Literal, Optional, Self, Union
+from datetime import datetime
 
-from pydantic import UUID4, BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import UUID4, BaseModel, ConfigDict, field_validator, model_validator, Field
 
 from budapp.commons import logging
 from budapp.commons.constants import (
@@ -189,3 +190,65 @@ class NotificationResult(BaseModel):
 
     target_type: Literal["model", "cluster", "endpoint", "project", "workflow", "user"] | None = None
     target_id: UUID4 | None = None
+
+
+class NotificationTrigger(BaseModel):
+    """Represents a notification request."""
+
+    notification_type: NotificationType = NotificationType.EVENT
+    name: str  # Workflow identifier
+    subscriber_ids: Optional[Union[str, List[str]]] = None
+    payload: dict = Field(default_factory=dict)
+    actor: Optional[str] = None
+    topic_keys: Optional[Union[str, List[str]]] = Field(default_factory=list)
+    time: str = datetime.now().isoformat()
+
+    @model_validator(mode="after")
+    def check_required_fields(self) -> Self:
+        """Check if required fields are present in the request.
+
+        Raises:
+            ValueError: If `subscriber_ids` is not present for event notifications.
+            ValueError: If `topic_keys` is not present for topic notifications.
+
+        Returns:
+            Self: The instance of the class.
+        """
+        if self.notification_type == NotificationType.EVENT and not self.subscriber_ids:
+            raise ValueError("subscriber_ids is required for event notifications")
+        if self.notification_type == NotificationType.TOPIC and not self.topic_keys:
+            raise ValueError("topic_keys is required for topic notifications")
+        return self
+
+
+class SubscriberCreate(BaseModel):
+    """Represents a subscriber request."""
+
+    subscriber_id: str
+    email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    avatar: Optional[str] = None
+    channels: Optional[list] = Field(default_factory=list)
+    data: Optional[dict] = None
+
+
+class SubscriberUpdate(BaseModel):
+    """Represents a subscriber update request."""
+
+    email: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    avatar: Optional[str] = None
+    channels: Optional[list] = Field(default_factory=list)
+    data: Optional[dict] = None
+
+
+class AppNotificationResponse(BaseModel):
+    """Represents a notification response."""
+
+    acknowledged: bool
+    status: str
+    transaction_id: str

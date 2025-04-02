@@ -642,6 +642,7 @@ class ProjectStatusEnum(StrEnum):
 # Bud Notify Workflow
 BUD_NOTIFICATION_WORKFLOW = "bud-notification"
 BUD_INTERNAL_WORKFLOW = "bud-internal"
+PROJECT_INVITATION_WORKFLOW = "bud-project-invite"
 
 
 class NotificationStatus(Enum):

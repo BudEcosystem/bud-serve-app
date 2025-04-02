@@ -44,6 +44,7 @@ from . import logging
 
 load_dotenv()
 
+
 def parse_cors(v: Any) -> List[str] | str:
     """Parse CORS_ORIGINS into a list of strings."""
     if isinstance(v, str) and not v.startswith("["):
@@ -125,6 +126,9 @@ class AppConfig(BaseAppConfig):
     bud_notify_app_id: str = Field(alias="BUD_NOTIFY_APP_ID")
     source_topic: str = Field(alias="SOURCE_TOPIC", default="budAppMessages")
 
+    # Bud notify
+    bud_notify_base_url: str = Field(alias="BUD_NOTIFY_BASE_URL", default="http://localhost:9081/")
+
     # Budserve host
     budserve_host: str = Field(alias="BUD_SERVE_HOST", default="https://api-dev.bud.studio")
 
@@ -133,6 +137,9 @@ class AppConfig(BaseAppConfig):
 
     # Add model directory
     add_model_dir: DirectoryPath = Field(os.path.expanduser("~/.cache"), alias="ADD_MODEL_DIR")
+
+    # Frontend URL
+    frontend_url: str = Field(alias="FRONTEND_URL", default="http://localhost:3000")
 
     @computed_field
     def static_dir(self) -> str:
@@ -181,6 +188,7 @@ class SecretsConfig(BaseConfig):
         api_token = secrets_settings.dapr_api_token
         ```
     """
+
     # App Info
     name: str = __version__.split("@")[0]
     version: str = __version__.split("@")[-1]
@@ -215,7 +223,9 @@ class SecretsConfig(BaseConfig):
         alias="POSTGRES_PASSWORD",
         json_schema_extra=enable_periodic_sync_from_store(is_global=True),
     )
-    hf_token: Optional[str] = Field(None, alias="HF_TOKEN", json_schema_extra=enable_periodic_sync_from_store(is_global=True))
+    hf_token: Optional[str] = Field(
+        None, alias="HF_TOKEN", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
+    )
 
     @computed_field
     def redis_url(self) -> str:
@@ -225,6 +235,7 @@ class SecretsConfig(BaseConfig):
 
 app_settings = AppConfig()
 secrets_settings = SecretsConfig()
+
 
 def postgres_url(app_settings: BaseAppConfig, secrets_settings: BaseSecretsConfig) -> str:
     """Construct and returns a PostgreSQL connection URL.
@@ -236,6 +247,7 @@ def postgres_url(app_settings: BaseAppConfig, secrets_settings: BaseSecretsConfi
         A formatted PostgreSQL connection string.
     """
     return f"postgresql://{secrets_settings.psql_user}:{secrets_settings.psql_password}@{app_settings.psql_host}:{app_settings.psql_port}/{app_settings.psql_dbname}"
+
 
 logging.configure_logging(app_settings.log_dir, app_settings.log_level)
 

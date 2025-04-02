@@ -16,8 +16,13 @@
 
 """The core package, containing essential business logic, services, and routing configurations for the permissions."""
 
+from typing import List, Union
+from uuid import UUID
+from sqlalchemy import delete
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
+
+from .models import ProjectPermission as ProjectPermissionModel
 
 logger = logging.get_logger(__name__)
 
@@ -26,3 +31,18 @@ class PermissionDataManager(DataManagerUtils):
     """Data manager for the Permission model."""
 
     pass
+
+
+class ProjectPermissionDataManager(DataManagerUtils):
+    """Project Permission data manager class responsible for operations over database."""
+
+    async def delete_project_permissions_by_user_ids(
+        self, user_ids: List[UUID], project_id: UUID
+    ) -> List[ProjectPermissionModel]:
+        """Delete all project permissions by user ids."""
+
+        stmt = delete(ProjectPermissionModel).where(
+            ProjectPermissionModel.user_id.in_(user_ids),
+            ProjectPermissionModel.project_id == project_id,
+        )
+        return await self.execute_commit(stmt)

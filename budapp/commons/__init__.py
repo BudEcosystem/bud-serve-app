@@ -39,4 +39,5 @@ from ..benchmark_ops.models import BenchmarkRequestMetricsSchema as BenchmarkReq
 from ..playground_ops.models import ChatSession as ChatSession
 from ..playground_ops.models import Message as Message
 from ..playground_ops.models import Note as Note
+from ..dataset_ops.models import DatasetSchema as DatasetSchema
 from .database import Base as Base

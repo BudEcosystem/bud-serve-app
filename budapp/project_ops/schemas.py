@@ -26,11 +26,15 @@ from pydantic import (
     ConfigDict,
     Field,
     field_validator,
+    model_validator,
+    EmailStr,
 )
 
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 
-from ..commons.constants import ClusterStatusEnum
+from ..commons.constants import ClusterStatusEnum, PermissionEnum, UserStatusEnum
+from ..permissions.schemas import PermissionList
+from ..user_ops.schemas import UserInfo
 from ..commons.helpers import validate_icon
 
 
@@ -104,6 +108,7 @@ class ProjectClusterFilter(BaseModel):
     name: str | None = None
     status: ClusterStatusEnum | None = None
 
+
 class Project(ProjectBase):
     """Project response to client schema"""
 
@@ -113,3 +118,111 @@ class Project(ProjectBase):
     created_by: UUID4 | None = None
     created_at: datetime
     modified_at: datetime
+
+
+class ProjectCreateRequest(ProjectBase):
+    benchmark: bool = False
+
+
+class ProjectFilter(BaseModel):
+    name: str | None = None
+
+
+class PaginatedTagsResponse(PaginatedSuccessResponse):
+    """Paginated tags response schema."""
+
+    tags: list[Tag] = []
+
+
+class ProjectSuccessResopnse(SuccessResponse):
+    """Project success response schema."""
+
+    project: Project
+
+
+class ProjectListResponse(BaseModel):
+    """Project list response to client schema"""
+
+    project: Project
+    users_count: int
+    endpoints_count: int
+    profile_colors: list
+
+    # Convert users_count and endpoints_count to int if they are None
+    @field_validator("users_count", "endpoints_count", mode="before")
+    @classmethod
+    def convert_none_to_zero(cls, v):
+        if not isinstance(v, int):
+            return 0
+        return v
+
+
+class PaginatedProjectsResponse(PaginatedSuccessResponse):
+    """Paginated projects response schema."""
+
+    projects: list[ProjectListResponse] = []
+
+
+class ProjectUserAdd(BaseModel):
+    """User to add to project"""
+
+    user_id: UUID4 | None = None
+    email: EmailStr | None = None
+    scopes: list[str]
+
+    @field_validator("scopes")
+    @classmethod
+    def validate_scopes(cls, v: list[str]) -> list[str]:
+        valid_scopes = {
+            PermissionEnum.ENDPOINT_VIEW.value,
+            PermissionEnum.ENDPOINT_MANAGE.value,
+        }
+        if not all(scope in valid_scopes for scope in v):
+            raise ValueError(f"Found invalid scopes. Valid scopes are: {valid_scopes}")
+
+        # If ENDPOINT_MANAGE is present, ensure ENDPOINT_VIEW is also included
+        if PermissionEnum.ENDPOINT_MANAGE.value in v:
+            v = list(set(v + [PermissionEnum.ENDPOINT_VIEW.value]))
+
+        return v
+
+    @model_validator(mode="after")
+    def check_user_id_or_email(self) -> "ProjectUserAdd":
+        user_id = self.user_id
+        email = self.email
+        if user_id is not None and email is not None:
+            raise ValueError("Either user_id or email must be provided, but not both")
+        elif user_id is None and email is None:
+            raise ValueError("Either user_id or email must be provided")
+        return self
+
+
+class ProjectDetailResponse(SuccessResponse):
+    """Project response to client schema"""
+
+    project: ProjectResponse
+    endpoints_count: int
+
+
+class ProjectUserAddList(BaseModel):
+    """List of users to add to project"""
+
+    users: list[ProjectUserAdd]
+
+
+class ProjectUserUpdate(BaseModel):
+    user_ids: list[UUID4]
+
+
+class ProjectUserList(UserInfo):
+    """List of users assigned to a project"""
+
+    permissions: List[PermissionList]
+    project_role: str
+    status: UserStatusEnum
+
+
+class PagenatedProjectUserResponse(PaginatedSuccessResponse):
+    """Paginated response for project users"""
+
+    users: List[ProjectUserList]

@@ -179,3 +179,10 @@ class RedisException(Exception):
     def __str__(self):
         """Return a string representation of the Redis exception."""
         return f"RedisException: {self.message}"
+
+
+class BudNotifyException(Exception):
+    """BudNotifyException is raised when there is an error in the budnotify server"""
+
+    def __init__(self, message: str = "Error found from budnotify server"):
+        self.message = message
