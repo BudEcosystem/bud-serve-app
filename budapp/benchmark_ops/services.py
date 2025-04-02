@@ -614,7 +614,7 @@ class BenchmarkService(SessionMixin):
         payload = {
             "pretrained_model_uri": db_model.uri,
             "input_tokens": deployment_config["max_input_tokens"],
-            "output_tokens": deployment_config["max_outut_tokens"],
+            "output_tokens": deployment_config["max_output_tokens"],
             "concurrency": deployment_config["concurrent_requests"],
             "cluster_id": str(data["bud_cluster_id"]),
             "nodes": [node["hostname"] for node in data["nodes"]],
