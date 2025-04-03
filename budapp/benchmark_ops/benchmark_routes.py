@@ -281,6 +281,49 @@ async def get_field1_vs_field2_data(
 
 
 @benchmark_router.post(
+    "/{benchmark_id}/analysis/field1_vs_field2",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully fetched analysis data",
+        },
+    },
+    description="Fetchetched analysis data",
+)
+async def get_field1_vs_field2_benchmark_data(
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    benchmark_id: UUID,
+    field1: str,
+    field2: str,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Fetch field1 vs field2 analysis."""
+    try:
+        field1_vs_field2_data = BenchmarkRequestMetricsService(session).get_field1_vs_field2_data(field1, field2,benchmark_id)
+        response = SuccessResponse(
+            object="benchmark.request.metrics.detail",
+            param={"result": field1_vs_field2_data},
+            message=f"Successfully fetched {field1} vs {field2} analysis data for benchmark : {benchmark_id}.",
+        )
+    except Exception as e:
+        logger.exception(f"Failed to fetch {field1} vs {field2} data for benchmark : {benchmark_id} : {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=f"Failed to fetch {field1} vs {field2} data for benchmark : {benchmark_id} : {e}"
+        )
+
+    return response.to_http_response()
+
+
+
+@benchmark_router.post(
     "/request-metrics",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
@@ -341,7 +384,7 @@ async def add_request_metrics(
     description="Get dataset vs input-distribution",
 )
 async def get_dataset_input_distribution(
-    dataset_id: UUID,
+    dataset_ids: List[UUID],
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     benchmark_id: Optional[UUID]=None,
@@ -350,7 +393,7 @@ async def get_dataset_input_distribution(
     """Get dataset input distribution."""
     try:
         dataset_input_distribution = await BenchmarkRequestMetricsService(session).get_dataset_distribution_metrics(
-            distribution_type="prompt_len", dataset_id=dataset_id, benchmark_id=benchmark_id, num_bins=num_bins
+            distribution_type="prompt_len", dataset_ids=dataset_ids, benchmark_id=benchmark_id, num_bins=num_bins
         )
         response = SuccessResponse(
             object="benchmark.dataset.input.distribution",
@@ -385,7 +428,7 @@ async def get_dataset_input_distribution(
     description="Get dataset vs output-distribution",
 )
 async def get_dataset_output_distribution(
-    dataset_id: UUID,
+    dataset_ids: List[UUID],
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     benchmark_id: Optional[UUID]=None,
@@ -394,7 +437,7 @@ async def get_dataset_output_distribution(
     """Get dataset output distribution."""
     try:
         dataset_output_distribution = await BenchmarkRequestMetricsService(session).get_dataset_distribution_metrics(
-            distribution_type="output_len", dataset_id=dataset_id, benchmark_id=benchmark_id, num_bins=num_bins
+            distribution_type="output_len", dataset_ids=dataset_ids, benchmark_id=benchmark_id, num_bins=num_bins
         )
         response = SuccessResponse(
             object="benchmark.dataset.input.distribution",

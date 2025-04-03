@@ -108,6 +108,10 @@ class BenchmarkResponse(BaseModel):
     tpot: float = 0.5
     ttft: float = 0.5
     created_at: datetime
+    eval_with: Literal["dataset", "configuration"]
+    dataset_ids: Optional[list[UUID4]]
+    max_input_tokens: Optional[int]
+    max_output_tokens: Optional[int]
 
     @model_validator(mode="before")
     @classmethod
