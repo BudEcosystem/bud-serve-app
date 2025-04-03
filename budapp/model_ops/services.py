@@ -17,15 +17,16 @@
 """The model ops services. Contains business logic for model ops."""
 
 import os
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple
+from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 import aiohttp
+import requests
 from fastapi import UploadFile, status
 from pydantic import HttpUrl
-import requests
-from urllib.parse import urlparse
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
@@ -48,13 +49,14 @@ from ..commons.constants import (
     BENCHMARK_FIELDS_LABEL_MAPPER,
     BENCHMARK_FIELDS_TYPE_MAPPER,
     BUD_INTERNAL_WORKFLOW,
-    LICENSE_DIR,
     HF_AUTHORS_DIR,
+    LICENSE_DIR,
     BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     CloudModelStatusEnum,
     CredentialTypeEnum,
     EndpointStatusEnum,
+    ModelLicenseObjectTypeEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
@@ -68,6 +70,7 @@ from ..commons.helpers import validate_huggingface_repo_format
 from ..core.schemas import NotificationPayload, NotificationResult
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..shared.minio_store import ModelStore
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import (
@@ -1113,7 +1116,9 @@ class LocalModelWorkflowService(SessionMixin):
         # Create model licenses
         extracted_license = model_info.get("license", {})
         if extracted_license:
-            db_model_licenses = await self._create_model_licenses_from_model_info(extracted_license, db_model.id)
+            db_model_licenses = await self._create_model_licenses_from_model_info(
+                extracted_license, db_model.id, local_path
+            )
             logger.debug(f"Model licenses created for model {db_model.id}")
 
         # Update to workflow step
@@ -1343,7 +1348,7 @@ class LocalModelWorkflowService(SessionMixin):
         return await PaperPublishedDataManager(self.session).insert_all(paper_models)
 
     async def _create_model_licenses_from_model_info(
-        self, extracted_license: dict, model_id: UUID
+        self, extracted_license: dict, model_id: UUID, local_path: str
     ) -> List[ModelLicenses]:
         """Create model licenses from model info."""
         license_name = normalize_value(extracted_license.get("name"))
@@ -1369,18 +1374,57 @@ class LocalModelWorkflowService(SessionMixin):
                     }
                 )
 
+        license_object_type, updated_license_url = await self._license_url_type_identifier(
+            local_path, license_url, model_id
+        )
+
         license_data = ModelLicensesCreate(
             name=license_name,
-            url=license_url,
+            url=updated_license_url,
             faqs=updated_license_faqs if updated_license_faqs else None,
             model_id=model_id,
             license_type=license_type,
             description=license_description,
             suitability=license_suitability,
+            data_type=license_object_type,
         )
         return await ModelLicensesDataManager(self.session).insert_one(
             ModelLicenses(**license_data.model_dump(exclude_none=True))
         )
+
+    async def _license_url_type_identifier(
+        self, local_path: str, license_url: str, model_id: UUID
+    ) -> Tuple[ModelLicenseObjectTypeEnum, str]:
+        """Identify license url type.
+
+        Args:
+            local_path (str): Local path.
+            license_url (str): License url.
+
+        Returns:
+            str: Model license object type.
+        """
+        if license_url.startswith(local_path):
+            # Check if object exists in minio
+            model_store = ModelStore()
+            is_minio_object_exists = model_store.check_file_exists(app_settings.minio_bucket, license_url)
+            if is_minio_object_exists:
+                # Download to a temp file and upload to minio
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    minio_store = ModelStore()
+                    file_name = os.path.basename(license_url)
+                    download_path = os.path.join(temp_dir, file_name)
+                    minio_store.download_object(app_settings.minio_bucket, license_url, download_path)
+
+                    # License object name
+                    license_object_name = f"{model_id}/{file_name}"
+                    minio_store.upload_file(app_settings.minio_model_bucket, download_path, license_object_name)
+                    return ModelLicenseObjectTypeEnum.MINIO, license_object_name
+            else:
+                logger.error("License url %s does not exist in minio.", license_url)
+                return ModelLicenseObjectTypeEnum.URL, license_url
+        else:
+            return ModelLicenseObjectTypeEnum.URL, license_url
 
     @staticmethod
     async def get_base_model_relation(model_tree: dict) -> Optional[BaseModelRelationEnum]:
@@ -1829,8 +1873,7 @@ class LocalModelWorkflowService(SessionMixin):
 
     @staticmethod
     def save_author_logo(img_url: str) -> str:
-        """
-        Downloads and saves the logo from the given image URL locally with a unique name.
+        """Downloads and saves the logo from the given image URL locally with a unique name.
 
         Args:
             img_url (str): The URL of the logo image.
