@@ -46,15 +46,15 @@ from .crud import ProjectDataManager
 from .models import Project as ProjectModel
 from .schemas import (
     ProjectClusterListResponse,
-    ProjectCreate,
-    ProjectRequest,
+    # ProjectCreate,
+    # ProjectRequest,
     ProjectResponse,
     ProjectUserAdd,
     ProjectUserAdd,
     ProjectListResponse,
     ProjectUserList,
 )
-from ..permissions.models import ProjectPermission as ProjectPermissionModel, Permission as PermissionModel
+from ..permissions.models import ProjectPermission, Permission
 from ..permissions.schemas import ProjectPermissionCreate, PermissionList
 from ..permissions.crud import ProjectPermissionDataManager, PermissionDataManager
 from ..user_ops.crud import UserDataManager
@@ -68,20 +68,40 @@ logger = logging.get_logger(__name__)
 class ProjectService(SessionMixin):
     """Project service."""
 
-    async def create_project(self, project: ProjectRequest, current_user_id: UUID) -> ProjectModel:
-        if await ProjectDataManager(self.session).retrieve_project_by_fields(
-            {"name": project.name, "status": ProjectStatusEnum.ACTIVE},
+    # async def create_project(self, project: ProjectRequest, current_user_id: UUID) -> ProjectModel:
+    #     if await ProjectDataManager(self.session).retrieve_project_by_fields(
+    #         {"name": project.name, "status": ProjectStatusEnum.ACTIVE},
+    #         missing_ok=True,
+    #         case_sensitive=False,
+    #     ):
+    #         raise HTTPException(
+    #             status_code=status.HTTP_400_BAD_REQUEST,
+    #             detail="Project already exist with same name",
+    #         )
+
+    #     project_data = ProjectCreate(**project.model_dump(), created_by=current_user_id)
+    #     project_model = ProjectModel(**project_data.model_dump())
+    #     db_project = await ProjectDataManager(self.session).create_project(project_model)
+
+    #     # Add current user to project
+    #     default_project_level_scopes = PermissionEnum.get_project_default_permissions()
+    #     add_users_data = ProjectUserAdd(user_id=current_user_id, scopes=default_project_level_scopes)
+    #     db_project = await self.add_users_to_project(db_project.id, [add_users_data])
+
+    #     return db_project
+
+    async def create_project(self, project_data: Dict[str, Any], current_user_id: UUID) -> ProjectModel:
+        if await ProjectDataManager(self.session).retrieve_by_fields(
+            ProjectModel,
+            {"name": project_data["name"], "status": ProjectStatusEnum.ACTIVE},
             missing_ok=True,
             case_sensitive=False,
         ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Project already exist with same name",
-            )
+            raise ClientException("Project already exist with same name")
 
-        project_data = ProjectCreate(**project.model_dump(), created_by=current_user_id)
-        project_model = ProjectModel(**project_data.model_dump())
-        db_project = await ProjectDataManager(self.session).create_project(project_model)
+        project_data["created_by"] = current_user_id
+        project_model = ProjectModel(**project_data)
+        db_project = await ProjectDataManager(self.session).insert_one(project_model)
 
         # Add current user to project
         default_project_level_scopes = PermissionEnum.get_project_default_permissions()
@@ -344,26 +364,6 @@ class ProjectService(SessionMixin):
         db_tags, count = await ProjectDataManager(self.session).get_all_tags()
         return db_tags, count
 
-    async def create_project(self, project_data: Dict[str, Any], current_user_id: UUID) -> ProjectModel:
-        if await ProjectDataManager(self.session).retrieve_by_fields(
-            ProjectModel,
-            {"name": project_data["name"], "status": ProjectStatusEnum.ACTIVE},
-            missing_ok=True,
-            case_sensitive=False,
-        ):
-            raise ClientException("Project already exist with same name")
-
-        project_data["created_by"] = current_user_id
-        project_model = ProjectModel(**project_data)
-        db_project = await ProjectDataManager(self.session).insert_one(project_model)
-
-        # Add current user to project
-        default_project_level_scopes = PermissionEnum.get_project_default_permissions()
-        add_users_data = ProjectUserAdd(user_id=current_user_id, scopes=default_project_level_scopes)
-        db_project = await self.add_users_to_project(db_project.id, [add_users_data])
-
-        return db_project
-
     async def add_users_to_project(
         self,
         project_id: UUID,
@@ -453,7 +453,7 @@ class ProjectService(SessionMixin):
                     auth_id=db_user.auth_id,
                     scopes=project_permission_mapping[db_user.id],
                 )
-                project_permissions.append(ProjectPermissionModel(**project_permission_data.model_dump()))
+                project_permissions.append(ProjectPermission(**project_permission_data.model_dump()))
 
                 # Store email notification payload
                 email_notification_payloads.append(
@@ -468,43 +468,43 @@ class ProjectService(SessionMixin):
         new_user_ids = []
 
         # Handle non budserve users
-        if emails:
-            # User name, role will be static
-            user_name = "Bud User"
-            user_role = UserRoleEnum.DEVELOPER
+        # if emails:
+        #     # User name, role will be static
+        #     user_name = "Bud User"
+        #     user_role = UserRoleEnum.DEVELOPER
 
-            for new_email in emails:
-                password = generate_valid_password()
+        #     for new_email in emails:
+        #         password = generate_valid_password()
 
-                # NOTE: New user created with help of auth service, it will handle different scenarios like notification, permission, etc.
-                user_data = UserCreate(name=user_name, email=new_email, password=password, role=user_role)
-                db_user = await AuthService(self.session).register_user(user_data)
+        #         # NOTE: New user created with help of auth service, it will handle different scenarios like notification, permission, etc.
+        #         user_data = UserCreate(name=user_name, email=new_email, password=password, role=user_role)
+        #         db_user = await AuthService(self.session).register_user(user_data)
 
-                # Add user to project
-                db_project.users.append(db_user)
+        #         # Add user to project
+        #         db_project.users.append(db_user)
 
-                project_permission_data = ProjectPermissionCreate(
-                    project_id=db_project.id,
-                    user_id=db_user.id,
-                    auth_id=db_user.auth_id,
-                    scopes=project_permission_mapping[db_user.email],
-                )
-                project_permissions.append(ProjectPermissionModel(**project_permission_data.model_dump()))
+        #         project_permission_data = ProjectPermissionCreate(
+        #             project_id=db_project.id,
+        #             user_id=db_user.id,
+        #             auth_id=db_user.auth_id,
+        #             scopes=project_permission_mapping[db_user.email],
+        #         )
+        #         project_permissions.append(ProjectPermission(**project_permission_data.model_dump()))
 
-                new_user_ids.append(db_user.id)
+        #         new_user_ids.append(db_user.id)
 
-                # Store email notification payload
-                email_notification_payloads.append(
-                    {
-                        "subscriber_id": str(db_user.id),
-                        "user": {
-                            "name": db_user.name,
-                            "is_budserve_user": False,
-                            "password": password,
-                        },
-                        "project": project_notification_payload,
-                    }
-                )
+        #         # Store email notification payload
+        #         email_notification_payloads.append(
+        #             {
+        #                 "subscriber_id": str(db_user.id),
+        #                 "user": {
+        #                     "name": db_user.name,
+        #                     "is_budserve_user": False,
+        #                     "password": password,
+        #                 },
+        #                 "project": project_notification_payload,
+        #             }
+        #         )
 
         # Update project to reflect changes in db
         db_project = ProjectDataManager(self.session).update_one(db_project)
@@ -541,19 +541,19 @@ class ProjectService(SessionMixin):
         #     except BudNotifyException as e:
         #         logger.error(f"Failed to trigger notification {e.message}")
 
-        for content in email_notification_payloads:
-            subscriber_id = content.pop("subscriber_id")
-            notification_request = (
-                NotificationBuilder()
-                .set_payload(content=content, category=NotificationCategory.INTERNAL)
-                .set_notification_request(subscriber_ids=[subscriber_id], name=PROJECT_INVITATION_WORKFLOW)
-                .build()
-            )
-            try:
-                await BudNotifyService().send_notification(notification_request)
-                logger.info(f"Sent email notification to {subscriber_id}")
-            except BudNotifyException as err:
-                logger.error(f"Failed to send email notification {err.message}")
+        # for content in email_notification_payloads:
+        #     subscriber_id = content.pop("subscriber_id")
+        #     notification_request = (
+        #         NotificationBuilder()
+        #         .set_payload(content=content, category=NotificationCategory.INTERNAL)
+        #         .set_notification_request(subscriber_ids=[subscriber_id], name=PROJECT_INVITATION_WORKFLOW)
+        #         .build()
+        #     )
+        #     try:
+        #         await BudNotifyService().send_notification(notification_request)
+        #         logger.info(f"Sent email notification to {subscriber_id}")
+        #     except BudNotifyException as err:
+        #         logger.error(f"Failed to send email notification {err.message}")
 
         return db_project
 
@@ -571,9 +571,7 @@ class ProjectService(SessionMixin):
         filters_dict["benchmark"] = False
 
         # Get current user scopes
-        db_permissions = await PermissionDataManager(self.session).retrieve_by_fields(
-            PermissionModel, {"user_id": user_id}
-        )
+        db_permissions = await PermissionDataManager(self.session).retrieve_by_fields(Permission, {"user_id": user_id})
         user_scopes = db_permissions.scopes_list
 
         # NOTE: Only project manager can list all projects, otherwise only participated projects will be listed
@@ -650,7 +648,7 @@ class ProjectService(SessionMixin):
         # Remove project permissions on benchmark
         if is_benchmark:
             _ = await ProjectPermissionDataManager(self.session).delete_by_fields(
-                ProjectPermissionModel, {"project_id": project_id}
+                ProjectPermission, {"project_id": project_id}
             )
             logger.info("Deleted all project level permissions")
 
@@ -737,7 +735,7 @@ class ProjectService(SessionMixin):
 
     async def _get_parsed_project_user_permissions(
         self,
-        results: List[Tuple[UserModel, str, ProjectPermissionModel, PermissionModel]],
+        results: List[Tuple[UserModel, str, ProjectPermission, Permission]],
     ) -> List[ProjectUserList]:
         """Get parsed project user list response"""
 

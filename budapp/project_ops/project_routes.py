@@ -37,8 +37,8 @@ from .schemas import (
     EditProjectRequest,
     ProjectClusterFilter,
     ProjectClusterPaginatedResponse,
-    ProjectRequest,
-    ProjectResponse,
+    # ProjectRequest,
+    # ProjectResponse,
     SingleProjectResponse,
     PaginatedTagsResponse,
     ProjectCreateRequest,
@@ -59,24 +59,24 @@ logger = logging.get_logger(__name__)
 project_router = APIRouter(prefix="/projects", tags=["project"])
 
 
-@project_router.post(
-    "/",
-    response_model=SingleResponse[ProjectResponse],
-    responses={
-        401: {"model": ErrorResponse},
-        422: {"model": ErrorResponse},
-        400: {"model": ErrorResponse},
-    },
-)
-async def create_project(
-    project: ProjectRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
-):
-    db_project = await ProjectService(session).create_project(project, current_user.id)
-    logger.info("Project created")
+# @project_router.post(
+#     "/",
+#     response_model=SingleResponse[ProjectResponse],
+#     responses={
+#         401: {"model": ErrorResponse},
+#         422: {"model": ErrorResponse},
+#         400: {"model": ErrorResponse},
+#     },
+# )
+# async def create_project(
+#     project: ProjectRequest,
+#     current_user: Annotated[User, Depends(get_current_active_user)],
+#     session: Annotated[Session, Depends(get_session)],
+# ):
+#     db_project = await ProjectService(session).create_project(project, current_user.id)
+#     logger.info("Project created")
 
-    return SingleResponse(message="Project created successfully", result=db_project)
+#     return SingleResponse(message="Project created successfully", result=db_project)
 
 
 @project_router.patch(
