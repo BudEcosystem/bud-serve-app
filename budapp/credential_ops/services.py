@@ -12,7 +12,7 @@ from budapp.commons.config import app_settings
 from budapp.commons.constants import EndpointStatusEnum, ModelProviderTypeEnum, PermissionEnum, ProjectStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.security import RSAHandler
-from budapp.endpoint_ops.crud import EndpointDataManager
+from budapp.endpoint_ops.crud import AdapterDataManager, EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.model_ops.crud import ProviderDataManager
 
@@ -278,21 +278,32 @@ class CredentialService(SessionMixin):
         db_project = db_credential.project
         endpoints = db_project.endpoints
         db_endpoint = None
+        adapters, _ = await AdapterDataManager(self.session).get_all_adapters_in_project(db_project.id)
+        logger.info("adapters: %s", adapters)
         db_router = None
+        db_adapter = None
         for endpoint in endpoints:
             if endpoint.name == endpoint_name and endpoint.status == EndpointStatusEnum.RUNNING.value:
                 db_endpoint = endpoint
                 break
-        if not db_endpoint:
+        if not db_endpoint and adapters:
+            for adapter in adapters:
+                if adapter.name == endpoint_name:
+                    db_adapter = adapter
+                    break
+        if not db_endpoint and not db_adapter:
             for router in db_project.routers:
                 if router.name == endpoint_name:
                     db_router = router
                     break
-        if not db_endpoint and not db_router:
+        if not db_endpoint and not db_adapter and not db_router:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endpoint or Route not found")
 
         if db_router:
             router_config = await self.generate_route_config_from_router(db_router)
+        elif db_adapter:
+            db_model = db_adapter.model
+            router_config = await self.generate_route_config_from_adapter(db_adapter, db_model)
         else:
             db_model = db_endpoint.model
             router_config = await self.generate_route_config_from_endpoint(db_endpoint, db_model)
@@ -311,7 +322,7 @@ class CredentialService(SessionMixin):
         api_base = db_endpoint.url
         if db_model.provider_type != ModelProviderTypeEnum.CLOUD_MODEL:
             api_base = f"{db_endpoint.url}/v1"
-            deploy_model_uri = f"{app_settings.add_model_dir}/{db_model.local_path}"
+            deploy_model_uri = f"{db_endpoint.namespace}"
             actual_model_name = f"openai/{deploy_model_uri}"
         else:
             model_uri = db_model.uri
@@ -319,9 +330,10 @@ class CredentialService(SessionMixin):
             if model_uri.startswith(f"{model_source}/"):
                 model_uri = model_uri.removeprefix(f"{model_source}/")
             deploy_model_uri = f"{model_source}/{model_uri}"
+            actual_model_name = f"openai/{db_endpoint.namespace}"
 
         model_config = ModelConfig(
-            model_name=db_endpoint.name,
+            model_name=db_endpoint.namespace,
             litellm_params={
                 "model": actual_model_name,
                 "api_base": api_base,
@@ -352,6 +364,68 @@ class CredentialService(SessionMixin):
             project_id=db_project.id,
             project_name=db_project.name,
             endpoint_name=db_endpoint.name,
+            routing_policy=None,
+            cache_configuration=CacheConfig(**json.loads(db_endpoint.cache_config))
+            if db_endpoint.cache_enabled
+            else None,
+            model_configuration=[model_config],
+        )
+
+        return router_config
+
+    async def generate_route_config_from_adapter(self, db_adapter, db_model) -> RouterConfig:
+        """Generate a RouterConfig from the given adapter and model.
+
+        Args:
+            db_adapter: The database adapter instance.
+            db_model: The database model instance.
+
+        Returns:
+            RouterConfig: The generated router configuration.
+        """
+        db_endpoint = db_adapter.endpoint
+        db_model = db_adapter.model
+
+        actual_model_name = f"openai/{db_adapter.name}"
+
+        api_base = f"{db_endpoint.url}/v1"
+        deploy_model_uri = f"{db_adapter.deployment_name}"
+        actual_model_name = f"openai/{deploy_model_uri}"
+
+
+        model_config = ModelConfig(
+            model_name=db_adapter.deployment_name,
+            litellm_params={
+                "model": actual_model_name,
+                "api_base": api_base,
+                "api_key": app_settings.litellm_proxy_master_key,
+            },
+            model_info={
+                "id": db_model.id,
+                "metadata": {
+                    "name": db_model.name,
+                    "provider": db_model.provider.name,
+                    "modality": db_model.modality.value,
+                    "endpoint_id": db_endpoint.id,
+                    "adapter_id": db_adapter.id,
+                    "cloud": db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
+                    "deploy_model_uri": deploy_model_uri,
+                },
+            },
+            input_cost_per_token=None,
+            output_cost_per_token=None,
+            tpm=None,
+            rpm=None,
+            complexity_threshold=None,
+            weight=None,
+            cool_down_period=None,
+            fallback_endpoint_ids=None,
+        )
+
+        router_config = RouterConfig(
+            project_id=db_endpoint.project_id,
+            project_name=db_endpoint.project.name,
+            endpoint_name=db_adapter.name,
             routing_policy=None,
             cache_configuration=CacheConfig(**json.loads(db_endpoint.cache_config))
             if db_endpoint.cache_enabled
