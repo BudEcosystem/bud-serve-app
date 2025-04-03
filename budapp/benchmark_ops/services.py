@@ -323,7 +323,7 @@ class BenchmarkService(SessionMixin):
                     eval_with=request["eval_with"],
                     max_input_tokens=request.get("max_input_tokens"),
                     max_output_tokens=request.get("max_output_tokens"),
-                    datasets=request.get("datasets"),
+                    dataset_ids=request.get("datasets"),
                     user_id=current_user_id,
                     model_id=request["model_id"],
                     cluster_id=request["cluster_id"],
