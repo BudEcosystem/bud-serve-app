@@ -179,3 +179,25 @@ class RedisException(Exception):
     def __str__(self):
         """Return a string representation of the Redis exception."""
         return f"RedisException: {self.message}"
+
+
+class MinioException(Exception):
+    """A custom exception class for minio-related errors.
+
+    This exception can be raised when minio operations fail or encounter issues.
+
+    Attributes:
+        message (str): A human-readable string describing the minio error.
+
+    Args:
+        message (str): The error message describing the Redis issue.
+    """
+
+    def __init__(self, message: str):
+        """Initialize the MinioException with a message."""
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        """Return a string representation of the Redis exception."""
+        return f"MinioException: {self.message}"
