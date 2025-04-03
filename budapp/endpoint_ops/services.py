@@ -1447,6 +1447,14 @@ class EndpointService(SessionMixin):
             if db_adapters:
                 raise ClientException("Adapter name is already taken in the endpoint")
 
+            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel, {"name": adapter_name, "project_id": project_id},
+                missing_ok=True,
+                exclude_fields={"status": EndpointStatusEnum.DELETED}
+            )
+            if db_endpoint:
+                raise ClientException("Name already taken in the project")
+
         # Prepare workflow step data
         workflow_step_data = AddAdapterWorkflowStepData(
             endpoint_id=endpoint_id,
