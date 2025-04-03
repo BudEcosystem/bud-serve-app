@@ -38,6 +38,8 @@ from budapp.commons.constants import (
 )
 from budapp.commons.database import Base, TimestampMixin
 
+from ..commons.constants import ModelLicenseObjectTypeEnum
+
 
 class Model(Base, TimestampMixin):
     """Model for a AI model."""
@@ -155,7 +157,15 @@ class ModelLicenses(Base, TimestampMixin):
     license_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     suitability: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-
+    data_type: Mapped[str] = mapped_column(
+        Enum(
+            ModelLicenseObjectTypeEnum,
+            name="model_license_object_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=ModelLicenseObjectTypeEnum.URL,
+    )
     model: Mapped["Model"] = relationship("Model", back_populates="model_licenses")
 
 
