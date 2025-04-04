@@ -31,7 +31,7 @@ from pydantic import HttpUrl
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.db_utils import SessionMixin
-from budapp.commons.exceptions import ClientException
+from budapp.commons.exceptions import ClientException, MinioException
 from budapp.commons.helpers import assign_random_colors_to_names, normalize_value
 from budapp.commons.schemas import Tag, Task
 from budapp.credential_ops.crud import ProprietaryCredentialDataManager
@@ -64,7 +64,7 @@ from ..commons.constants import (
     NotificationTypeEnum,
     VisibilityEnum,
     WorkflowStatusEnum,
-    WorkflowTypeEnum,
+    WorkflowTypeEnum
 )
 from ..commons.helpers import validate_huggingface_repo_format
 from ..core.schemas import NotificationPayload, NotificationResult
@@ -2078,15 +2078,20 @@ class ModelService(SessionMixin):
         if data.get("license_file"):
             # If a file is provided, save it locally and update the DB with the local path
             file = data.pop("license_file")
-            file_path = await self._save_uploaded_file(file)
-            await self._create_or_update_license_entry(model_id, file.filename, file_path, None, current_user_id)
+
+            # Save to minio
+            license_object_name = await self._save_license_to_minio(file, model_id)
+
+            # Create or update license entry
+            await self._create_or_update_license_entry(model_id, file.filename, license_object_name, current_user_id, ModelLicenseObjectTypeEnum.MINIO)
 
         elif data.get("license_url"):
             # If a license URL is provided, store the URL in the DB instead of the file path
             license_url = data.pop("license_url")
             filename = license_url.split("/")[-1]  # Extract filename from the URL
+            filename = filename if filename else "sample license"
             await self._create_or_update_license_entry(
-                model_id, filename if filename else "sample license", None, str(license_url), current_user_id
+                model_id, filename, str(license_url), current_user_id, ModelLicenseObjectTypeEnum.URL
             )  # TODO: modify filename arg when license service implemented
 
         # Add papers if provided
@@ -2097,58 +2102,84 @@ class ModelService(SessionMixin):
         # Update model with validated data
         await ModelDataManager(self.session).update_by_fields(db_model, data)
 
-    async def _save_uploaded_file(self, file: UploadFile) -> str:
+    async def _save_license_to_minio(self, file: UploadFile, model_id: UUID) -> str:
         """Save uploaded file and return file path."""
-        # create the license directory if not present already
-        os.makedirs(os.path.join(app_settings.static_dir, LICENSE_DIR), exist_ok=True)
-        file_path = os.path.join(app_settings.static_dir, LICENSE_DIR, file.filename)
-        with Path(file_path).open("wb") as f:
-            f.write(await file.read())
-        return os.path.join(LICENSE_DIR, file.filename)
+        # Check if the license file already exists in minio
+        minio_store = ModelStore()
+        license_object_prefix = f"{model_id}"
+        try:
+            # is_minio_object_exists = minio_store.check_file_exists(app_settings.minio_model_bucket, license_object_prefix)
+            minio_store.remove_objects(app_settings.minio_model_bucket, license_object_prefix, recursive=True)
+
+            # Download file to a temp folder and save it to minio
+            with tempfile.TemporaryDirectory() as temp_dir:
+                file_path = os.path.join(temp_dir, file.filename)
+                with open(file_path, "wb") as f:
+                    f.write(await file.read())
+                license_object_name = f"{model_id}/{file.filename}"
+
+                # Upload file to minio
+                minio_store.upload_file(app_settings.minio_model_bucket, file_path, license_object_name)
+            
+            return license_object_name
+        except MinioException as e:
+            logger.exception(f"Error uploading file to minio: {e}")
+            raise ClientException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Unable to save license file") from e
 
     async def _create_or_update_license_entry(
-        self, model_id: UUID, filename: str, file_path: str, license_url: str, current_user_id: UUID
+        self, model_id: UUID, filename: str, license_url: str, current_user_id: UUID, data_type: ModelLicenseObjectTypeEnum
     ) -> None:
         """Create or update a license entry in the database."""
+        # Set license source
+        if data_type == ModelLicenseObjectTypeEnum.MINIO:
+            minio_store = ModelStore()
+            license_source = minio_store.get_object_url(app_settings.minio_model_bucket, license_url)
+        else:
+            license_source = license_url
+
         # Check if a license entry with the given model_id exists
         existing_license = await ModelLicensesDataManager(self.session).retrieve_by_fields(
             ModelLicenses, fields={"model_id": model_id}, missing_ok=True
         )
+
         if existing_license:
             logger.debug(f"existing license: {existing_license}")
-            existing_license_path = (
-                os.path.join(app_settings.static_dir, existing_license.path) if existing_license.path else ""
-            )
-            if existing_license_path and os.path.exists(existing_license_path):
-                try:
-                    os.remove(existing_license_path)
-                except PermissionError:
-                    raise ClientException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        message=f"Permission denied while accessing the file: {existing_license.name}",
-                    )
 
             update_license_data = {
                 "name": filename,
-                "path": file_path if file_path else None,
-                "url": license_url if license_url else None,
+                "url": license_url,
+                "data_type": data_type,
+                "faqs": None,
+                "description": None,
+                "suitability": None,
+                "license_type": None,
             }
-            license_source = file_path if file_path else license_url
+
+            # Update database
             await ModelLicensesDataManager(self.session).update_by_fields(existing_license, update_license_data)
+
+            # Execute license faqs workflow
             await self.fetch_license_faqs(model_id, existing_license.id, current_user_id, license_source)
         else:
             # Create a new license entry
             license_entry = ModelLicensesModel(
                 id=uuid4(),
                 name=filename,
-                path=file_path if file_path else None,
-                url=license_url if license_url else None,
+                url=license_url,
+                data_type=data_type,
                 model_id=model_id,
+                faqs=None,
+                description=None,
+                suitability=None,
+                license_type=None,
             )
-            license_source = file_path if file_path else license_url
+
+             # Update database
             await ModelLicensesDataManager(self.session).insert_one(
                 ModelLicenses(**license_entry.model_dump(exclude_unset=True))
             )
+
+            # Execute license faqs workflow
             await self.fetch_license_faqs(model_id, license_entry.id, current_user_id, license_source)
 
     async def _update_papers(self, model_id: UUID, paper_urls: list[str]) -> None:

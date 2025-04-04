@@ -165,9 +165,6 @@ class AppConfig(BaseAppConfig):
     # model download directory
     model_download_dir: str = Field("model_registry", alias="MODEL_DOWNLOAD_DIR")
 
-    # model license minio directory
-    model_license_dir: str = Field("model_license", alias="MODEL_LICENSE_DIR")
-
     @computed_field
     def static_dir(self) -> str:
         """Get the static directory."""
