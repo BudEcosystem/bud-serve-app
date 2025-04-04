@@ -18,6 +18,7 @@
 """Contains Pydantic schemas used for data validation and serialization within the auth services."""
 
 from typing import Any
+
 from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field
 
 from budapp.commons.constants import TokenTypeEnum
@@ -61,7 +62,7 @@ class UserLogin(BaseModel):
 
     email: EmailStr = Field(min_length=1, max_length=100)
     password: str = Field(min_length=8, max_length=100)
-    tenant_id: UUID4 | None = None # if not provided, the user will be logged in to the first tenant they belong to
+    tenant_id: UUID4 | None = Field(None, description="The ID of the tenant. If not provided, the user will be logged in to the first tenant they belong to.")
 
 
 class UserLoginData(BaseModel):

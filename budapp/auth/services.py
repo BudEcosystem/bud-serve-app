@@ -47,6 +47,9 @@ logger = logging.get_logger(__name__)
 class AuthService(SessionMixin):
     async def login_user(self, user: UserLogin) -> UserLoginData:
         """Login a user with email and password."""
+        
+        logger.debug(f"::USER:: User: {user}")
+        
         # Get user
         db_user = await UserDataManager(self.session).retrieve_by_fields(
             UserModel, {"email": user.email}, missing_ok=True
@@ -85,6 +88,8 @@ class AuthService(SessionMixin):
                 tenant = await UserDataManager(self.session).retrieve_by_fields(
                     Tenant, {"id": tenant_mapping.tenant_id}, missing_ok=True
                 )
+                
+        logger.debug(f"::USER:: Tenant: {tenant.realm_name} {tenant_mapping.id}")
 
         if not tenant:
             raise ClientException("User does not belong to any tenant")
@@ -97,6 +102,8 @@ class AuthService(SessionMixin):
         )
         if not tenant_client:
             raise ClientException("Tenant client configuration not found")
+        
+        logger.debug(f"::USER:: Tenant client: {tenant_client.id} {tenant_client.client_id}")
 
         # Authenticate with Keycloak
         keycloak_manager = KeycloakManager()

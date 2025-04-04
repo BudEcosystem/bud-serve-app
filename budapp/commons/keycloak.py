@@ -2,10 +2,12 @@
 
 from typing import Optional, Tuple
 
-from keycloak import KeycloakAdmin, KeycloakAuthenticationError, KeycloakOpenID
+from keycloak import KeycloakAdmin, KeycloakAuthenticationError, KeycloakGetError, KeycloakInvalidTokenError, KeycloakOpenID
 
 from budapp.commons.constants import UserRoleEnum
 from budapp.user_ops.schemas import TenantClientSchema
+from jose import JWTError, ExpiredSignatureError
+
 
 from . import logging
 from .config import app_settings
@@ -386,22 +388,29 @@ class KeycloakManager:
         try:
             openid_client = self.get_keycloak_openid_client(realm_name, credentials)
 
-            # Optional: Validate token signature and claims
-            options = {
-                "verify_signature": True,
-                "verify_aud": True,
-                "verify_exp": True,
-            }
-
             decoded_token = openid_client.decode_token(
                 token,
-                key=None, # type: ignore
-                options=options,
             )
 
             logger.info(f"Token successfully validated for realm {realm_name}")
             return decoded_token
 
+        except (KeycloakAuthenticationError, KeycloakGetError) as e:
+            logger.error(f"Keycloak error during token validation: {str(e)}")
+            raise
+
+        except ExpiredSignatureError:
+            logger.warning("Token has expired")
+            raise
+
+        except JWTError as e:
+            logger.warning(f"General JWT error: {str(e)}")
+            raise
+        
+        except KeycloakInvalidTokenError as e:
+            logger.warning(f"Keycloak invalid token error: {str(e)}")
+            raise
+
         except Exception as e:
-            logger.error(f"Failed to validate token: {str(e)}")
+            logger.error(f"Unexpected error validating token: {str(e)}")
             raise

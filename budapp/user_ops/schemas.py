@@ -67,7 +67,7 @@ class TenantClientSchema(BaseModel):
     """Tenant client schema."""
 
     id: UUID4
-    client_id: UUID4
+    client_id: str
     client_secret: str
 
 class UserCreate(UserBase):

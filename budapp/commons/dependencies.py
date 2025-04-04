@@ -30,7 +30,7 @@ from budapp.commons.constants import UserStatusEnum
 from budapp.commons.database import SessionLocal
 from budapp.commons.keycloak import KeycloakManager
 from budapp.user_ops.crud import UserDataManager
-from budapp.user_ops.models import Tenant, TenantClient
+from budapp.user_ops.models import Tenant, TenantClient, User as UserModel
 from budapp.user_ops.schemas import TenantClientSchema, User
 
 
@@ -81,6 +81,8 @@ async def get_current_user(
 
     try:
         realm_name = app_settings.default_realm_name
+        
+        logger.debug(f"::USER:: Validating token for realm: {realm_name}")
 
         # get the tenant from db with name as realm_name
         tenant = await UserDataManager(session).retrieve_by_fields(
@@ -90,6 +92,8 @@ async def get_current_user(
         if not tenant:
             raise credentials_exception
 
+        logger.debug(f"::USER:: Tenant found: {tenant.id}")
+
         # get the credentials for the realm
         tenant_client = await UserDataManager(session).retrieve_by_fields(
             TenantClient, {"tenant_id": tenant.id}, missing_ok=True
@@ -98,10 +102,14 @@ async def get_current_user(
         if not tenant_client:
             raise credentials_exception
 
-        credentials = TenantClientSchema(client_id=tenant_client.client_id, client_secret=tenant_client.client_secret)
+        credentials = TenantClientSchema(id=tenant_client.id, client_id=tenant_client.client_id, client_secret=tenant_client.client_secret)
 
         manager = KeycloakManager()
-        payload = manager.validate_token(token.credentials, realm_name, credentials)
+        
+        logger.debug(f"::USER:: Token: {token.credentials}")
+        payload = await manager.validate_token(token.credentials, realm_name, credentials)
+
+        logger.debug(f"::USER:: Token validated: {payload}")
 
         auth_id: str = payload.get("sub")
         if not auth_id:
@@ -109,7 +117,7 @@ async def get_current_user(
 
         # get the user from db with auth_id
         db_user = await UserDataManager(session).retrieve_by_fields(
-            User, {"auth_id": auth_id}, missing_ok=True
+            UserModel, {"auth_id": auth_id}, missing_ok=True
         )
 
         if not db_user:
