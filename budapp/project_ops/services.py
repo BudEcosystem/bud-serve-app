@@ -359,9 +359,23 @@ class ProjectService(SessionMixin):
 
         for content in email_notification_payloads:
             subscriber_id = content.pop("subscriber_id")
+            # notification_request = (
+            #     NotificationBuilder()
+            #     .set_payload(content=content, category=NotificationCategory.INTERNAL)
+            #     .set_notification_request(subscriber_ids=[subscriber_id], name=PROJECT_INVITATION_WORKFLOW)
+            #     .build()
+            # )
             notification_request = (
                 NotificationBuilder()
-                .set_payload(content=content, category=NotificationCategory.INTERNAL)
+                .set_content(
+                    title=db_project.name,
+                    message="Project Invite",
+                    icon=db_project.icon,
+                    result=NotificationResult(target_id=db_project.id, target_type="project").model_dump(
+                        exclude_none=True, exclude_unset=True
+                    ),
+                )
+                .set_payload(category=NotificationCategory.INTERNAL)
                 .set_notification_request(subscriber_ids=[subscriber_id], name=PROJECT_INVITATION_WORKFLOW)
                 .build()
             )

@@ -71,15 +71,10 @@ class NotificationBuilder:
         type: str = None,
         source: str = app_settings.source_topic,
         workflow_id: str = None,
-        content: dict = None,
     ) -> "NotificationBuilder":
         """Set the payload for the notification."""
-        content_to_use = content or self.content
-        if isinstance(content_to_use, NotificationContent):
-            content_to_use = content_to_use.model_dump()
-
         self.payload = NotificationPayload(
-            category=category, type=type, source=source, content=content_to_use, workflow_id=workflow_id
+            category=category, type=type, source=source, content=self.content, workflow_id=workflow_id
         )
         return self
 
@@ -323,23 +318,3 @@ class BudNotifyHandler:
 
                 logger.info("Successfully create multiple subscribers")
                 return response_data
-
-
-class NotificaitonService(DataManagerUtils):
-    async def send_app_notification_to_users(self, payload: Dict, user_ids: List[str]) -> AppNotificationResponse:
-        """Send notification to users"""
-
-        # Trigger notification
-        notification_data = NotificationTrigger(
-            notification_type=NotificationType.EVENT,
-            name=BUD_NOTIFICATION_WORKFLOW,
-            subscriber_ids=user_ids,
-            payload=payload,
-        )
-        notify_handler = BudNotifyHandler()
-        try:
-            response = await notify_handler.trigger_notification(notification_data)
-            logger.info("Notification triggered successfully")
-            return AppNotificationResponse(**response)
-        except BudNotifyException as err:
-            logger.error(f"Failed to trigger notification {err.message}")
