@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Literal, Optional
 from uuid import UUID
 
-from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator
+from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator, computed_field
 
 from budapp.commons.constants import BenchmarkStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse
@@ -108,6 +108,10 @@ class BenchmarkResponse(BaseModel):
     tpot: float = 0.5
     ttft: float = 0.5
     created_at: datetime
+    eval_with: Literal["dataset", "configuration"]
+    dataset_ids: Optional[list[UUID4]]
+    max_input_tokens: Optional[int]
+    max_output_tokens: Optional[int]
 
     @model_validator(mode="before")
     @classmethod
@@ -193,6 +197,11 @@ class BenchmarkRequestMetrics(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
+    @computed_field(return_type=float)
+    @property
+    def itl_sum(self) -> float:
+        """Compute sum of inter-token latencies (itl) if available."""
+        return sum(self.itl) if self.itl else 0.0
 
 class AddRequestMetricsRequest(BaseModel):
     metrics: list[BenchmarkRequestMetrics]

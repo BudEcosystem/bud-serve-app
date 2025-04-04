@@ -20,7 +20,7 @@
 from typing import List, Optional, Union
 from uuid import UUID
 
-from budmicroframe.commons.schemas import SuccessResponse
+from budmicroframe.commons.schemas import PaginatedResponse, SuccessResponse
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
@@ -39,7 +39,7 @@ from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
 from .schemas import AddRequestMetricsRequest, BenchmarkFilter, BenchmarkPaginatedResponse, RunBenchmarkWorkflowRequest
-from .services import BenchmarkService, BenchmarkRequestMetricsService
+from .services import BenchmarkRequestMetricsService, BenchmarkService
 
 
 logger = logging.get_logger(__name__)
@@ -281,6 +281,49 @@ async def get_field1_vs_field2_data(
 
 
 @benchmark_router.post(
+    "/{benchmark_id}/analysis/field1_vs_field2",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully fetched analysis data",
+        },
+    },
+    description="Fetchetched analysis data",
+)
+async def get_field1_vs_field2_benchmark_data(
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    benchmark_id: UUID,
+    field1: str,
+    field2: str,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Fetch field1 vs field2 analysis."""
+    try:
+        field1_vs_field2_data = BenchmarkRequestMetricsService(session).get_field1_vs_field2_data(field1, field2,benchmark_id)
+        response = SuccessResponse(
+            object="benchmark.request.metrics.detail",
+            param={"result": field1_vs_field2_data},
+            message=f"Successfully fetched {field1} vs {field2} analysis data for benchmark : {benchmark_id}.",
+        )
+    except Exception as e:
+        logger.exception(f"Failed to fetch {field1} vs {field2} data for benchmark : {benchmark_id} : {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=f"Failed to fetch {field1} vs {field2} data for benchmark : {benchmark_id} : {e}"
+        )
+
+    return response.to_http_response()
+
+
+
+@benchmark_router.post(
     "/request-metrics",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
@@ -317,6 +360,138 @@ async def add_request_metrics(
         logger.exception(f"Failed to add request metrics: {e}")
         response = ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add request metrics"
+        )
+
+    return response.to_http_response()
+
+
+@benchmark_router.post(
+   "/dataset/input-distribution",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully fetched dataset metrics",
+        },
+    },
+    description="Get dataset vs input-distribution",
+)
+async def get_dataset_input_distribution(
+    dataset_ids: List[UUID],
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    benchmark_id: Optional[UUID]=None,
+    num_bins: int=10,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Get dataset input distribution."""
+    try:
+        dataset_input_distribution = await BenchmarkRequestMetricsService(session).get_dataset_distribution_metrics(
+            distribution_type="prompt_len", dataset_ids=dataset_ids, benchmark_id=benchmark_id, num_bins=num_bins
+        )
+        response = SuccessResponse(
+            object="benchmark.dataset.input.distribution",
+            param={"result": dataset_input_distribution},
+            message="Successfully fetched dataset input distribution",
+        )
+    except Exception as e:
+        logger.exception(f"Failed to fetch dataset input distribution: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to fetch dataset input distribution"
+        )
+
+    return response.to_http_response()
+
+
+@benchmark_router.post(
+   "/dataset/output-distribution",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully fetched dataset metrics",
+        },
+    },
+    description="Get dataset vs output-distribution",
+)
+async def get_dataset_output_distribution(
+    dataset_ids: List[UUID],
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    benchmark_id: Optional[UUID]=None,
+    num_bins: int=10,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Get dataset output distribution."""
+    try:
+        dataset_output_distribution = await BenchmarkRequestMetricsService(session).get_dataset_distribution_metrics(
+            distribution_type="output_len", dataset_ids=dataset_ids, benchmark_id=benchmark_id, num_bins=num_bins
+        )
+        response = SuccessResponse(
+            object="benchmark.dataset.input.distribution",
+            param={"result": dataset_output_distribution},
+            message="Successfully fetched dataset output distribution",
+        )
+    except Exception as e:
+        logger.exception(f"Failed to fetch dataset output distribution: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to fetch dataset output distribution"
+        )
+
+    return response.to_http_response()
+
+
+@benchmark_router.get(
+   "/request-metrics",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully fetched benchmark request metrics",
+        },
+    },
+    description="Get benchmark request metrics",
+)
+async def get_request_metrics(
+    benchmark_id: UUID,
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Get benchmark request metrics."""
+    try:
+        request_metrics, count = await BenchmarkRequestMetricsService(session).get_request_metrics(benchmark_id=benchmark_id, offset=(page-1)*limit, limit=limit)
+        response = PaginatedResponse(
+            object="benchmark.request.metrics.list",
+            items=request_metrics,
+            page=page,
+            limit=limit,
+            total_items=count,
+        )
+    except Exception as e:
+        logger.exception(f"Failed to fetch benchmark request metricsn: {e}")
+        response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to fetch benchmark request metrics"
         )
 
     return response.to_http_response()

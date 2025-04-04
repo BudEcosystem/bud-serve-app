@@ -423,6 +423,8 @@ class WorkflowTypeEnum(StrEnum):
     LICENSE_FAQ_FETCH = auto()
     LOCAL_MODEL_QUANTIZATION = auto()
     MODEL_BENCHMARK = auto()
+    ADD_ADAPTER = auto()
+    DELETE_ADAPTER = auto()
 
 
 class NotificationType(Enum):
@@ -473,6 +475,8 @@ class PayloadType(str, Enum):
     FETCH_LICENSE_FAQS = "fetch_license_faqs"
     DEPLOY_QUANTIZATION = "deploy_quantization"
     RUN_BENCHMARK = "performance_benchmark"
+    ADD_ADAPTER = "add_adapter"
+    DELETE_ADAPTER = "delete_adapter"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -497,6 +501,8 @@ class BudServeWorkflowStepEventName(str, Enum):
     LICENSE_FAQ_EVENTS = "license_faq_events"
     QUANTIZATION_SIMULATION_EVENTS = "bud_simulator_events"
     QUANTIZATION_DEPLOYMENT_EVENTS = "quantization_deployment_events"
+    ADAPTER_DEPLOYMENT_EVENTS = "adapter_deployment_events"
+    ADAPTER_DELETE_EVENTS = "adapter_delete_events"
 
 
 class ClusterStatusEnum(StrEnum):
@@ -518,6 +524,27 @@ class ClusterStatusEnum(StrEnum):
 
 class EndpointStatusEnum(StrEnum):
     """Status for endpoint.
+
+    Attributes:
+        RUNNING: Represents the running endpoint status.
+        FAILURE: Represents the failure endpoint status.
+        DEPLOYING: Represents the deploying endpoint status.
+        UNHEALTHY: Represents the unhealthy endpoint status.
+        DELETING: Represents the deleting endpoint status.
+        DELETED: Represents the deleted endpoint status.
+        PENDING: Represents the pending endpoint status.
+    """
+
+    RUNNING = auto()
+    FAILURE = auto()
+    DEPLOYING = auto()
+    UNHEALTHY = auto()
+    DELETING = auto()
+    DELETED = auto()
+    PENDING = auto()
+
+class AdapterStatusEnum(StrEnum):
+    """Adapter status types.
 
     Attributes:
         RUNNING: Represents the running endpoint status.
@@ -2580,7 +2607,8 @@ class NotificationTypeEnum(StrEnum):
     DEPLOYMENT_DELETION_SUCCESS = auto()
     MODEL_QUANTIZATION_SUCCESS = auto()
     MODEL_BENCHMARK_SUCCESS = auto()
-
+    ADAPTER_DEPLOYMENT_SUCCESS = auto()
+    ADAPTER_DELETION_SUCCESS = auto()
 
 BENCHMARK_FIELDS_TYPE_MAPPER = {
     "classification": "Classification",

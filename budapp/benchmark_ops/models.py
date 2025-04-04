@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 from budmicroframe.shared.psql_service import CRUDMixin, PSQLBase, TimestampMixin
@@ -44,6 +44,9 @@ class BenchmarkSchema(PSQLBase, TimestampMixin):
     tags: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
     description: Mapped[str] = mapped_column(String, nullable=True)
     eval_with: Mapped[str] = mapped_column(String, nullable=True)
+    max_input_tokens: Mapped[int] = mapped_column(Integer, nullable=True)
+    max_output_tokens: Mapped[int] = mapped_column(Integer, nullable=True)
+    dataset_ids: Mapped[list] = mapped_column(JSONB, nullable=True)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=True)
     cluster_id: Mapped[UUID] = mapped_column(ForeignKey("cluster.id"), nullable=True)
@@ -234,3 +237,8 @@ class BenchmarkRequestMetricsCRUD(CRUDMixin[BenchmarkRequestMetricsSchema, None,
     def __init__(self):
         """Initialize benchmark request metrics crud methods."""
         super().__init__(model=self.__model__)
+
+    def fetch_count(self, conditions: Dict[str, Any]):
+        """Fetch count of benchmark request metrics based on conditions."""
+        stmt = select(func.count()).select_from(self.model).filter_by(**conditions)
+        return self.execute_scalar(stmt)
