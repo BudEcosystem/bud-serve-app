@@ -145,7 +145,7 @@ class BudNotifyHandler:
     """BudNotifyHandler sends notifications to the BudNotify server"""
 
     def __init__(self):
-        self.url = app_settings.bud_notify_base_url
+        self.base_url = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_notify_app_id}/method/"
 
     @staticmethod
     def _handle_exception(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -198,7 +198,7 @@ class BudNotifyHandler:
         """Trigger notification in BudNotify"""
 
         payload = data.model_dump_json(exclude_none=True)
-        url = f"{self.url}notification"
+        url = f"{self.base_url}notification"
 
         headers = {"accept": "application/json", "Content-Type": "application/json"}
 
@@ -218,7 +218,7 @@ class BudNotifyHandler:
         """Create subscriber in BudNotify"""
 
         payload = data.model_dump(exclude_none=True)
-        url = f"{self.url}subscribers"
+        url = f"{self.base_url}subscribers"
 
         async with aiohttp.ClientSession() as session, session.post(url, json=payload) as response:
             if response.status != 201:
@@ -236,7 +236,7 @@ class BudNotifyHandler:
     async def get_all_subscribers(self, page: int = 0, limit: int = 10) -> Dict:
         """Get all subscribers in BudNotify"""
 
-        url = f"{self.url}subscribers?page={page}&limit={limit}"
+        url = f"{self.base_url}subscribers?page={page}&limit={limit}"
 
         async with aiohttp.ClientSession() as session, session.get(url) as response:
             if response.status != 200:
@@ -254,7 +254,7 @@ class BudNotifyHandler:
     async def retrieve_subscriber(self, subscriber_id: str) -> Dict:
         """Retrieve subscriber from BudNotify by id"""
 
-        url = f"{self.url}subscribers/{subscriber_id}"
+        url = f"{self.base_url}subscribers/{subscriber_id}"
 
         async with aiohttp.ClientSession() as session, session.get(url) as response:
             if response.status != 200:
@@ -272,7 +272,7 @@ class BudNotifyHandler:
     async def update_subscriber(self, subscriber_id: str, data: SubscriberUpdate) -> Dict:
         """Update subscriber in BudNotify by using subscriber id"""
 
-        url = f"{self.url}subscribers/{subscriber_id}"
+        url = f"{self.base_url}subscribers/{subscriber_id}"
         payload = data.model_dump(exclude_none=True)
 
         async with aiohttp.ClientSession() as session, session.put(url, json=payload) as response:
@@ -291,7 +291,7 @@ class BudNotifyHandler:
     async def delete_subscriber(self, subscriber_id: str) -> None:
         """Delete subscriber in BudNotify by using subscriber id"""
 
-        url = f"{self.url}subscribers/{subscriber_id}"
+        url = f"{self.base_url}subscribers/{subscriber_id}"
 
         async with aiohttp.ClientSession() as session, session.delete(url) as response:
             if response.status != 200:
@@ -309,7 +309,7 @@ class BudNotifyHandler:
     async def bulk_create_subscribers(self, subscribers: List[SubscriberCreate]) -> Dict:
         """Bulk create subscribers in BudNotify"""
 
-        url = f"{self.url}subscribers/bulk-create"
+        url = f"{self.base_url}subscribers/bulk-create"
         payload = [data.model_dump(exclude_none=True) for data in subscribers]
 
         async with aiohttp.ClientSession() as session, session.post(url, json=payload) as response:

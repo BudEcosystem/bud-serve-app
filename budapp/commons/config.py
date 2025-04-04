@@ -137,9 +137,6 @@ class AppConfig(BaseAppConfig):
     bud_notify_app_id: str = Field(alias="BUD_NOTIFY_APP_ID")
     source_topic: str = Field(alias="SOURCE_TOPIC", default="budAppMessages")
 
-    # Bud notify
-    bud_notify_base_url: str = Field(alias="BUD_NOTIFY_BASE_URL", default="http://localhost:9081/")
-
     # Budserve host
     budserve_host: str = Field(alias="BUD_SERVE_HOST", default="https://api-dev.bud.studio")
 
