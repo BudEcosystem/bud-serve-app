@@ -41,3 +41,5 @@ budmicroframe @ git+https://github.com/BudEcosystem/bud-microframe.git
 
 # Keycloak
 python-keycloak>=5.3.1
+# Minio
+minio>=7.2.14

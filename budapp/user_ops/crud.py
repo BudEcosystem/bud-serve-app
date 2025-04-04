@@ -19,7 +19,7 @@
 from typing import List
 from uuid import UUID
 
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, update
 
 from budapp.commons import logging
 from budapp.commons.constants import UserStatusEnum
@@ -51,3 +51,17 @@ class UserDataManager(DataManagerUtils):
 
         stmt = select(User).filter(User.email.in_(emails))
         return self.scalars_all(stmt)
+
+    async def update_subscriber_status(self, user_ids: List[int], is_subscriber: bool) -> None:
+        """Update the is_subscriber status for a list of user IDs."""
+
+        if not user_ids:
+            raise ValueError("The list of user IDs must not be empty.")
+
+        stmt = update(User).where(User.id.in_(user_ids)).values(is_subscriber=is_subscriber)
+
+        self.session.execute(stmt)
+        self.session.commit()
+
+        logger.info(f"Updated is_subscriber status for {len(user_ids)} users.")
+        return

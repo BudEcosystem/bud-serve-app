@@ -166,6 +166,14 @@ class AppConfig(BaseAppConfig):
     keycloak_admin_password: str = Field(alias="KEYCLOAK_ADMIN_PASSWORD")
     keycloak_realm_name: str = Field(alias="KEYCLOAK_REALM_NAME")
     keycloak_verify_ssl: bool = Field(True, alias="KEYCLOAK_VERIFY_SSL")
+    # Minio store
+    minio_endpoint: str = Field("bud-store.bud.studio", alias="MINIO_ENDPOINT")
+    minio_secure: bool = Field(True, alias="MINIO_SECURE")
+    minio_bucket: str = Field("models-registry", alias="MINIO_BUCKET")
+    minio_model_bucket: str = Field("model-info", alias="MINIO_MODEL_BUCKET")
+
+    # model download directory
+    model_download_dir: str = Field("model_registry", alias="MODEL_DOWNLOAD_DIR")
 
     @computed_field
     def static_dir(self) -> str:
@@ -249,7 +257,9 @@ class SecretsConfig(BaseConfig):
         alias="POSTGRES_PASSWORD",
         json_schema_extra=enable_periodic_sync_from_store(is_global=True),
     )
-    hf_token: Optional[str] = Field(None, alias="HF_TOKEN", json_schema_extra=enable_periodic_sync_from_store(is_global=True))
+    hf_token: Optional[str] = Field(
+        None, alias="HF_TOKEN", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
+    )
 
     base_dir: DirectoryPath = Field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
     vault_path: DirectoryPath = base_dir
@@ -257,6 +267,18 @@ class SecretsConfig(BaseConfig):
     # Encryption
     private_key_password: str = "bud_encryption_password"
     aes_key_hex: str = ""
+
+    # Minio store
+    minio_access_key: Optional[str] = Field(
+        None,
+        alias="MINIO_ACCESS_KEY",
+        json_schema_extra=enable_periodic_sync_from_store(is_global=True),
+    )
+    minio_secret_key: Optional[str] = Field(
+        None,
+        alias="MINIO_SECRET_KEY",
+        json_schema_extra=enable_periodic_sync_from_store(is_global=True),
+    )
 
     @computed_field
     def redis_url(self) -> str:

@@ -543,6 +543,7 @@ class EndpointStatusEnum(StrEnum):
     DELETED = auto()
     PENDING = auto()
 
+
 class AdapterStatusEnum(StrEnum):
     """Adapter status types.
 
@@ -669,6 +670,7 @@ class ProjectStatusEnum(StrEnum):
 # Bud Notify Workflow
 BUD_NOTIFICATION_WORKFLOW = "bud-notification"
 BUD_INTERNAL_WORKFLOW = "bud-internal"
+PROJECT_INVITATION_WORKFLOW = "bud-project-invite"
 
 
 class NotificationStatus(Enum):
@@ -2609,6 +2611,8 @@ class NotificationTypeEnum(StrEnum):
     MODEL_BENCHMARK_SUCCESS = auto()
     ADAPTER_DEPLOYMENT_SUCCESS = auto()
     ADAPTER_DELETION_SUCCESS = auto()
+    PROJECT_INVITATION_SUCCESS = auto()
+
 
 BENCHMARK_FIELDS_TYPE_MAPPER = {
     "classification": "Classification",
@@ -2674,3 +2678,10 @@ class DatasetStatusEnum(Enum):
 
 # Recommended cluster scheduler state store key
 RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY = "recommended_cluster_scheduler_state"
+
+
+class ModelLicenseObjectTypeEnum(StrEnum):
+    """Model license object type."""
+
+    URL = "url"
+    MINIO = "minio"

@@ -238,6 +238,14 @@ class SQLAlchemyMixin(SessionMixin):
             logger.exception(f"Failed to execute scalar statement: {e}")
             raise DatabaseException("Unable to execute scalar statement") from e
 
+    async def execute_commit(self, stmt: Executable) -> None:
+        try:
+            self.session.execute(stmt)
+            self.session.commit()
+        except (Exception, SQLAlchemyError) as e:
+            logger.exception(f"Failed to execute statement: {e}")
+            raise DatabaseException("Unable to execute statement") from e
+
 
 class DataManagerUtils(SQLAlchemyMixin):
     """Utility class for data management operations."""

@@ -26,7 +26,7 @@ from budapp.commons.database import Base, TimestampMixin
 from budapp.permissions.models import ProjectPermission
 
 from ..commons.constants import ProjectStatusEnum
-
+from ..permissions.models import ProjectPermission
 
 project_user_association = Table(
     "project_user_association",
@@ -67,5 +67,7 @@ class Project(Base, TimestampMixin):
         "Router",
         back_populates="project",
     )
-    project_permissions: Mapped[list[ProjectPermission]] = relationship(back_populates="project", cascade="all, delete")
+    project_permissions: Mapped[list[ProjectPermission]] = relationship(
+        back_populates="project", cascade="all, delete"
+    )
     created_user: Mapped["User"] = relationship(back_populates="created_projects", foreign_keys=[created_by])

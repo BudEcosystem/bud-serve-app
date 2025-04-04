@@ -18,7 +18,10 @@
 
 from datetime import datetime
 
-from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field
+from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field, field_validator
+from typing import List
+from ..commons.helpers import validate_password_string
+from ..permissions.schemas import PermissionList
 
 from budapp.commons.constants import UserRoleEnum, UserStatusEnum
 from budapp.commons.schemas import SuccessResponse
@@ -66,3 +69,33 @@ class TenantClientSchema(BaseModel):
     id: UUID4
     client_id: UUID4
     client_secret: str
+
+class UserCreate(UserBase):
+    """Create user schema"""
+
+    password: str = Field(min_length=8, max_length=100)
+    permissions: List[PermissionList] | None = None
+    role: UserRoleEnum
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        is_valid, message = validate_password_string(value)
+        if not is_valid:
+            raise ValueError(message)
+        return value
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, value: UserRoleEnum) -> UserRoleEnum:
+        if value == UserRoleEnum.SUPER_ADMIN:
+            raise ValueError("The SUPER_ADMIN role is not permitted.")
+        return value
+
+
+class UserFilter(BaseModel):
+    """Filter user schema"""
+
+    name: str | None = None
+    email: str | None = None
+    role: UserRoleEnum | None = None

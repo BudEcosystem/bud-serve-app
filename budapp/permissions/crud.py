@@ -16,12 +16,13 @@
 
 """The core package, containing essential business logic, services, and routing configurations for the permissions."""
 
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Union
 
 from fastapi import status
 from fastapi.exceptions import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
+from uuid import UUID
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 
@@ -65,3 +66,14 @@ class ProjectPermissionDataManager(DataManagerUtils):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Permission not found")
 
         return db_project_permission if db_project_permission else None
+
+    async def delete_project_permissions_by_user_ids(
+        self, user_ids: List[UUID], project_id: UUID
+    ) -> List[ProjectPermission]:
+        """Delete all project permissions by user ids."""
+
+        stmt = delete(ProjectPermission).where(
+            ProjectPermission.user_id.in_(user_ids),
+            ProjectPermission.project_id == project_id,
+        )
+        return await self.execute_commit(stmt)
