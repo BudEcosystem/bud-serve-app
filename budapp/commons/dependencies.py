@@ -21,6 +21,8 @@ from typing import List
 
 from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import ExpiredSignatureError, JWTError
+from keycloak import KeycloakAuthenticationError, KeycloakGetError, KeycloakInvalidTokenError
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -71,20 +73,17 @@ async def get_current_user(
     Returns:
         User: The current user.
     """
-    # Define an exception to be raised for invalid credentials
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid authentication credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-
     try:
         realm_name = app_settings.default_realm_name
         
         logger.debug(f"::USER:: Validating token for realm: {realm_name}")
 
-        # get the tenant from db with name as realm_name
         tenant = await UserDataManager(session).retrieve_by_fields(
             Tenant, {"realm_name": realm_name, "is_active": True}, missing_ok=True
         )
@@ -94,7 +93,6 @@ async def get_current_user(
 
         logger.debug(f"::USER:: Tenant found: {tenant.id}")
 
-        # get the credentials for the realm
         tenant_client = await UserDataManager(session).retrieve_by_fields(
             TenantClient, {"tenant_id": tenant.id}, missing_ok=True
         )
@@ -102,20 +100,22 @@ async def get_current_user(
         if not tenant_client:
             raise credentials_exception
 
-        credentials = TenantClientSchema(id=tenant_client.id, client_id=tenant_client.client_id, client_secret=tenant_client.client_secret)
+        credentials = TenantClientSchema(
+            id=tenant_client.id,
+            client_id=tenant_client.client_id,
+            client_secret=tenant_client.client_secret
+        )
 
         manager = KeycloakManager()
-        
+
         logger.debug(f"::USER:: Token: {token.credentials}")
         payload = await manager.validate_token(token.credentials, realm_name, credentials)
-
         logger.debug(f"::USER:: Token validated: {payload}")
 
         auth_id: str = payload.get("sub")
         if not auth_id:
             raise credentials_exception
 
-        # get the user from db with auth_id
         db_user = await UserDataManager(session).retrieve_by_fields(
             UserModel, {"auth_id": auth_id}, missing_ok=True
         )
@@ -124,9 +124,29 @@ async def get_current_user(
             raise credentials_exception
 
         return db_user
+
+    except ExpiredSignatureError:
+        logger.warning("::USER:: Token has expired")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    except (JWTError, KeycloakInvalidTokenError):
+        logger.warning("::USER:: Invalid JWT or token rejected by Keycloak")
+        raise credentials_exception
+
+    except (KeycloakAuthenticationError, KeycloakGetError) as e:
+        logger.error(f"::USER:: Keycloak error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service unavailable",
+        )
+
     except Exception as e:
-        logger.error(f"Error getting current user: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user") from e
+        logger.error(f"::USER:: Unexpected error while getting current user: {str(e)}")
+        raise credentials_exception
 
 
 
