@@ -25,7 +25,7 @@ from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from ..commons.config import app_settings
-from ..shared.notification_service import BudNotifyService, NotificationBuilder, NotificaitonService
+from ..shared.notification_service import BudNotifyService, NotificationBuilder
 
 from ..cluster_ops.crud import ClusterDataManager
 from ..endpoint_ops.crud import EndpointDataManager
