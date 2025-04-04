@@ -321,6 +321,9 @@ class BenchmarkService(SessionMixin):
                     tags=request["tags"],
                     description=request["description"],
                     eval_with=request["eval_with"],
+                    max_input_tokens=request.get("max_input_tokens"),
+                    max_output_tokens=request.get("max_output_tokens"),
+                    dataset_ids=[dataset["id"] for dataset in request["datasets"]] if request.get("datasets") else None,
                     user_id=current_user_id,
                     model_id=request["model_id"],
                     cluster_id=request["cluster_id"],
@@ -698,12 +701,12 @@ class BenchmarkRequestMetricsService(SessionMixin):
             with BenchmarkRequestMetricsCRUD() as crud:
                 crud.bulk_insert(metrics_data, session=self.session)
 
-    def _get_distribution_bins(self, distribution_type: str, dataset_id: UUID, benchmark_id: Optional[UUID]=None, num_bins: int=10) -> list:
+    def _get_distribution_bins(self, distribution_type: str, dataset_ids: List[UUID], benchmark_id: Optional[UUID]=None, num_bins: int=10) -> list:
         """Get distribution bins."""
         bins = []
         with BenchmarkRequestMetricsCRUD() as crud:
-            params = {"dataset_id": dataset_id}
-            query = f"SELECT MAX({distribution_type}) FROM benchmark_request_metrics WHERE dataset_id = :dataset_id"
+            params = {"dataset_ids": dataset_ids}
+            query = f"SELECT MAX({distribution_type}) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
             if benchmark_id:
                 query += " AND benchmark_id = :benchmark_id"
                 params["benchmark_id"] = benchmark_id
@@ -720,11 +723,11 @@ class BenchmarkRequestMetricsService(SessionMixin):
             print(bins)
         return bins
 
-    async def get_dataset_distribution_metrics(self, distribution_type: str, dataset_id: UUID, benchmark_id: Optional[UUID]=None, num_bins: int=10) -> list:
+    async def get_dataset_distribution_metrics(self, distribution_type: str, dataset_ids: List[UUID], benchmark_id: Optional[UUID]=None, num_bins: int=10) -> list:
         """Get dataset distribution metrics."""
         graph_data_list = []
         # calculate distribution bins
-        bins = self._get_distribution_bins(distribution_type, dataset_id, benchmark_id, num_bins)
+        bins = self._get_distribution_bins(distribution_type, dataset_ids, benchmark_id, num_bins)
 
         if not bins:
             raise HTTPException(
@@ -733,7 +736,7 @@ class BenchmarkRequestMetricsService(SessionMixin):
             )
 
         with BenchmarkRequestMetricsCRUD() as crud:
-            params={"dataset_id": dataset_id}
+            params={"dataset_ids": dataset_ids}
             query = f"""
                     WITH bins AS (
                         SELECT * FROM (VALUES
@@ -759,7 +762,7 @@ class BenchmarkRequestMetricsService(SessionMixin):
                     LEFT JOIN benchmark_request_metrics m
                         ON m.{distribution_type} >= b.bin_start
                         AND m.{distribution_type} < b.bin_end
-                    WHERE m.dataset_id = :dataset_id AND m.success is true
+                        AND m.dataset_id = ANY(:dataset_ids) AND m.success is true
                 """
             if benchmark_id:
                 query += " AND m.benchmark_id = :benchmark_id"
@@ -771,7 +774,7 @@ class BenchmarkRequestMetricsService(SessionMixin):
             print(query)
             graph_data = crud.execute_raw_query(
                 query=text(query),
-                params={"dataset_id": dataset_id, "benchmark_id": benchmark_id},
+                params=params,
             )
             for row in graph_data:
                 temp_data = {
@@ -797,3 +800,24 @@ class BenchmarkRequestMetricsService(SessionMixin):
             total_count = crud.fetch_count(conditions={"benchmark_id": benchmark_id})
             request_metrics = [BenchmarkRequestMetrics.model_validate(request_metric, from_attributes=True) for request_metric in db_request_metrics]
         return request_metrics, total_count
+
+    def get_field1_vs_field2_data(self, field1: str, field2: str, benchmark_id: UUID) -> dict:
+        """Get field1 vs field2 data."""
+        GET_DATA_QUERY = f"""
+            SELECT
+                b.{field1},
+                b.{field2}
+            FROM benchmark_request_metrics as b
+            WHERE b.benchmark_id = :benchmark_id
+        """
+        print(GET_DATA_QUERY)
+        with BenchmarkRequestMetricsCRUD() as crud:
+            analysis_data = crud.execute_raw_query(query=text(GET_DATA_QUERY), params={"benchmark_id": benchmark_id})
+
+        analysis_data_list = []
+        for row in analysis_data:
+            analysis_data_list.append({
+                field1: row[0],
+                field2: row[1],
+            })
+        return analysis_data_list
