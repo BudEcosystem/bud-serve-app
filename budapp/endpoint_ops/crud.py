@@ -490,7 +490,16 @@ class AdapterDataManager(DataManagerUtils):
         if order_by:
             sort_conditions = await self.generate_sorting_stmt(AdapterModel, order_by)
             stmt = stmt.order_by(*sort_conditions)
-        
+
+        result = self.scalars_all(stmt)
+        logger.info("all adapters result: %s", result)
+        return result, count
+
+    async def get_all_adapters_in_project(self, project_id: UUID) -> Tuple[List[AdapterModel], int]:
+        """Get all adapters in a project."""
+        stmt = select(AdapterModel).join(EndpointModel).filter(EndpointModel.project_id == project_id)
+        count_stmt = select(func.count()).select_from(AdapterModel).join(EndpointModel).filter(EndpointModel.project_id == project_id)
+        count = self.execute_scalar(count_stmt)
         result = self.scalars_all(stmt)
         logger.info("all adapters result: %s", result)
         return result, count
