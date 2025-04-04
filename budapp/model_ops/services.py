@@ -2502,17 +2502,33 @@ class ModelService(SessionMixin):
         )
         logger.debug(f"license retrieved successfully: {db_license.id}")
 
-        # update faqs
+        # update license details
         license_details = payload.content.result["license_details"]
-        updated_license_details = {
-            "name": license_details.get("name", "license"),
-            "license_type": license_details.get("type"),
-            "description": license_details.get("type_description"),
-            "suitability": license_details.get("type_suitability"),
-            "faqs": license_details.get("faqs"),
+
+        license_faqs = normalize_value(license_details.get("faqs", []))
+        updated_license_faqs = []
+        if license_faqs:
+            for faq in license_faqs:
+                faq_description = " ".join(faq.get("reason", [])).strip()
+                impact = faq.get("impact", "")
+                answer = "YES" if impact == "POSITIVE" else "NO"
+                updated_license_faqs.append(
+                    {
+                        "question": faq.get("question"),
+                        "description": faq_description,
+                        "answer": answer,
+                    }
+                )
+
+        license_data = {
+            "name": normalize_value(license_details.get("name", "license")),
+            "license_type": normalize_value(license_details.get("type")),
+            "description": normalize_value(license_details.get("type_description")),
+            "suitability": normalize_value(license_details.get("type_suitability")),
+            "faqs": updated_license_faqs,
         }
 
-        db_license = await ModelLicensesDataManager(self.session).update_by_fields(db_license, updated_license_details)
+        db_license = await ModelLicensesDataManager(self.session).update_by_fields(db_license, license_data)
         logger.debug(f"updated FAQs for license {db_license.id}")
 
         # Mark workflow as completed
