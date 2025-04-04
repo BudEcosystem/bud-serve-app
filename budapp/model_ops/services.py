@@ -2503,8 +2503,16 @@ class ModelService(SessionMixin):
         logger.debug(f"license retrieved successfully: {db_license.id}")
 
         # update faqs
-        faqs = payload.content.result["faqs"]
-        db_license = await ModelLicensesDataManager(self.session).update_by_fields(db_license, {"faqs": faqs})
+        license_details = payload.content.result["license_details"]
+        updated_license_details = {
+            "name": license_details.get("name"),
+            "license_type": license_details.get("type"),
+            "description": license_details.get("type_description"),
+            "suitability": license_details.get("type_suitability"),
+            "faqs": license_details.get("faqs"),
+        }
+
+        db_license = await ModelLicensesDataManager(self.session).update_by_fields(db_license, updated_license_details)
         logger.debug(f"updated FAQs for license {db_license.id}")
 
         # Mark workflow as completed
