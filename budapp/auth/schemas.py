@@ -85,7 +85,7 @@ class UserLoginResponse(SuccessResponse):
 class LogoutRequest(BaseModel):
     """Schema for logout request."""
     tenant_id: UUID4 | None = Field(None, description="The ID of the tenant. If not provided, the user will be logged in to the first tenant they belong to.")
-    refresh_token: str = Field(min_length=1, max_length=255)
+    refresh_token: str = Field(min_length=1)
 
     class Config:
         """Pydantic config."""

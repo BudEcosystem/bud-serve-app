@@ -311,7 +311,7 @@ class KeycloakManager:
         """
         try:
             openid_client = self.get_keycloak_openid_client(realm_name, credentials)
-            token = openid_client.token(username, password)
+            token = openid_client.token(username, password, scope="openid profile email roles")
             return token
         except KeycloakAuthenticationError:
             logger.warning(f"Invalid credentials for user {username}")
