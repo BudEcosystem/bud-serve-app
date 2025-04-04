@@ -77,13 +77,13 @@ class User(Base, TimestampMixin):
     created_projects: Mapped[list[Project]] = relationship(back_populates="created_user")
     created_clusters: Mapped[list[Cluster]] = relationship(back_populates="created_user")
     created_endpoints: Mapped[list[Endpoint]] = relationship(back_populates="created_user")
-    
+
 
 
 class Tenant(Base, TimestampMixin):
     """Tenant model."""
 
-    __tablename__ = "tenants"
+    __tablename__ = "tenant"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
@@ -104,7 +104,7 @@ class TenantClient(Base, TimestampMixin):
     __tablename__ = "tenant_clients"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("tenants.id"), nullable=False)
+    tenant_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("tenant.id"), nullable=False)
     client_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     client_secret: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     redirect_uris: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
@@ -113,15 +113,15 @@ class TenantClient(Base, TimestampMixin):
 
     # Add relationship
     tenant: Mapped["Tenant"] = relationship(back_populates="clients")
-    
+
 class TenantUserMapping(Base, TimestampMixin):
     """Tenant user mapping model."""
 
     __tablename__ = "tenant_user_mapping"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("tenants.id"), nullable=False)
-    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id"), nullable=False)
+    tenant_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("tenant.id"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("user.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
