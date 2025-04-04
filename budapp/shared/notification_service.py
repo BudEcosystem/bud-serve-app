@@ -79,7 +79,7 @@ class NotificationBuilder:
             content_to_use = content_to_use.model_dump()
 
         self.payload = NotificationPayload(
-            category=category, type=type, source=source, content=self.content, workflow_id=workflow_id
+            category=category, type=type, source=source, content=content_to_use, workflow_id=workflow_id
         )
         return self
 
