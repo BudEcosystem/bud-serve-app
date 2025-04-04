@@ -1,8 +1,8 @@
 """Updated license table
 
-Revision ID: ab1a2a66c589
-Revises: 35c352d33c91
-Create Date: 2025-04-03 19:12:01.248649
+Revision ID: 20d36fea791f
+Revises: 27e74d56736e
+Create Date: 2025-04-04 07:12:34.420691
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'ab1a2a66c589'
-down_revision: Union[str, None] = '35c352d33c91'
+revision: str = '20d36fea791f'
+down_revision: Union[str, None] = '27e74d56736e'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
