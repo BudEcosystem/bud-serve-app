@@ -17,6 +17,7 @@
 
 """Contains Pydantic schemas used for data validation and serialization within the auth services."""
 
+from typing import Any
 from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field
 
 from budapp.commons.constants import TokenTypeEnum
@@ -66,7 +67,7 @@ class UserLogin(BaseModel):
 class UserLoginData(BaseModel):
     """User login data schema."""
 
-    token: any
+    token: Any
     first_login: bool
     is_reset_password: bool
 
@@ -75,7 +76,7 @@ class UserLoginResponse(SuccessResponse):
     """User login response schema."""
 
     model_config = ConfigDict(extra="ignore")
-    token: any
+    token: Any
     first_login: bool
     is_reset_password: bool
 

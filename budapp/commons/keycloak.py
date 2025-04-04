@@ -251,9 +251,16 @@ class KeycloakManager:
             user_id = realm_admin.create_user(payload=user_representation, exist_ok=True)
             logger.info(f"Realm admin {username} created successfully")
 
-            # Assign role to user
-            realm_admin.assign_realm_roles(user_id=user_id, roles=[UserRoleEnum.ADMIN.value])
-            logger.info(f"Role {UserRoleEnum.ADMIN.value} assigned to realm admin {username}")
+            logger.debug(f"User ID of realm admin {username}: {user_id}")
+
+            groups = realm_admin.get_groups()
+            super_admin_group = next((g for g in groups if g["name"] == UserRoleEnum.SUPER_ADMIN.value), None)
+
+            if not super_admin_group:
+                raise ValueError(f"Group {UserRoleEnum.SUPER_ADMIN.value} not found in realm {realm_name}")
+
+            realm_admin.group_user_add(user_id=user_id, group_id=super_admin_group["id"])
+            logger.info(f"Assigned user {username} to group {UserRoleEnum.SUPER_ADMIN.value}")
 
             return user_id
         except Exception as e:

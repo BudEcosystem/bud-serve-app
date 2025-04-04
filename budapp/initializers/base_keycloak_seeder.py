@@ -24,7 +24,9 @@ class BaseKeycloakSeeder(BaseSeeder):
             try:
                 await self._seed_keycloak(session)
             except Exception as e:
-                logger.error(f"Failed to create super user. Error: {e}")
+                import traceback
+                logger.error(f"Error during seeding: {traceback.format_exc()}")
+                logger.error(f"Failed to complete seeding. Error: {e}")
 
     @staticmethod
     async def _seed_keycloak(session: Session) -> None:
@@ -38,6 +40,8 @@ class BaseKeycloakSeeder(BaseSeeder):
 
         # check if its already exisits
         if not keycloak_manager.realm_exists(default_realm_name):
+            logger.debug(f"::KEYCLOAK::Realm {default_realm_name} does not exist. Creating...")
+
             await keycloak_manager.create_realm(default_realm_name)
 
             # Save The Tenant in DB
@@ -48,8 +52,29 @@ class BaseKeycloakSeeder(BaseSeeder):
                 description="Default tenant for superuser",
                 is_active=True,
             )
-            await UserDataManager(session).insert_one(tenant)
+            tenant = await UserDataManager(session).insert_one(tenant)
 
+        # check if relm alreasy exisits in db
+        tenant = await UserDataManager(session).retrieve_by_fields(
+            Tenant,
+            {"realm_name": default_realm_name},
+            missing_ok=True,
+        )
+
+        if not tenant:
+            # Save The Tenant in DB
+            tenant = Tenant(
+                name="Default Tenant",
+                realm_name=default_realm_name,
+                tenant_identifier=default_realm_name,
+                description="Default tenant for superuser",
+                is_active=True,
+            )
+            tenant = await UserDataManager(session).insert_one(tenant)
+
+
+
+        logger.debug(f"::KEYCLOAK::Realm {default_realm_name} found.")
         # check if the client exists for the tenant
         tenant_client = await UserDataManager(session).retrieve_by_fields(
             TenantClient,
@@ -57,14 +82,16 @@ class BaseKeycloakSeeder(BaseSeeder):
             missing_ok=True,
         )
 
+        #logger.debug(f"::KEYCLOAK::Client {tenant_client.id} found.")
+
         if not tenant_client:
             # Create the default client if it doesn't exist
-            new_client_id, client_secret = await keycloak_manager.create_client(default_client_id)
+            new_client_id, client_secret = await keycloak_manager.create_client(default_client_id, default_realm_name)
 
             # Save The Tenant Client in DB
             tenant_client = TenantClient(
                 tenant_id=tenant.id,
-                client_id=new_client_id,
+                client_id=default_client_id,
                 client_secret=client_secret,  # TODO: perform encryption before saving
             )
             await UserDataManager(session).insert_one(tenant_client)
@@ -88,7 +115,7 @@ class BaseKeycloakSeeder(BaseSeeder):
             # Save The User in DB
             db_user = UserModel(
                 name="admin",
-                auth_id=UUID(keycloak_user_id),
+                auth_id=keycloak_user_id,
                 email=app_settings.superuser_email,
                 is_superuser=True,
                 color=UserColorEnum.get_random_color(),
@@ -102,7 +129,7 @@ class BaseKeycloakSeeder(BaseSeeder):
             # also add to the user mapping table
             tenant_user_mapping = TenantUserMapping(
                 tenant_id=tenant.id,
-                user_id=db_user.auth_id,
+                user_id=db_user.id,
             )
             await UserDataManager(session).insert_one(tenant_user_mapping)
 
