@@ -18,7 +18,6 @@
 
 import os
 import tempfile
-from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
@@ -50,7 +49,6 @@ from ..commons.constants import (
     BENCHMARK_FIELDS_TYPE_MAPPER,
     BUD_INTERNAL_WORKFLOW,
     HF_AUTHORS_DIR,
-    LICENSE_DIR,
     BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     CloudModelStatusEnum,
@@ -64,7 +62,7 @@ from ..commons.constants import (
     NotificationTypeEnum,
     VisibilityEnum,
     WorkflowStatusEnum,
-    WorkflowTypeEnum
+    WorkflowTypeEnum,
 )
 from ..commons.helpers import validate_huggingface_repo_format
 from ..core.schemas import NotificationPayload, NotificationResult
@@ -2083,7 +2081,9 @@ class ModelService(SessionMixin):
             license_object_name = await self._save_license_to_minio(file, model_id)
 
             # Create or update license entry
-            await self._create_or_update_license_entry(model_id, file.filename, license_object_name, current_user_id, ModelLicenseObjectTypeEnum.MINIO)
+            await self._create_or_update_license_entry(
+                model_id, file.filename, license_object_name, current_user_id, ModelLicenseObjectTypeEnum.MINIO
+            )
 
         elif data.get("license_url"):
             # If a license URL is provided, store the URL in the DB instead of the file path
@@ -2120,14 +2120,21 @@ class ModelService(SessionMixin):
 
                 # Upload file to minio
                 minio_store.upload_file(app_settings.minio_model_bucket, file_path, license_object_name)
-            
+
             return license_object_name
         except MinioException as e:
             logger.exception(f"Error uploading file to minio: {e}")
-            raise ClientException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Unable to save license file") from e
+            raise ClientException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Unable to save license file"
+            ) from e
 
     async def _create_or_update_license_entry(
-        self, model_id: UUID, filename: str, license_url: str, current_user_id: UUID, data_type: ModelLicenseObjectTypeEnum
+        self,
+        model_id: UUID,
+        filename: str,
+        license_url: str,
+        current_user_id: UUID,
+        data_type: ModelLicenseObjectTypeEnum,
     ) -> None:
         """Create or update a license entry in the database."""
         # Set license source
@@ -2174,7 +2181,7 @@ class ModelService(SessionMixin):
                 license_type=None,
             )
 
-             # Update database
+            # Update database
             await ModelLicensesDataManager(self.session).insert_one(
                 ModelLicenses(**license_entry.model_dump(exclude_unset=True))
             )
@@ -2314,6 +2321,16 @@ class ModelService(SessionMixin):
         else:
             await self._perform_model_deletion_request(db_model.local_path)
             logger.debug(f"Model deletion successful for {db_model.local_path}")
+
+        # Delete existing license from minio
+        if db_model.model_licenses:
+            logger.debug(f"Deleting license from minio for model {db_model.id}")
+            if db_model.model_licenses.data_type == ModelLicenseObjectTypeEnum.MINIO:
+                minio_store = ModelStore()
+                minio_store.remove_objects(app_settings.minio_model_bucket, f"{db_model.id}", recursive=True)
+
+            # Delete license from db
+            await ModelLicensesDataManager(self.session).delete_by_fields(ModelLicenses, {"model_id": db_model.id})
 
         db_model = await ModelDataManager(self.session).update_by_fields(db_model, {"status": ModelStatusEnum.DELETED})
 
