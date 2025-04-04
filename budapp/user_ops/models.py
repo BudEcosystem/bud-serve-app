@@ -70,9 +70,7 @@ class User(Base, TimestampMixin):
     benchmarks: Mapped[list["BenchmarkSchema"]] = relationship(back_populates="user")
     # benchmark_results: Mapped[list["BenchmarkResult"]] = relationship(back_populates="user")
     projects: Mapped[list[Project]] = relationship(secondary=project_user_association, back_populates="users")
-    project_permissions: Mapped[list[ProjectPermission]] = relationship(
-        back_populates="user"
-    )
+    project_permissions: Mapped[list[ProjectPermission]] = relationship(back_populates="user")
     created_projects: Mapped[list[Project]] = relationship(back_populates="created_user")
     created_clusters: Mapped[list[Cluster]] = relationship(back_populates="created_user")
     created_endpoints: Mapped[list[Endpoint]] = relationship(back_populates="created_user")

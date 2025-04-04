@@ -28,11 +28,14 @@ from pydantic import (
     Field,
     field_validator,
     model_validator,
+    EmailStr,
 )
 
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 
-from ..commons.constants import ClusterStatusEnum, PermissionEnum
+from ..commons.constants import ClusterStatusEnum, PermissionEnum, UserStatusEnum
+from ..permissions.schemas import PermissionList
+from ..user_ops.schemas import UserInfo
 from ..commons.helpers import validate_icon
 
 
@@ -43,20 +46,20 @@ class ProjectBase(BaseModel):
     icon: str | None = None
 
 
-class ProjectRequest(ProjectBase):
-    benchmark: bool = False
+# class ProjectRequest(ProjectBase):
+#     benchmark: bool = False
 
-    @field_validator("icon", mode="before")
-    @classmethod
-    def icon_validate(cls, value: str | None) -> str | None:
-        """Validate the icon."""
-        if value is not None and not validate_icon(value):
-            raise ValueError("invalid icon")
-        return value
+#     @field_validator("icon", mode="before")
+#     @classmethod
+#     def icon_validate(cls, value: str | None) -> str | None:
+#         """Validate the icon."""
+#         if value is not None and not validate_icon(value):
+#             raise ValueError("invalid icon")
+#         return value
 
 
-class ProjectCreate(ProjectRequest):
-    created_by: UUID4
+# class ProjectCreate(ProjectRequest):
+#     created_by: UUID4
 
 
 class EditProjectRequest(BaseModel):
@@ -166,3 +169,77 @@ class Project(ProjectBase):
     created_by: UUID4 | None = None
     created_at: datetime
     modified_at: datetime
+
+
+class ProjectCreateRequest(ProjectBase):
+    benchmark: bool = False
+
+
+class ProjectFilter(BaseModel):
+    name: str | None = None
+
+
+class PaginatedTagsResponse(PaginatedSuccessResponse):
+    """Paginated tags response schema."""
+
+    tags: list[Tag] = []
+
+
+class ProjectSuccessResopnse(SuccessResponse):
+    """Project success response schema."""
+
+    project: Project
+
+
+class ProjectListResponse(BaseModel):
+    """Project list response to client schema"""
+
+    project: Project
+    users_count: int
+    endpoints_count: int
+    profile_colors: list
+
+    # Convert users_count and endpoints_count to int if they are None
+    @field_validator("users_count", "endpoints_count", mode="before")
+    @classmethod
+    def convert_none_to_zero(cls, v):
+        if not isinstance(v, int):
+            return 0
+        return v
+
+
+class PaginatedProjectsResponse(PaginatedSuccessResponse):
+    """Paginated projects response schema."""
+
+    projects: list[ProjectListResponse] = []
+
+
+class ProjectDetailResponse(SuccessResponse):
+    """Project response to client schema"""
+
+    project: ProjectResponse
+    endpoints_count: int
+
+
+class ProjectUserAddList(BaseModel):
+    """List of users to add to project"""
+
+    users: list[ProjectUserAdd]
+
+
+class ProjectUserUpdate(BaseModel):
+    user_ids: list[UUID4]
+
+
+class ProjectUserList(UserInfo):
+    """List of users assigned to a project"""
+
+    permissions: List[PermissionList]
+    project_role: str
+    status: UserStatusEnum
+
+
+class PagenatedProjectUserResponse(PaginatedSuccessResponse):
+    """Paginated response for project users"""
+
+    users: List[ProjectUserList]

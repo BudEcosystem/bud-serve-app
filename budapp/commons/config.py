@@ -55,6 +55,7 @@ from . import logging
 
 load_dotenv()
 
+
 def parse_cors(v: Any) -> List[str] | str:
     """Parse CORS_ORIGINS into a list of strings."""
     if isinstance(v, str) and not v.startswith("["):
@@ -212,6 +213,7 @@ class SecretsConfig(BaseConfig):
         api_token = secrets_settings.dapr_api_token
         ```
     """
+
     # App Info
     name: str = __version__.split("@")[0]
     version: str = __version__.split("@")[-1]
@@ -246,7 +248,9 @@ class SecretsConfig(BaseConfig):
         alias="POSTGRES_PASSWORD",
         json_schema_extra=enable_periodic_sync_from_store(is_global=True),
     )
-    hf_token: Optional[str] = Field(None, alias="HF_TOKEN", json_schema_extra=enable_periodic_sync_from_store(is_global=True))
+    hf_token: Optional[str] = Field(
+        None, alias="HF_TOKEN", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
+    )
 
     base_dir: DirectoryPath = Field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
     vault_path: DirectoryPath = base_dir
@@ -315,6 +319,7 @@ class SecretsConfig(BaseConfig):
 app_settings = AppConfig()
 secrets_settings = SecretsConfig()
 
+
 def postgres_url(app_settings: BaseAppConfig, secrets_settings: BaseSecretsConfig) -> str:
     """Construct and returns a PostgreSQL connection URL.
 
@@ -325,6 +330,7 @@ def postgres_url(app_settings: BaseAppConfig, secrets_settings: BaseSecretsConfi
         A formatted PostgreSQL connection string.
     """
     return f"postgresql://{secrets_settings.psql_user}:{secrets_settings.psql_password}@{app_settings.psql_host}:{app_settings.psql_port}/{app_settings.psql_dbname}"
+
 
 logging.configure_logging(app_settings.log_dir, app_settings.log_level)
 

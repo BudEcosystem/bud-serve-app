@@ -17,8 +17,11 @@
 """Provides helper functions for the project."""
 
 import os
+import random
+import string
+import re
 from enum import Enum
-from typing import Dict, List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Union, Tuple
 
 from huggingface_hub.utils import validate_repo_id
 from huggingface_hub.utils._validators import HFValidationError
@@ -291,3 +294,73 @@ def get_param_range(num_params: int) -> tuple[int, int]:
             f"{min_num_params/1000:.2f}K to {max_num_params/1000:.2f}K"
         )
         return min_num_params, max_num_params
+
+
+def generate_valid_password(min_length: int = 8) -> str:
+    """
+    Generates a valid password string that meets the following criteria:
+    - Contains at least one digit.
+    - Contains at least one alphabetic character.
+    - Contains at least one special character from the set `!@#$%^&*`.
+    - Has a minimum length of `min_length`.
+
+    Args:
+        min_length (int, optional): The minimum length of the password. Defaults to 8.
+
+    Returns:
+        str: A randomly generated password string that satisfies the above criteria.
+    """
+    # Define character pools
+    digits = string.digits
+    alphabets = string.ascii_letters
+    special_chars = "!@#$%^&*"
+
+    # Ensure the string contains at least one digit, alphabet, and special character
+    mandatory_chars = [
+        random.choice(digits),
+        random.choice(alphabets),
+        random.choice(special_chars),
+    ]
+
+    # Combine all allowed characters (excluding whitespaces)
+    all_chars = digits + alphabets + special_chars
+
+    # Fill the rest of the string with random characters from the combined pool
+    remaining_length = min_length - len(mandatory_chars)
+    remaining_chars = [random.choice(all_chars) for _ in range(remaining_length)]
+
+    # Combine and shuffle the characters
+    result = mandatory_chars + remaining_chars
+    random.shuffle(result)
+
+    # Join the characters into a single string
+    final_string = "".join(result)
+
+    return final_string
+
+
+def validate_password_string(password: str) -> Union[bool, Tuple[bool, str]]:
+    """
+    Validate the password based on the following conditions:
+    - Contains at least one digit
+    - Contains at least one alphabet character
+    - Contains at least one special character
+    - Contains no whitespace
+
+    Args:
+        password: The password to validate.
+
+    Returns:
+        A tuple with a boolean and an error message if the validation fails,
+        or True if the validation succeeds.
+    """
+    if not re.search(r"\d", password):
+        return False, "Password must contain at least one digit."
+    if not re.search(r"[a-zA-Z]", password):
+        return False, "Password must contain at least one alphabet character."
+    if not re.search(f"[{re.escape(string.punctuation)}]", password):
+        return False, "Password must contain at least one special character."
+    if re.search(r"\s", password):
+        return False, "Password must not contain any whitespace."
+
+    return True, "Password is valid."

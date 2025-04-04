@@ -16,19 +16,25 @@
 
 """Provides shared functions for managing notification service."""
 
-from typing import Any, Dict, List, Optional, Union
-
+from typing import Any, Dict, List, Optional, Union, Callable
+import asyncio
 import aiohttp
+from aiohttp import client_exceptions
 
 from ..commons import logging
 from ..commons.config import app_settings
-from ..commons.constants import (
-    BUD_NOTIFICATION_WORKFLOW,
-    NotificationCategory,
-    NotificationStatus,
+from ..commons.constants import BUD_NOTIFICATION_WORKFLOW, NotificationCategory, NotificationStatus, NotificationType
+from ..commons.exceptions import BudNotifyException
+from ..core.schemas import (
+    NotificationContent,
+    NotificationPayload,
+    NotificationRequest,
+    SubscriberCreate,
+    SubscriberUpdate,
+    NotificationTrigger,
+    AppNotificationResponse,
 )
-from ..core.schemas import NotificationContent, NotificationPayload, NotificationRequest
-
+from ..commons.db_utils import DataManagerUtils
 
 logger = logging.get_logger(__name__)
 
@@ -128,3 +134,187 @@ class BudNotifyService:
                 return response_data
         except Exception as e:
             logger.exception(f"Failed to send notification: {e}")
+
+
+class BudNotifyHandler:
+    """BudNotifyHandler sends notifications to the BudNotify server"""
+
+    def __init__(self):
+        self.base_url = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_notify_app_id}/method/"
+
+    @staticmethod
+    def _handle_exception(func: Callable[..., Any]) -> Callable[..., Any]:
+        """Handle exceptions for both synchronous and asynchronous functions.
+
+        This decorator wraps a function to handle exceptions, converting them into a
+        custom `NovuApiClientException` with a specific message. It distinguishes between
+        asynchronous and synchronous functions, applying appropriate handling for each.
+
+        Args:
+        func (Callable[..., Any]): The function to be wrapped by the decorator.
+
+        Returns:
+        Callable[..., Any]: The wrapped function with added exception handling.
+
+        Raises:
+        NovuApiClientException: If a `ClientConnectionError` or any other exception occurs.
+        """
+        if asyncio.iscoroutinefunction(func):
+
+            async def async_wrapper(self, *args: Any, **kwargs: Any) -> Any:
+                try:
+                    return await func(self, *args, **kwargs)
+                except client_exceptions.ClientConnectionError:
+                    raise BudNotifyException("Failed to connect to server") from None
+                except BudNotifyException as err:
+                    raise err
+                except Exception as err:
+                    logger.exception(err)
+                    raise BudNotifyException("Unexpected error occurred") from None
+
+            return async_wrapper
+        else:
+
+            def sync_wrapper(self, *args: Any, **kwargs: Any) -> Any:
+                try:
+                    return func(self, *args, **kwargs)
+                except client_exceptions.ClientConnectionError:
+                    raise BudNotifyException("Failed to connect to server") from None
+                except BudNotifyException as err:
+                    raise err
+                except Exception as err:
+                    logger.exception(err)
+                    raise BudNotifyException("Unexpected error occurred") from None
+
+            return sync_wrapper
+
+    @_handle_exception
+    async def trigger_notification(self, data: NotificationTrigger) -> Dict:
+        """Trigger notification in BudNotify"""
+
+        payload = data.model_dump_json(exclude_none=True)
+        url = f"{self.base_url}notification"
+
+        headers = {"accept": "application/json", "Content-Type": "application/json"}
+
+        async with aiohttp.ClientSession() as session, session.post(url, data=payload, headers=headers) as response:
+            if response.status != 200:
+                logger.error("Failed to trigger notification")
+                raise BudNotifyException(f"Failed to trigger notification: {response.status} {response.reason}")
+            else:
+                response_data = await response.json()
+                if "code" in response_data and response_data["code"] != 200:
+                    raise BudNotifyException(f"Failed to trigger notification: {response.status} {response.reason}")
+                logger.info(f"Triggered notification: {response.status} {response.reason}")
+                return response_data
+
+    @_handle_exception
+    async def create_subscriber(self, data: SubscriberCreate) -> Dict:
+        """Create subscriber in BudNotify"""
+
+        payload = data.model_dump(exclude_none=True)
+        url = f"{self.base_url}subscribers"
+
+        async with aiohttp.ClientSession() as session, session.post(url, json=payload) as response:
+            if response.status != 201:
+                logger.error(f"Failed to create subscriber: {response.status} {response.reason}")
+                raise BudNotifyException("Failed to create subscriber")
+            else:
+                response_data = await response.json()
+                if "code" in response_data and response_data["code"] != 200:
+                    raise BudNotifyException("Failed to create subscriber")
+
+                logger.info("Created subscriber in BudNotify")
+                return response_data
+
+    @_handle_exception
+    async def get_all_subscribers(self, page: int = 0, limit: int = 10) -> Dict:
+        """Get all subscribers in BudNotify"""
+
+        url = f"{self.base_url}subscribers?page={page}&limit={limit}"
+
+        async with aiohttp.ClientSession() as session, session.get(url) as response:
+            if response.status != 200:
+                logger.error(f"Failed to get subscribers: {response.status} {response.reason}")
+                raise BudNotifyException("Failed to get subscribers")
+            else:
+                response_data = await response.json()
+                if "code" in response_data and response_data["code"] != 200:
+                    raise BudNotifyException("Failed to get subscribers")
+
+                logger.info("Get subscribers from BudNotify")
+                return response_data
+
+    @_handle_exception
+    async def retrieve_subscriber(self, subscriber_id: str) -> Dict:
+        """Retrieve subscriber from BudNotify by id"""
+
+        url = f"{self.base_url}subscribers/{subscriber_id}"
+
+        async with aiohttp.ClientSession() as session, session.get(url) as response:
+            if response.status != 200:
+                logger.error(f"Failed to get subscriber: {response.status} {response.reason}")
+                raise BudNotifyException("Failed to retrieve subscriber")
+            else:
+                response_data = await response.json()
+                if "code" in response_data and response_data["code"] != 200:
+                    raise BudNotifyException("Failed to retrieve subscriber")
+
+                logger.info("Successfully retrieve subscriber from BudNotify")
+                return response_data
+
+    @_handle_exception
+    async def update_subscriber(self, subscriber_id: str, data: SubscriberUpdate) -> Dict:
+        """Update subscriber in BudNotify by using subscriber id"""
+
+        url = f"{self.base_url}subscribers/{subscriber_id}"
+        payload = data.model_dump(exclude_none=True)
+
+        async with aiohttp.ClientSession() as session, session.put(url, json=payload) as response:
+            if response.status != 200:
+                logger.error(f"Failed to update subscriber: {response.status} {response.reason}")
+                raise BudNotifyException("Failed to update subscriber.")
+            else:
+                response_data = await response.json()
+                if "code" in response_data and response_data["code"] != 200:
+                    raise BudNotifyException("Failed to update subscriber.")
+
+                logger.info("Successfully update subscriber in BudNotify")
+                return response_data
+
+    @_handle_exception
+    async def delete_subscriber(self, subscriber_id: str) -> None:
+        """Delete subscriber in BudNotify by using subscriber id"""
+
+        url = f"{self.base_url}subscribers/{subscriber_id}"
+
+        async with aiohttp.ClientSession() as session, session.delete(url) as response:
+            if response.status != 200:
+                logger.error(f"Failed to delete subscriber: {response.status} {response.reason}")
+                raise BudNotifyException("Failed to delete subscriber")
+            else:
+                response_data = await response.json()
+                if "code" in response_data and response_data["code"] != 200:
+                    raise BudNotifyException("Failed to delete subscriber")
+
+                logger.info("Successfully delete subscriber from BudNotify")
+                return response_data
+
+    @_handle_exception
+    async def bulk_create_subscribers(self, subscribers: List[SubscriberCreate]) -> Dict:
+        """Bulk create subscribers in BudNotify"""
+
+        url = f"{self.base_url}subscribers/bulk-create"
+        payload = [data.model_dump(exclude_none=True) for data in subscribers]
+
+        async with aiohttp.ClientSession() as session, session.post(url, json=payload) as response:
+            if response.status != 200:
+                logger.error(f"Failed to bulk create subscriber: {response.status} {response.reason}")
+                raise BudNotifyException("Failed to bulk create subscribers")
+            else:
+                response_data = await response.json()
+                if "code" in response_data and response_data["code"] != 200:
+                    raise BudNotifyException("Failed to bulk create subscribers")
+
+                logger.info("Successfully create multiple subscribers")
+                return response_data
