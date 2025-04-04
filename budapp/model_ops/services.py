@@ -1349,7 +1349,7 @@ class LocalModelWorkflowService(SessionMixin):
         self, extracted_license: dict, model_id: UUID, local_path: str
     ) -> List[ModelLicenses]:
         """Create model licenses from model info."""
-        license_name = normalize_value(extracted_license.get("name"))
+        license_name = normalize_value(extracted_license.get("name", "license"))
         license_url = normalize_value(extracted_license.get("url"))
         license_faqs = normalize_value(extracted_license.get("faqs", []))
         license_type = normalize_value(extracted_license.get("type"))
@@ -2505,7 +2505,7 @@ class ModelService(SessionMixin):
         # update faqs
         license_details = payload.content.result["license_details"]
         updated_license_details = {
-            "name": license_details.get("name"),
+            "name": license_details.get("name", "license"),
             "license_type": license_details.get("type"),
             "description": license_details.get("type_description"),
             "suitability": license_details.get("type_suitability"),
