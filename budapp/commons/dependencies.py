@@ -77,7 +77,7 @@ async def get_current_user(
         detail="Invalid authentication credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
 
     try:
         realm_name = app_settings.default_realm_name
@@ -206,3 +206,37 @@ async def parse_ordering_fields(
                     order_by_list.append((field_name, sort_direction))
 
     return order_by_list
+
+
+
+
+# async def check_endpoint_permission(
+#     current_user: Annotated[User, Depends(get_current_active_user)],
+#     session: Session = Depends(get_session),
+#     permission: PermissionEnum = Depends(PermissionEnum),
+# ):
+#     """Check if the current user has the required endpoint permission.
+    
+#     Args:
+#         required_permission: The permission to check for
+#         current_user: The current authenticated user
+#         session: Database session
+        
+#     Returns:
+#         bool: True if user has permission, False otherwise
+        
+#     Raises:
+#         HTTPException: If user doesn't have required permission
+#     """
+#     # Super admin has all permissions
+#     if current_user.is_superuser:
+#         return True
+
+#     # Get user's permissions from database
+#     # user_permissions = await PermissionDataManager(session).retrieve_by_fields(
+#     #     PermissionModel,
+#     #     {"user_id": current_user.id, "auth_id": current_user.auth_id},
+#     #     missing_ok=True
+#     # )
+#     pass
+

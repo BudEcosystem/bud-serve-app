@@ -41,6 +41,8 @@ class KeycloakManager:
     @property
     def admin_client(self) -> KeycloakAdmin:
         """Get the admin client instance."""
+        if self._admin_client is None:
+            raise ValueError("KeycloakAdmin client not initialized")
         return self._admin_client
 
     def _get_base_url(self) -> str:
@@ -69,18 +71,20 @@ class KeycloakManager:
         except Exception as e:
             logger.error(f"Failed to create realm admin for realm {realm_name}: {str(e)}")
             raise
-    def get_keycloak_openid_client(self, realm_name: str, credentials: TenantClientSchema) -> KeycloakAdmin:
+    def get_keycloak_openid_client(self, realm_name: str, credentials: TenantClientSchema) -> KeycloakOpenID:
         """Get the keycloak openid client.
 
         Args:
             realm_name: Name of the realm
+            credentials: The client credentials schema containing client_id and client_secret
         """
         return KeycloakOpenID(
             server_url=app_settings.keycloak_server_url,
-            client_id=credentials.client_id,
+            client_id=str(credentials.client_id),
             realm_name=realm_name,
             client_secret_key=credentials.client_secret,
         )
+
     async def create_realm(self, realm_name: str) -> dict:
         """Create a new realm in Keycloak.
 
@@ -116,10 +120,10 @@ class KeycloakManager:
                 UserRoleEnum.DEVOPS.value,
                 UserRoleEnum.SUPER_ADMIN.value,
             ]
-            
+
             for group in groups:
                 relam_admin.create_group({"name": group, "path": f"/{group}"}, skip_exists=True)
-                
+
             # Create permission roles in Keycloak
             role_names = [
                 "model:view", "model:manage",
@@ -127,16 +131,28 @@ class KeycloakManager:
                 "user:view", "user:manage",
                 "projects:view", "projects:manage",
             ]
-            
+
             for role_name in role_names:
                 relam_admin.create_realm_role({"name": role_name, "description": f"Permission role: {role_name}"}, skip_exists=True)
-                
-           # Assign roles to all groups
-            # group_objs = relam_admin.get_groups()
-            # for group in group_objs:
-            #     relam_admin.add_group_realm_roles(group_id=group["id"], roles=role_names)
-            
-           
+
+            # Step 1: Get the role objects (dicts) by name
+            # role_objs = [
+            #     relam_admin.get_realm_role(role_name)
+            #     for role_name in role_names
+            # ]
+
+            # # Get group objects and assign roles
+            # existing_groups = relam_admin.get_groups()
+            # for group in existing_groups:
+            #     if group["name"] in groups:
+            #         relam_admin.assign_group_realm_roles(group_id=group["id"], roles=role_objs)
+
+            # Fetch Relm Info
+            realm_info =  self.admin_client.get_realm(realm_name)
+            logger.info(f"Realm {realm_name} created successfully with info: {realm_info}")
+
+            return realm_info
+
 
         except Exception as e:
             logger.error(f"Failed to create realm {realm_name}: {str(e)}")
@@ -163,14 +179,16 @@ class KeycloakManager:
         }
 
         try:
-
             realm_admin = self.get_realm_admin(realm_name)
             new_client_id = realm_admin.create_client(payload=client_representation)
-            client_secret = realm_admin.get_client_secrets(new_client_id)["value"]
+            secrets = realm_admin.get_client_secrets(new_client_id)
+            client_secret = secrets.get("value", "") # type: ignore
+            if not client_secret:
+                raise ValueError(f"Client secret not found for client {new_client_id}")
             return new_client_id, client_secret
         except Exception as e:
             logger.error(f"Error creating client {client_id} in realm {realm_name}: {str(e)}")
-            raise
+            raise e
 
     async def create_user(
         self, username: str, email: str, password: str, realm_name: str, role: UserRoleEnum
@@ -229,7 +247,7 @@ class KeycloakManager:
         }
 
         try:
-            realm_admin = self.get_realm_admin()
+            realm_admin = self.get_realm_admin(realm_name)
             user_id = realm_admin.create_user(payload=user_representation, exist_ok=True)
             logger.info(f"Realm admin {username} created successfully")
 
@@ -269,7 +287,7 @@ class KeycloakManager:
 
         Returns:
             dict: Contains access_token, refresh_token, etc.
-            
+
         Example:
             {
                 "access_token": "eyJhbGciOiJSUzI1NiIsInR...",
@@ -328,7 +346,7 @@ class KeycloakManager:
 
         Returns:
             dict: Decoded token claims if valid, else raises exception
-            
+
         Example:
         {
             "exp": 1712180647,
@@ -370,7 +388,7 @@ class KeycloakManager:
 
             decoded_token = openid_client.decode_token(
                 token,
-                key=None,  # auto-fetch from /certs
+                key=None, # type: ignore
                 options=options,
             )
 
