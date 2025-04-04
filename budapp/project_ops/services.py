@@ -333,7 +333,6 @@ class ProjectService(SessionMixin):
                     ),
                 )
                 .set_payload(
-                    content=NotificationContent(message=f"You have been added to {db_project.name} project"),
                     type=NotificationTypeEnum.PROJECT_INVITATION_SUCCESS.value,
                 )
                 .set_notification_request(subscriber_ids=user_ids_str)
