@@ -102,6 +102,7 @@ async def get_current_user(
 
         credentials = TenantClientSchema(
             id=tenant_client.id,
+            client_named_id=tenant_client.client_named_id,
             client_id=tenant_client.client_id,
             client_secret=tenant_client.client_secret
         )

@@ -23,6 +23,7 @@ from budapp.commons.constants import UserStatusEnum, UserColorEnum, PermissionEn
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.keycloak import KeycloakManager
+from budapp.commons.security import HashManager
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
@@ -196,41 +197,51 @@ class AuthService(SessionMixin):
         if email_exists:
             logger.info(f"Email already registered: {user.email}")
             raise ClientException(detail="Email already registered")
+        
+        try:
+            # Keycloak Integration
+            keycloak_manager = KeycloakManager()
+            
+            # get the default tenant
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+            )
+            if not tenant:
+                raise ClientException("Default tenant not found")
+            
+            # get the default tenant client
+            tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+                TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+            )
+            if not tenant_client:
+                raise ClientException("Default tenant client not found")
+            
+        
+            user_auth_id = await keycloak_manager.create_user_with_permissions(user, app_settings.default_realm_name, tenant_client.client_id)
+            
 
-        # Hash password
-        salted_password = user.password + secrets_settings.password_salt
-        user.password = await HashManager().get_hash(salted_password)
-        logger.info(f"Password hashed for {user.email}")
+            # Hash password
+            # salted_password = user.password + secrets_settings.password_salt
+            # user.password = await HashManager().get_hash(salted_password)
+            # logger.info(f"Password hashed for {user.email}")
 
-        user_data = user.model_dump(exclude={"permissions"})
-        user_data["color"] = UserColorEnum.get_random_color()
+            user_data = user.model_dump(exclude={"permissions"})
+            user_data["color"] = UserColorEnum.get_random_color()
 
-        user_data["status"] = UserStatusEnum.INVITED
+            user_data["status"] = UserStatusEnum.INVITED
 
-        user_model = UserModel(**user_data)
+            user_model = UserModel(**user_data)
+            user_model.auth_id = user_auth_id
 
-        # NOTE: is_reset_password, first_login will be set to True by default
-        # NOTE: status wil be invited by default
-        # Create user
-        db_user = await UserDataManager(self.session).insert_one(user_model)
+            # NOTE: is_reset_password, first_login will be set to True by default |  # TODO
+            # NOTE: status wil be invited by default
+            # Create user
+            db_user = await UserDataManager(self.session).insert_one(user_model)
 
-        # Ensure that both given scopes and default scopes are uniquely added to the user without duplication.
-        scopes = PermissionEnum.get_default_permissions()
-        if user.permissions:
-            new_scopes = [permission.name for permission in user.permissions if permission.has_permission]
-            scopes.extend(new_scopes)
-        scopes = list(set(scopes))
-        logger.info(f"Scopes created for {user.email}: {scopes}")
-
-        permissions = PermissionCreate(
-            user_id=db_user.id,
-            auth_id=db_user.auth_id,
-            scopes=scopes,
-        )
-        permission_model = PermissionModel(**permissions.model_dump())
-        _ = await PermissionDataManager(self.session).insert_one(permission_model)
-
-        # Add user to budnotify subscribers
+        except Exception as e:
+            logger.error(f"Failed to register user: {e}")
+            raise ClientException(detail="Failed to register user")
+        
         try:
             subscriber_data = SubscriberCreate(
                 subscriber_id=str(db_user.id),

@@ -17,12 +17,14 @@
 
 """Contains Pydantic schemas used for data validation and serialization within the auth services."""
 
-from typing import Any
+from typing import Any, List
 
-from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field
+from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from budapp.commons.constants import TokenTypeEnum
+from budapp.commons.constants import TokenTypeEnum, UserRoleEnum
+from budapp.commons.helpers import validate_password_string
 from budapp.commons.schemas import SuccessResponse
+from budapp.permissions.schemas import PermissionList
 
 
 class AuthToken(BaseModel):
@@ -93,6 +95,43 @@ class LogoutRequest(BaseModel):
 
 class LogoutResponse(SuccessResponse):
     """Schema for logout response."""
+    message: str
+
+    class Config:
+        """Pydantic config."""
+        from_attributes = True
+
+class UserBase(BaseModel):
+    """Base user schema"""
+
+    name: str = Field(min_length=1, max_length=100)
+    email: EmailStr = Field(min_length=1, max_length=100)
+
+
+class UserCreate(UserBase):
+    """Create user schema"""
+
+    password: str = Field(min_length=8, max_length=100)
+    permissions: List[PermissionList] | None = None
+    role: UserRoleEnum
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        is_valid, message = validate_password_string(value)
+        if not is_valid:
+            raise ValueError(message)
+        return value
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, value: UserRoleEnum) -> UserRoleEnum:
+        if value == UserRoleEnum.SUPER_ADMIN:
+            raise ValueError("The SUPER_ADMIN role is not permitted.")
+        return value
+    
+class UserRegisterResponse(SuccessResponse):
+    """User register response schema"""
     message: str
 
     class Config:

@@ -27,7 +27,7 @@ from budapp.commons.dependencies import get_session
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
 
-from .schemas import LogoutResponse, UserLogin, UserLoginResponse, LogoutRequest
+from .schemas import LogoutResponse, UserCreate, UserLogin, UserLoginResponse, LogoutRequest, UserRegisterResponse
 from .services import AuthService
 
 
@@ -37,7 +37,47 @@ auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @auth_router.post(
-    "/login",
+    "/register",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": UserRegisterResponse,
+            "description": "Successfully registered user",
+        },
+    },
+    description="Register a user with email and password",
+)
+async def register_user(
+    user: UserCreate, session: Annotated[Session, Depends(get_session)]
+) -> Union[UserRegisterResponse, ErrorResponse]:
+    """Register a user with email and password."""
+    try:
+        db_user = await AuthService(session).register_user(user)
+        return UserRegisterResponse(
+            code=status.HTTP_200_OK,
+            message="User registered successfully",
+            object="user",
+            user=db_user
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"ClientException: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Exception: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Something went wrong"
+        ).to_http_response()
+
+
+@auth_router.post(
+    "/login",   
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
