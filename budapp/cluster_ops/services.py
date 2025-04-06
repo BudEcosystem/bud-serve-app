@@ -25,10 +25,11 @@ from uuid import UUID
 import aiohttp
 import yaml
 from fastapi import UploadFile, status
+from pydantic import ValidationError
 
 from budapp.cluster_ops.utils import ClusterMetricsFetcher
 from budapp.commons import logging
-from budapp.commons.async_utils import check_file_extension
+from budapp.commons.async_utils import check_file_extension, get_range_label
 from budapp.commons.config import app_settings
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
@@ -48,6 +49,7 @@ from ..commons.constants import (
     BudServeWorkflowStepEventName,
     ClusterStatusEnum,
     EndpointStatusEnum,
+    ModelProviderTypeEnum,
     ModelStatusEnum,
     NotificationTypeEnum,
     WorkflowStatusEnum,
@@ -79,6 +81,9 @@ from .schemas import (
     PrometheusConfig,
     ModelClusterRecommendedCreate,
     ModelClusterRecommendedUpdate,
+    RecommendedCluster,
+    RecommendedClusterData,
+    DeploymentTemplateCreate,
 )
 from budapp.credential_ops.crud import CloudProviderCredentialDataManager
 from budapp.credential_ops.models import CloudCredentials
@@ -1684,3 +1689,260 @@ class ClusterService(SessionMixin):
             raise ClientException(
                 "Failed to get cluster nodes", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
+
+    async def get_recommended_clusters(self, workflow_id: UUID) -> List[RecommendedCluster]:
+        """Get recommended clusters for a workflow.
+
+        Args:
+            workflow_id: The ID of the workflow to get recommended clusters for
+
+        Returns:
+            List of recommended clusters
+        """
+        # From workflow id get simulator_id and deploy_config
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+
+        # Get all workflow steps according with ascending order of step number
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for model deployment
+        keys_of_interest = [
+            "deploy_config",
+            "simulator_id",
+            "model_id",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        # Check if required data is present
+        if (
+            "deploy_config" not in required_data
+            or "simulator_id" not in required_data
+            or "model_id" not in required_data
+        ):
+            logger.error("Unable to find required data from workflow steps")
+            raise ClientException("Unable to find required data from workflow steps")
+
+        # Get model details
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": required_data["model_id"], "status": ModelStatusEnum.ACTIVE}
+        )
+
+        # Validate deploy_config
+        try:
+            deploy_config = DeploymentTemplateCreate(**required_data["deploy_config"])
+        except ValidationError as e:
+            logger.error("Invalid deployment configuration: %s", e)
+            raise ClientException("Invalid deployment configuration found")
+
+        # Validate simulator_id
+        try:
+            simulator_id = UUID(required_data["simulator_id"])
+            if not isinstance(simulator_id, UUID):
+                raise ClientException("Invalid simulator details found")
+        except ValueError as e:
+            logger.error("Invalid simulator ID: %s", e)
+            raise ClientException("Invalid simulator details found")
+
+        # Get recommended clusters from simulator app
+        recommended_clusters = await self._perform_get_recommended_clusters_request(simulator_id)
+
+        # Get all active clusters by recommended cluster ids
+        db_clusters, _ = await ClusterDataManager(self.session).get_available_clusters_by_cluster_ids(
+            [UUID(item["cluster_id"]) for item in recommended_clusters["items"]]
+        )
+
+        # Parse recommended clusters response
+        return await self._parse_recommended_clusters_response(
+            db_clusters, recommended_clusters, deploy_config, db_model
+        )
+
+    async def _perform_get_recommended_clusters_request(self, simulator_id: UUID) -> Dict:
+        """Perform get recommended clusters request to simulator app.
+
+        Args:
+            simulator_id: The ID of the simulator to get recommended clusters for
+        """
+        get_recommended_clusters_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/recommendations"
+        query_params = {
+            "workflow_id": str(simulator_id),
+            "limit": 20,
+        }
+
+        try:
+            logger.debug(f"Performing get recommended clusters request. endpoint: {get_recommended_clusters_endpoint}")
+            async with aiohttp.ClientSession() as session, session.get(
+                get_recommended_clusters_endpoint, params=query_params
+            ) as response:
+                response_data = await response.json()
+                if response.status != 200 or response_data.get("object") == "error":
+                    logger.error(f"Failed to get recommended clusters: {response.status} {response_data}")
+                    raise ClientException(
+                        "Failed to get recommended clusters", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+
+                logger.debug("Successfully fetched recommended clusters")
+                return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send get recommended clusters request: {e}")
+            raise ClientException(
+                "Failed to get recommended clusters", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def _parse_recommended_clusters_response(
+        self,
+        db_clusters: List[ClusterModel],
+        recommended_clusters: Dict,
+        deploy_config: DeploymentTemplateCreate,
+        db_model: Model,
+    ) -> List[RecommendedCluster]:
+        """Parse recommended clusters response.
+
+        Args:
+            db_clusters: List of active clusters
+            recommended_clusters: Recommended clusters
+        """
+        # Create a mapper for recommended cluster details with cluster id
+        recommended_cluster_mapper = {(item["cluster_id"]): item for item in recommended_clusters["items"]}
+
+        # Create a mapper for cluster details with cluster id
+        db_cluster_mapper = {(str(db_cluster.cluster_id)): db_cluster for db_cluster in db_clusters}
+
+        # Create a list to store recommended cluster data
+        data = []
+
+        # Iterate over all recommended clusters
+        for recommended_cluster_id, recommended_cluster_data in recommended_cluster_mapper.items():
+            if recommended_cluster_id not in db_cluster_mapper:
+                logger.info(f"BudSimulator cluster id {recommended_cluster_id} not found in database")
+                continue
+
+            db_cluster = db_cluster_mapper[recommended_cluster_id]
+
+            # calculate replicas
+            total_replicas = recommended_cluster_data["metrics"]["replica"]
+
+            # calculate concurrency
+            concurrency_data = {
+                "label": await get_range_label(
+                    recommended_cluster_data["metrics"]["concurrency"], deploy_config.concurrent_requests
+                ),
+                "value": recommended_cluster_data["metrics"]["concurrency"],
+            }
+
+            if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+                ttft_data = None
+                per_session_tokens_per_sec_data = None
+                over_all_throughput_data = None
+                e2e_latency_data = None
+            else:
+                # calculate ttft
+                ttft_data = {
+                    "label": await get_range_label(
+                        recommended_cluster_data["metrics"]["ttft"],
+                        deploy_config.ttft,
+                        higher_is_better=False,
+                    ),
+                    "value": recommended_cluster_data["metrics"]["ttft"],
+                }
+
+                # calculate per_session_tokens_per_sec
+                per_session_tokens_per_sec_data = {
+                    "label": await get_range_label(
+                        recommended_cluster_data["metrics"]["throughput_per_user"],
+                        deploy_config.per_session_tokens_per_sec,
+                    ),
+                    "value": recommended_cluster_data["metrics"]["throughput_per_user"],
+                }
+
+                # calculate overall throughput
+                over_all_throughput = (
+                    recommended_cluster_data["metrics"]["concurrency"]
+                    * recommended_cluster_data["metrics"]["throughput_per_user"]
+                )
+                over_all_throughput_data = {
+                    "label": per_session_tokens_per_sec_data[
+                        "label"
+                    ],  # Since overall throughput is a product of concurrency and throughput_per_user, the label is the same as throughput_per_user
+                    "value": over_all_throughput,
+                }
+
+                # calculate e2e_latency
+                e2e_latency_data = {
+                    "label": await get_range_label(
+                        recommended_cluster_data["metrics"]["e2e_latency"],
+                        deploy_config.e2e_latency,
+                        higher_is_better=False,
+                    ),
+                    "value": recommended_cluster_data["metrics"]["e2e_latency"],
+                }
+
+            # cost per million tokens
+            cost_per_million_tokens = recommended_cluster_data["metrics"]["cost_per_million_tokens"]
+
+            # Resource details
+            resource_details = []
+            if db_cluster.cpu_count > 0:
+                resource_details.append(
+                    {
+                        "type": "CPU",
+                        "available": db_cluster.cpu_available_workers,
+                        "total": db_cluster.cpu_total_workers,
+                    }
+                )
+            if db_cluster.gpu_count > 0:
+                resource_details.append(
+                    {
+                        "type": "GPU",
+                        "available": db_cluster.gpu_available_workers,
+                        "total": db_cluster.gpu_total_workers,
+                    }
+                )
+            if db_cluster.hpu_count > 0:
+                resource_details.append(
+                    {
+                        "type": "HPU",
+                        "available": db_cluster.hpu_available_workers,
+                        "total": db_cluster.hpu_total_workers,
+                    }
+                )
+
+            # Total resources
+            total_resources = sum([item["total"] for item in resource_details])
+
+            # Resources used
+            resources_used = total_resources - sum([item["available"] for item in resource_details])
+
+            # device types
+            device_types = recommended_cluster_data["metrics"].get("device_types", [])
+
+            # append recommended cluster data to the response
+            data.append(
+                RecommendedCluster(
+                    id=db_cluster.id,
+                    cluster_id=db_cluster.cluster_id,
+                    name=db_cluster.name,
+                    cost_per_token=cost_per_million_tokens,
+                    total_resources=total_resources,
+                    resources_used=resources_used,
+                    resource_details=resource_details,
+                    required_devices=device_types,
+                    benchmarks=RecommendedClusterData(
+                        replicas=total_replicas,
+                        ttft=ttft_data,
+                        per_session_tokens_per_sec=per_session_tokens_per_sec_data,
+                        e2e_latency=e2e_latency_data,
+                        over_all_throughput=over_all_throughput_data,
+                        concurrency=concurrency_data,
+                    ),
+                )
+            )
+
+        return data

@@ -18,11 +18,11 @@
 """Contains core Pydantic schemas used for data validation and serialization within the cluster ops services."""
 
 from datetime import datetime
-from typing import Any, List, Dict, Union, Optional
+from typing import Any, List, Dict, Union, Optional, Literal
 from uuid import UUID
 from enum import Enum
 
-from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, Field, computed_field, field_validator, HttpUrl
+from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, Field, computed_field, field_validator, HttpUrl, model_validator
 
 from budapp.commons.constants import ClusterStatusEnum, EndpointStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
@@ -530,3 +530,77 @@ class ModelClusterRecommendedUpdate(ModelClusterRecommendedCreate):
     """Model recommended cluster update schema."""
 
     pass
+
+
+class RecommendedClusterData(BaseModel):
+    """Recommended cluster benchmarks schema"""
+
+    replicas: int
+    concurrency: dict
+    ttft: dict | None = None
+    e2e_latency: dict | None = None
+    per_session_tokens_per_sec: dict | None = None
+    over_all_throughput: dict | None = None
+
+
+class RecommendedCluster(BaseModel):
+    """Recommended cluster response schema"""
+
+    id: UUID
+    cluster_id: UUID
+    name: str
+    cost_per_token: float
+    total_resources: int
+    resources_used: int
+    resource_details: list[dict]
+    required_devices: list[dict]
+    benchmarks: RecommendedClusterData
+
+
+class RecommendedClusterResponse(SuccessResponse):
+    """User response to client schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    clusters: list[RecommendedCluster]
+    status: Literal["success", "processing"] = "success"
+    workflow_id: UUID
+
+
+class DeploymentTemplateCreate(BaseModel):
+    """Deployment template request schema"""
+
+    concurrent_requests: int = Field(gt=0)
+    avg_sequence_length: int = Field(ge=10, le=2000)
+    avg_context_length: int = Field(ge=30, le=32000)
+    per_session_tokens_per_sec: Optional[list[int]] = None
+    ttft: Optional[list[int]] = None
+    e2e_latency: Optional[list[int]] = None
+
+    @field_validator("per_session_tokens_per_sec", "ttft", "e2e_latency", mode="before")
+    @classmethod
+    def validate_int_range(cls, value):
+        if value is not None and (
+            not isinstance(value, list) or len(value) != 2 or not all(isinstance(x, int) for x in value)
+        ):
+            raise ValueError("Must be a list of two integers")
+        return value
+
+    @model_validator(mode="after")
+    def validate_ranges(self) -> "DeploymentTemplateCreate":
+        # Define range validations
+        range_validations = {
+            "ttft": (50, 5000),
+            "per_session_tokens_per_sec": (5, 100),
+            "e2e_latency": (1, 300),
+        }
+        for field, (min_val, max_val) in range_validations.items():
+            field_value = getattr(self, field)
+            if field_value is None:
+                continue
+            field_value_min, field_value_max = field_value
+            if field_value_min < min_val:
+                raise ValueError(f"{field} must be greater than or equal to {min_val}")
+            if field_value_max > max_val:
+                raise ValueError(f"{field} must be less than or equal to {max_val}")
+        return self

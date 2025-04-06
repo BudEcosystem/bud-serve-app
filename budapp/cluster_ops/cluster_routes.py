@@ -51,6 +51,7 @@ from .schemas import (
     SingleClusterResponse,
     ClusterMetricsResponse,
     MetricTypeEnum,
+    RecommendedClusterResponse,
 )
 from .services import ClusterService
 from budapp.cluster_ops.schemas import CreateCloudClusterRequest
@@ -602,3 +603,47 @@ async def recommended_scheduler():
         response = ErrorResponse(message="Error recommended scheduler", code=500)
 
     return response.to_http_response()
+
+
+@cluster_router.get(
+    "/recommended/{workflow_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RecommendedClusterResponse,
+            "description": "Successfully retrieved recommended clusters",
+        },
+    },
+    description="Get all recommended clusters by id",
+)
+async def get_recommended_clusters(
+    workflow_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[RecommendedClusterResponse, ErrorResponse]:
+    """Get recommended clusters by workflow id."""
+    try:
+        recommended_clusters = await ClusterService(session).get_recommended_clusters(workflow_id)
+
+        return RecommendedClusterResponse(
+            code=status.HTTP_200_OK,
+            message="Successfully retrieved recommended clusters",
+            clusters=recommended_clusters,
+            object="cluster.recommended_clusters",
+            workflow_id=workflow_id,
+        )
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Error retrieving recommended clusters: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Error retrieving recommended clusters",
+        ).to_http_response()
