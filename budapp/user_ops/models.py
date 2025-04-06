@@ -105,6 +105,7 @@ class TenantClient(Base, TimestampMixin):
     tenant_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("tenant.id"), nullable=False)
     client_id: Mapped[str] = mapped_column(String, nullable=False)
     client_secret: Mapped[str] = mapped_column(String, nullable=False)
+    client_named_id: Mapped[str] = mapped_column(String, nullable=False)
     redirect_uris: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))

@@ -68,6 +68,7 @@ class TenantClientSchema(BaseModel):
 
     id: UUID4
     client_id: str
+    client_named_id: str
     client_secret: str
 
 class UserCreate(UserBase):

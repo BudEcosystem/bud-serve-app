@@ -1,8 +1,8 @@
 """keycloak
 
-Revision ID: 9f8d195646db
+Revision ID: cb1af702f194
 Revises: 20d36fea791f
-Create Date: 2025-04-04 16:32:28.187491
+Create Date: 2025-04-06 16:36:36.751084
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '9f8d195646db'
+revision: str = 'cb1af702f194'
 down_revision: Union[str, None] = '20d36fea791f'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -37,6 +37,7 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.Uuid(), nullable=False),
     sa.Column('client_id', sa.String(), nullable=False),
     sa.Column('client_secret', sa.String(), nullable=False),
+    sa.Column('client_named_id', sa.String(), nullable=False),
     sa.Column('redirect_uris', sa.ARRAY(sa.String()), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),

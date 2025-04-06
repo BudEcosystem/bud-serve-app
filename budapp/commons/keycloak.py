@@ -1,5 +1,6 @@
 # budapp/commons/keycloak.py
 
+import json
 from typing import Optional, Tuple
 
 from keycloak import KeycloakAdmin, KeycloakAuthenticationError, KeycloakGetError, KeycloakInvalidTokenError, KeycloakOpenID
@@ -82,7 +83,7 @@ class KeycloakManager:
         """
         return KeycloakOpenID(
             server_url=app_settings.keycloak_server_url,
-            client_id=str(credentials.client_id),
+            client_id=str(credentials.client_named_id),
             realm_name=realm_name,
             client_secret_key=credentials.client_secret,
         )
@@ -115,39 +116,16 @@ class KeycloakManager:
 
             # MAP Roles ad Groups
             relam_admin = self.get_realm_admin(realm_name)
-            groups = [
+            roles = [
                 UserRoleEnum.ADMIN.value,
                 UserRoleEnum.DEVELOPER.value,
                 UserRoleEnum.TESTER.value,
                 UserRoleEnum.DEVOPS.value,
                 UserRoleEnum.SUPER_ADMIN.value,
             ]
-
-            for group in groups:
-                relam_admin.create_group({"name": group, "path": f"/{group}"}, skip_exists=True)
-
-            # Create permission roles in Keycloak
-            role_names = [
-                "model:view", "model:manage",
-                "cluster:view", "cluster:manage",
-                "user:view", "user:manage",
-                "projects:view", "projects:manage",
-            ]
-
-            for role_name in role_names:
-                relam_admin.create_realm_role({"name": role_name, "description": f"Permission role: {role_name}"}, skip_exists=True)
-
-            # Step 1: Get the role objects (dicts) by name
-            # role_objs = [
-            #     relam_admin.get_realm_role(role_name)
-            #     for role_name in role_names
-            # ]
-
-            # # Get group objects and assign roles
-            # existing_groups = relam_admin.get_groups()
-            # for group in existing_groups:
-            #     if group["name"] in groups:
-            #         relam_admin.assign_group_realm_roles(group_id=group["id"], roles=role_objs)
+            
+            for role_name in roles:
+                relam_admin.create_realm_role({"name": role_name, "description": f" Role: {role_name}"}, skip_exists=True)
 
             # Fetch Relm Info
             realm_info =  self.admin_client.get_realm(realm_name)
@@ -159,6 +137,36 @@ class KeycloakManager:
         except Exception as e:
             logger.error(f"Failed to create realm {realm_name}: {str(e)}")
             raise
+    
+    
+    async def _create_module_resource(self, realm_admin, client_id: str, module_name: str) -> str:
+        """
+        Create a module-level resource in Keycloak Authorization.
+
+        Args:
+            realm_admin: Instance of realm_admin
+            client_id: Internal client UUID
+            module_name: e.g. "cluster", "model"
+
+        Returns:
+            ID of the created resource
+        """
+        
+        resource = {
+            "name": f"module_{module_name}",
+            "type": "module",
+            "owner": {"id": client_id},
+            "ownerManagedAccess": True,
+            "displayName": f"{module_name.capitalize()} Module",
+            "scopes": [{"name": "view"}, {"name": "manage"}]
+        }
+        
+        existing_resources = realm_admin.get_client_authz_resources(client_id)
+        for r in existing_resources:
+            if r["name"] == resource["name"]:
+                return r["_id"]
+            
+        return realm_admin.create_client_authz_resource(client_id, resource)
 
     async def create_client(self, client_id: str, realm_name: str) -> Tuple[str, str]:
         """Create a new client in Keycloak.
@@ -176,8 +184,10 @@ class KeycloakManager:
             "enabled": True,
             "protocol": "openid-connect",
             "publicClient": False,
-            "redirectUris": [f"{base_url}/*"],
-            "webOrigins": [base_url],
+            "redirectUris": ["*"],
+            "webOrigins": ["*"],
+            "authorizationServicesEnabled": True,
+            "serviceAccountsEnabled": True,
         }
 
         try:
@@ -187,6 +197,12 @@ class KeycloakManager:
             client_secret = secrets.get("value", "") # type: ignore
             if not client_secret:
                 raise ValueError(f"Client secret not found for client {new_client_id}")
+            
+            # Create Resources / Scopes / Policies / Roles
+            modules = ["cluster", "model", "projects", "user"]
+            for module in modules:
+                await self._create_module_resource(realm_admin, new_client_id, module)
+        
             return new_client_id, client_secret
         except Exception as e:
             logger.error(f"Error creating client {client_id} in realm {realm_name}: {str(e)}")
@@ -228,7 +244,7 @@ class KeycloakManager:
             logger.error(f"Error creating user {username} in realm {realm_name}: {str(e)}")
             raise
 
-    async def create_realm_admin(self, username: str, email: str, password: str, realm_name: str) -> str:
+    async def create_realm_admin(self, username: str, email: str, password: str, realm_name: str, client_id: str, client_secret: str) -> str:
         """Create a new realm admin user in Keycloak.
 
         Args:
@@ -243,6 +259,8 @@ class KeycloakManager:
         user_representation = {
             "username": username,
             "email": email,
+            "firstName":"Admin", #TODO Update this to be dynamic
+            "lastName":"Admin", #TODO Update this to be dynamic
             "enabled": True,
             "emailVerified": True,
             "credentials": [{"type": "password", "value": password, "temporary": False}],
@@ -254,15 +272,90 @@ class KeycloakManager:
             logger.info(f"Realm admin {username} created successfully")
 
             logger.debug(f"User ID of realm admin {username}: {user_id}")
+            
+            # Step 1: Get all realm roles
+            roles = realm_admin.get_realm_roles()
+            super_admin_role = next((r for r in roles if r["name"] == "super_admin"), None)
 
-            groups = realm_admin.get_groups()
-            super_admin_group = next((g for g in groups if g["name"] == UserRoleEnum.SUPER_ADMIN.value), None)
+            if not super_admin_role:
+                raise ValueError(f"Realm role 'super_admin' not found in realm {realm_name}")
+            
+            # Step 2: Assign the role to the user
+            realm_admin.assign_realm_roles(user_id=user_id, roles=[super_admin_role])
+            logger.info(f"Assigned 'super_admin' role to user {username}")
+            
+            # Step 3: Assign policies to the user
+            modules = ["cluster", "model", "projects", "user"]
+            for module in modules:
+                resource_name = f"module_{module}"
+                resources = realm_admin.get_client_authz_resources(client_id=client_id)
+                module_resource = next((r for r in resources if r["name"] == resource_name), None)
+                
+                if not module_resource:
+                    logger.warning(f"Resource {resource_name} not found for client {client_id}")
+                    continue
+                
+                resource_id = module_resource["_id"]
+                policy_name = f"user-policy-{user_id}"
+                existing_policies = realm_admin.get_client_authz_policies(client_id)
+                logger.debug(f"Existing policies: {existing_policies}")
+                user_policy = next((p for p in existing_policies if p["name"] == policy_name), None)
+                
+                if not user_policy:
+                    user_policy = {
+                        "name": policy_name,
+                        "description": f"User policy for {user_id}",
+                        "logic": "POSITIVE",
+                        "users": [user_id],
+                    }
+                    
+                    logger.debug(f"Creating user policy: {json.dumps(user_policy, indent=4)}")
+                    
+                    policy_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/user"
+                    
+                    data_raw = realm_admin.connection.raw_post(
+                        policy_url, 
+                        data=json.dumps(user_policy),
+                        max=-1,
+                        permission=False,
+                    )
+                    
+                    logger.debug(f"User policy response: {data_raw.json()}")
+                    policy_id = data_raw.json()["id"]
+                else:
+                    policy_id = user_policy["id"]
+                    
+                # Step 3b: Create permission (if not exists)
+                permission_name = f"user-{user_id}-module-{module}-view-manage"
+                existing_permissions = realm_admin.get_client_authz_permissions(client_id)
+                if any(p["name"] == permission_name for p in existing_permissions):
+                    logger.info(f"Permission {permission_name} already exists — skipping.")
+                    continue
 
-            if not super_admin_group:
-                raise ValueError(f"Group {UserRoleEnum.SUPER_ADMIN.value} not found in realm {realm_name}")
-
-            realm_admin.group_user_add(user_id=user_id, group_id=super_admin_group["id"])
-            logger.info(f"Assigned user {username} to group {UserRoleEnum.SUPER_ADMIN.value}")
+                permission = {
+                    "name": permission_name,
+                    "decisionStrategy": "UNANIMOUS",
+                    "description": f"Permission for {user_id} to view and manage {module}",
+                    "resources": [resource_id],
+                    "policies": [policy_id]
+                }
+                
+                logger.debug(f"Creating permission: {json.dumps(permission, indent=4)}")
+                permission_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/permission/resource"
+                data_raw = realm_admin.connection.raw_post(
+                    permission_url, 
+                    data=json.dumps(permission),
+                    max=-1,
+                    permission=False,
+                )
+                
+                logger.debug(f"Permission response: {data_raw.json()}")
+                permission_id = data_raw.json()["id"]
+                
+                logger.debug(f"Permission ID: {permission_id}")
+                
+                #realm_admin.create_client_authz_permission(client_id, permission)
+                logger.info(f"Permission {permission_name} assigned to user {username} for module {module}")
 
             return user_id
         except Exception as e:

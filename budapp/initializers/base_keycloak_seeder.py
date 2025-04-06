@@ -39,20 +39,23 @@ class BaseKeycloakSeeder(BaseSeeder):
         default_client_id = "default-internal-client"
 
         # check if its already exisits
-        if not keycloak_manager.realm_exists(default_realm_name):
-            logger.debug(f"::KEYCLOAK::Realm {default_realm_name} does not exist. Creating...")
+        if  keycloak_manager.realm_exists(default_realm_name):
+            logger.info(f"::KEYCLOAK::Realm {default_realm_name} already exists. Skipping...")
+            return
+        
+        logger.debug(f"::KEYCLOAK::Realm {default_realm_name} does not exist. Creating...")
 
-            await keycloak_manager.create_realm(default_realm_name)
+        await keycloak_manager.create_realm(default_realm_name)
 
-            # Save The Tenant in DB
-            tenant = Tenant(
-                name="Default Tenant",
-                realm_name=default_realm_name,
-                tenant_identifier=default_realm_name,
-                description="Default tenant for superuser",
-                is_active=True,
-            )
-            tenant = await UserDataManager(session).insert_one(tenant)
+        # Save The Tenant in DB
+        tenant = Tenant(
+            name="Default Tenant",
+            realm_name=default_realm_name,
+            tenant_identifier=default_realm_name,
+            description="Default tenant for superuser",
+            is_active=True,
+        )
+        tenant = await UserDataManager(session).insert_one(tenant)
 
         # check if relm alreasy exisits in db
         tenant = await UserDataManager(session).retrieve_by_fields(
@@ -91,7 +94,8 @@ class BaseKeycloakSeeder(BaseSeeder):
             # Save The Tenant Client in DB
             tenant_client = TenantClient(
                 tenant_id=tenant.id,
-                client_id=default_client_id,
+                client_named_id=default_client_id,
+                client_id=new_client_id,
                 client_secret=client_secret,  # TODO: perform encryption before saving
             )
             await UserDataManager(session).insert_one(tenant_client)
@@ -110,6 +114,8 @@ class BaseKeycloakSeeder(BaseSeeder):
                 email=app_settings.superuser_email,
                 password=app_settings.superuser_password,
                 realm_name=default_realm_name,
+                client_id=new_client_id,
+                client_secret=tenant_client.client_secret,
             )
 
             # Save The User in DB
