@@ -63,8 +63,6 @@ async def register_user(
         return UserRegisterResponse(
             code=status.HTTP_200_OK,
             message="User registered successfully",
-            object="user",
-            user=db_user
         ).to_http_response()
     except ClientException as e:
         logger.error(f"ClientException: {e}")

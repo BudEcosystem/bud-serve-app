@@ -237,6 +237,8 @@ class AuthService(SessionMixin):
             # NOTE: status wil be invited by default
             # Create user
             db_user = await UserDataManager(self.session).insert_one(user_model)
+            
+            return db_user
 
         except Exception as e:
             logger.error(f"Failed to register user: {e}")

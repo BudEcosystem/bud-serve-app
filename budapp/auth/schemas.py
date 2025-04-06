@@ -133,7 +133,6 @@ class UserCreate(UserBase):
 class UserRegisterResponse(SuccessResponse):
     """User register response schema"""
     message: str
-
     class Config:
         """Pydantic config."""
         from_attributes = True
