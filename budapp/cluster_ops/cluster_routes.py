@@ -581,9 +581,10 @@ async def get_node_wise_events_by_hostname(
         ).to_http_response()
 
 
-@cluster_router.post("/recommended-scheduler", tags=["Cluster"])
+@cluster_router.post("/recommended-scheduler")
 async def recommended_scheduler():
     """Recommended scheduler cron job.
+
     This endpoint processes the recommended scheduler cron job.
 
     Returns:

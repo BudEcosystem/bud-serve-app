@@ -17,10 +17,11 @@
 
 """Contains core Pydantic schemas used for data validation and serialization within the core services."""
 
-from typing import Any, Dict, List, Literal, Optional, Self, Union
 from datetime import datetime
+from typing import Any, Dict, List, Literal, Optional, Self, Union
+from uuid import UUID
 
-from pydantic import UUID4, BaseModel, ConfigDict, field_validator, model_validator, Field
+from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from budapp.commons import logging
 from budapp.commons.constants import (
@@ -156,6 +157,9 @@ class NotificationResponse(SuccessResponse):
     pass
 
 
+# Schemas related to model templates
+
+
 class ModelTemplateCreate(BaseModel):
     """Model template create schema."""
 
@@ -172,6 +176,7 @@ class ModelTemplateCreate(BaseModel):
     @field_validator("per_session_tokens_per_sec", "ttft", "e2e_latency", mode="before")
     @classmethod
     def validate_int_range(cls, value):
+        """Validate the int range of the list."""
         if value is not None and (
             not isinstance(value, list) or len(value) != 2 or not all(isinstance(x, int) for x in value)
         ):
@@ -183,6 +188,38 @@ class ModelTemplateUpdate(ModelTemplateCreate):
     """Model template update schema."""
 
     pass
+
+
+class ModelTemplateResponse(BaseModel):
+    """Model template response schema."""
+
+    id: UUID
+    name: str
+    description: str
+    icon: str
+    template_type: ModelTemplateTypeEnum
+    avg_sequence_length: Optional[int] = None
+    avg_context_length: Optional[int] = None
+    per_session_tokens_per_sec: Optional[list[int]] = None
+    ttft: Optional[list[int]] = None
+    e2e_latency: Optional[list[int]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ModelTemplateListResponse(PaginatedSuccessResponse):
+    """Model template list response schema."""
+
+    templates: List[ModelTemplateResponse]
+
+
+class ModelTemplateFilter(BaseModel):
+    """Model template filter schema"""
+
+    template_type: Optional[ModelTemplateTypeEnum] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
 
 
 class NotificationResult(BaseModel):
