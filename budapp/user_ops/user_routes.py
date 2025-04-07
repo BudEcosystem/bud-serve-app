@@ -26,8 +26,10 @@ from budapp.commons import logging
 from budapp.commons.dependencies import get_current_active_invite_user, get_session
 from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
+from uuid import UUID
 
-from .schemas import UserResponse
+from budapp.user_ops.services import UserService
+from .schemas import UserResponse, UserUpdate
 
 
 logger = logging.get_logger(__name__)
@@ -67,4 +69,46 @@ async def get_current_user(
         logger.exception(f"Failed to get current user: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get current user"
+        ).to_http_response()
+
+@user_router.patch(
+    "/{user_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": UserResponse,
+            "description": "Successfully update current user",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_401_UNAUTHORIZED: {
+            "model": ErrorResponse,
+            "description": "Unauthorized",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Update current user",
+)
+async def update_current_user(
+    user_id: UUID,
+    user: UserUpdate,
+    current_user: Annotated[User, Depends(get_current_active_invite_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[UserResponse, ErrorResponse]:
+    """Update current user."""
+    try:
+        db_user = await UserService(session).update_active_user(
+            user_id, user.model_dump(exclude_unset=True, exclude_none=True), current_user
+        )
+        return UserResponse(
+            object="user.me", code=status.HTTP_200_OK, message="Successfully update current user", user=db_user
+        ).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to update current user: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update current user"
         ).to_http_response()

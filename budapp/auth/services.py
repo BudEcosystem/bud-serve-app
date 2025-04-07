@@ -238,13 +238,6 @@ class AuthService(SessionMixin):
             # Create user
             db_user = await UserDataManager(self.session).insert_one(user_model)
             
-            return db_user
-
-        except Exception as e:
-            logger.error(f"Failed to register user: {e}")
-            raise ClientException(detail="Failed to register user")
-        
-        try:
             subscriber_data = SubscriberCreate(
                 subscriber_id=str(db_user.id),
                 email=db_user.email,
@@ -254,7 +247,13 @@ class AuthService(SessionMixin):
             logger.info("User added to budnotify subscriber")
 
             _ = await UserDataManager(self.session).update_subscriber_status(user_ids=[db_user.id], is_subscriber=True)
+            
+            return db_user
+
+        except Exception as e:
+            logger.error(f"Failed to register user: {e}")
+            raise ClientException(detail="Failed to register user")
+        
         except BudNotifyException as e:
             logger.error(f"Failed to add user to budnotify subscribers: {e}")
 
-        return db_user

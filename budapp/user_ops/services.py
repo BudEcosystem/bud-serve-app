@@ -15,3 +15,15 @@
 #  -----------------------------------------------------------------------------
 
 """The user ops package, containing essential business logic, services, and routing configurations for the user ops."""
+
+from typing import Dict
+from uuid import UUID
+from budapp.commons.db_utils import SessionMixin
+from budapp.user_ops.models import User as UserModel
+
+
+class UserService(SessionMixin):
+    async def update_active_user(
+        self, user_id: UUID, fields: Dict, current_user: UserModel
+    ) -> UserModel:
+        pass
