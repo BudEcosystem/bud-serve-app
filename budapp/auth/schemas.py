@@ -64,7 +64,10 @@ class UserLogin(BaseModel):
 
     email: EmailStr = Field(min_length=1, max_length=100)
     password: str = Field(min_length=8, max_length=100)
-    tenant_id: UUID4 | None = Field(None, description="The ID of the tenant. If not provided, the user will be logged in to the first tenant they belong to.")
+    tenant_id: UUID4 | None = Field(
+        None,
+        description="The ID of the tenant. If not provided, the user will be logged in to the first tenant they belong to.",
+    )
 
 
 class UserLoginData(BaseModel):
@@ -86,20 +89,29 @@ class UserLoginResponse(SuccessResponse):
 
 class LogoutRequest(BaseModel):
     """Schema for logout request."""
-    tenant_id: UUID4 | None = Field(None, description="The ID of the tenant. If not provided, the user will be logged in to the first tenant they belong to.")
+
+    tenant_id: UUID4 | None = Field(
+        None,
+        description="The ID of the tenant. If not provided, the user will be logged in to the first tenant they belong to.",
+    )
     refresh_token: str = Field(min_length=1)
 
     class Config:
         """Pydantic config."""
+
         from_attributes = True
+
 
 class LogoutResponse(SuccessResponse):
     """Schema for logout response."""
+
     message: str
 
     class Config:
         """Pydantic config."""
+
         from_attributes = True
+
 
 class UserBase(BaseModel):
     """Base user schema"""
@@ -129,19 +141,22 @@ class UserCreate(UserBase):
         if value == UserRoleEnum.SUPER_ADMIN:
             raise ValueError("The SUPER_ADMIN role is not permitted.")
         return value
-    
+
+
 class UserRegisterResponse(SuccessResponse):
-    """User register response schema"""
+    """User register response schema."""
+
     message: str
+
     class Config:
         """Pydantic config."""
+
         from_attributes = True
 
-      
+
 class ResourceCreate(BaseModel):
-    """Resource create schema"""
+    """Resource create schema."""
+
     resource_type: str
     resource_id: str
-    scopes: List[str] # view , manage
-    
-    
+    scopes: List[str]  # view , manage
