@@ -567,40 +567,16 @@ class RecommendedClusterResponse(SuccessResponse):
     workflow_id: UUID
 
 
-class DeploymentTemplateCreate(BaseModel):
-    """Deployment template request schema"""
+class RecommendedClusterRequest(BaseModel):
+    """Request to get recommended cluster events"""
 
-    concurrent_requests: int = Field(gt=0)
-    avg_sequence_length: int = Field(ge=10, le=2000)
-    avg_context_length: int = Field(ge=30, le=32000)
-    per_session_tokens_per_sec: Optional[list[int]] = None
-    ttft: Optional[list[int]] = None
-    e2e_latency: Optional[list[int]] = None
-
-    @field_validator("per_session_tokens_per_sec", "ttft", "e2e_latency", mode="before")
-    @classmethod
-    def validate_int_range(cls, value):
-        if value is not None and (
-            not isinstance(value, list) or len(value) != 2 or not all(isinstance(x, int) for x in value)
-        ):
-            raise ValueError("Must be a list of two integers")
-        return value
-
-    @model_validator(mode="after")
-    def validate_ranges(self) -> "DeploymentTemplateCreate":
-        # Define range validations
-        range_validations = {
-            "ttft": (50, 5000),
-            "per_session_tokens_per_sec": (5, 100),
-            "e2e_latency": (1, 300),
-        }
-        for field, (min_val, max_val) in range_validations.items():
-            field_value = getattr(self, field)
-            if field_value is None:
-                continue
-            field_value_min, field_value_max = field_value
-            if field_value_min < min_val:
-                raise ValueError(f"{field} must be greater than or equal to {min_val}")
-            if field_value_max > max_val:
-                raise ValueError(f"{field} must be less than or equal to {max_val}")
-        return self
+    pretrained_model_uri: str
+    input_tokens: int
+    output_tokens: int
+    concurrency: int
+    target_ttft: int
+    target_throughput_per_user: int
+    target_e2e_latency: int
+    notification_metadata: BudNotificationMetadata
+    source_topic: str
+    is_proprietary_model: bool

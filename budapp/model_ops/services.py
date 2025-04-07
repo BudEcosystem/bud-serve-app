@@ -40,8 +40,10 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
-from ..cluster_ops.crud import ModelClusterRecommendedDataManager
+from ..cluster_ops.crud import ClusterDataManager, ModelClusterRecommendedDataManager
+from ..cluster_ops.models import Cluster as ClusterModel
 from ..cluster_ops.models import ModelClusterRecommended as ModelClusterRecommendedModel
+from ..cluster_ops.schemas import RecommendedClusterRequest
 from ..cluster_ops.workflows import ClusterRecommendedSchedulerWorkflows
 from ..commons.constants import (
     APP_ICONS,
@@ -52,6 +54,7 @@ from ..commons.constants import (
     BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     CloudModelStatusEnum,
+    ClusterStatusEnum,
     CredentialTypeEnum,
     EndpointStatusEnum,
     ModelLicenseObjectTypeEnum,
@@ -60,14 +63,20 @@ from ..commons.constants import (
     ModelSourceEnum,
     ModelStatusEnum,
     NotificationTypeEnum,
+    ProjectStatusEnum,
     VisibilityEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
 from ..commons.helpers import validate_huggingface_repo_format
+from ..commons.schemas import BudNotificationMetadata
+from ..core.crud import ModelTemplateDataManager
+from ..core.models import ModelTemplate as ModelTemplateModel
 from ..core.schemas import NotificationPayload, NotificationResult
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..project_ops.crud import ProjectDataManager
+from ..project_ops.models import Project as ProjectModel
 from ..shared.minio_store import ModelStore
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.schemas import WorkflowUtilCreate
@@ -89,6 +98,8 @@ from .schemas import (
     CreateCloudModelWorkflowSteps,
     CreateLocalModelWorkflowRequest,
     CreateLocalModelWorkflowSteps,
+    DeploymentTemplateCreate,
+    DeploymentWorkflowStepData,
     Leaderboard,
     LeaderboardBenchmark,
     LeaderboardModelInfo,
@@ -98,6 +109,7 @@ from .schemas import (
     ModelArchitectureLLMConfig,
     ModelArchitectureVisionConfig,
     ModelCreate,
+    ModelDeploymentRequest,
     ModelDetailSuccessResponse,
     ModelIssue,
     ModelLicensesCreate,
@@ -2750,6 +2762,529 @@ class ModelService(SessionMixin):
         except Exception as e:
             logger.exception(f"Failed to send top leaderboard by uris request: {e}")
             raise ClientException("Failed to fetch top leaderboards") from e
+
+    async def deploy_model_by_step(
+        self,
+        current_user_id: UUID,
+        step_number: int,
+        workflow_id: Optional[UUID] = None,
+        workflow_total_steps: Optional[int] = None,
+        model_id: Optional[UUID] = None,
+        project_id: Optional[UUID] = None,
+        cluster_id: Optional[UUID] = None,
+        endpoint_name: Optional[str] = None,
+        deploy_config: Optional[DeploymentTemplateCreate] = None,
+        template_id: Optional[UUID] = None,
+        trigger_workflow: bool = False,
+        credential_id: Optional[UUID] = None,
+    ) -> EndpointModel:
+        """Create workflow steps and execute deployment workflow.
+
+        Arguments availability handled in router pydantic validation
+        - If workflow_id is provided, then step_number and either of (model_id, project_id, cluster_id, endpoint_name, replicas) should be provided
+        - If workflow_id is not provided, the function will create a new workflow and a new workflow step.
+            - Also for workflow step creation needed step_number and either of (model_id, project_id, cluster_id, endpoint_name, replicas)
+        """
+        current_step_number = step_number
+
+        # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.MODEL_DEPLOYMENT,
+            title="Deploying Model",
+            total_steps=workflow_total_steps,
+            icon=APP_ICONS["general"]["deployment_mono"],
+            created_by=current_user_id,
+        )
+
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id, workflow_create, current_user_id
+        )
+
+        # Validate project
+        if project_id:
+            db_project = await ProjectDataManager(self.session).retrieve_project_by_fields(
+                ProjectModel, {"id": project_id, "status": ProjectStatusEnum.ACTIVE}
+            )
+
+            # Update workflow tag
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"tag": db_project.name}
+            )
+
+        # Validate model
+        if model_id:
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
+            )
+
+            # Update workflow icon
+            if db_model.provider_type in [ModelProviderTypeEnum.HUGGING_FACE, ModelProviderTypeEnum.CLOUD_MODEL]:
+                db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                    ProviderModel, {"id": db_model.provider_id}
+                )
+                model_icon = db_provider.icon
+            else:
+                model_icon = db_model.icon
+
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"icon": model_icon, "title": db_model.name}
+            )
+
+        # Validate template
+        if template_id:
+            db_template = await ModelTemplateDataManager(self.session).retrieve_by_fields(
+                ModelTemplateModel, {"id": template_id}
+            )
+
+        # Validate cluster
+        if cluster_id:
+            db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+                ClusterModel, {"cluster_id": cluster_id}, exclude_fields={"status": ClusterStatusEnum.DELETED}
+            )
+
+            if db_cluster.status != ClusterStatusEnum.AVAILABLE:
+                logger.error(f"Cluster {cluster_id} is currently not available.")
+                raise ClientException("Cluster is not available")
+
+        # Validate credential
+        if credential_id:
+            db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_by_fields(
+                ProprietaryCredentialModel, {"id": credential_id}
+            )
+
+        # Update workflow title
+        if endpoint_name:
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"title": endpoint_name}
+            )
+
+        # Prepare workflow step data
+        workflow_step_data = DeploymentWorkflowStepData(
+            model_id=model_id,
+            project_id=project_id,
+            cluster_id=cluster_id,
+            endpoint_name=endpoint_name,
+            deploy_config=deploy_config,
+            template_id=template_id,
+            credential_id=credential_id,
+        ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+
+        # Get workflow steps
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": db_workflow.id}
+        )
+
+        # For avoiding another db call for record retrieval, storing db object while iterating over db_workflow_steps
+        db_current_workflow_step = None
+
+        if db_workflow_steps:
+            db_step_project_id = None
+            db_step_endpoint_name = None
+
+            for db_step in db_workflow_steps:
+                # Get current workflow step
+                if db_step.step_number == current_step_number:
+                    db_current_workflow_step = db_step
+
+                if "project_id" in db_step.data:
+                    db_step_project_id = db_step.data["project_id"]
+                if "endpoint_name" in db_step.data:
+                    db_step_endpoint_name = db_step.data["endpoint_name"]
+
+            # Check duplicate endpoint in project
+            query_endpoint_name = None
+            query_project_id = None
+            if project_id and db_step_endpoint_name:
+                # If user gives project_id but endpoint_name given in earlier step
+                query_endpoint_name = db_step_endpoint_name
+                query_project_id = project_id
+            elif endpoint_name and db_step_project_id:
+                # If user gives endpoint_name but project_id given in earlier step
+                query_endpoint_name = endpoint_name
+                query_project_id = db_step_project_id
+            elif endpoint_name and project_id:
+                # if user gives both endpoint_name and project_id
+                query_endpoint_name = endpoint_name
+                query_project_id = project_id
+            elif db_step_endpoint_name and db_step_project_id:
+                # if user gives endpoint_name and project_id in earlier step
+                query_endpoint_name = db_step_endpoint_name
+                query_project_id = db_step_project_id
+
+            if query_endpoint_name and query_project_id:
+                # NOTE: A model can only be deployed once in a project
+                db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                    EndpointModel,
+                    {
+                        "name": query_endpoint_name,
+                        "project_id": query_project_id,
+                    },
+                    exclude_fields={"status": EndpointStatusEnum.DELETED},
+                    missing_ok=True,
+                    case_sensitive=False,
+                )
+                if db_endpoint:
+                    logger.info(
+                        f"An endpoint with name {query_endpoint_name} already exists in project: {query_project_id}"
+                    )
+                    raise ClientException("An endpoint with this name already exists in this project")
+
+        if db_current_workflow_step:
+            logger.debug(f"Workflow {db_workflow.id} step {current_step_number} already exists")
+
+            # Update workflow step data in db
+            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                db_current_workflow_step,
+                {"data": workflow_step_data},
+            )
+            logger.info(f"Workflow {db_workflow.id} step {current_step_number} updated")
+        else:
+            logger.info(f"Creating workflow step {current_step_number} for workflow {db_workflow.id}")
+
+            # Insert step details in db
+            db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+                WorkflowStepModel(
+                    workflow_id=db_workflow.id,
+                    step_number=current_step_number,
+                    data=workflow_step_data,
+                )
+            )
+
+        # Update workflow current step as the highest step_number
+        db_max_workflow_step_number = max(step.step_number for step in db_workflow_steps) if db_workflow_steps else 0
+        workflow_current_step = max(current_step_number, db_max_workflow_step_number)
+        logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
+
+        # This will ensure workflow step number is updated to the latest step number
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": workflow_current_step},
+        )
+
+        if deploy_config:
+            # Fetch model information from previous steps
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": db_workflow.id}
+            )
+
+            # Get latest model_id from workflow steps
+            model_id = None
+            for db_workflow_step in db_workflow_steps:
+                if "model_id" in db_workflow_step.data:
+                    model_id = db_workflow_step.data["model_id"]
+
+            if not model_id:
+                raise ClientException("Model ID is not provided")
+
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
+            )
+
+            # Create next step from backend
+            # Increment workflow_current_step with 1
+            current_step_number = current_step_number + 1
+            workflow_current_step = current_step_number
+
+            bud_simulator_events = await self._perform_cluster_simulation(
+                db_workflow.id,
+                deploy_config,
+                current_user_id,
+                db_model.uri,
+                db_model.provider_type,
+                db_model.local_path,
+            )
+            simulator_id = bud_simulator_events.pop("workflow_id")
+            recommended_cluster_events = {
+                "simulator_id": simulator_id,
+                "bud_simulator_events": bud_simulator_events,
+            }
+
+            # Update or create next workflow step
+            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                db_workflow.id, current_step_number, recommended_cluster_events
+            )
+            logger.debug(f"Workflow step updated {db_workflow_step.id}")
+
+            # Update workflow progress
+            bud_simulator_events["progress_type"] = "bud_simulator_events"
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"progress": bud_simulator_events, "current_step": workflow_current_step},
+            )
+
+        # Execute workflow
+        if trigger_workflow:
+            logger.info("Workflow triggered")
+
+            # Increment step number of workflow and workflow step
+            current_step_number = current_step_number + 1
+            workflow_current_step = current_step_number
+
+            # TODO: Currently querying workflow steps again by ordering steps in ascending order
+            # To ensure the latest step update is fetched, Consider excluding it later
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": db_workflow.id}
+            )
+
+            # Define the keys required for model deployment
+            keys_of_interest = [
+                "model_id",
+                "project_id",
+                "cluster_id",
+                # "created_by",
+                "endpoint_name",
+                "simulator_id",
+                "deploy_config",
+                "credential_id",
+            ]
+
+            # from workflow steps extract necessary information
+            required_data = {}
+            for db_workflow_step in db_workflow_steps:
+                for key in keys_of_interest:
+                    if key in db_workflow_step.data:
+                        required_data[key] = db_workflow_step.data[key]
+
+            required_keys = [
+                "model_id",
+                "project_id",
+                "cluster_id",
+                # "created_by",
+                # "replicas",
+                "endpoint_name",
+                "simulator_id",
+                "deploy_config",
+            ]
+
+            if "model_id" in required_data:
+                db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                    Model,
+                    {"id": required_data["model_id"], "status": ModelStatusEnum.ACTIVE},
+                )
+
+                if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+                    required_keys.append("credential_id")
+
+            # Check if all required keys are present
+            missing_keys = [key for key in required_keys if key not in required_data]
+            if missing_keys:
+                raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
+
+            # Perform duplicate endpoint check
+            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel,
+                {
+                    "name": required_data["endpoint_name"],
+                    "project_id": required_data["project_id"],
+                },
+                exclude_fields={"status": EndpointStatusEnum.DELETED},
+                missing_ok=True,
+                case_sensitive=False,
+            )
+
+            if db_endpoint:
+                raise ClientException("An endpoint with this name already exists in this project")
+
+            # Trigger model deployment and get deployment events
+            model_deployment_response = await self._initiate_model_deployment(
+                cluster_id=UUID(required_data["cluster_id"]),
+                endpoint_name=required_data["endpoint_name"],
+                simulator_id=UUID(required_data["simulator_id"]),
+                model_id=UUID(required_data["model_id"]),
+                deploy_config=DeploymentTemplateCreate(**required_data["deploy_config"]),
+                workflow_id=db_workflow.id,
+                subscriber_id=current_user_id,
+                credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
+            )
+            model_deployment_events = {
+                "budserve_cluster_events": model_deployment_response,
+            }
+
+            # Update or create next workflow step
+            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                db_workflow.id, current_step_number, model_deployment_events
+            )
+            logger.debug(f"Workflow step updated {db_workflow_step.id}")
+
+            # Update workflow progress
+            model_deployment_response["progress_type"] = "budserve_cluster_events"
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"progress": model_deployment_response, "current_step": workflow_current_step},
+            )
+            logger.debug("Successfully triggered model deployment")
+
+        return db_workflow
+
+    @staticmethod
+    async def _perform_cluster_simulation(
+        workflow_id: UUID,
+        deploy_config: DeploymentTemplateCreate,
+        subscriber_id: UUID,
+        model_uri: str,
+        provider_type: ModelProviderTypeEnum,
+        local_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get recommended cluster events."""
+        logger.info("Getting recommended cluster events")
+
+        notification_metadata = BudNotificationMetadata(
+            workflow_id=str(workflow_id),
+            subscriber_ids=str(subscriber_id),
+            name=BUD_INTERNAL_WORKFLOW,
+        )
+
+        if provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            recommended_cluster_request = RecommendedClusterRequest(
+                pretrained_model_uri=model_uri,
+                input_tokens=deploy_config.avg_context_length,
+                output_tokens=deploy_config.avg_sequence_length,
+                concurrency=deploy_config.concurrent_requests,
+                target_ttft=0,
+                target_throughput_per_user=0,
+                target_e2e_latency=0,
+                notification_metadata=notification_metadata,
+                source_topic=app_settings.source_topic,
+                is_proprietary_model=True,
+            )
+        else:
+            # Only applicable for local model deployment
+            # ttft and e2e latency minimum values
+            # throughput maximum value
+            target_throughput_per_user_max = (
+                deploy_config.per_session_tokens_per_sec[1] if deploy_config.per_session_tokens_per_sec else None
+            )
+            ttft_min = deploy_config.ttft[0] if deploy_config.ttft else None
+            e2e_latency_min = deploy_config.e2e_latency[0] if deploy_config.e2e_latency else None
+            recommended_cluster_request = RecommendedClusterRequest(
+                pretrained_model_uri=local_path,
+                # pretrained_model_uri=model_uri, # Uncomment this for model uri
+                input_tokens=deploy_config.avg_context_length,
+                output_tokens=deploy_config.avg_sequence_length,
+                concurrency=deploy_config.concurrent_requests,
+                target_ttft=ttft_min,
+                target_throughput_per_user=target_throughput_per_user_max,
+                target_e2e_latency=e2e_latency_min,
+                notification_metadata=notification_metadata,
+                source_topic=app_settings.source_topic,
+                is_proprietary_model=False,
+            )
+
+        # Get recommended cluster info from Bud Simulator
+        recommended_cluster_endpoint = (
+            f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/run"
+        )
+
+        # Perform recommended cluster simulation
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    recommended_cluster_endpoint, json=recommended_cluster_request.model_dump()
+                ) as response:
+                    response_data = await response.json()
+                    if response.status >= 400:
+                        raise ClientException("Unable to perform recommended cluster simulation")
+
+                    # Add payload key to steps
+                    if "steps" in response_data:
+                        steps = response_data["steps"]
+                        for step in steps:
+                            step["payload"] = {}
+                        response_data["steps"] = steps
+
+                    return response_data
+        except ClientException as e:
+            raise e
+        except Exception as e:
+            logger.error(f"Failed to perform recommended cluster simulation: {e}")
+            raise ClientException("Unable to perform recommended cluster simulation") from e
+
+    async def _initiate_model_deployment(
+        self,
+        cluster_id: UUID,
+        endpoint_name: str,
+        simulator_id: UUID,
+        model_id: UUID,
+        deploy_config: DeploymentTemplateCreate,
+        workflow_id: UUID,
+        subscriber_id: UUID,
+        credential_id: UUID | None = None,
+    ) -> Dict[str, Any]:
+        """Trigger model deployment by step."""
+        logger.debug("Triggering model deployment")
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
+        )
+        logger.debug(f"Found model: {db_model.source}")
+
+        target_throughput_per_user_max = (
+            deploy_config.per_session_tokens_per_sec[1] if deploy_config.per_session_tokens_per_sec else None
+        )
+        ttft_min = deploy_config.ttft[0] if deploy_config.ttft else None
+        e2e_latency_min = deploy_config.e2e_latency[0] if deploy_config.e2e_latency else None
+
+        notification_metadata = BudNotificationMetadata(
+            workflow_id=str(workflow_id),
+            subscriber_ids=str(subscriber_id),
+            name=BUD_INTERNAL_WORKFLOW,
+        )
+
+        if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            model_uri = db_model.uri
+            model_source = db_model.source
+            if model_uri.startswith(f"{model_source}/"):
+                model_uri = model_uri.removeprefix(f"{model_source}/")
+            deploy_model_uri = model_uri if not credential_id else f"{model_source}/{model_uri}"
+            # Update made in lite-llm pr merge
+        else:
+            deploy_model_uri = db_model.local_path
+            # deploy_model_uri = db_model.uri # Uncomment this for model uri
+
+        # Perform model deployment
+        model_deployment_request = ModelDeploymentRequest(
+            cluster_id=cluster_id,
+            simulator_id=simulator_id,
+            endpoint_name=endpoint_name,
+            model=deploy_model_uri,
+            target_ttft=ttft_min,
+            target_e2e_latency=e2e_latency_min,
+            target_throughput_per_user=target_throughput_per_user_max,
+            concurrency=deploy_config.concurrent_requests,
+            input_tokens=deploy_config.avg_context_length,
+            output_tokens=deploy_config.avg_sequence_length,
+            notification_metadata=notification_metadata,
+            source_topic=app_settings.source_topic,
+            credential_id=credential_id,
+        )
+        model_deployment_endpoint = (
+            f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"
+        )
+        model_deployment_payload = model_deployment_request.model_dump(mode="json", exclude_none=True)
+        logger.debug("model_deployment_payload: %s", model_deployment_payload)
+
+        # Perform model deployment
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(model_deployment_endpoint, json=model_deployment_payload) as response:
+                    response_data = await response.json()
+                    logger.debug("model_deployment_response: %s", response_data)
+
+                    if response.status >= 400:
+                        raise ClientException("Unable to perform model deployment")
+
+                    # Add payload key to steps
+                    if "steps" in response_data:
+                        steps = response_data["steps"]
+                        for step in steps:
+                            step["payload"] = {}
+                        response_data["steps"] = steps
+
+                    return response_data
+        except ClientException as e:
+            raise e
+        except Exception as e:
+            logger.error(f"Failed to perform model deployment: {e}")
+            raise ClientException("Unable to perform model deployment") from e
 
 
 class ModelServiceUtil(SessionMixin):

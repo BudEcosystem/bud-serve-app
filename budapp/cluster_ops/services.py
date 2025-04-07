@@ -60,6 +60,7 @@ from ..core.schemas import NotificationResult
 from ..model_ops.crud import ModelDataManager
 from ..model_ops.models import Model
 from ..model_ops.schemas import Model as ModelSchema
+from ..model_ops.schemas import DeploymentTemplateCreate
 from ..model_ops.services import ModelServiceUtil
 from ..project_ops.schemas import Project as ProjectSchema
 from ..shared.dapr_service import DaprService
@@ -83,7 +84,6 @@ from .schemas import (
     ModelClusterRecommendedUpdate,
     RecommendedCluster,
     RecommendedClusterData,
-    DeploymentTemplateCreate,
 )
 from budapp.credential_ops.crud import CloudProviderCredentialDataManager
 from budapp.credential_ops.models import CloudCredentials
