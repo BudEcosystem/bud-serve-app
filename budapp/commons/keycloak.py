@@ -663,80 +663,95 @@ class KeycloakManager:
     ) -> None:
         """Create a resource with permissions."""
         try:
-            resource_name = f"URN::{resource.resource_type}::{resource.resource_id}"
-        
-        
             realm_admin = self.get_realm_admin(realm_name)
-        
-            # Check if resource already exists
-            resources = realm_admin.get_client_authz_resources(client_id)
-            module_resource = next((r for r in resources if r["name"] == resource_name), None)
-        
-            if not module_resource:
-                realm_admin.create_client_authz_resource(client_id, resource_name)
-                logger.info(f"Resource {resource_name} created successfully")
+             
+            scopes = ["view", "manage"]
             
-            resource_id = module_resource["_id"]
-            policy_name = f"user-policy-{user_auth_id}"
-            existing_policies = realm_admin.get_client_authz_policies(client_id)
-            logger.debug(f"Existing policies: {existing_policies}")
-            user_policy = next((p for p in existing_policies if p["name"] == policy_name), None)
+            for scope in scopes:
+                resource_name = f"URN::{resource.resource_type}::{resource.resource_id}::{scope}"
+                
+                # Check if resource already exists
+                resources = realm_admin.get_client_authz_resources(client_id)
+                module_resource = next((r for r in resources if r["name"] == resource_name), None)
         
-            if not user_policy:
-                user_policy = {
-                    "name": policy_name,
-                    "description": f"User policy for {user_auth_id}",
-                    "logic": "POSITIVE",
-                    "users": [user_auth_id],
+                if not module_resource:
+                    resource = {
+                        "name": f"{resource_name}",
+                        "type": resource.resource_type.capitalize(),
+                        "owner": {"id": client_id},
+                        "ownerManagedAccess": True,
+                        "displayName": f"{resource_name.capitalize()} Entity",
+                        "scopes": [{
+                            "name": resource.scopes[0],
+                        },{
+                            "name": resource.scopes[1],
+                        }]
+                    }
+                    
+                    realm_admin.create_client_authz_resource(client_id, resource)
+                    logger.info(f"Resource {resource_name} created successfully")
+            
+                resource_id = module_resource["_id"]
+                policy_name = f"user-policy-{user_auth_id}-{resource_name}"
+                existing_policies = realm_admin.get_client_authz_policies(client_id)
+                logger.debug(f"Existing policies: {existing_policies}")
+                user_policy = next((p for p in existing_policies if p["name"] == policy_name), None)
+        
+                if not user_policy:
+                    user_policy = {
+                        "name": policy_name,
+                        "description": f"User policy for {user_auth_id}",
+                        "logic": "POSITIVE",
+                        "users": [user_auth_id],
+                    }
+                
+                    logger.debug(f"Creating user policy: {json.dumps(user_policy, indent=4)}")
+                
+                    policy_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/user"
+                
+                    data_raw = realm_admin.connection.raw_post(
+                        policy_url, 
+                        data=json.dumps(user_policy),
+                        max=-1,
+                        permission=False,
+                    )
+                
+                    logger.debug(f"User policy response: {data_raw.json()}")
+                    policy_id = data_raw.json()["id"]
+                else:
+                    policy_id = user_policy["id"]
+        
+                # Create permission (if not exists)
+                permission_name = f"user-{user_auth_id}-entity-{resource.resource_type}-{resource.resource_id}-{scope}"
+                existing_permissions = realm_admin.get_client_authz_permissions(client_id)
+                if any(p["name"] == permission_name for p in existing_permissions):
+                    logger.info(f"Permission {permission_name} already exists — skipping.")
+                    return
+        
+                permission = {
+                    "name": permission_name,
+                    "decisionStrategy": "UNANIMOUS",
+                    "description": f"Permission for {user_auth_id} to view and manage {resource.resource_type}",
+                    "resources": [resource_id],
+                    "policies": [policy_id]
                 }
             
-                logger.debug(f"Creating user policy: {json.dumps(user_policy, indent=4)}")
+                logger.debug(f"Creating permission: {json.dumps(permission, indent=4)}")
             
-                policy_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/user"
-            
+                permission_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/permission/resource"
                 data_raw = realm_admin.connection.raw_post(
-                    policy_url, 
-                    data=json.dumps(user_policy),
+                    permission_url, 
+                    data=json.dumps(permission),
                     max=-1,
                     permission=False,
                 )
             
-                logger.debug(f"User policy response: {data_raw.json()}")
-                policy_id = data_raw.json()["id"]
-            else:
-                policy_id = user_policy["id"]
-        
-            # Create permission (if not exists)
-            permission_name = f"user-{user_auth_id}-entity-{resource.resource_type}-{resource.resource_id}"
-            existing_permissions = realm_admin.get_client_authz_permissions(client_id)
-            if any(p["name"] == permission_name for p in existing_permissions):
-                logger.info(f"Permission {permission_name} already exists — skipping.")
-                return
-        
-            permission = {
-                "name": permission_name,
-                "decisionStrategy": "UNANIMOUS",
-                "description": f"Permission for {user_auth_id} to view and manage {resource.resource_type}",
-                "resources": [resource_id],
-                "policies": [policy_id]
-            }
-        
-            logger.debug(f"Creating permission: {json.dumps(permission, indent=4)}")
-        
-            permission_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/permission/resource"
-            data_raw = realm_admin.connection.raw_post(
-                permission_url, 
-                data=json.dumps(permission),
-                max=-1,
-                permission=False,
-            )
-        
-            logger.debug(f"Permission response: {data_raw.json()}")
-            permission_id = data_raw.json()["id"]
-        
-            logger.debug(f"Permission ID: {permission_id}")
-        
-            logger.info(f"Permission {permission_name} assigned to user {user_auth_id} for {resource.resource_type}")
+                logger.debug(f"Permission response: {data_raw.json()}")
+                permission_id = data_raw.json()["id"]
+            
+                logger.debug(f"Permission ID: {permission_id}")
+            
+                logger.info(f"Permission {permission_name} assigned to user {user_auth_id} for {resource.resource_type}")
         except Exception as e:
             logger.error(f"Error creating resource with permissions: {str(e)}")
             raise
