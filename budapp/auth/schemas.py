@@ -136,3 +136,12 @@ class UserRegisterResponse(SuccessResponse):
     class Config:
         """Pydantic config."""
         from_attributes = True
+
+      
+class ResourceCreate(BaseModel):
+    """Resource create schema"""
+    resource_type: str
+    resource_id: str
+    scopes: List[str] # view , manage
+    
+    
