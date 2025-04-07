@@ -57,11 +57,15 @@ class NotificationBuilder:
         tag: Optional[str] = None,
         result: Optional[Dict[str, Any]] = None,
         status: NotificationStatus = NotificationStatus.COMPLETED,
+        email_content: dict = None,
     ) -> "NotificationBuilder":
         """Set the content for the notification."""
-        self.content = NotificationContent(
-            title=title, message=message, icon=icon, tag=tag, status=status, result=result
-        )
+        if email_content:
+            self.content = email_content
+        else:
+            self.content = NotificationContent(
+                title=title, message=message, icon=icon, tag=tag, status=status, result=result
+            )
         return self
 
     def set_payload(

@@ -105,7 +105,7 @@ class NotificationPayload(BaseModel):
     event: str | None = None
     workflow_id: str | None = None
     source: str
-    content: NotificationContent
+    content: dict | NotificationContent
 
 
 class NotificationRequest(CloudEventBase):

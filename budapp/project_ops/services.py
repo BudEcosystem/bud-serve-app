@@ -25,7 +25,7 @@ from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from ..commons.config import app_settings
-from ..shared.notification_service import BudNotifyService, NotificationBuilder, NotificaitonService
+from ..shared.notification_service import BudNotifyService, NotificationBuilder
 
 from ..cluster_ops.crud import ClusterDataManager
 from ..endpoint_ops.crud import EndpointDataManager
@@ -367,12 +367,7 @@ class ProjectService(SessionMixin):
             notification_request = (
                 NotificationBuilder()
                 .set_content(
-                    title=db_project.name,
-                    message="Project Invite",
-                    icon=db_project.icon,
-                    result=NotificationResult(target_id=db_project.id, target_type="project").model_dump(
-                        exclude_none=True, exclude_unset=True
-                    ),
+                    email_content=content,
                 )
                 .set_payload(category=NotificationCategory.INTERNAL)
                 .set_notification_request(subscriber_ids=[subscriber_id], name=PROJECT_INVITATION_WORKFLOW)
