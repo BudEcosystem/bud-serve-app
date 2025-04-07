@@ -106,7 +106,7 @@ class NotificationPayload(BaseModel):
     event: str | None = None
     workflow_id: str | None = None
     source: str
-    content: dict | NotificationContent
+    content: NotificationContent
 
 
 class NotificationRequest(CloudEventBase):
@@ -215,7 +215,7 @@ class ModelTemplateListResponse(PaginatedSuccessResponse):
 
 
 class ModelTemplateFilter(BaseModel):
-    """Model template filter schema"""
+    """Model template filter schema."""
 
     template_type: Optional[ModelTemplateTypeEnum] = None
     name: Optional[str] = None
