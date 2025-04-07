@@ -45,6 +45,8 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
 from ..cluster_ops.crud import ClusterDataManager
 from ..cluster_ops.models import Cluster as ClusterModel
+from ..core.crud import ModelTemplateDataManager
+from ..core.models import ModelTemplate as ModelTemplateModel
 from ..credential_ops.crud import ProprietaryCredentialDataManager
 from ..credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
 from ..endpoint_ops.crud import EndpointDataManager
@@ -246,6 +248,14 @@ class WorkflowService(SessionMixin):
                 else None
             )
 
+            db_template = (
+                await ModelTemplateDataManager(self.session).retrieve_by_fields(
+                    ModelTemplateModel, {"id": UUID(required_data["template_id"])}, missing_ok=True
+                )
+                if "template_id" in required_data
+                else None
+            )
+
             workflow_steps = RetrieveWorkflowStepData(
                 provider_type=provider_type if provider_type else None,
                 provider=db_provider if db_provider else None,
@@ -296,6 +306,7 @@ class WorkflowService(SessionMixin):
                 simulator_id=simulator_id if simulator_id else None,
                 template_id=template_id if template_id else None,
                 endpoint_details=endpoint_details if endpoint_details else None,
+                template=db_template if db_template else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
