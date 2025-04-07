@@ -123,6 +123,10 @@ async def get_current_user(
 
         if not db_user:
             raise credentials_exception
+        
+        db_user.raw_token = token.credentials
+        
+        logger.debug(f"::USER:: User: {db_user.raw_token}")
 
         return db_user
 
@@ -236,36 +240,4 @@ async def parse_ordering_fields(
 
     return order_by_list
 
-
-
-
-# async def check_endpoint_permission(
-#     current_user: Annotated[User, Depends(get_current_active_user)],
-#     session: Session = Depends(get_session),
-#     permission: PermissionEnum = Depends(PermissionEnum),
-# ):
-#     """Check if the current user has the required endpoint permission.
-    
-#     Args:
-#         required_permission: The permission to check for
-#         current_user: The current authenticated user
-#         session: Database session
-        
-#     Returns:
-#         bool: True if user has permission, False otherwise
-        
-#     Raises:
-#         HTTPException: If user doesn't have required permission
-#     """
-#     # Super admin has all permissions
-#     if current_user.is_superuser:
-#         return True
-
-#     # Get user's permissions from database
-#     # user_permissions = await PermissionDataManager(session).retrieve_by_fields(
-#     #     PermissionModel,
-#     #     {"user_id": current_user.id, "auth_id": current_user.auth_id},
-#     #     missing_ok=True
-#     # )
-#     pass
 

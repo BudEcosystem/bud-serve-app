@@ -54,6 +54,7 @@ class User(UserInfo):
     status: UserStatusEnum
     created_at: datetime
     modified_at: datetime
+    raw_token: str | None = None
 
 
 class UserResponse(SuccessResponse):

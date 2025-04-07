@@ -23,7 +23,9 @@ from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
+from budapp.commons.constants import PermissionEnum
 from budapp.commons.dependencies import get_current_active_invite_user, get_session
+from budapp.commons.permission_handler import require_permissions
 from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
 from uuid import UUID
@@ -55,6 +57,7 @@ user_router = APIRouter(prefix="/users", tags=["user"])
     },
     description="Get current user",
 )
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def get_current_user(
     current_user: Annotated[User, Depends(get_current_active_invite_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -93,6 +96,7 @@ async def get_current_user(
     },
     description="Update current user",
 )
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def update_current_user(
     user_id: UUID,
     user: UserUpdate,
