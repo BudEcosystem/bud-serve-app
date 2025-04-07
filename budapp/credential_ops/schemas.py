@@ -196,6 +196,8 @@ class ProprietaryCredentialRequest(BaseModel):
 class ProprietaryCredentialResponse(BaseModel):
     """Proprietary Credential response schema"""
 
+    model_config = ConfigDict(protected_namespaces=(), from_attributes=True)
+
     name: str
     type: CredentialTypeEnum
     other_provider_creds: dict | None
