@@ -2802,7 +2802,7 @@ class ModelService(SessionMixin):
 
         # Validate project
         if project_id:
-            db_project = await ProjectDataManager(self.session).retrieve_project_by_fields(
+            db_project = await ProjectDataManager(self.session).retrieve_by_fields(
                 ProjectModel, {"id": project_id, "status": ProjectStatusEnum.ACTIVE}
             )
 
