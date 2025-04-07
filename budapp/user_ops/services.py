@@ -18,12 +18,53 @@
 
 from typing import Dict
 from uuid import UUID
+from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
-from budapp.user_ops.models import User as UserModel
+from budapp.commons.keycloak import KeycloakManager
+from budapp.user_ops.crud import UserDataManager
+from budapp.user_ops.models import Tenant, TenantClient, User as UserModel
+from budapp.commons.config import app_settings
+from budapp.user_ops.schemas import TenantClientSchema
 
+logger = logging.get_logger(__name__)
 
 class UserService(SessionMixin):
-    async def update_active_user(
-        self, user_id: UUID, fields: Dict, current_user: UserModel
+    async def get_user_roles_and_permissions(
+        self, 
+        user: UserModel,
     ) -> UserModel:
-        pass
+        """Get user roles and permissions."""
+        auth_id = user.auth_id
+        
+        # Relan Name
+        realm_name = app_settings.default_realm_name
+        
+        # Default Client Details
+        tenant = await UserDataManager(self.session).retrieve_by_fields(
+            Tenant, {"realm_name": realm_name}, missing_ok=True
+        )
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+        )
+        
+        # Credentials
+        credentials = TenantClientSchema(
+            id=tenant_client.id,
+            client_named_id=tenant_client.client_named_id,
+            client_id=tenant_client.client_id,
+            client_secret=tenant_client.client_secret,
+        )
+        
+        # Keycloak Manager
+        keycloak_manager = KeycloakManager()
+        result = await keycloak_manager.get_user_roles_and_permissions(
+            auth_id,
+            realm_name,
+            tenant_client.client_id,
+            credentials,
+            user.raw_token,
+        )
+        
+        logger.debug(f"::KEYCLOAK::User {auth_id} roles and permissions: {result}")
+        
+        return result

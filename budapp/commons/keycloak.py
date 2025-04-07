@@ -1,10 +1,13 @@
 # budapp/commons/keycloak.py
 
+import base64
 import json
-from typing import Optional, Tuple
+import sys
+from typing import Dict, List, Optional, Tuple
 from venv import create
 
 from keycloak import KeycloakAdmin, KeycloakAuthenticationError, KeycloakGetError, KeycloakInvalidTokenError, KeycloakOpenID
+import requests
 
 from budapp.auth.schemas import UserCreate
 from budapp.commons.constants import UserRoleEnum
@@ -558,7 +561,99 @@ class KeycloakManager:
         except Exception as e:
             logger.error(f"Error logging out user from realm {realm_name}: {str(e)}")
             return False
+    
+    async def get_user_roles_and_permissions(
+        self,
+        user_id: str,
+        realm_name: str,
+        client_id: str,
+        credentials: TenantClientSchema,
+        token: str,
+    ) -> Dict[str, List[str]]:
+        try:
+            keycloak_openid = self.get_keycloak_openid_client(realm_name, credentials)
+            
+            # Validate the endpoint is correct
+            oidc_config = keycloak_openid.well_known()
+            token_endpoint = oidc_config.get('token_endpoint')
+            if not token_endpoint:
+                raise Exception("Could not retrieve token_endpoint from OIDC well-known configuration.")
+            
+            # access token = token
+            if not token:
+                raise KeycloakAuthenticationError("Access token not found.")
+            
+            # Request the RPT
+            headers = {
+                'Authorization': f'Bearer {token}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            }
+            payload = {
+                'grant_type': 'urn:ietf:params:oauth:grant-type:uma-ticket',
+                'audience': credentials.client_named_id,
+            }
+            
+            response = requests.post(token_endpoint, headers=headers, data=payload)
+            response.raise_for_status()
+            
+            # RPT Response 
+            rpt_response_data = response.json()
+            requesting_party_token = rpt_response_data.get('access_token')
+            
+            if not requesting_party_token:
+                raise ValueError(f"'access_token' (RPT) not found in UMA response. Full response: {json.dumps(rpt_response_data)}")
+            
+            # Decode RPT Payload
+            rpt_payload = self._decode_jwt_payload(requesting_party_token)
+            if not rpt_payload:
+                raise ValueError("Failed to decode the obtained RPT.")
+            
+            # Extract and format permissions
+            raw_permissions = rpt_payload.get('authorization', {}).get('permissions', [])
+            
+            formatted_permissions = []
+            for perm in raw_permissions:
+                # Ensure we only include the desired fields and handle missing scopes
+                formatted_perm = {
+                    "rsid": perm.get("rsid"),      # Get rsid or None if missing
+                    "rsname": perm.get("rsname"),  # Get rsname or None if missing
+                    "scopes": perm.get("scopes", []) # Get scopes or default to empty list
+                }
+                formatted_permissions.append(formatted_perm)
 
+            # Prepare final output structure
+            final_output = {"permissions": formatted_permissions}
+            
+            return final_output
+            
+        except Exception as e:
+            logger.error(f"Error getting user roles and permissions: {str(e)}")
+            raise
+
+    def _decode_jwt_payload(self, token: str) -> dict:
+        """Safely decodes the payload of a JWT using base64."""
+        try:
+            # Split token into parts: header, payload, signature
+            parts = token.split('.')
+            if len(parts) != 3:
+                print("[ERROR] Invalid JWT format: Incorrect number of segments.", file=sys.stderr)
+                return None
+
+            payload_encoded = parts[1]
+            # Add padding if necessary for base64 decoding
+            payload_encoded += '=' * (-len(payload_encoded) % 4)
+            # Use urlsafe_b64decode for JWT compatibility
+            payload_decoded_bytes = base64.urlsafe_b64decode(payload_encoded)
+            payload_json = json.loads(payload_decoded_bytes.decode('utf-8'))
+            return payload_json
+        except IndexError:
+            # This case should be caught by len(parts) check now, but keep for safety
+            print("[ERROR] Invalid JWT format: Could not split segments.", file=sys.stderr)
+        except (TypeError, base64.binascii.Error, UnicodeDecodeError, json.JSONDecodeError) as e:
+            print(f"[ERROR] Failed to decode JWT payload: {e}", file=sys.stderr)
+            print(f"Encoded payload segment was: {payload_encoded}", file=sys.stderr)
+        return None
+        
     async def validate_token(
         self,
         token: str,

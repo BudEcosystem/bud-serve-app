@@ -19,7 +19,7 @@
 from datetime import datetime
 
 from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field, field_validator
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 from ..commons.helpers import validate_password_string
 from ..permissions.schemas import PermissionList
 
@@ -123,3 +123,11 @@ class UserUpdate(BaseModel):
         if value == UserRoleEnum.SUPER_ADMIN:
             raise ValueError("The SUPER_ADMIN role is not permitted.")
         return value
+    
+
+class MyPermissions(SuccessResponse):
+    """User permissions schema"""
+
+    model_config = ConfigDict(from_attributes=True)
+    permissions: List[Dict[str, Union[str, List[str]]]] = []
+    
