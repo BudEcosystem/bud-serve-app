@@ -57,11 +57,11 @@ class NotificationBuilder:
         tag: Optional[str] = None,
         result: Optional[Dict[str, Any]] = None,
         status: NotificationStatus = NotificationStatus.COMPLETED,
-        email_content: dict = None,
+        content: dict = None,
     ) -> "NotificationBuilder":
         """Set the content for the notification."""
-        if email_content:
-            self.content = email_content
+        if content:
+            self.content = content
         else:
             self.content = NotificationContent(
                 title=title, message=message, icon=icon, tag=tag, status=status, result=result

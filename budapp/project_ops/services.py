@@ -367,7 +367,7 @@ class ProjectService(SessionMixin):
             notification_request = (
                 NotificationBuilder()
                 .set_content(
-                    email_content=content,
+                    content=content,
                 )
                 .set_payload(category=NotificationCategory.INTERNAL)
                 .set_notification_request(subscriber_ids=[subscriber_id], name=PROJECT_INVITATION_WORKFLOW)
