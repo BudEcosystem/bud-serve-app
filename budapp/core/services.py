@@ -37,8 +37,9 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..benchmark_ops.services import BenchmarkService
 from ..endpoint_ops.services import EndpointService
 from ..model_ops.services import LocalModelWorkflowService, ModelService
-from .crud import IconDataManager
+from .crud import IconDataManager, ModelTemplateDataManager
 from .models import Icon as IconModel
+from .models import ModelTemplate as ModelTemplateModel
 from .schemas import NotificationPayload, NotificationResponse
 
 
@@ -645,3 +646,20 @@ class IconService(SessionMixin):
     ) -> Tuple[List[IconModel], int]:
         """Get all icon icons."""
         return await IconDataManager(self.session).get_all_icons(offset, limit, filters, order_by, search)
+
+
+class ModelTemplateService(SessionMixin):
+    """Service for managing model templates."""
+
+    async def get_all_templates(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[ModelTemplateModel], int]:
+        """Get all model templates."""
+        return await ModelTemplateDataManager(self.session).get_all_model_templates(
+            offset, limit, filters, order_by, search
+        )

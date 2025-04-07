@@ -49,6 +49,7 @@ from budapp.user_ops.schemas import UserInfo
 from ..commons.config import app_settings
 from ..commons.constants import ModelLicenseObjectTypeEnum
 from ..commons.helpers import validate_icon
+from ..commons.schemas import BudNotificationMetadata
 from ..shared.minio_store import ModelStore
 
 
@@ -893,6 +894,141 @@ class CancelDeploymentWorkflowRequest(BaseModel):
     """Cancel deployment workflow request schema."""
 
     workflow_id: UUID4
+
+
+class DeploymentTemplateCreate(BaseModel):
+    """Deployment template request schema."""
+
+    concurrent_requests: int = Field(gt=0)
+    avg_sequence_length: int = Field(ge=10, le=2000)
+    avg_context_length: int = Field(ge=30, le=32000)
+    per_session_tokens_per_sec: Optional[list[int]] = None
+    ttft: Optional[list[int]] = None
+    e2e_latency: Optional[list[int]] = None
+
+    @field_validator("per_session_tokens_per_sec", "ttft", "e2e_latency", mode="before")
+    @classmethod
+    def validate_int_range(cls, value):
+        if value is not None and (
+            not isinstance(value, list) or len(value) != 2 or not all(isinstance(x, int) for x in value)
+        ):
+            raise ValueError("Must be a list of two integers")
+        return value
+
+    @model_validator(mode="after")
+    def validate_ranges(self) -> "DeploymentTemplateCreate":
+        # Define range validations
+        range_validations = {
+            "ttft": (50, 5000),
+            "per_session_tokens_per_sec": (5, 100),
+            "e2e_latency": (1, 300),
+        }
+        for field, (min_val, max_val) in range_validations.items():
+            field_value = getattr(self, field)
+            if field_value is None:
+                continue
+            field_value_min, field_value_max = field_value
+            if field_value_min < min_val:
+                raise ValueError(f"{field} must be greater than or equal to {min_val}")
+            if field_value_max > max_val:
+                raise ValueError(f"{field} must be less than or equal to {max_val}")
+        return self
+
+
+class ModelDeployStepRequest(BaseModel):
+    """Request to deploy a model by step."""
+
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None
+    step_number: int = Field(..., gt=0)
+    trigger_workflow: bool = False
+    model_id: UUID4 | None = None
+    cluster_id: UUID4 | None = None
+    project_id: UUID4 | None = None
+    template_id: UUID4 | None = None
+    endpoint_name: str | None = Field(None, min_length=1, max_length=100)
+    deploy_config: DeploymentTemplateCreate | None = None
+    credential_id: UUID4 | None = None
+
+    @field_validator("endpoint_name")
+    @classmethod
+    def validate_endpoint_name(cls, v: str | None) -> str | None:
+        """Validate and transform endpoint name."""
+        if v is None:
+            return None
+
+        # Replace spaces with hyphens
+        v = v.replace(" ", "-")
+
+        # Define allowed pattern: alphanumeric, hyphens
+        pattern = r"^[a-zA-Z0-9-]+$"
+
+        if not re.match(pattern, v):
+            raise ValueError("Endpoint name can only contain letters, numbers, hyphens (-)")
+
+        # strip leading and trailing hyphens and spaces convert it to lowercase
+        v = v.strip("- ").lower()
+
+        return v
+
+    @model_validator(mode="after")
+    def validate_fields(self) -> "ModelDeployStepRequest":
+        """Validate the fields of the request."""
+        if self.workflow_id is None and self.workflow_total_steps is None:
+            raise ValueError("workflow_total_steps is required when workflow_id is not provided")
+
+        if self.workflow_id is not None and self.workflow_total_steps is not None:
+            raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
+
+        # NOTE: commenting out since Model deployment contain a Skip step so doesn't need to check for other fields
+        # Check if at least one of the other fields is provided
+        # other_fields = [
+        #     self.model_id,
+        #     self.cluster_id,
+        #     self.project_id,
+        #     self.endpoint_name,
+        #     self.template_id,
+        #     self.deploy_config,
+        #     self.credential_id,
+        # ]
+        # if not any(other_fields):
+        #     raise ValueError(
+        #         "At least one of model_id, cluster_id, project_id, or endpoint_name is required when workflow_id is provided"
+        #     )
+
+        return self
+
+
+class DeploymentWorkflowStepData(BaseModel):
+    """Workflow step data schema."""
+
+    model_id: UUID4 | None = None
+    cluster_id: UUID4 | None = None
+    project_id: UUID4 | None = None
+    endpoint_name: str | None = None
+    created_by: UUID4 | None = None
+    template_id: UUID4 | None = None
+    deploy_config: DeploymentTemplateCreate | None = None
+    credential_id: UUID4 | None = None
+
+
+class ModelDeploymentRequest(BaseModel):
+    """Request to deploy a model to a cluster."""
+
+    cluster_id: UUID4
+    simulator_id: UUID4
+    endpoint_name: str
+    hf_token: str | None = None
+    model: str
+    target_ttft: Optional[int] = None
+    target_e2e_latency: Optional[int] = None
+    target_throughput_per_user: Optional[int] = None
+    concurrency: int
+    input_tokens: int
+    output_tokens: int
+    notification_metadata: BudNotificationMetadata
+    source_topic: str
+    credential_id: UUID4 | None = None
 
 
 class TopLeaderboardRequest(BaseModel):

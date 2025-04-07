@@ -45,6 +45,10 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
 from ..cluster_ops.crud import ClusterDataManager
 from ..cluster_ops.models import Cluster as ClusterModel
+from ..core.crud import ModelTemplateDataManager
+from ..core.models import ModelTemplate as ModelTemplateModel
+from ..credential_ops.crud import ProprietaryCredentialDataManager
+from ..credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..endpoint_ops.schemas import AddAdapterWorkflowStepData
@@ -153,6 +157,11 @@ class WorkflowService(SessionMixin):
             user_confirmation = required_data.get("user_confirmation")
             run_as_simulation = required_data.get("run_as_simulation")
             adapter_model_id = required_data.get("adapter_model_id")
+            endpoint_name = required_data.get("endpoint_name")
+            deploy_config = required_data.get("deploy_config")
+            simulator_id = required_data.get("simulator_id")
+            template_id = required_data.get("template_id")
+            endpoint_details = required_data.get("endpoint_details")
 
             quantization_config = QuantizeModelWorkflowStepData(
                 model_id=model_id,
@@ -231,6 +240,22 @@ class WorkflowService(SessionMixin):
                 else None
             )
 
+            db_credential = (
+                await ProprietaryCredentialDataManager(self.session).retrieve_by_fields(
+                    ProprietaryCredentialModel, {"id": UUID(required_data["credential_id"])}, missing_ok=True
+                )
+                if "credential_id" in required_data
+                else None
+            )
+
+            db_template = (
+                await ModelTemplateDataManager(self.session).retrieve_by_fields(
+                    ModelTemplateModel, {"id": UUID(required_data["template_id"])}, missing_ok=True
+                )
+                if "template_id" in required_data
+                else None
+            )
+
             workflow_steps = RetrieveWorkflowStepData(
                 provider_type=provider_type if provider_type else None,
                 provider=db_provider if db_provider else None,
@@ -274,7 +299,14 @@ class WorkflowService(SessionMixin):
                 user_confirmation=user_confirmation,
                 run_as_simulation=run_as_simulation,
                 adapter_config=adapter_config if adapter_config else None,
-                adapter_deployment_events=adapter_deployment_events if adapter_deployment_events else None
+                adapter_deployment_events=adapter_deployment_events if adapter_deployment_events else None,
+                credential=db_credential if db_credential else None,
+                endpoint_name=endpoint_name if endpoint_name else None,
+                deploy_config=deploy_config if deploy_config else None,
+                simulator_id=simulator_id if simulator_id else None,
+                template_id=template_id if template_id else None,
+                endpoint_details=endpoint_details if endpoint_details else None,
+                template=db_template if db_template else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -392,7 +424,20 @@ class WorkflowService(SessionMixin):
                 "endpoint_id",
                 BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value,
                 "adapter_id",
-            ]
+            ],
+            "deploy_model": [
+                "model_id",
+                "project_id",
+                "cluster_id",
+                "endpoint_name",
+                "budserve_cluster_events",
+                "bud_simulator_events",
+                "deploy_config",
+                "template_id",
+                "simulator_id",
+                "credential_id",
+                "endpoint_details",
+            ],
         }
 
         # Combine all lists using set union
