@@ -18,11 +18,11 @@
 """Contains core Pydantic schemas used for data validation and serialization within the cluster ops services."""
 
 from datetime import datetime
-from typing import Any, List, Dict, Union, Optional
+from typing import Any, List, Dict, Union, Optional, Literal
 from uuid import UUID
 from enum import Enum
 
-from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, Field, computed_field, field_validator, HttpUrl
+from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, Field, computed_field, field_validator, HttpUrl, model_validator
 
 from budapp.commons.constants import ClusterStatusEnum, EndpointStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
@@ -530,3 +530,53 @@ class ModelClusterRecommendedUpdate(ModelClusterRecommendedCreate):
     """Model recommended cluster update schema."""
 
     pass
+
+
+class RecommendedClusterData(BaseModel):
+    """Recommended cluster benchmarks schema"""
+
+    replicas: int
+    concurrency: dict
+    ttft: dict | None = None
+    e2e_latency: dict | None = None
+    per_session_tokens_per_sec: dict | None = None
+    over_all_throughput: dict | None = None
+
+
+class RecommendedCluster(BaseModel):
+    """Recommended cluster response schema"""
+
+    id: UUID
+    cluster_id: UUID
+    name: str
+    cost_per_token: float
+    total_resources: int
+    resources_used: int
+    resource_details: list[dict]
+    required_devices: list[dict]
+    benchmarks: RecommendedClusterData
+
+
+class RecommendedClusterResponse(SuccessResponse):
+    """User response to client schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    clusters: list[RecommendedCluster]
+    status: Literal["success", "processing"] = "success"
+    workflow_id: UUID
+
+
+class RecommendedClusterRequest(BaseModel):
+    """Request to get recommended cluster events"""
+
+    pretrained_model_uri: str
+    input_tokens: int
+    output_tokens: int
+    concurrency: int
+    target_ttft: int
+    target_throughput_per_user: int
+    target_e2e_latency: int
+    notification_metadata: BudNotificationMetadata
+    source_topic: str
+    is_proprietary_model: bool

@@ -51,6 +51,7 @@ from .schemas import (
     LocalModelScanRequest,
     ModelAuthorFilter,
     ModelAuthorResponse,
+    ModelDeployStepRequest,
     ModelDetailSuccessResponse,
     ModelFilter,
     ModelPaginatedResponse,
@@ -1038,4 +1039,55 @@ async def cancel_model_quantization(
         logger.exception(f"Failed to cancel model quantization: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to cancel model quantization"
+        ).to_http_response()
+
+
+@model_router.post(
+    "/deploy-workflow",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RetrieveWorkflowDataResponse,
+            "description": "Successfully deploy a model in server for a specified project by step",
+        },
+    },
+    description="Deploy a model in server for a specified project by step",
+)
+async def deploy_model_by_step(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    deploy_request: ModelDeployStepRequest,
+) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
+    """Deploy a model in server for a specified project by step."""
+    try:
+        db_workflow = await ModelService(session).deploy_model_by_step(
+            current_user_id=current_user.id,
+            step_number=deploy_request.step_number,
+            workflow_id=deploy_request.workflow_id,
+            workflow_total_steps=deploy_request.workflow_total_steps,
+            model_id=deploy_request.model_id,
+            project_id=deploy_request.project_id,
+            cluster_id=deploy_request.cluster_id,
+            endpoint_name=deploy_request.endpoint_name,
+            deploy_config=deploy_request.deploy_config,
+            template_id=deploy_request.template_id,
+            trigger_workflow=deploy_request.trigger_workflow,
+            credential_id=deploy_request.credential_id,
+        )
+
+        return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
+    except ClientException as e:
+        logger.exception(f"Failed to deploy model: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to deploy model: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to deploy model"
         ).to_http_response()

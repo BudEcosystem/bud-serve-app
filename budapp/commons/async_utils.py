@@ -123,3 +123,40 @@ async def get_user_from_auth_header(authorization: Annotated[str, Header()], ses
         raise ClientException(
             status_code=status.HTTP_401_UNAUTHORIZED, message="Invalid authentication credentials"
         ) from e
+
+
+async def get_range_label(
+    value: float, target: Union[int, List[int]], tolerance: float = 0, higher_is_better: bool = True
+) -> str:
+    """Determine if a value matches the target or is within the target range.
+
+    Args:
+        value: The float value to check
+        target: Either a single integer target or list of two integers defining a range [min, max]
+        tolerance: Percentage tolerance for single target comparison (default: 10%)
+
+    Returns:
+        str: "Better Range"/"Worse Range"/"Expected Range" based on comparison
+
+    Raises:
+        ValueError: If target is neither an integer nor a list of exactly 2 integers
+    """
+    # Handle single target value
+    if isinstance(target, (int, float)):
+        tolerance_range = target * tolerance
+        min_value = target - tolerance_range
+        max_value = target + tolerance_range
+
+    # Handle target range
+    elif isinstance(target, list) and len(target) == 2:
+        min_value, max_value = target
+
+    else:
+        raise ValueError("Target must be either a single number or a list of two numbers")
+
+    if value < min_value:
+        return "Worse" if higher_is_better else "Better"
+    elif value > max_value:
+        return "Better" if higher_is_better else "Worse"
+    else:
+        return "Expected"
