@@ -22,7 +22,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from budapp.commons import logging
-from budapp.commons.config import app_settings, get_settings
+from budapp.commons.config import app_settings
 from budapp.commons.constants import UserStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import BudNotifyException
@@ -36,7 +36,7 @@ from budapp.user_ops.schemas import TenantClientSchema
 
 
 logger = logging.get_logger(__name__)
-settings = get_settings()
+settings = app_settings
 
 class UserService(SessionMixin):
 
