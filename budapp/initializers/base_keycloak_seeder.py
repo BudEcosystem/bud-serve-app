@@ -1,4 +1,3 @@
-from sqlalchemy import UUID
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
@@ -42,7 +41,7 @@ class BaseKeycloakSeeder(BaseSeeder):
         if  keycloak_manager.realm_exists(default_realm_name):
             logger.info(f"::KEYCLOAK::Realm {default_realm_name} already exists. Skipping...")
             return
-        
+
         logger.debug(f"::KEYCLOAK::Realm {default_realm_name} does not exist. Creating...")
 
         await keycloak_manager.create_realm(default_realm_name)
