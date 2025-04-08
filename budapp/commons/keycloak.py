@@ -98,6 +98,23 @@ class KeycloakManager:
             client_secret_key=credentials.client_secret,
         )
 
+    async def update_user_password(self, user_id: str, password: str, realm_name: str) -> None:
+        """Update a user's password in Keycloak.
+
+        Args:
+            user_id: The ID of the user to update
+            password: The new password for the user
+
+        Returns:
+            None
+        """
+        try:
+            realm_admin = self.get_realm_admin(realm_name)
+            realm_admin.set_user_password(user_id=user_id, password=password, temporary=False)
+        except Exception as e:
+            logger.error(f"Error updating user password: {str(e)}")
+            raise
+
     async def create_realm(self, realm_name: str) -> dict:
         """Create a new realm in Keycloak.
 

@@ -32,7 +32,8 @@ from budapp.commons.constants import UserStatusEnum
 from budapp.commons.database import SessionLocal
 from budapp.commons.keycloak import KeycloakManager
 from budapp.user_ops.crud import UserDataManager
-from budapp.user_ops.models import Tenant, TenantClient, User as UserModel
+from budapp.user_ops.models import Tenant, TenantClient
+from budapp.user_ops.models import User as UserModel
 from budapp.user_ops.schemas import TenantClientSchema, User
 
 
@@ -81,7 +82,7 @@ async def get_current_user(
 
     try:
         realm_name = app_settings.default_realm_name
-        
+
         logger.debug(f"::USER:: Validating token for realm: {realm_name}")
 
         tenant = await UserDataManager(session).retrieve_by_fields(
@@ -104,7 +105,7 @@ async def get_current_user(
             id=tenant_client.id,
             client_named_id=tenant_client.client_named_id,
             client_id=tenant_client.client_id,
-            client_secret=tenant_client.client_secret
+            client_secret=tenant_client.client_secret,
         )
 
         manager = KeycloakManager()
@@ -117,15 +118,13 @@ async def get_current_user(
         if not auth_id:
             raise credentials_exception
 
-        db_user = await UserDataManager(session).retrieve_by_fields(
-            UserModel, {"auth_id": auth_id}, missing_ok=True
-        )
+        db_user = await UserDataManager(session).retrieve_by_fields(UserModel, {"auth_id": auth_id}, missing_ok=True)
 
         if not db_user:
             raise credentials_exception
-        
+
         db_user.raw_token = token.credentials
-        
+
         logger.debug(f"::USER:: User: {db_user.raw_token}")
 
         return db_user
@@ -154,7 +153,6 @@ async def get_current_user(
         raise credentials_exception
 
 
-
 async def get_current_active_user(current_user: Annotated[User, Depends(get_current_user)]) -> User:
     """Get the current active user.
 
@@ -167,6 +165,20 @@ async def get_current_active_user(current_user: Annotated[User, Depends(get_curr
     if current_user.status != UserStatusEnum.ACTIVE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
     return current_user
+
+
+async def get_user_realm(current_user: Annotated[User, Depends(get_current_user)]) -> str:
+    """Get the user realm.
+
+    Args:
+        current_user (User): The current user.
+
+    Returns:
+        str: The user realm.
+    """
+    # Note : should be updated to get the realm from the user, when start to support multi-realm
+
+    return app_settings.default_realm_name
 
 
 async def get_current_active_invite_user(current_user: Annotated[User, Depends(get_current_user)]) -> User:
@@ -239,5 +251,3 @@ async def parse_ordering_fields(
                     order_by_list.append((field_name, sort_direction))
 
     return order_by_list
-
-

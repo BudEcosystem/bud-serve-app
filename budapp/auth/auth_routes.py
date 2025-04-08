@@ -27,7 +27,7 @@ from budapp.commons.dependencies import get_session
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
 
-from .schemas import LogoutResponse, UserCreate, UserLogin, UserLoginResponse, LogoutRequest, UserRegisterResponse
+from .schemas import LogoutRequest, LogoutResponse, UserCreate, UserLogin, UserLoginResponse, UserRegisterResponse
 from .services import AuthService
 
 
@@ -75,7 +75,7 @@ async def register_user(
 
 
 @auth_router.post(
-    "/login",   
+    "/login",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,

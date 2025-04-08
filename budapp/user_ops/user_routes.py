@@ -17,20 +17,18 @@
 """The model ops package, containing essential business logic, services, and routing configurations for the user ops."""
 
 from typing import Union
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
-from budapp.commons.constants import PermissionEnum
-from budapp.commons.dependencies import get_current_active_invite_user, get_session
-from budapp.commons.permission_handler import require_permissions
+from budapp.commons.dependencies import get_current_active_invite_user, get_session, get_user_realm
 from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
-from uuid import UUID
-
 from budapp.user_ops.services import UserService
+
 from .schemas import MyPermissions, UserResponse, UserUpdate
 
 
@@ -101,12 +99,13 @@ async def update_current_user(
     user_id: UUID,
     user: UserUpdate,
     current_user: Annotated[User, Depends(get_current_active_invite_user)],
+    realm_name: Annotated[str, Depends(get_user_realm)],
     session: Annotated[Session, Depends(get_session)],
 ) -> Union[UserResponse, ErrorResponse]:
     """Update current user."""
     try:
         db_user = await UserService(session).update_active_user(
-            user_id, user.model_dump(exclude_unset=True, exclude_none=True), current_user
+            user_id, user.model_dump(exclude_unset=True, exclude_none=True), current_user, realm_name
         )
         return UserResponse(
             object="user.me", code=status.HTTP_200_OK, message="Successfully update current user", user=db_user
