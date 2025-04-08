@@ -575,6 +575,13 @@ class ModelResponse(BaseModel):
     model_cluster_recommended: ModelClusterRecommended | None = None
 
 
+class ModelDeploymentResponse(ModelResponse):
+    """Model deployment response schema."""
+
+    strengths: list[str] | None = None
+    limitations: list[str] | None = None
+
+
 class ModelListResponse(BaseModel):
     """Model list response schema."""
 

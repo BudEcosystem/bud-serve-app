@@ -25,7 +25,7 @@ from pydantic import UUID4, BaseModel, ConfigDict, field_validator, model_valida
 
 from ..commons.constants import EndpointStatusEnum
 from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse
-from ..model_ops.schemas import ModelResponse
+from ..model_ops.schemas import ModelDeploymentResponse
 from ..project_ops.schemas import ProjectResponse
 from ..commons.constants import FeedbackEnum
 
@@ -38,7 +38,7 @@ class EndpointListResponse(BaseModel):
     id: UUID4
     name: str
     status: EndpointStatusEnum
-    model: ModelResponse
+    model: ModelDeploymentResponse
     project: ProjectResponse
     created_at: datetime
     modified_at: datetime
