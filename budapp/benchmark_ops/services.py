@@ -714,7 +714,7 @@ class BenchmarkRequestMetricsService(SessionMixin):
                 query=text(query),
                 params=params,
             )
-        if metrics_data:
+        if metrics_data and metrics_data[0][0] is not None:
             max_value = metrics_data[0][0]
             bin_width = max_value / num_bins
             bins = bins = [(i+1, round(i*bin_width, 1), round((i+1)*bin_width, 1)) for i in range(num_bins)]
@@ -732,7 +732,7 @@ class BenchmarkRequestMetricsService(SessionMixin):
         if not bins:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Dataset distribution not found: {dataset_id}",
+                detail=f"Dataset distribution not found: {dataset_ids}",
             )
 
         with BenchmarkRequestMetricsCRUD() as crud:
