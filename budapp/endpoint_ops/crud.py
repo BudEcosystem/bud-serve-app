@@ -346,14 +346,14 @@ class EndpointDataManager(DataManagerUtils):
                     and_(Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL, Model.uri == CloudModel.uri),
                 )
                 .filter(or_(*search_conditions, *explicit_conditions))
-                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+                .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
                 .filter(EndpointModel.project_id.in_(project_ids))
             )
             count_stmt = (
                 select(func.count(distinct(EndpointModel.id)))
                 .join(Model, EndpointModel.model_id == Model.id)
                 .filter(or_(*search_conditions, *explicit_conditions))
-                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+                .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
                 .filter(EndpointModel.project_id.in_(project_ids))
             )
         else:
@@ -391,7 +391,7 @@ class EndpointDataManager(DataManagerUtils):
                     and_(Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL, Model.uri == CloudModel.uri),
                 )
                 .where(and_(*explicit_conditions))
-                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+                .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
                 .filter(EndpointModel.project_id.in_(project_ids))
             )
             count_stmt = (
@@ -399,7 +399,7 @@ class EndpointDataManager(DataManagerUtils):
                 .filter_by(**filters)
                 .join(Model, EndpointModel.model_id == Model.id)
                 .where(and_(*explicit_conditions))
-                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+                .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
                 .filter(EndpointModel.project_id.in_(project_ids))
             )
 
@@ -449,7 +449,8 @@ class AdapterDataManager(DataManagerUtils):
         # Generate statements according to search or filters
         if search:
             search_conditions = await self.generate_search_stmt(AdapterModel, filters)
-            stmt = (select(AdapterModel)
+            stmt = (
+                select(AdapterModel)
                 .join(EndpointModel)
                 .join(Model)
                 .filter(or_(*search_conditions))
@@ -498,7 +499,12 @@ class AdapterDataManager(DataManagerUtils):
     async def get_all_adapters_in_project(self, project_id: UUID) -> Tuple[List[AdapterModel], int]:
         """Get all adapters in a project."""
         stmt = select(AdapterModel).join(EndpointModel).filter(EndpointModel.project_id == project_id)
-        count_stmt = select(func.count()).select_from(AdapterModel).join(EndpointModel).filter(EndpointModel.project_id == project_id)
+        count_stmt = (
+            select(func.count())
+            .select_from(AdapterModel)
+            .join(EndpointModel)
+            .filter(EndpointModel.project_id == project_id)
+        )
         count = self.execute_scalar(count_stmt)
         result = self.scalars_all(stmt)
         logger.info("all adapters result: %s", result)
