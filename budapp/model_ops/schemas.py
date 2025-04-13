@@ -683,7 +683,7 @@ class LeaderboardModelInfo(BaseModel):
 class LeaderboardBenchmark(BaseModel):
     """Leaderboard benchmark schema."""
 
-    type: str
+    type: str | None = None
     label: str
     value: int | float | None = None
 
@@ -706,7 +706,7 @@ class TopLeaderboardBenchmark(BaseModel):
 
     field: str
     value: int | float | None = None
-    type: str
+    type: str | None = None
     label: str
 
 
@@ -1051,30 +1051,7 @@ class ModelDeploymentRequest(BaseModel):
 class TopLeaderboardRequest(BaseModel):
     """Top leaderboard request schema."""
 
-    benchmarks: list[
-        Literal[
-            "lc_win_rate",
-            "bcfl",
-            "live_code_bench",
-            "classification",
-            "clustering",
-            "pair_classification",
-            "reranking",
-            "retrieval",
-            "semantic",
-            "summarization",
-            "ugi_score",
-            "mmbench",
-            "mmstar",
-            "mmmu",
-            "math_vista",
-            "ocr_bench",
-            "ai2d",
-            "hallucination_bench",
-            "mmvet",
-            "lmsys_areana",
-        ]
-    ] = Field(..., description="The benchmarks to list")
+    benchmarks: list[str] = Field(..., description="The benchmarks to list")
     k: int = Field(5, description="Maximum number of leaderboards", ge=1)
 
     @model_validator(mode="after")

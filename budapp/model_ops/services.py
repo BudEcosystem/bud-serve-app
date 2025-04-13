@@ -2592,14 +2592,14 @@ class ModelService(SessionMixin):
         selected_model_leaderboard = None
         for leaderboard in bud_model_leaderboards:
             if leaderboard.get("model_info", {}).get("uri") == selected_model_uri:
-                selected_model_leaderboard = Leaderboard(**leaderboard)
+                selected_model_leaderboard = leaderboard
                 break
         if not selected_model_leaderboard:
             logger.debug("No leaderboard found for selected model %s", selected_model_uri)
             return []
 
         # Ignore fields with None values
-        valid_fields = selected_model_leaderboard.model_dump(exclude_none=True).keys()
+        valid_fields = [key for key in selected_model_leaderboard.keys() if key != "model_info"]
         logger.debug("Valid fields: %s", valid_fields)
 
         leaderboard_tables: List[LeaderboardTable] = []
@@ -2617,10 +2617,20 @@ class ModelService(SessionMixin):
             # Create benchmark entries for each valid field
             benchmarks = {}
             for field in valid_fields:
-                value = leaderboard.get(field)
-                benchmarks[field] = LeaderboardBenchmark(
-                    type=BENCHMARK_FIELDS_TYPE_MAPPER[field], value=value, label=BENCHMARK_FIELDS_LABEL_MAPPER[field]
+                label_alternative = (
+                    leaderboard.get(field)[1] if leaderboard.get(field) and len(leaderboard.get(field)) == 2 else None
                 )
+                if label_alternative:
+                    value = (
+                        leaderboard.get(field)[0]
+                        if leaderboard.get(field) and len(leaderboard.get(field)) == 2
+                        else None
+                    )
+                    benchmarks[field] = LeaderboardBenchmark(
+                        type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, None),
+                        value=value,
+                        label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, label_alternative),
+                    )
 
             leaderboard_tables.append(LeaderboardTable(model=model, benchmarks=benchmarks))
 
@@ -2667,13 +2677,14 @@ class ModelService(SessionMixin):
 
         # Fetch top leaderboards from bud_model app
         bud_model_response = await self._perform_top_leaderboard_by_uri_request(db_model_uris, benchmarks, limit)
+
         bud_model_leaderboards = bud_model_response.get("leaderboards", [])
 
         if len(bud_model_leaderboards) == 0:
             return []
 
         # Get model info by uris
-        leaderboard_uris = [leaderboard.get("model_info", {}).get("uri") for leaderboard in bud_model_leaderboards]
+        leaderboard_uris = [leaderboard.get("uri") for leaderboard in bud_model_leaderboards]
         db_models = await ModelDataManager(self.session).get_models_by_uris(leaderboard_uris)
 
         # If no models found, return empty list
@@ -2693,7 +2704,7 @@ class ModelService(SessionMixin):
 
         # Iterate over leaderboards
         for leaderboard in bud_model_leaderboards:
-            leaderboard_model_uri = leaderboard.get("model_info", {}).get("uri")
+            leaderboard_model_uri = leaderboard.get("uri")
 
             # If model not found, skip
             if leaderboard_model_uri not in db_model_info:
@@ -2701,14 +2712,20 @@ class ModelService(SessionMixin):
 
             benchmarks = []
             for field in fields:
-                benchmarks.append(
-                    TopLeaderboardBenchmark(
-                        field=field,
-                        value=leaderboard.get(field),
-                        type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, ""),
-                        label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, ""),
-                    ).model_dump()
+                label_alternative = (
+                    leaderboard.get(field)[1] if leaderboard.get(field) and len(leaderboard.get(field)) == 2 else None
                 )
+                if label_alternative:
+                    benchmarks.append(
+                        TopLeaderboardBenchmark(
+                            field=field,
+                            value=leaderboard.get(field)[0]
+                            if leaderboard.get(field) and len(leaderboard.get(field)) == 2
+                            else None,
+                            type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, None),
+                            label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, label_alternative),
+                        ).model_dump()
+                    )
             result.append(
                 TopLeaderboard(
                     benchmarks=benchmarks,
