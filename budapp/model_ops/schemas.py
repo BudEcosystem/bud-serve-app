@@ -149,6 +149,15 @@ class ModelLicensesModel(BaseModel):
         return self
 
 
+class ModelLicenseTypeSchema(BaseModel):
+    """Model Licenses Model Schema"""
+
+    license_type: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
 # Model related schemas
 
 
@@ -580,6 +589,7 @@ class ModelDeploymentResponse(ModelResponse):
 
     strengths: list[str] | None = None
     limitations: list[str] | None = None
+    model_licenses: ModelLicenseTypeSchema | None = None
 
 
 class ModelListResponse(BaseModel):

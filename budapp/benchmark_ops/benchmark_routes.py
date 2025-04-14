@@ -400,6 +400,11 @@ async def get_dataset_input_distribution(
             param={"result": dataset_input_distribution},
             message="Successfully fetched dataset input distribution",
         )
+    except HTTPException as http_exc:
+        logger.exception(f"Failed to fetch dataset input distribution: {http_exc}")
+        response = ErrorResponse(
+            code=http_exc.status_code, message=http_exc.detail
+        )
     except Exception as e:
         logger.exception(f"Failed to fetch dataset input distribution: {e}")
         response = ErrorResponse(
@@ -443,6 +448,11 @@ async def get_dataset_output_distribution(
             object="benchmark.dataset.input.distribution",
             param={"result": dataset_output_distribution},
             message="Successfully fetched dataset output distribution",
+        )
+    except HTTPException as http_exc:
+        logger.exception(f"Failed to fetch dataset output distribution: {http_exc}")
+        response = ErrorResponse(
+            code=http_exc.status_code, message=http_exc.detail
         )
     except Exception as e:
         logger.exception(f"Failed to fetch dataset output distribution: {e}")
