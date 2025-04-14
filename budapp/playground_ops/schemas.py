@@ -25,7 +25,7 @@ from pydantic import UUID4, BaseModel, ConfigDict, field_validator, model_valida
 
 from ..commons.constants import EndpointStatusEnum
 from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse
-from ..model_ops.schemas import ModelDeploymentResponse
+from ..model_ops.schemas import ModelDeploymentResponse, LeaderboardTable
 from ..project_ops.schemas import ProjectResponse
 from ..commons.constants import FeedbackEnum
 
@@ -45,6 +45,7 @@ class EndpointListResponse(BaseModel):
     input_cost: dict | None = None
     output_cost: dict | None = None
     context_length: int | None = None
+    leaderboards: list[LeaderboardTable] = []
 
 
 class PlaygroundDeploymentListResponse(PaginatedSuccessResponse):

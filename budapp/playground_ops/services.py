@@ -40,6 +40,7 @@ from .schemas import (
     NoteResponse,
     EndpointListResponse,
 )
+from ..model_ops.services import ModelService
 
 
 logger = logging.get_logger(__name__)
@@ -76,6 +77,7 @@ class PlaygroundService(SessionMixin):
         db_deployments_list = []
         for db_endpoint in db_endpoints:
             deployment, input_cost, output_cost, context_length = db_endpoint
+            db_leaderboards = await ModelService(self.session).list_leaderboards(deployment.model.id, "model", 5)
             db_deployment = EndpointListResponse(
                 id=deployment.id,
                 name=deployment.name,
@@ -87,6 +89,7 @@ class PlaygroundService(SessionMixin):
                 input_cost=input_cost,
                 output_cost=output_cost,
                 context_length=context_length,
+                leaderboards=db_leaderboards,
             )
             db_deployments_list.append(db_deployment)
 
