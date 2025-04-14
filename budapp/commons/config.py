@@ -169,9 +169,6 @@ class AppConfig(BaseAppConfig):
     # model download directory
     model_download_dir: str = Field("model_registry", alias="MODEL_DOWNLOAD_DIR")
 
-    # Grafana
-    grafana_url: str = Field(alias="GRAFANA_URL")
-
     @computed_field
     def static_dir(self) -> str:
         """Get the static directory."""
