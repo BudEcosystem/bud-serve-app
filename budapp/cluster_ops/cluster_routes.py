@@ -39,22 +39,23 @@ from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
 from .schemas import (
+    AnalyticsPanelResponse,
+    AnalyticsPanelsResponse,
     CancelClusterOnboardingRequest,
     ClusterEndpointFilter,
     ClusterEndpointPaginatedResponse,
     ClusterFilter,
     ClusterListResponse,
+    ClusterMetricsResponse,
     ClusterNodeWiseEventsResponse,
     CreateClusterWorkflowRequest,
     EditClusterRequest,
-    NodeMetricsResponse,
-    SingleClusterResponse,
-    ClusterMetricsResponse,
     MetricTypeEnum,
+    NodeMetricsResponse,
     RecommendedClusterResponse,
+    SingleClusterResponse,
 )
 from .services import ClusterService
-from budapp.cluster_ops.schemas import CreateCloudClusterRequest
 from .workflows import ClusterRecommendedSchedulerWorkflows
 
 
@@ -648,3 +649,68 @@ async def get_recommended_clusters(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Error retrieving recommended clusters",
         ).to_http_response()
+
+
+@cluster_router.get(
+    "/{cluster_id}/analytics-panels/iframe/{panel_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": AnalyticsPanelResponse,
+            "description": "Successfully retrieved grafana dashboard id",
+        },
+    },
+    description="Get grafana dashboard id",
+)
+async def get_grafana_dashboard_id(
+    cluster_id: UUID,
+    panel_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[AnalyticsPanelResponse, ErrorResponse]:
+    """Get grafana dashboard id."""
+    pass
+
+@cluster_router.get(
+    "/{cluster_id}/analytics-panels/",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": AnalyticsPanelsResponse,
+            "description": "Successfully retrieved grafana dashboard id",
+        },
+    },
+    description="Get grafana dashboard id",
+)
+async def get_grafana_panels(
+    cluster_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[AnalyticsPanelsResponse, ErrorResponse]:
+    """Get grafana dashboard id."""
+    # {
+    #     "deployments": [
+    #         {
+    #             "id": "123",
+    #             "name": "Deployment Name",
+    #             "iframe_url": "https://grafana.com/docs/grafana/latest/dashboards/build/panels/iframe/",
+    #             "status": "success"
+    #         }
+    #     ]
+    # }
+
+    pass

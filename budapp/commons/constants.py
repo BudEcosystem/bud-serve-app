@@ -2685,3 +2685,7 @@ class ModelLicenseObjectTypeEnum(StrEnum):
 
     URL = "url"
     MINIO = "minio"
+
+
+# Grafana Dashboard ID
+GRAFANA_CLUSTER_WORKLOAD_NAME_PATTERN = "Kubernetes / Compute Resources / Workload"

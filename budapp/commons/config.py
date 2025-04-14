@@ -18,16 +18,6 @@
 
 import os
 from pathlib import Path
-
-from typing import Annotated, Any, Dict, List, Optional
-
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.types import (
-    PrivateKeyTypes,
-    PublicKeyTypes,
-)
-from dapr.conf import settings as dapr_settings
-
 from typing import Annotated, Any, List, Optional
 
 from budmicroframe.commons.config import (
@@ -37,8 +27,12 @@ from budmicroframe.commons.config import (
     enable_periodic_sync_from_store,
     register_settings,
 )
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.types import (
+    PrivateKeyTypes,
+    PublicKeyTypes,
+)
 from dotenv import load_dotenv
-
 from pydantic import (
     AnyHttpUrl,
     AnyUrl,
@@ -174,6 +168,9 @@ class AppConfig(BaseAppConfig):
 
     # model download directory
     model_download_dir: str = Field("model_registry", alias="MODEL_DOWNLOAD_DIR")
+
+    # Grafana
+    grafana_url: str = Field(alias="GRAFANA_URL")
 
     @computed_field
     def static_dir(self) -> str:
@@ -318,7 +315,6 @@ class SecretsConfig(BaseConfig):
     @property
     def aes_key(self) -> bytes:
         """Return AES key loaded from the HEX format"""
-
         if not self.aes_key_hex:
             raise RuntimeError("AES key is not set")
 
