@@ -34,6 +34,8 @@ from budapp.commons.config import app_settings
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.core.schemas import NotificationPayload
+from budapp.credential_ops.crud import CloudProviderCredentialDataManager
+from budapp.credential_ops.models import CloudCredentials
 from budapp.endpoint_ops.crud import EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.shared.promql_service import PrometheusMetricsClient
@@ -59,8 +61,8 @@ from ..commons.helpers import get_hardware_types
 from ..core.schemas import NotificationResult
 from ..model_ops.crud import ModelDataManager
 from ..model_ops.models import Model
-from ..model_ops.schemas import Model as ModelSchema
 from ..model_ops.schemas import DeploymentTemplateCreate
+from ..model_ops.schemas import Model as ModelSchema
 from ..model_ops.services import ModelServiceUtil
 from ..project_ops.schemas import Project as ProjectSchema
 from ..shared.dapr_service import DaprService
@@ -79,14 +81,12 @@ from .schemas import (
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
     MetricTypeEnum,
-    PrometheusConfig,
     ModelClusterRecommendedCreate,
     ModelClusterRecommendedUpdate,
+    PrometheusConfig,
     RecommendedCluster,
     RecommendedClusterData,
 )
-from budapp.credential_ops.crud import CloudProviderCredentialDataManager
-from budapp.credential_ops.models import CloudCredentials
 
 
 logger = logging.get_logger(__name__)
@@ -502,9 +502,9 @@ class ClusterService(SessionMixin):
                         with open(temp_file.name, "rb") as config_file:
                             form.add_field("configuration", config_file, filename=temp_file.name)
                             try:
-                                logger.debug(f"************************")
+                                logger.debug("************************")
                                 logger.debug(config_file)
-                                logger.debug(f"************************")
+                                logger.debug("************************")
 
                                 async with session.post(create_cluster_endpoint, data=form) as response:
                                     response_data = await response.json()
@@ -617,9 +617,9 @@ class ClusterService(SessionMixin):
             status_sync_at=datetime.now(tz=timezone.utc),
             # Cloud Cluster
             cluster_type=required_data.get("cluster_type", "ON_PERM"),
-            cloud_provider_id=required_data.get("provider_id", None),
-            credential_id=required_data.get("credential_id", None),
-            region=required_data.get("region", None),
+            cloud_provider_id=required_data.get("provider_id"),
+            credential_id=required_data.get("credential_id"),
+            region=required_data.get("region"),
         )
 
         # Mark workflow as completed
