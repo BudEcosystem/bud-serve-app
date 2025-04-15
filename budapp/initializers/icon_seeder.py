@@ -32,26 +32,6 @@ class IconSeeder(BaseSeeder):
             except Exception as e:
                 logger.exception(f"Failed to seed icons: {e}")
 
-    def _sync_category_from_default(self, category: str, default_icon_dir: str, target_icon_dir: str):
-        """Sync a specific icon category directory from default to target."""
-        src_category_dir = os.path.join(default_icon_dir, category)
-        dst_category_dir = os.path.join(target_icon_dir, category)
-
-        if not os.path.exists(src_category_dir):
-            logger.warning(f"Default category '{category}' does not exist at: {src_category_dir}")
-            return
-
-        os.makedirs(dst_category_dir, exist_ok=True)
-
-        for file in os.listdir(src_category_dir):
-            src_file = os.path.join(src_category_dir, file)
-            dst_file = os.path.join(dst_category_dir, file)
-
-            if os.path.isfile(src_file):
-                if not os.path.exists(dst_file) or not filecmp.cmp(src_file, dst_file, shallow=False):
-                    shutil.copy2(src_file, dst_file)
-                    logger.debug(f"Copied: {src_file} -> {dst_file}")
-
     @staticmethod
     async def _process_icon_name(filename: str) -> str:
         """Process icon name to be used as the name of the icon
