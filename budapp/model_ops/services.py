@@ -2599,14 +2599,17 @@ class ModelService(SessionMixin):
             return []
 
         # Ignore fields with None values
-        valid_fields = [key for key in selected_model_leaderboard.keys() if key != "model_info"]
+        valid_fields = []
+        for benchmark in selected_model_leaderboard.get("benchmarks", []):
+            valid_fields.append(benchmark.get("eval_name"))
+        # valid_fields = [key for key in selected_model_leaderboard.keys() if key != "model_info"]
         logger.debug("Valid fields: %s", valid_fields)
 
         leaderboard_tables: List[LeaderboardTable] = []
 
         for leaderboard in bud_model_leaderboards:
             model_info = leaderboard.get("model_info", {})
-
+            bud_model_benchmarks = leaderboard.get("benchmarks", [])
             # Create model info
             model = LeaderboardModelInfo(
                 uri=model_info.get("uri"),
@@ -2614,21 +2617,14 @@ class ModelService(SessionMixin):
                 is_selected=model_info.get("uri") == selected_model_uri,
             )
 
-            # Create benchmark entries for each valid field
             benchmarks = {}
-            for field in valid_fields:
-                label_alternative = (
-                    leaderboard.get(field)[1] if leaderboard.get(field) and len(leaderboard.get(field)) == 2 else None
-                )
-                if label_alternative:
-                    value = (
-                        leaderboard.get(field)[0]
-                        if leaderboard.get(field) and len(leaderboard.get(field)) == 2
-                        else None
-                    )
+            for bud_model_benchmark in bud_model_benchmarks:
+                field = bud_model_benchmark.get("eval_name")
+                if field in valid_fields:
+                    label_alternative = bud_model_benchmark.get("eval_label")
                     benchmarks[field] = LeaderboardBenchmark(
                         type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, None),
-                        value=value,
+                        value=bud_model_benchmark.get("eval_score"),
                         label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, label_alternative),
                     )
 
@@ -2711,17 +2707,14 @@ class ModelService(SessionMixin):
                 continue
 
             benchmarks = []
-            for field in fields:
-                label_alternative = (
-                    leaderboard.get(field)[1] if leaderboard.get(field) and len(leaderboard.get(field)) == 2 else None
-                )
-                if label_alternative:
+            for bud_model_benchmark in leaderboard.get("benchmarks", []):
+                field = bud_model_benchmark.get("eval_name")
+                if field in fields:
+                    label_alternative = bud_model_benchmark.get("eval_label")
                     benchmarks.append(
                         TopLeaderboardBenchmark(
                             field=field,
-                            value=leaderboard.get(field)[0]
-                            if leaderboard.get(field) and len(leaderboard.get(field)) == 2
-                            else None,
+                            value=bud_model_benchmark.get("eval_score"),
                             type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, None),
                             label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, label_alternative),
                         ).model_dump()
