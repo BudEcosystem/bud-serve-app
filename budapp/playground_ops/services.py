@@ -22,25 +22,25 @@ from uuid import UUID
 from fastapi import status
 
 from ..commons import logging
+from ..commons.constants import EndpointStatusEnum
 from ..commons.db_utils import SessionMixin
 from ..commons.exceptions import ClientException
-from ..commons.constants import EndpointStatusEnum
 from ..credential_ops.crud import CredentialDataManager
 from ..credential_ops.models import Credential as CredentialModel
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..model_ops.services import ModelService
 from ..project_ops.crud import ProjectDataManager
-from .crud import ChatSessionDataManager, MessageDataManager, ChatSettingDataManager, NoteDataManager
-from .models import ChatSession, Message, ChatSetting, Note
+from .crud import ChatSessionDataManager, ChatSettingDataManager, MessageDataManager, NoteDataManager
+from .models import ChatSession, ChatSetting, Message, Note
 from .schemas import (
     ChatSessionCreate,
     ChatSessionListResponse,
-    MessageResponse,
     ChatSettingListResponse,
-    NoteResponse,
     EndpointListResponse,
+    MessageResponse,
+    NoteResponse,
 )
-from ..model_ops.services import ModelService
 
 
 logger = logging.get_logger(__name__)
@@ -77,7 +77,7 @@ class PlaygroundService(SessionMixin):
         db_deployments_list = []
         for db_endpoint in db_endpoints:
             deployment, input_cost, output_cost, context_length = db_endpoint
-            db_leaderboards = await ModelService(self.session).list_leaderboards(deployment.model.id, "model", 5)
+            db_leaderboard = await ModelService(self.session).get_leaderboard_by_model_uri(deployment.model.id)
             db_deployment = EndpointListResponse(
                 id=deployment.id,
                 name=deployment.name,
@@ -89,7 +89,7 @@ class PlaygroundService(SessionMixin):
                 input_cost=input_cost,
                 output_cost=output_cost,
                 context_length=context_length,
-                leaderboards=db_leaderboards,
+                leaderboard=db_leaderboard,
             )
             db_deployments_list.append(db_deployment)
 
@@ -202,7 +202,6 @@ class MessageService(SessionMixin):
 
     async def create_message(self, user_id: UUID, message_data: dict) -> Message:
         """Create a new message and insert it into the database."""
-
         # validate deployment id
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
             EndpointModel,
