@@ -1,10 +1,13 @@
 import os
+import shutil
+import filecmp
 
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.database import engine
+from budapp.commons.helpers import replicate_dir
 from budapp.core.crud import IconDataManager
 from budapp.core.models import Icon as IconModel
 from budapp.core.schemas import IconCreate, IconUpdate
@@ -44,6 +47,9 @@ class IconSeeder(BaseSeeder):
         """Seed icons into the database"""
         # Store new icons as a list for bulk creation
         icons_to_create = []
+        if app_settings.static_dir != os.path.join(str(app_settings.base_dir), "static"):
+            default_icons_path = os.path.join(str(app_settings.base_dir), "static", "icons")
+            replicate_dir(default_icons_path, app_settings.icon_dir, is_override=False)
 
         for category in os.listdir(app_settings.icon_dir):
             category_dir = os.path.join(app_settings.icon_dir, category)
