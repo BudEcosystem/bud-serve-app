@@ -46,7 +46,17 @@ Choose either:
 
 ### Step 8: Deployment
 
-Trigger deployment steps. If successful, workflow ends with a success step; otherwise, an error will be shown during deployment.
+Trigger deployment steps which are performed by budcluster microservice.
+- Verify cluster connection
+- Transfer model to cluster (this step is skipped if benchmark is requested for cloud model)
+- Deploy model engine
+  - for cloud model, deployed engine is instance of litellm server.
+  - for local model, deployed engine is instance of budruntime server.
+- Verify model deployment
+- Run performance benchmark
+
+If successful, workflow ends with a success step; otherwise, an error event is published to budapp microservice.
+Cleanup is performed in both success and failure conditions. Deployed model is deleted and cluster resources are freed.
 
 ---
 
@@ -253,18 +263,6 @@ Node json is response of GET node-metrics API
   "trigger_workflow": true
 }
 ```
-
-Step 8 leads to below sub-steps which are performed by budcluster microservice.
-- Verify cluster connection
-- Transfer model to cluster (this step is skipped if benchmark is requested for cloud model)
-- Deploy model engine
-  - for cloud model, deployed engine is instance of litellm server.
-  - for local model, deployed engine is instance of budruntime server.
-- Verify model deployment
-- Run performance benchmark
-
-If any of the steps fail, error event is published to budapp microservice from budcluster microservice.
-Cleanup is performed in both success and failure conditions. Deployed model is deleted and cluster resources are freed.
 
 # List all benchmarks
 
