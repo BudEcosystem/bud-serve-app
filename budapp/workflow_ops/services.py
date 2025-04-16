@@ -162,7 +162,7 @@ class WorkflowService(SessionMixin):
             simulator_id = required_data.get("simulator_id")
             template_id = required_data.get("template_id")
             endpoint_details = required_data.get("endpoint_details")
-
+            modality = required_data.get("modality")
             quantization_config = QuantizeModelWorkflowStepData(
                 model_id=model_id,
                 quantized_model_name=required_data.get("quantized_model_name"),
@@ -307,6 +307,7 @@ class WorkflowService(SessionMixin):
                 template_id=template_id if template_id else None,
                 endpoint_details=endpoint_details if endpoint_details else None,
                 template=db_template if db_template else None,
+                modality=modality if modality else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
