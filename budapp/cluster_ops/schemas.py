@@ -18,19 +18,27 @@
 """Contains core Pydantic schemas used for data validation and serialization within the cluster ops services."""
 
 from datetime import datetime
-from typing import Any, List, Dict, Union, Optional, Literal
-from uuid import UUID
 from enum import Enum
+from typing import Any, Dict, List, Literal, Optional, Union
+from uuid import UUID
 
-from pydantic import UUID4, AnyHttpUrl, BaseModel, ConfigDict, Field, computed_field, field_validator, HttpUrl, model_validator
+from pydantic import (
+    UUID4,
+    AnyHttpUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    field_validator,
+)
 
 from budapp.commons.constants import ClusterStatusEnum, EndpointStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 
 from ..commons.helpers import validate_icon
 from ..commons.schemas import BudNotificationMetadata
-from ..project_ops.schemas import Project
 from ..model_ops.schemas import Model
+from ..project_ops.schemas import Project
 
 
 class ClusterBase(BaseModel):
@@ -580,3 +588,8 @@ class RecommendedClusterRequest(BaseModel):
     notification_metadata: BudNotificationMetadata
     source_topic: str
     is_proprietary_model: bool
+
+class GrafanaDashboardResponse(SuccessResponse):
+    """Grafana dashboard response schema."""
+
+    url: str
