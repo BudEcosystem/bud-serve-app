@@ -13,6 +13,7 @@ logger = logging.get_logger(__name__)
 
 CURRENT_FILE_PATH = os.path.dirname(os.path.abspath(__file__))
 
+
 class Grafana:
     def __init__(self):
         """Initialize the Grafana client."""
@@ -55,29 +56,23 @@ class Grafana:
 
     def publish_dashboard(self, dashboard_json, uid, new_title=None, folder_id=None, overwrite=False):
         """Publish a dashboard to Grafana."""
-        headers = {
-            "Content-Type": "application/json"
-        }
+        headers = {"Content-Type": "application/json"}
 
         dashboard = dashboard_json.copy()
         if new_title:
-            dashboard['title'] = new_title
+            dashboard["title"] = new_title
 
-        dashboard['uid'] = uid
-        dashboard.pop('id', None)
+        dashboard["uid"] = uid
+        dashboard.pop("id", None)
 
         payload = {
             "dashboard": dashboard,
             "overwrite": overwrite,
-            "message": f"Dashboard created programmatically on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            "message": f"Dashboard created programmatically on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         }
 
         try:
-            response = requests.post(
-                f"{self.url}/api/dashboards/import",
-                headers=headers,
-                json=payload
-            )
+            response = requests.post(f"{self.url}/api/dashboards/import", headers=headers, json=payload)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -88,20 +83,13 @@ class Grafana:
 
     def make_dashboard_public(self, dashboard_uid):
         """Make a Grafana dashboard publicly accessible."""
-        headers = {
-            "Content-Type": "application/json"
-        }
+        headers = {"Content-Type": "application/json"}
 
-        payload = {
-            "share": "public",
-            "isEnabled": True
-        }
+        payload = {"share": "public", "isEnabled": True}
 
         try:
             response = requests.post(
-                f"{self.url}/api/dashboards/uid/{dashboard_uid}/public-dashboards",
-                headers=headers,
-                json=payload
+                f"{self.url}/api/dashboards/uid/{dashboard_uid}/public-dashboards", headers=headers, json=payload
             )
             response.raise_for_status()
             return response.json()
@@ -113,14 +101,9 @@ class Grafana:
 
     def get_public_dashboard_url_by_uid(self, cluster_id: str):
         """Get the public URL of a Grafana dashboard by its UID."""
-        headers = {
-            "Content-Type": "application/json"
-        }
+        headers = {"Content-Type": "application/json"}
 
-        response = requests.get(
-            f"{self.url}/api/dashboards/uid/{cluster_id}/public-dashboards",
-            headers=headers
-        )
+        response = requests.get(f"{self.url}/api/dashboards/uid/{cluster_id}/public-dashboards", headers=headers)
         if response.status_code == 200:
             data = response.json()
             logger.debug(f"Public dashboard: {data}")
@@ -131,16 +114,19 @@ class Grafana:
             logger.error(f"Failed to get access token: {response.text}")
             raise Exception(f"Failed to get access token: {response.text}")
 
-    def create_dashboard_from_file(self, cluster, datasource_uid):
+    def create_dashboard_from_file(self, cluster, datasource_uid, cluster_name):
         """Create a dashboard from a file."""
         logger.debug(f"Creating dashboard from file: {self.fixed_input_path}")
         dashboard_json = self.load_dashboard_json(self.fixed_input_path)
         dashboard = dashboard_json.get("dashboard", dashboard_json)
+
+        # update title
+        dashboard["title"] = f"{cluster_name}"
         sanitized = self.sanitize_dashboard(dashboard, cluster, datasource_uid)
 
         logger.debug("Dashboard Sanitized")
 
-        title = f"{sanitized.get('title', 'Dashboard')} - {cluster}"
+        title = f"{sanitized.get('title', 'Dashboard')}"
 
         logger.debug(f"Publishing dashboard with title: {title}")
 
@@ -154,7 +140,7 @@ class Grafana:
             logger.debug(f"  URL: {self.url}/d/{result['uid']}")
             logger.debug(f"  UID: {result['uid']}")
 
-            public = self.make_dashboard_public(result['uid'])
+            public = self.make_dashboard_public(result["uid"])
             if public:
                 logger.debug("Dashboard Made Public")
                 logger.debug(f"  Public URL: {self.url}/public-dashboards/{public['accessToken']}")
