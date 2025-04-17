@@ -635,7 +635,7 @@ class ClusterService(SessionMixin):
 
             # Run The Grafana Creation Workflow
             grafana = Grafana()
-            await grafana.create_dashboard_from_file(bud_cluster_id, "prometheus")
+            await grafana.create_dashboard_from_file(bud_cluster_id, "prometheus",cluster_data.name)
 
             logger.debug(f"Cluster created successfully: {db_cluster.id}")
         except Exception as e:
