@@ -2773,52 +2773,22 @@ class ModelService(SessionMixin):
             logger.exception(f"Failed to send top leaderboard by uris request: {e}")
             raise ClientException("Failed to fetch top leaderboards") from e
 
-    async def get_leaderboard_by_model_uri(self, model_id: str) -> Optional[TopLeaderboard]:
+    async def get_leaderboard_by_model_uris(self, model_uris: List[str]) -> dict:
         """Service method to fetch and parse leaderboard for a given model URI.
 
         Args:
-            model_uri (str): Model URI to query leaderboard for.
-            limit (int): Number of top leaderboard entries to return.
+            model_uris (str): Model URIs to query leaderboard for.
 
         Returns:
             List[LeaderboardTable]: Parsed leaderboard table data.
         """
-        db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
-        )
-        if not db_model:
-            raise ClientException("Model is not available")
-        bud_model_response = await self._perform_leaderboard_by_uri_request(db_model.uri)
+        # Fetch leaderboard data from bud_model app
+        bud_model_response = await self._perform_leaderboard_by_uris_request(model_uris)
+        bud_model_leaderboards = bud_model_response.get("leaderboards", {})
 
-        bud_model_leaderboard = bud_model_response.get("leaderboards", [])
-        if len(bud_model_leaderboard) == 0:
-            return None
+        return bud_model_leaderboards
 
-        bud_model_leaderboard = bud_model_leaderboard[0]
-        db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"id": model_id, "uri": bud_model_leaderboard.get("uri"), "status": ModelStatusEnum.ACTIVE}
-        )
-        if not db_model:
-            return None
-
-        benchmarks = []
-        for benchmark in bud_model_leaderboard.get("benchmarks", []):
-            benchmarks.append(
-                TopLeaderboardBenchmark(
-                    field=benchmark.get("eval_name"),
-                    value=benchmark.get("eval_score"),
-                    type=BENCHMARK_FIELDS_TYPE_MAPPER.get(benchmark.get("eval_name"), None),
-                    label=BENCHMARK_FIELDS_LABEL_MAPPER.get(benchmark.get("eval_name"), benchmark.get("eval_label")),
-                ).model_dump()
-            )
-
-        return TopLeaderboard(
-            benchmarks=benchmarks,
-            name=db_model.name,
-            provider_type=db_model.provider_type,
-        )
-
-    async def _perform_leaderboard_by_uri_request(self, uri: str) -> Dict:
+    async def _perform_leaderboard_by_uris_request(self, uris: List[str]) -> Dict:
         """Perform top leaderboard fetch request to bud_model app.
 
         Args:
@@ -2826,9 +2796,11 @@ class ModelService(SessionMixin):
             benchmark_fields: The benchmarks to return.
             k: The maximum number of leaderboards to return.
         """
-        bud_model_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/leaderboard/models/compare"
+        bud_model_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/leaderboard/models-uris"
+        )
 
-        query_params = {"model_uris": [uri]}
+        query_params = {"model_uris": uris}
 
         logger.debug(f"Performing leaderboard by uri request to budmodel {query_params}")
         try:

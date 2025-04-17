@@ -75,9 +75,10 @@ class PlaygroundService(SessionMixin):
             search,
         )
         db_deployments_list = []
+        model_uris = []
         for db_endpoint in db_endpoints:
             deployment, input_cost, output_cost, context_length = db_endpoint
-            db_leaderboard = await ModelService(self.session).get_leaderboard_by_model_uri(deployment.model.id)
+            model_uris.append(deployment.model.uri)
             db_deployment = EndpointListResponse(
                 id=deployment.id,
                 name=deployment.name,
@@ -89,9 +90,12 @@ class PlaygroundService(SessionMixin):
                 input_cost=input_cost,
                 output_cost=output_cost,
                 context_length=context_length,
-                leaderboard=db_leaderboard,
+                leaderboard=None,
             )
             db_deployments_list.append(db_deployment)
+        db_leaderboards = await ModelService(self.session).get_leaderboard_by_model_uris(model_uris)
+        for db_deployment in db_deployments_list:
+            db_deployment.leaderboard = db_leaderboards.get(db_deployment.model.uri, {}).get("benchmarks", None)
 
         return db_deployments_list, count
 
