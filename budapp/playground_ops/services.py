@@ -95,7 +95,7 @@ class PlaygroundService(SessionMixin):
             db_deployments_list.append(db_deployment)
         db_leaderboards = await ModelService(self.session).get_leaderboard_by_model_uris(model_uris)
         for db_deployment in db_deployments_list:
-            db_deployment.leaderboard = db_leaderboards.get(db_deployment.model.uri, {}).get("benchmarks", None)
+            db_deployment.leaderboard = db_leaderboards.get(db_deployment.model.uri, None)
 
         return db_deployments_list, count
 

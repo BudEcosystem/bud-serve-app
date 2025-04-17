@@ -19,13 +19,13 @@
 
 import re
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..commons.constants import EndpointStatusEnum, FeedbackEnum
 from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse
-from ..model_ops.schemas import ModelDeploymentResponse, TopLeaderboard
+from ..model_ops.schemas import ModelDeploymentResponse, TopLeaderboardBenchmark
 from ..project_ops.schemas import ProjectResponse
 
 
@@ -44,7 +44,7 @@ class EndpointListResponse(BaseModel):
     input_cost: dict | None = None
     output_cost: dict | None = None
     context_length: int | None = None
-    leaderboard: TopLeaderboard | None = None
+    leaderboard: List[TopLeaderboardBenchmark] | None = None
 
 
 class PlaygroundDeploymentListResponse(PaginatedSuccessResponse):

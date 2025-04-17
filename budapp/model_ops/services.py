@@ -2785,8 +2785,29 @@ class ModelService(SessionMixin):
         # Fetch leaderboard data from bud_model app
         bud_model_response = await self._perform_leaderboard_by_uris_request(model_uris)
         bud_model_leaderboards = bud_model_response.get("leaderboards", {})
+        parsed_leaderboards = {}
+        for leaderboard in bud_model_leaderboards:
+            leaderboard_model_uri = leaderboard.get("uri")
 
-        return bud_model_leaderboards
+            # If model not found, skip
+            if leaderboard_model_uri not in model_uris:
+                continue
+
+            benchmarks = []
+            for bud_model_benchmark in leaderboard.get("benchmarks", []):
+                field = bud_model_benchmark.get("eval_name")
+                label_alternative = bud_model_benchmark.get("eval_label")
+                benchmarks.append(
+                    TopLeaderboardBenchmark(
+                        field=field,
+                        value=bud_model_benchmark.get("eval_score"),
+                        type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, None),
+                        label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, label_alternative),
+                    ).model_dump()
+                )
+            parsed_leaderboards[leaderboard_model_uri] = benchmarks
+
+        return parsed_leaderboards
 
     async def _perform_leaderboard_by_uris_request(self, uris: List[str]) -> Dict:
         """Perform top leaderboard fetch request to bud_model app.
