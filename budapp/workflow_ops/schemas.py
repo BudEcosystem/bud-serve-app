@@ -5,7 +5,13 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 
 from ..cluster_ops.schemas import ClusterResponse
-from ..commons.constants import ModelProviderTypeEnum, VisibilityEnum, WorkflowStatusEnum, WorkflowTypeEnum
+from ..commons.constants import (
+    AddModelModalityEnum,
+    ModelProviderTypeEnum,
+    VisibilityEnum,
+    WorkflowStatusEnum,
+    WorkflowTypeEnum,
+)
 from ..core.schemas import ModelTemplateResponse
 from ..credential_ops.schemas import ProprietaryCredentialResponse
 from ..endpoint_ops.schemas import AddAdapterWorkflowStepData, EndpointResponse
@@ -68,6 +74,7 @@ class RetrieveWorkflowStepData(BaseModel):
     template_id: UUID4 | None = None
     endpoint_details: dict | None = None
     template: ModelTemplateResponse | None = None
+    modality: AddModelModalityEnum | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):

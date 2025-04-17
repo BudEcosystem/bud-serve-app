@@ -134,6 +134,30 @@ class ModalityEnum(Enum):
     EMBEDDING = "embedding"
     TEXT_TO_SPEECH = "text_to_speech"
     SPEECH_TO_TEXT = "speech_to_text"
+    LLM_EMBEDDING = "llm_embedding"
+    MLLM_EMBEDDING = "mllm_embedding"
+
+
+class AddModelModalityEnum(Enum):
+    """Enumeration of model modalities when adding a model.
+
+    This enum represents different types of AI model modalities or capabilities.
+
+    Attributes:
+        LLM (str): Represents Large Language Models for text generation and processing.
+        MLLM (str): Represents Multi-Modal Large Language Models for text generation and processing.
+        IMAGE (str): Represents image-related models for tasks like generation or analysis.
+        EMBEDDING (str): Represents models that create vector embeddings of input data.
+        TEXT_TO_SPEECH (str): Represents models that convert text to spoken audio.
+        SPEECH_TO_TEXT (str): Represents models that transcribe spoken audio to text.
+    """
+
+    LLM = "llm"
+    MLLM = "mllm"
+    IMAGE = "image"
+    EMBEDDING = "embedding"
+    TEXT_TO_SPEECH = "text_to_speech"
+    SPEECH_TO_TEXT = "speech_to_text"
 
 
 ModelSourceEnum = create_dynamic_enum(

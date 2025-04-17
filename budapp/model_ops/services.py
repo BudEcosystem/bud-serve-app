@@ -100,7 +100,6 @@ from .schemas import (
     CreateLocalModelWorkflowSteps,
     DeploymentTemplateCreate,
     DeploymentWorkflowStepData,
-    Leaderboard,
     LeaderboardBenchmark,
     LeaderboardModelInfo,
     LeaderboardTable,
@@ -738,6 +737,7 @@ class LocalModelWorkflowService(SessionMixin):
         tags = request.tags
         icon = request.icon
         trigger_workflow = request.trigger_workflow
+        modality = request.modality
 
         current_step_number = step_number
 
@@ -809,6 +809,7 @@ class LocalModelWorkflowService(SessionMixin):
             tags=tags,
             icon=icon,
             provider_id=provider_id,
+            modality=modality,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
