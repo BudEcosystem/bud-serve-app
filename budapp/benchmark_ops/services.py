@@ -36,6 +36,7 @@ from ..endpoint_ops.services import EndpointService
 from ..model_ops.crud import ModelDataManager, ProviderDataManager
 from ..model_ops.models import Model
 from ..model_ops.models import Provider as ProviderModel
+from ..model_ops.schemas import ModelResponse
 from ..model_ops.services import ModelService, ModelServiceUtil
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
@@ -53,6 +54,7 @@ from .schemas import (
 
 
 logger = logging.get_logger(__name__)
+
 
 class BenchmarkService(SessionMixin):
     """Benchmark service."""
@@ -161,7 +163,9 @@ class BenchmarkService(SessionMixin):
                     request.model = f"{model_source}/{model_uri}"
 
         # Prepare workflow step data
-        workflow_step_data = RunBenchmarkWorkflowStepData(**request.model_dump(exclude={"workflow_id", "workflow_total_steps", "step_number", "trigger_workflow"})).model_dump(mode="json", exclude_none=True)
+        workflow_step_data = RunBenchmarkWorkflowStepData(
+            **request.model_dump(exclude={"workflow_id", "workflow_total_steps", "step_number", "trigger_workflow"})
+        ).model_dump(mode="json", exclude_none=True)
 
         # For avoiding another db call for record retrieval, storing db object while iterating over db_workflow_steps
         db_current_workflow_step = None
@@ -229,7 +233,7 @@ class BenchmarkService(SessionMixin):
                         required_data[key] = db_workflow_step.data[key]
 
             # Check if all required keys are present
-            required_keys = ["model_id", "cluster_id", "bud_cluster_id","nodes", "eval_with", "concurrent_requests"]
+            required_keys = ["model_id", "cluster_id", "bud_cluster_id", "nodes", "eval_with", "concurrent_requests"]
             if required_data.get("eval_with", "") == "configuration":
                 required_keys.extend(["max_input_tokens", "max_output_tokens"])
             missing_keys = [key for key in required_keys if key not in required_data]
@@ -242,7 +246,6 @@ class BenchmarkService(SessionMixin):
                 )
             except ClientException as e:
                 raise e
-
 
         # Trigger workflow
         if trigger_workflow:
@@ -300,7 +303,10 @@ class BenchmarkService(SessionMixin):
                 if "datasets" in required_data:
                     with DatasetCRUD() as crud:
                         db_datasets = await crud.get_datatsets_by_ids(required_data["datasets"])
-                        required_data["datasets"] = [DatasetResponse.model_validate(db_dataset).model_dump(mode="json") for db_dataset in db_datasets]
+                        required_data["datasets"] = [
+                            DatasetResponse.model_validate(db_dataset).model_dump(mode="json")
+                            for db_dataset in db_datasets
+                        ]
                 # Perform add worker deployment
                 await self._add_run_benchmark_workflow_step(
                     current_step_number, required_data, db_workflow, current_user_id
@@ -310,12 +316,14 @@ class BenchmarkService(SessionMixin):
 
         return db_workflow
 
-    async def _add_run_benchmark_workflow_step(self, current_step_number: int, request: dict, db_workflow: WorkflowModel, current_user_id: UUID):
+    async def _add_run_benchmark_workflow_step(
+        self, current_step_number: int, request: dict, db_workflow: WorkflowModel, current_user_id: UUID
+    ):
         """Add run benchmark workflow step."""
         # insert benchmark in budapp db
         benchmark_id = None
         with BenchmarkCRUD() as crud:
-            db_benchmark =  crud.insert(
+            db_benchmark = crud.insert(
                 BenchmarkSchema(
                     name=request["name"],
                     tags=request["tags"],
@@ -323,13 +331,15 @@ class BenchmarkService(SessionMixin):
                     eval_with=request["eval_with"],
                     max_input_tokens=request.get("max_input_tokens"),
                     max_output_tokens=request.get("max_output_tokens"),
-                    dataset_ids=[dataset["id"] for dataset in request["datasets"]] if request.get("datasets") else None,
+                    dataset_ids=[dataset["id"] for dataset in request["datasets"]]
+                    if request.get("datasets")
+                    else None,
                     user_id=current_user_id,
                     model_id=request["model_id"],
                     cluster_id=request["cluster_id"],
                     nodes=request["nodes"],
                     concurrency=request["concurrent_requests"],
-                    status=BenchmarkStatusEnum.PROCESSING
+                    status=BenchmarkStatusEnum.PROCESSING,
                 )
             )
             logger.debug(f"Benchmark created with id {db_benchmark.id}")
@@ -432,7 +442,11 @@ class BenchmarkService(SessionMixin):
             benchmark_response = payload.content.result
             logger.info(f"Updating benchmark with response: {benchmark_response}")
             if benchmark_response["benchmark_status"]:
-                update_data = {"status": BenchmarkStatusEnum.SUCCESS, "bud_cluster_benchmark_id": benchmark_response["bud_cluster_benchmark_id"], "result": benchmark_response["result"]}
+                update_data = {
+                    "status": BenchmarkStatusEnum.SUCCESS,
+                    "bud_cluster_benchmark_id": benchmark_response["bud_cluster_benchmark_id"],
+                    "result": benchmark_response["result"],
+                }
             else:
                 update_data = {"status": BenchmarkStatusEnum.FAILED, "reason": benchmark_response["result"]}
 
@@ -442,7 +456,6 @@ class BenchmarkService(SessionMixin):
             )
 
             db_benchmark = crud.fetch_one(conditions={"id": db_benchmark.id}, raise_on_error=False)
-
 
         # Update current step number
         current_step_number = db_workflow.current_step + 1
@@ -495,31 +508,41 @@ class BenchmarkService(SessionMixin):
     ) -> List[dict]:
         """Get all benchmarks."""
         with BenchmarkCRUD() as crud:
-            db_benchmarks, total_count = await crud.fetch_many_with_search(filters=filters, order_by=order_by, limit=limit, offset=offset, search=search)
+            db_benchmarks, total_count = await crud.fetch_many_with_search(
+                filters=filters, order_by=order_by, limit=limit, offset=offset, search=search
+            )
             benchmark_list = []
             for db_benchmark in db_benchmarks:
                 benchmark_dict = {**db_benchmark.__dict__}
-                benchmark_dict["model"] = {**db_benchmark.model.__dict__}  # Ensure relationships are included
+                benchmark_dict["model"] = ModelResponse.model_validate(db_benchmark.model).model_dump(
+                    mode="json"
+                )  # Ensure relationships are included
                 benchmark_dict["cluster"] = {**db_benchmark.cluster.__dict__}
-                benchmark_dict["tpot"] = round(benchmark_dict["result"].get("mean_tpot_ms", 0.0), 2) if benchmark_dict["result"] else 0.0
-                benchmark_dict["ttft"] = round(benchmark_dict["result"].get("mean_ttft_ms", 0.0), 2) if benchmark_dict["result"] else 0.0
+                benchmark_dict["tpot"] = (
+                    round(benchmark_dict["result"].get("mean_tpot_ms", 0.0), 2) if benchmark_dict["result"] else 0.0
+                )
+                benchmark_dict["ttft"] = (
+                    round(benchmark_dict["result"].get("mean_ttft_ms", 0.0), 2) if benchmark_dict["result"] else 0.0
+                )
                 benchmark_list.append(benchmark_dict)
             return benchmark_list, total_count
 
     async def _perform_get_benchmark_result_request(self, benchmark_id: UUID) -> dict:
         """Perform run benchmark request to budcluster service."""
-        get_benchmark_result_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/benchmark/result"
+        get_benchmark_result_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/benchmark/result"
+        )
         async with aiohttp.ClientSession() as session:
             try:
-                async with session.get(get_benchmark_result_endpoint, params={"benchmark_id": str(benchmark_id)}) as response:
+                async with session.get(
+                    get_benchmark_result_endpoint, params={"benchmark_id": str(benchmark_id)}
+                ) as response:
                     response_data = await response.json()
                     logger.debug(f"Response from budcluster service: {response_data}")
 
                     if response.status != 200 or response_data.get("object") == "error":
                         error_message = response_data.get("message", "Failed to get benchmark result")
-                        logger.error(
-                            f"Failed to get benchmark result with external service: {error_message}"
-                        )
+                        logger.error(f"Failed to get benchmark result with external service: {error_message}")
                         raise ClientException(error_message, status_code=response.status)
 
                     logger.debug("Successfully fetched benchmark result with budcluster service")
@@ -531,7 +554,6 @@ class BenchmarkService(SessionMixin):
             except Exception as e:
                 logger.error(f"Failed to make get benchmark result call to budcluster service: {e}")
                 raise ClientException("Unable to get benchmark result with external service") from e
-
 
     async def get_benchmark_result(self, benchmark_id: UUID) -> dict:
         """Get benchmark result."""
@@ -545,7 +567,8 @@ class BenchmarkService(SessionMixin):
                     )
                 if db_benchmark.status in [BenchmarkStatusEnum.PROCESSING, BenchmarkStatusEnum.FAILED]:
                     raise HTTPException(
-                        detail=f"Benchmark {db_benchmark.name} is {db_benchmark.status}", status_code=status.HTTP_400_BAD_REQUEST
+                        detail=f"Benchmark {db_benchmark.name} is {db_benchmark.status}",
+                        status_code=status.HTTP_400_BAD_REQUEST,
                     )
         bud_cluster_response = await self._perform_get_benchmark_result_request(db_benchmark.bud_cluster_benchmark_id)
 
@@ -592,12 +615,14 @@ class BenchmarkService(SessionMixin):
 
         analysis_data_list = []
         for row in analysis_data:
-            analysis_data_list.append({
-                "model_id": str(row[0]),
-                "model_uri": row[1],
-                field1: row[2],
-                field2: row[3],
-            })
+            analysis_data_list.append(
+                {
+                    "model_id": str(row[0]),
+                    "model_uri": row[1],
+                    field1: row[2],
+                    field2: row[3],
+                }
+            )
         return analysis_data_list
 
     async def _perform_add_worker_simulation(
@@ -641,13 +666,13 @@ class BenchmarkService(SessionMixin):
                 {
                     "id": "performance_estimation",
                     "title": "Generating best configuration for each cluster",
-                    "description": "Analyze and estimate the optimal performance for each cluster"
+                    "description": "Analyze and estimate the optimal performance for each cluster",
                 },
                 {
                     "id": "ranking",
                     "title": "Ranking the cluster based on performance",
-                    "description": "Rank the clusters to find the best configuration"
-                }
+                    "description": "Rank the clusters to find the best configuration",
+                },
             ],
             "object": "workflow_metadata",
             "status": "PENDING",
@@ -695,18 +720,24 @@ class BenchmarkRequestMetricsService(SessionMixin):
         if request.metrics:
             valid_keys = {column.name for column in BenchmarkRequestMetricsSchema.__table__.columns}
             metrics_data = [
-                BenchmarkRequestMetricsSchema(**{k: v for k, v in metric.model_dump(mode="json").items() if k in valid_keys})
+                BenchmarkRequestMetricsSchema(
+                    **{k: v for k, v in metric.model_dump(mode="json").items() if k in valid_keys}
+                )
                 for metric in request.metrics
             ]
             with BenchmarkRequestMetricsCRUD() as crud:
                 crud.bulk_insert(metrics_data, session=self.session)
 
-    def _get_distribution_bins(self, distribution_type: str, dataset_ids: List[UUID], benchmark_id: Optional[UUID]=None, num_bins: int=10) -> list:
+    def _get_distribution_bins(
+        self, distribution_type: str, dataset_ids: List[UUID], benchmark_id: Optional[UUID] = None, num_bins: int = 10
+    ) -> list:
         """Get distribution bins."""
         bins = []
         with BenchmarkRequestMetricsCRUD() as crud:
             params = {"dataset_ids": dataset_ids}
-            query = f"SELECT MAX({distribution_type}) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
+            query = (
+                f"SELECT MAX({distribution_type}) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
+            )
             if benchmark_id:
                 query += " AND benchmark_id = :benchmark_id"
                 params["benchmark_id"] = benchmark_id
@@ -717,13 +748,18 @@ class BenchmarkRequestMetricsService(SessionMixin):
         if metrics_data and metrics_data[0][0] is not None:
             max_value = metrics_data[0][0]
             bin_width = max_value / num_bins
-            bins = bins = [(i+1, round(i*bin_width, 1), round((i+1)*bin_width, 1)) for i in range(num_bins)]
+            bins = bins = [(i + 1, round(i * bin_width, 1), round((i + 1) * bin_width, 1)) for i in range(num_bins)]
             # Adjust the bin range to make them exclusive
-            bins = [(bin_id, bin_start, bin_end + 0.1 if bin_id == num_bins else bin_end) for bin_id, bin_start, bin_end in bins]
+            bins = [
+                (bin_id, bin_start, bin_end + 0.1 if bin_id == num_bins else bin_end)
+                for bin_id, bin_start, bin_end in bins
+            ]
             print(bins)
         return bins
 
-    async def get_dataset_distribution_metrics(self, distribution_type: str, dataset_ids: List[UUID], benchmark_id: Optional[UUID]=None, num_bins: int=10) -> list:
+    async def get_dataset_distribution_metrics(
+        self, distribution_type: str, dataset_ids: List[UUID], benchmark_id: Optional[UUID] = None, num_bins: int = 10
+    ) -> list:
         """Get dataset distribution metrics."""
         graph_data_list = []
         # calculate distribution bins
@@ -736,7 +772,7 @@ class BenchmarkRequestMetricsService(SessionMixin):
             )
 
         with BenchmarkRequestMetricsCRUD() as crud:
-            params={"dataset_ids": dataset_ids}
+            params = {"dataset_ids": dataset_ids}
             query = f"""
                     WITH bins AS (
                         SELECT * FROM (VALUES
@@ -796,9 +832,14 @@ class BenchmarkRequestMetricsService(SessionMixin):
     async def get_request_metrics(self, benchmark_id: UUID, offset: int = 0, limit: int = 10) -> dict:
         """Get benchmark request metrics."""
         with BenchmarkRequestMetricsCRUD() as crud:
-            db_request_metrics, _ = crud.fetch_many(conditions={"benchmark_id": benchmark_id}, limit=limit, offset=offset)
+            db_request_metrics, _ = crud.fetch_many(
+                conditions={"benchmark_id": benchmark_id}, limit=limit, offset=offset
+            )
             total_count = crud.fetch_count(conditions={"benchmark_id": benchmark_id})
-            request_metrics = [BenchmarkRequestMetrics.model_validate(request_metric, from_attributes=True) for request_metric in db_request_metrics]
+            request_metrics = [
+                BenchmarkRequestMetrics.model_validate(request_metric, from_attributes=True)
+                for request_metric in db_request_metrics
+            ]
         return request_metrics, total_count
 
     def get_field1_vs_field2_data(self, field1: str, field2: str, benchmark_id: UUID) -> dict:
@@ -816,8 +857,10 @@ class BenchmarkRequestMetricsService(SessionMixin):
 
         analysis_data_list = []
         for row in analysis_data:
-            analysis_data_list.append({
-                field1: row[0],
-                field2: row[1],
-            })
+            analysis_data_list.append(
+                {
+                    field1: row[0],
+                    field2: row[1],
+                }
+            )
         return analysis_data_list
