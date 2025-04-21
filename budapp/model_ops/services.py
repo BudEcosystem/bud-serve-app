@@ -100,7 +100,6 @@ from .schemas import (
     CreateLocalModelWorkflowSteps,
     DeploymentTemplateCreate,
     DeploymentWorkflowStepData,
-    Leaderboard,
     LeaderboardBenchmark,
     LeaderboardModelInfo,
     LeaderboardTable,
@@ -738,6 +737,7 @@ class LocalModelWorkflowService(SessionMixin):
         tags = request.tags
         icon = request.icon
         trigger_workflow = request.trigger_workflow
+        modality = request.modality
 
         current_step_number = step_number
 
@@ -809,6 +809,7 @@ class LocalModelWorkflowService(SessionMixin):
             tags=tags,
             icon=icon,
             provider_id=provider_id,
+            modality=modality,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
@@ -2592,21 +2593,24 @@ class ModelService(SessionMixin):
         selected_model_leaderboard = None
         for leaderboard in bud_model_leaderboards:
             if leaderboard.get("model_info", {}).get("uri") == selected_model_uri:
-                selected_model_leaderboard = Leaderboard(**leaderboard)
+                selected_model_leaderboard = leaderboard
                 break
         if not selected_model_leaderboard:
             logger.debug("No leaderboard found for selected model %s", selected_model_uri)
             return []
 
         # Ignore fields with None values
-        valid_fields = selected_model_leaderboard.model_dump(exclude_none=True).keys()
+        valid_fields = []
+        for benchmark in selected_model_leaderboard.get("benchmarks", []):
+            valid_fields.append(benchmark.get("eval_name"))
+        # valid_fields = [key for key in selected_model_leaderboard.keys() if key != "model_info"]
         logger.debug("Valid fields: %s", valid_fields)
 
         leaderboard_tables: List[LeaderboardTable] = []
 
         for leaderboard in bud_model_leaderboards:
             model_info = leaderboard.get("model_info", {})
-
+            bud_model_benchmarks = leaderboard.get("benchmarks", [])
             # Create model info
             model = LeaderboardModelInfo(
                 uri=model_info.get("uri"),
@@ -2614,13 +2618,16 @@ class ModelService(SessionMixin):
                 is_selected=model_info.get("uri") == selected_model_uri,
             )
 
-            # Create benchmark entries for each valid field
             benchmarks = {}
-            for field in valid_fields:
-                value = leaderboard.get(field)
-                benchmarks[field] = LeaderboardBenchmark(
-                    type=BENCHMARK_FIELDS_TYPE_MAPPER[field], value=value, label=BENCHMARK_FIELDS_LABEL_MAPPER[field]
-                )
+            for bud_model_benchmark in bud_model_benchmarks:
+                field = bud_model_benchmark.get("eval_name")
+                if field in valid_fields:
+                    label_alternative = bud_model_benchmark.get("eval_label")
+                    benchmarks[field] = LeaderboardBenchmark(
+                        type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, None),
+                        value=bud_model_benchmark.get("eval_score"),
+                        label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, label_alternative),
+                    )
 
             leaderboard_tables.append(LeaderboardTable(model=model, benchmarks=benchmarks))
 
@@ -2667,13 +2674,14 @@ class ModelService(SessionMixin):
 
         # Fetch top leaderboards from bud_model app
         bud_model_response = await self._perform_top_leaderboard_by_uri_request(db_model_uris, benchmarks, limit)
+
         bud_model_leaderboards = bud_model_response.get("leaderboards", [])
 
         if len(bud_model_leaderboards) == 0:
             return []
 
         # Get model info by uris
-        leaderboard_uris = [leaderboard.get("model_info", {}).get("uri") for leaderboard in bud_model_leaderboards]
+        leaderboard_uris = [leaderboard.get("uri") for leaderboard in bud_model_leaderboards]
         db_models = await ModelDataManager(self.session).get_models_by_uris(leaderboard_uris)
 
         # If no models found, return empty list
@@ -2693,22 +2701,25 @@ class ModelService(SessionMixin):
 
         # Iterate over leaderboards
         for leaderboard in bud_model_leaderboards:
-            leaderboard_model_uri = leaderboard.get("model_info", {}).get("uri")
+            leaderboard_model_uri = leaderboard.get("uri")
 
             # If model not found, skip
             if leaderboard_model_uri not in db_model_info:
                 continue
 
             benchmarks = []
-            for field in fields:
-                benchmarks.append(
-                    TopLeaderboardBenchmark(
-                        field=field,
-                        value=leaderboard.get(field),
-                        type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, ""),
-                        label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, ""),
-                    ).model_dump()
-                )
+            for bud_model_benchmark in leaderboard.get("benchmarks", []):
+                field = bud_model_benchmark.get("eval_name")
+                if field in fields:
+                    label_alternative = bud_model_benchmark.get("eval_label")
+                    benchmarks.append(
+                        TopLeaderboardBenchmark(
+                            field=field,
+                            value=bud_model_benchmark.get("eval_score"),
+                            type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, None),
+                            label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, label_alternative),
+                        ).model_dump()
+                    )
             result.append(
                 TopLeaderboard(
                     benchmarks=benchmarks,
@@ -2762,6 +2773,73 @@ class ModelService(SessionMixin):
         except Exception as e:
             logger.exception(f"Failed to send top leaderboard by uris request: {e}")
             raise ClientException("Failed to fetch top leaderboards") from e
+
+    async def get_leaderboard_by_model_uris(self, model_uris: List[str]) -> dict:
+        """Service method to fetch and parse leaderboard for a given model URI.
+
+        Args:
+            model_uris (str): Model URIs to query leaderboard for.
+
+        Returns:
+            List[LeaderboardTable]: Parsed leaderboard table data.
+        """
+        # Fetch leaderboard data from bud_model app
+        bud_model_response = await self._perform_leaderboard_by_uris_request(model_uris)
+        bud_model_leaderboards = bud_model_response.get("leaderboards", {})
+        parsed_leaderboards = {}
+        for leaderboard in bud_model_leaderboards:
+            leaderboard_model_uri = leaderboard.get("uri")
+
+            # If model not found, skip
+            if leaderboard_model_uri not in model_uris:
+                continue
+
+            benchmarks = []
+            for bud_model_benchmark in leaderboard.get("benchmarks", []):
+                field = bud_model_benchmark.get("eval_name")
+                label_alternative = bud_model_benchmark.get("eval_label")
+                benchmarks.append(
+                    TopLeaderboardBenchmark(
+                        field=field,
+                        value=bud_model_benchmark.get("eval_score"),
+                        type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, None),
+                        label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, label_alternative),
+                    ).model_dump()
+                )
+            parsed_leaderboards[leaderboard_model_uri] = benchmarks
+
+        return parsed_leaderboards
+
+    async def _perform_leaderboard_by_uris_request(self, uris: List[str]) -> Dict:
+        """Perform top leaderboard fetch request to bud_model app.
+
+        Args:
+            uris: The uris of the models.
+            benchmark_fields: The benchmarks to return.
+            k: The maximum number of leaderboards to return.
+        """
+        bud_model_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/leaderboard/models-uris"
+        )
+
+        query_params = {"model_uris": uris}
+
+        logger.debug(f"Performing leaderboard by uri request to budmodel {query_params}")
+        try:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(bud_model_endpoint, params=query_params) as response,
+            ):
+                response_data = await response.json()
+                if response.status != 200:
+                    logger.error(f"Failed to fetch leaderboards: {response.status} {response_data}")
+                    raise ClientException("Failed to fetch leaderboards")
+
+                logger.debug("Successfully fetched leaderboards from budmodel")
+                return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send leaderboard by uris request: {e}")
+            raise ClientException("Failed to fetch leaderboards") from e
 
     async def deploy_model_by_step(
         self,

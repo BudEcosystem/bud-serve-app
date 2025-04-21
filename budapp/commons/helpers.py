@@ -20,6 +20,9 @@ import os
 import random
 import string
 import re
+from pathlib import Path
+import shutil
+import filecmp
 from enum import Enum
 from typing import Dict, List, Literal, Optional, Union, Tuple
 
@@ -364,3 +367,44 @@ def validate_password_string(password: str) -> Union[bool, Tuple[bool, str]]:
         return False, "Password must not contain any whitespace."
 
     return True, "Password is valid."
+
+
+def replicate_dir(source: str, destination: str, is_override: bool = False):
+    """
+    Sync files from `source` to `destination` recursively.
+
+    - Preserves directory structure.
+    - Skips identical files unless `is_override=True`.
+    - Creates necessary directories as needed.
+    """
+    src_path = Path(source)
+    dst_path = Path(destination)
+
+    if not src_path.exists() or not src_path.is_dir():
+        logger.warning(f"Source directory does not exist or is not a directory: {source}")
+        return
+
+    for src_file in src_path.rglob("*"):  # Recursively go through everything
+        if src_file.is_file():
+            # Compute the relative path from source base
+            rel_path = src_file.relative_to(src_path)
+
+            # Construct full path in destination
+            dst_file = dst_path / rel_path
+
+            # Ensure the destination folder exists
+            dst_file.parent.mkdir(parents=True, exist_ok=True)
+
+            # Decide whether to copy
+            if not dst_file.exists():
+                shutil.copy2(src_file, dst_file)
+                logger.debug(f"Copied (new): {src_file} -> {dst_file}")
+            elif is_override:
+                # Only copy if files differ
+                if not filecmp.cmp(src_file, dst_file, shallow=False):
+                    shutil.copy2(src_file, dst_file)
+                    logger.debug(f"Copied (override): {src_file} -> {dst_file}")
+                else:
+                    logger.debug(f"Skipped (identical): {dst_file}")
+            else:
+                logger.debug(f"Skipped (exists): {dst_file}")

@@ -19,15 +19,14 @@
 
 import re
 from datetime import datetime
-from typing import Any, Optional, Dict
+from typing import Any, Dict, Optional, List
 
-from pydantic import UUID4, BaseModel, ConfigDict, field_validator, model_validator, Field
+from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from ..commons.constants import EndpointStatusEnum
+from ..commons.constants import EndpointStatusEnum, FeedbackEnum
 from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse
-from ..model_ops.schemas import ModelDeploymentResponse
+from ..model_ops.schemas import ModelDeploymentResponse, TopLeaderboardBenchmark
 from ..project_ops.schemas import ProjectResponse
-from ..commons.constants import FeedbackEnum
 
 
 class EndpointListResponse(BaseModel):
@@ -45,6 +44,7 @@ class EndpointListResponse(BaseModel):
     input_cost: dict | None = None
     output_cost: dict | None = None
     context_length: int | None = None
+    leaderboard: List[TopLeaderboardBenchmark] | None = None
 
 
 class PlaygroundDeploymentListResponse(PaginatedSuccessResponse):
@@ -275,7 +275,6 @@ class MessageEditRequest(BaseModel):
     @model_validator(mode="after")
     def validate_edit_mode(cls, values):
         """Ensure required fields are set correctly based on the type of edit."""
-
         prompt = values.prompt
         response = values.response
         is_content_edit = prompt is not None or response is not None

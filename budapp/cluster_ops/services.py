@@ -38,6 +38,7 @@ from budapp.credential_ops.crud import CloudProviderCredentialDataManager
 from budapp.credential_ops.models import CloudCredentials
 from budapp.endpoint_ops.crud import EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
+from budapp.shared.grafana import Grafana
 from budapp.shared.promql_service import PrometheusMetricsClient
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
@@ -631,6 +632,11 @@ class ClusterService(SessionMixin):
             db_cluster = await ClusterDataManager(self.session).insert_one(
                 ClusterModel(**cluster_data.model_dump(exclude_unset=True, exclude_none=True))
             )
+
+            # Run The Grafana Creation Workflow
+            grafana = Grafana()
+            await grafana.create_dashboard_from_file(bud_cluster_id, "prometheus",cluster_data.name)
+
             logger.debug(f"Cluster created successfully: {db_cluster.id}")
         except Exception as e:
             logger.exception(f"Failed to create cluster: {e}")

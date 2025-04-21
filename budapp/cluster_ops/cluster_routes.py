@@ -34,6 +34,7 @@ from budapp.commons.dependencies import (
 )
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
+from budapp.shared.grafana import Grafana
 from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
@@ -47,12 +48,15 @@ from .schemas import (
     ClusterFilter,
     ClusterListResponse,
     ClusterMetricsResponse,
+    ClusterMetricsResponse,
     ClusterNodeWiseEventsResponse,
     CreateClusterWorkflowRequest,
     EditClusterRequest,
+    GrafanaDashboardResponse,
     MetricTypeEnum,
     NodeMetricsResponse,
     RecommendedClusterResponse,
+    SingleClusterResponse,
     SingleClusterResponse,
 )
 from .services import ClusterService
@@ -62,6 +66,47 @@ from .workflows import ClusterRecommendedSchedulerWorkflows
 logger = logging.get_logger(__name__)
 
 cluster_router = APIRouter(prefix="/clusters", tags=["cluster"])
+
+@cluster_router.get(
+    "/{cluster_id}/grafana-dashboard",
+    responses={
+        status.HTTP_200_OK: {
+            "model": GrafanaDashboardResponse,
+            "description": "Successfully retrieved Grafana dashboard URL",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="Get Grafana dashboard URL by cluster id",
+)
+async def get_grafana_dashboard_url(
+    cluster_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[GrafanaDashboardResponse, ErrorResponse]:
+    """Get Grafana dashboard URL by cluster id."""
+    try:
+        cluster_details = await ClusterService(session).get_cluster_details(cluster_id)
+        grafana = Grafana()
+        url = grafana.get_public_dashboard_url_by_uid(cluster_details.cluster_id)
+        return GrafanaDashboardResponse(
+            message="Successfully retrieved Grafana dashboard URL",
+            code=status.HTTP_200_OK,
+            object="cluster.grafana-dashboard",
+            url=url
+        )
+    except Exception as e:
+        logger.exception(f"Error retrieving Grafana dashboard URL: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Error retrieving Grafana dashboard URL",
+        ).to_http_response()
 
 
 @cluster_router.post(
