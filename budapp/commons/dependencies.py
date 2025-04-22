@@ -18,23 +18,22 @@
 
 from collections.abc import AsyncGenerator
 from typing import List
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import ExpiredSignatureError, JWTError
-from keycloak import KeycloakAuthenticationError, KeycloakGetError, KeycloakInvalidTokenError
+from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
+from budapp.auth.schemas import AccessTokenData
 from budapp.commons import logging
-from budapp.commons.config import app_settings
-from budapp.commons.constants import UserStatusEnum
+from budapp.commons.config import secrets_settings
+from budapp.commons.constants import JWT_ALGORITHM, TokenTypeEnum, UserStatusEnum
 from budapp.commons.database import SessionLocal
-from budapp.commons.keycloak import KeycloakManager
 from budapp.user_ops.crud import UserDataManager
-from budapp.user_ops.models import Tenant, TenantClient
 from budapp.user_ops.models import User as UserModel
-from budapp.user_ops.schemas import TenantClientSchema, User
+from budapp.user_ops.schemas import User
 
 
 logger = logging.get_logger(__name__)
@@ -74,83 +73,46 @@ async def get_current_user(
     Returns:
         User: The current user.
     """
+    # Define an exception to be raised for invalid credentials
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid authentication credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-
     try:
-        realm_name = app_settings.default_realm_name
-
-        logger.debug(f"::USER:: Validating token for realm: {realm_name}")
-
-        tenant = await UserDataManager(session).retrieve_by_fields(
-            Tenant, {"realm_name": realm_name, "is_active": True}, missing_ok=True
+        # Decode the token and verify its validity
+        payload = jwt.decode(
+            token.credentials,
+            secrets_settings.jwt_secret_key,
+            algorithms=[JWT_ALGORITHM],
         )
 
-        if not tenant:
-            raise credentials_exception
+        # Raise an exception if the token is not an access token
+        if payload.get("type") != TokenTypeEnum.ACCESS.value:
+            raise credentials_exception from None
 
-        logger.debug(f"::USER:: Tenant found: {tenant.id}")
-
-        tenant_client = await UserDataManager(session).retrieve_by_fields(
-            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
-        )
-
-        if not tenant_client:
-            raise credentials_exception
-
-        credentials = TenantClientSchema(
-            id=tenant_client.id,
-            client_named_id=tenant_client.client_named_id,
-            client_id=tenant_client.client_id,
-            client_secret=tenant_client.client_secret,
-        )
-
-        manager = KeycloakManager()
-
-        logger.debug(f"::USER:: Token: {token.credentials}")
-        payload = await manager.validate_token(token.credentials, realm_name, credentials)
-        logger.debug(f"::USER:: Token validated: {payload}")
-
+        # Extract the user ID from the payload. Raise an exception if it can't be found
         auth_id: str = payload.get("sub")
         if not auth_id:
-            raise credentials_exception
+            raise credentials_exception from None
 
-        db_user = await UserDataManager(session).retrieve_by_fields(UserModel, {"auth_id": auth_id}, missing_ok=True)
+        # Create AccessTokenData instance with user auth ID
+        token_data = AccessTokenData(sub=auth_id)
+    except JWTError:
+        logger.info("Invalid access token found")
+        # Raise an exception if there's an issue decoding the token
+        raise credentials_exception from None
 
-        if not db_user:
-            raise credentials_exception
+    # Retrieve the user from the database
+    db_user = await UserDataManager(session).retrieve_by_fields(
+        UserModel, {"auth_id": UUID(token_data.sub)}, missing_ok=True
+    )
 
-        db_user.raw_token = token.credentials
+    # Raise an exception if the user is not found
+    if not db_user:
+        raise credentials_exception from None
 
-        logger.debug(f"::USER:: User: {db_user.raw_token}")
-
-        return db_user
-
-    except ExpiredSignatureError:
-        logger.warning("::USER:: Token has expired")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    except (JWTError, KeycloakInvalidTokenError):
-        logger.warning("::USER:: Invalid JWT or token rejected by Keycloak")
-        raise credentials_exception
-
-    except (KeycloakAuthenticationError, KeycloakGetError) as e:
-        logger.error(f"::USER:: Keycloak error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service unavailable",
-        )
-
-    except Exception as e:
-        logger.error(f"::USER:: Unexpected error while getting current user: {str(e)}")
-        raise credentials_exception
+    return db_user
 
 
 async def get_current_active_user(current_user: Annotated[User, Depends(get_current_user)]) -> User:
@@ -165,20 +127,6 @@ async def get_current_active_user(current_user: Annotated[User, Depends(get_curr
     if current_user.status != UserStatusEnum.ACTIVE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
     return current_user
-
-
-async def get_user_realm(current_user: Annotated[User, Depends(get_current_user)]) -> str:
-    """Get the user realm.
-
-    Args:
-        current_user (User): The current user.
-
-    Returns:
-        str: The user realm.
-    """
-    # Note : should be updated to get the realm from the user, when start to support multi-realm
-
-    return app_settings.default_realm_name
 
 
 async def get_current_active_invite_user(current_user: Annotated[User, Depends(get_current_user)]) -> User:

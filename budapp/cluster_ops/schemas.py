@@ -20,19 +20,8 @@
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
-from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
-from pydantic import (
-    UUID4,
-    AnyHttpUrl,
-    BaseModel,
-    ConfigDict,
-    Field,
-    HttpUrl,
-    field_validator,
-)
 from pydantic import (
     UUID4,
     AnyHttpUrl,
@@ -48,7 +37,6 @@ from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 
 from ..commons.helpers import validate_icon
 from ..commons.schemas import BudNotificationMetadata
-from ..model_ops.schemas import Model
 from ..model_ops.schemas import Model
 from ..project_ops.schemas import Project
 
@@ -605,24 +593,3 @@ class GrafanaDashboardResponse(SuccessResponse):
     """Grafana dashboard response schema."""
 
     url: str
-
-
-class AnalyticsPanel(BaseModel):
-    """Analytics panel schema."""
-
-    id: UUID
-    name: str
-    iframe_url: str
-    status: str
-
-class AnalyticsPanelsResponse(SuccessResponse):
-    """Analytics panels response schema."""
-
-    deployment: list[AnalyticsPanel] | None = None
-    cluster: list[AnalyticsPanel] | None = None
-
-
-class AnalyticsPanelResponse(SuccessResponse):
-    """Analytics panel response schema."""
-
-    panel: AnalyticsPanel

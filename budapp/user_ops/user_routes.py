@@ -17,21 +17,17 @@
 """The model ops package, containing essential business logic, services, and routing configurations for the user ops."""
 
 from typing import Union
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
-from budapp.commons.constants import PermissionEnum
-from budapp.commons.dependencies import get_current_active_invite_user, get_session, get_user_realm
-from budapp.commons.permission_handler import require_permissions
+from budapp.commons.dependencies import get_current_active_invite_user, get_session
 from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
-from budapp.user_ops.services import UserService
 
-from .schemas import MyPermissions, UserResponse, UserUpdate
+from .schemas import UserResponse
 
 
 logger = logging.get_logger(__name__)
@@ -57,7 +53,6 @@ user_router = APIRouter(prefix="/users", tags=["user"])
     },
     description="Get current user",
 )
-# @require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def get_current_user(
     current_user: Annotated[User, Depends(get_current_active_invite_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -72,83 +67,4 @@ async def get_current_user(
         logger.exception(f"Failed to get current user: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get current user"
-        ).to_http_response()
-
-@user_router.patch(
-    "/{user_id}",
-    responses={
-        status.HTTP_200_OK: {
-            "model": UserResponse,
-            "description": "Successfully update current user",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
-        status.HTTP_401_UNAUTHORIZED: {
-            "model": ErrorResponse,
-            "description": "Unauthorized",
-        },
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
-    },
-    description="Update current user",
-)
-# @require_permissions(permissions=[PermissionEnum.USER_MANAGE])
-async def update_current_user(
-    user_id: UUID,
-    user: UserUpdate,
-    current_user: Annotated[User, Depends(get_current_active_invite_user)],
-    realm_name: Annotated[str, Depends(get_user_realm)],
-    session: Annotated[Session, Depends(get_session)],
-) -> Union[UserResponse, ErrorResponse]:
-    """Update current user."""
-    try:
-        db_user = await UserService(session).update_active_user(
-            user_id, user.model_dump(exclude_unset=True, exclude_none=True), current_user, realm_name
-        )
-        return UserResponse(
-            object="user.me", code=status.HTTP_200_OK, message="Successfully update current user", user=db_user
-        ).to_http_response()
-    except Exception as e:
-        logger.exception(f"Failed to update current user: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update current user"
-        ).to_http_response()
-
-@user_router.get(
-    "/me/permissions",
-    responses={
-        status.HTTP_200_OK: {
-            "model": MyPermissions,
-            "description": "Successfully get user permissions",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
-    },
-    description="Get user roles",
-)
-async def get_user_roles(
-    current_user: Annotated[User, Depends(get_current_active_invite_user)],
-    session: Annotated[Session, Depends(get_session)],
-) -> Union[MyPermissions, ErrorResponse]:
-    """Get user roles."""
-    try:
-        kc_user = await UserService(session).get_user_roles_and_permissions(current_user)
-        permissions_list = kc_user.get("permissions", [])
-        return MyPermissions(
-            object="user.permissions", code=status.HTTP_200_OK, message="Successfully get user permissions", permissions=permissions_list
-        ).to_http_response()
-    except Exception as e:
-        logger.exception(f"Failed to get user permissions: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get user roles"
         ).to_http_response()
