@@ -3,7 +3,7 @@ import uuid
 from typing import Annotated, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Path, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, status
 from sqlalchemy.orm import Session
 from typing_extensions import Union
 
@@ -20,6 +20,7 @@ from budapp.commons.schemas import (
 from budapp.commons.security import RSAHandler
 from budapp.user_ops.schemas import User
 
+from ..commons.async_utils import get_user_from_auth_header
 from .crud import CloudProviderCredentialDataManager, CloudProviderDataManager, CredentialDataManager
 from .models import CloudCredentials, CloudProviders, Credential
 from .schemas import (
@@ -93,8 +94,33 @@ async def update_credential(
     responses=error_responses,
     description="Get router config for the given API key and endpoint name",
 )
-async def get_router_config(api_key: str, endpoint_name: str, session: Annotated[Session, Depends(get_session)]):
-    router_config = await CredentialService(session).get_router_config(api_key, endpoint_name)
+async def get_router_config(
+    endpoint_name: Annotated[str, Query()],
+    session: Annotated[Session, Depends(get_session)],
+    api_key: Optional[str] = Query(None),
+    project_id: Optional[UUID] = Query(None),
+    authorization: Annotated[
+        str | None, Header()
+    ] = None,  # NOTE: Can't use in Openapi docs https://github.com/fastapi/fastapi/issues/612#issuecomment-547886504
+):
+    # Check if either api_key exists OR both project_id and authorization exist
+    if not api_key and (not authorization or not project_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="API key or authorization header with project_id is required",
+        )
+
+    current_user_id = None
+    if authorization:
+        try:
+            current_user = await get_user_from_auth_header(authorization, session)
+            current_user_id = current_user.id
+        except ClientException as e:
+            raise HTTPException(status_code=e.status_code, detail=e.message) from e
+
+    router_config = await CredentialService(session).get_router_config(
+        api_key, endpoint_name, current_user_id, project_id
+    )
     return SingleResponse(message="Router config retrieved successfully", result=router_config)
 
 

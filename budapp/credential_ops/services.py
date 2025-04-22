@@ -272,10 +272,26 @@ class CredentialService(SessionMixin):
     #     serializer=lambda x: x.model_dump_json(),
     #     deserializer=lambda x: RouterConfig.model_validate_json(x),
     # )
-    async def get_router_config(self, api_key: str, endpoint_name: str) -> RouterConfig:
+    async def get_router_config(
+        self, api_key: Optional[str], endpoint_name: str, current_user_id: Optional[UUID], project_id: Optional[UUID]
+    ) -> RouterConfig:
         router_config = None
-        db_credential = await self.retrieve_credential_details(api_key)
-        db_project = db_credential.project
+        db_project = None
+
+        # Project can be identified by either api_key or current_user_id and project_id
+        if api_key:
+            db_credential = await self.retrieve_credential_details(api_key)
+            db_project = db_credential.project
+        elif current_user_id and project_id:
+            db_project = await ProjectDataManager(self.session).retrieve_by_fields(
+                {"id": project_id, "status": ProjectStatusEnum.ACTIVE}
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Api-key or User accessible project id required.",
+            )
+
         endpoints = db_project.endpoints
         db_endpoint = None
         adapters, _ = await AdapterDataManager(self.session).get_all_adapters_in_project(db_project.id)
