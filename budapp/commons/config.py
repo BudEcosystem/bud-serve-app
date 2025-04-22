@@ -112,6 +112,9 @@ class AppConfig(BaseAppConfig):
     superuser_email: str = Field(alias="SUPER_USER_EMAIL")
     superuser_password: str = Field(alias="SUPER_USER_PASSWORD")
 
+    # default non master realm name
+    default_realm_name: str = Field(alias="DEFAULT_REALM_NAME", default="bud")
+
     # Token
     access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_minutes: int = Field(60 * 24 * 7, alias="REFRESH_TOKEN_EXPIRE_MINUTES")
@@ -151,6 +154,12 @@ class AppConfig(BaseAppConfig):
     # Frontend URL
     frontend_url: AnyUrl = Field(alias="FRONTEND_URL", default="http://localhost:3000")
 
+    # Keycloak
+    keycloak_server_url: str = Field(alias="KEYCLOAK_SERVER_URL")
+    keycloak_admin_username: str = Field(alias="KEYCLOAK_ADMIN_USERNAME")
+    keycloak_admin_password: str = Field(alias="KEYCLOAK_ADMIN_PASSWORD")
+    keycloak_realm_name: str = Field(alias="KEYCLOAK_REALM_NAME")
+    keycloak_verify_ssl: bool = Field(True, alias="KEYCLOAK_VERIFY_SSL")
     # Minio store
     minio_endpoint: str = Field("bud-store.bud.studio", alias="MINIO_ENDPOINT")
     minio_secure: bool = Field(True, alias="MINIO_SECURE")

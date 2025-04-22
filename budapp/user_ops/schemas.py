@@ -19,7 +19,7 @@
 from datetime import datetime
 
 from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field, field_validator
-from typing import List
+from typing import Dict, List, Optional, Union
 from ..commons.helpers import validate_password_string
 from ..permissions.schemas import PermissionList
 
@@ -54,6 +54,7 @@ class User(UserInfo):
     status: UserStatusEnum
     created_at: datetime
     modified_at: datetime
+    raw_token: str | None = None
 
 
 class UserResponse(SuccessResponse):
@@ -63,6 +64,13 @@ class UserResponse(SuccessResponse):
 
     user: UserInfo
 
+class TenantClientSchema(BaseModel):
+    """Tenant client schema."""
+
+    id: UUID4
+    client_id: str
+    client_named_id: str
+    client_secret: str
 
 class UserCreate(UserBase):
     """Create user schema"""
@@ -93,3 +101,33 @@ class UserFilter(BaseModel):
     name: str | None = None
     email: str | None = None
     role: UserRoleEnum | None = None
+
+class UserUpdate(BaseModel):
+    """Update user schema"""
+
+    name: str | None = Field(None, min_length=1, max_length=100)
+    password: str | None = Field(None, min_length=8, max_length=100)
+    role: Optional[UserRoleEnum] = None
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        is_valid, message = validate_password_string(value)
+        if not is_valid:
+            raise ValueError(message)
+        return value
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, value: Optional[UserRoleEnum]) -> Optional[UserRoleEnum]:
+        if value == UserRoleEnum.SUPER_ADMIN:
+            raise ValueError("The SUPER_ADMIN role is not permitted.")
+        return value
+    
+
+class MyPermissions(SuccessResponse):
+    """User permissions schema"""
+
+    model_config = ConfigDict(from_attributes=True)
+    permissions: List[Dict[str, Union[str, List[str]]]] = []
+    

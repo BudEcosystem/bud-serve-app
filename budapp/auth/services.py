@@ -22,9 +22,16 @@ from budapp.commons.config import secrets_settings
 from budapp.commons.constants import UserStatusEnum, UserColorEnum, PermissionEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
+from budapp.commons.keycloak import KeycloakManager
 from budapp.commons.security import HashManager
 from budapp.user_ops.crud import UserDataManager
+from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
+from budapp.user_ops.schemas import TenantClientSchema
+
+from .schemas import UserLogin, UserLoginData, LogoutRequest
+from .token import TokenService
+from budapp.commons.config import app_settings
 from budapp.user_ops.schemas import UserCreate
 from .schemas import UserLogin, UserLoginData
 from .token import TokenService
@@ -41,6 +48,9 @@ logger = logging.get_logger(__name__)
 class AuthService(SessionMixin):
     async def login_user(self, user: UserLogin) -> UserLoginData:
         """Login a user with email and password."""
+        
+        logger.debug(f"::USER:: User: {user}")
+        
         # Get user
         db_user = await UserDataManager(self.session).retrieve_by_fields(
             UserModel, {"email": user.email}, missing_ok=True
@@ -51,10 +61,71 @@ class AuthService(SessionMixin):
             logger.debug(f"User not found in database: {user.email}")
             raise ClientException("This email is not registered")
 
-        # Check if password is correct
-        salted_password = user.password + secrets_settings.password_salt
-        if not await HashManager().verify_hash(salted_password, db_user.password):
-            logger.debug(f"Password incorrect for {user.email}")
+        # Get tenant information
+        tenant = None
+        if user.tenant_id:
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"id": user.tenant_id}, missing_ok=True
+            )
+            if not tenant:
+                raise ClientException("Invalid tenant ID")
+
+            # Verify user belongs to tenant
+            tenant_mapping = await UserDataManager(self.session).retrieve_by_fields(
+                TenantUserMapping,
+                {"tenant_id": user.tenant_id, "user_id": db_user.id},
+                missing_ok=True
+            )
+            if not tenant_mapping:
+                raise ClientException("User does not belong to this tenant")
+        else:
+            # If no tenant specified, get the first tenant the user belongs to
+            tenant_mapping = await UserDataManager(self.session).retrieve_by_fields(
+                TenantUserMapping,
+                {"user_id": db_user.id},
+                missing_ok=True
+            )
+            if tenant_mapping:
+                tenant = await UserDataManager(self.session).retrieve_by_fields(
+                    Tenant, {"id": tenant_mapping.tenant_id}, missing_ok=True
+                )
+                
+        logger.debug(f"::USER:: Tenant: {tenant.realm_name} {tenant_mapping.id}")
+
+        if not tenant:
+            raise ClientException("User does not belong to any tenant")
+
+        # Get tenant client credentials
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient,
+            {"tenant_id": tenant.id},
+            missing_ok=True
+        )
+        if not tenant_client:
+            raise ClientException("Tenant client configuration not found")
+        
+        logger.debug(f"::USER:: Tenant client: {tenant_client.id} {tenant_client.client_id}")
+
+        # Authenticate with Keycloak
+        keycloak_manager = KeycloakManager()
+        credentials = TenantClientSchema(
+            id=tenant_client.id,
+            client_id=tenant_client.client_id,
+            client_named_id=tenant_client.client_named_id,
+            client_secret=tenant_client.client_secret
+        )
+
+        token_data = await keycloak_manager.authenticate_user(
+            username=user.email,
+            password=user.password,
+            realm_name=tenant.realm_name, # default realm name
+            credentials=credentials
+        )
+
+        logger.debug(f"Token data: {token_data}")
+
+        if not token_data:
+            logger.debug(f"Invalid credentials for user: {user.email}")
             raise ClientException("Incorrect email or password")
 
         if db_user.status == UserStatusEnum.DELETED:
@@ -64,14 +135,58 @@ class AuthService(SessionMixin):
         logger.debug(f"User Retrieved: {user.email}")
 
         # Create auth token
-        token = await TokenService(self.session).create_auth_token(str(db_user.auth_id))
+        # token = await TokenService(self.session).create_auth_token(str(db_user.auth_id))
 
         return UserLoginData(
-            token=token,
+            token=token_data,
             first_login=db_user.first_login,
             is_reset_password=db_user.is_reset_password,
         )
 
+    async def logout_user(self, logout_data: LogoutRequest) -> None:
+        """Logout a user by invalidating their refresh token."""
+        # Get tenant information
+        tenant = None
+        if logout_data.tenant_id:
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"id": logout_data.tenant_id}, missing_ok=True
+            )
+            if not tenant:
+                raise ClientException("Invalid tenant ID")
+        else:
+            # fetch default tenant
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+            )
+            if not tenant:
+                raise ClientException("Default tenant not found")
+
+        # Get tenant client credentials
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient,
+            {"tenant_id": tenant.id},
+            missing_ok=True
+        )
+        if not tenant_client:
+            raise ClientException("Tenant client configuration not found")
+
+        # Logout from Keycloak
+        keycloak_manager = KeycloakManager()
+        credentials = TenantClientSchema(
+            id=tenant_client.id,
+            client_id=tenant_client.client_id,
+            client_secret=tenant_client.client_secret
+        )
+
+        success = await keycloak_manager.logout_user(
+            refresh_token=logout_data.refresh_token,
+            realm_name=tenant.realm_name,
+            credentials=credentials
+        )
+
+        if not success:
+            raise ClientException("Failed to logout user")
+        
     async def register_user(self, user: UserCreate) -> UserModel:
         # Check if email is already registered
         email_exists = await UserDataManager(self.session).retrieve_by_fields(
@@ -82,42 +197,47 @@ class AuthService(SessionMixin):
         if email_exists:
             logger.info(f"Email already registered: {user.email}")
             raise ClientException(detail="Email already registered")
-
-        # Hash password
-        salted_password = user.password + secrets_settings.password_salt
-        user.password = await HashManager().get_hash(salted_password)
-        logger.info(f"Password hashed for {user.email}")
-
-        user_data = user.model_dump(exclude={"permissions"})
-        user_data["color"] = UserColorEnum.get_random_color()
-
-        user_data["status"] = UserStatusEnum.INVITED
-
-        user_model = UserModel(**user_data)
-
-        # NOTE: is_reset_password, first_login will be set to True by default
-        # NOTE: status wil be invited by default
-        # Create user
-        db_user = await UserDataManager(self.session).insert_one(user_model)
-
-        # Ensure that both given scopes and default scopes are uniquely added to the user without duplication.
-        scopes = PermissionEnum.get_default_permissions()
-        if user.permissions:
-            new_scopes = [permission.name for permission in user.permissions if permission.has_permission]
-            scopes.extend(new_scopes)
-        scopes = list(set(scopes))
-        logger.info(f"Scopes created for {user.email}: {scopes}")
-
-        permissions = PermissionCreate(
-            user_id=db_user.id,
-            auth_id=db_user.auth_id,
-            scopes=scopes,
-        )
-        permission_model = PermissionModel(**permissions.model_dump())
-        _ = await PermissionDataManager(self.session).insert_one(permission_model)
-
-        # Add user to budnotify subscribers
+        
         try:
+            # Keycloak Integration
+            keycloak_manager = KeycloakManager()
+            
+            # get the default tenant
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+            )
+            if not tenant:
+                raise ClientException("Default tenant not found")
+            
+            # get the default tenant client
+            tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+                TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+            )
+            if not tenant_client:
+                raise ClientException("Default tenant client not found")
+            
+        
+            user_auth_id = await keycloak_manager.create_user_with_permissions(user, app_settings.default_realm_name, tenant_client.client_id)
+            
+
+            # Hash password
+            # salted_password = user.password + secrets_settings.password_salt
+            # user.password = await HashManager().get_hash(salted_password)
+            # logger.info(f"Password hashed for {user.email}")
+
+            user_data = user.model_dump(exclude={"permissions"})
+            user_data["color"] = UserColorEnum.get_random_color()
+
+            user_data["status"] = UserStatusEnum.INVITED
+
+            user_model = UserModel(**user_data)
+            user_model.auth_id = user_auth_id
+
+            # NOTE: is_reset_password, first_login will be set to True by default |  # TODO
+            # NOTE: status wil be invited by default
+            # Create user
+            db_user = await UserDataManager(self.session).insert_one(user_model)
+            
             subscriber_data = SubscriberCreate(
                 subscriber_id=str(db_user.id),
                 email=db_user.email,
@@ -127,7 +247,13 @@ class AuthService(SessionMixin):
             logger.info("User added to budnotify subscriber")
 
             _ = await UserDataManager(self.session).update_subscriber_status(user_ids=[db_user.id], is_subscriber=True)
+            
+            return db_user
+
+        except Exception as e:
+            logger.error(f"Failed to register user: {e}")
+            raise ClientException(detail="Failed to register user")
+        
         except BudNotifyException as e:
             logger.error(f"Failed to add user to budnotify subscribers: {e}")
 
-        return db_user
