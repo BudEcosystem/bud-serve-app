@@ -394,7 +394,7 @@ class ProjectService(SessionMixin):
         filters_dict["status"] = ProjectStatusEnum.ACTIVE
         filters_dict["benchmark"] = False
 
-        #commenting out TODO: add new permission logic
+        # commenting out TODO: add new permission logic
         # Get current user scopes
         # db_permissions = await PermissionDataManager(self.session).retrieve_by_fields(Permission, {"user_id": user_id})
         # user_scopes = db_permissions.scopes_list
@@ -411,8 +411,8 @@ class ProjectService(SessionMixin):
 
         # temporary fix
         result, count = await ProjectDataManager(self.session).get_all_active_projects(
-                offset, limit, filters_dict, order_by, search
-            )
+            offset, limit, filters_dict, order_by, search
+        )
         return await self.parse_project_list_results(result), count
 
     async def parse_project_list_results(self, db_results: List) -> List[ProjectListResponse]:
@@ -564,9 +564,7 @@ class ProjectService(SessionMixin):
 
     async def _get_parsed_project_user_permissions(
         self,
-        results: List[Tuple[UserModel, str, ProjectPermission, 
-                            # Permission          #commenting out TODO: add new permission logic
-                            ]],
+        results: List[Tuple[UserModel, str, ProjectPermission, Permission]],
     ) -> List[ProjectUserList]:
         """Get parsed project user list response"""
 
@@ -587,15 +585,14 @@ class ProjectService(SessionMixin):
                         has_permission=permission in result[2].scopes_list,
                     )
                 )
-            #commenting out TODO: add new permission logic
             # Add project-related global level permissions to specific user
-            # for permission in global_project_permissions:
-            #     permissions.append(
-            #         PermissionList(
-            #             name=permission,
-            #             has_permission=permission in result[3].scopes_list,
-            #         )
-            #     )
+            for permission in global_project_permissions:
+                permissions.append(
+                    PermissionList(
+                        name=permission,
+                        has_permission=permission in result[3].scopes_list,
+                    )
+                )
             data.append(
                 ProjectUserList(
                     name=result[0].name,
@@ -604,7 +601,7 @@ class ProjectService(SessionMixin):
                     color=result[0].color,
                     role=result[0].role,
                     status=result[0].status,
-                    # permissions=permissions,         #commenting out TODO: add new permission logic
+                    permissions=permissions,
                     project_role=result[1],
                 )
             )
