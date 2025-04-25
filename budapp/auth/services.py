@@ -17,7 +17,6 @@
 
 """Implements auth services and business logic that power the microservices, including key functionality and integrations."""
 
-
 from fastapi import status
 from budapp.commons import logging
 from budapp.commons.config import app_settings
@@ -133,9 +132,8 @@ class AuthService(SessionMixin):
     async def refresh_token(self, token: RefreshTokenRequest) -> RefreshTokenResponse:
         """Refresh a user's access token using their refresh token."""
         try:
-
             # realm_name = app_settings.default_realm_name
-            
+
             # Get default tenant with realm_name
             tenant = await UserDataManager(self.session).retrieve_by_fields(
                 Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
@@ -254,7 +252,7 @@ class AuthService(SessionMixin):
         # Raise exception if email is already registered
         if email_exists:
             logger.info(f"Email already registered: {user.email}")
-            raise ClientException(detail="Email already registered")
+            raise ClientException("Email already registered")
 
         try:
             # Keycloak Integration
