@@ -182,11 +182,11 @@ async def logout_user(
     description="Refresh a user's access token using their refresh token",
 )
 async def refresh_token(
-    token: RefreshTokenRequest, session: Annotated[Session, Depends(get_session)], current_user: Annotated[User, Depends(get_current_user)]
+    token: RefreshTokenRequest, session: Annotated[Session, Depends(get_session)]
 ) -> Union[RefreshTokenResponse, ErrorResponse]:
     """Refresh a user's access token using their refresh token."""
     try:
-        auth_token_response = await AuthService(session).refresh_token(token, current_user)
+        auth_token_response = await AuthService(session).refresh_token(token)
         return auth_token_response.to_http_response()
     except ClientException as e:
         logger.error(f"ClientException: {e}")
