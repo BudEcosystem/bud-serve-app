@@ -130,10 +130,9 @@ class AuthService(SessionMixin):
             is_reset_password=db_user.is_reset_password,
         )
 
-    async def refresh_token(self, token: RefreshTokenRequest, current_user: User) -> RefreshTokenResponse:
+    async def refresh_token(self, token: RefreshTokenRequest) -> RefreshTokenResponse:
         """Refresh a user's access token using their refresh token."""
         try:
-            logger.debug(f"::USER:: User: {current_user}")
 
             # realm_name = app_settings.default_realm_name
             
@@ -145,35 +144,35 @@ class AuthService(SessionMixin):
                 raise ClientException("Default tenant not found")
 
             # Get user
-            db_user = await UserDataManager(self.session).retrieve_by_fields(
-                UserModel, {"email": current_user.email}, missing_ok=True
-            )
+            # db_user = await UserDataManager(self.session).retrieve_by_fields(
+            #     UserModel, {"email": current_user.email}, missing_ok=True
+            # )
 
-            tenant = None
-            # if current_user.tenant_id:
+            # tenant = None
+            # # if current_user.tenant_id:
+            # #     tenant = await UserDataManager(self.session).retrieve_by_fields(
+            # #         Tenant, {"id": current_user.tenant_id}, missing_ok=True
+            # #     )
+            # #     if not tenant:
+            # #         raise ClientException("Invalid tenant ID")
+
+            # #     # Verify user belongs to tenant
+            # #     tenant_mapping = await UserDataManager(self.session).retrieve_by_fields(
+            # #         TenantUserMapping, {"tenant_id": current_user.tenant_id, "user_id": db_user.id}, missing_ok=True
+            # #     )
+            # #     if not tenant_mapping:
+            # #         raise ClientException("User does not belong to this tenant")
+            # # else:
+            # # If no tenant specified, get the first tenant the user belongs to
+            # tenant_mapping = await UserDataManager(self.session).retrieve_by_fields(
+            #     TenantUserMapping, {"user_id": db_user.id}, missing_ok=True
+            # )
+            # if tenant_mapping:
             #     tenant = await UserDataManager(self.session).retrieve_by_fields(
-            #         Tenant, {"id": current_user.tenant_id}, missing_ok=True
+            #         Tenant, {"id": tenant_mapping.tenant_id}, missing_ok=True
             #     )
-            #     if not tenant:
-            #         raise ClientException("Invalid tenant ID")
 
-            #     # Verify user belongs to tenant
-            #     tenant_mapping = await UserDataManager(self.session).retrieve_by_fields(
-            #         TenantUserMapping, {"tenant_id": current_user.tenant_id, "user_id": db_user.id}, missing_ok=True
-            #     )
-            #     if not tenant_mapping:
-            #         raise ClientException("User does not belong to this tenant")
-            # else:
-            # If no tenant specified, get the first tenant the user belongs to
-            tenant_mapping = await UserDataManager(self.session).retrieve_by_fields(
-                TenantUserMapping, {"user_id": db_user.id}, missing_ok=True
-            )
-            if tenant_mapping:
-                tenant = await UserDataManager(self.session).retrieve_by_fields(
-                    Tenant, {"id": tenant_mapping.tenant_id}, missing_ok=True
-                )
-
-            logger.debug(f"::USER:: Tenant: {tenant.realm_name} {tenant_mapping.id}")
+            # logger.debug(f"::USER:: Tenant: {tenant.realm_name} {tenant_mapping.id}")
 
             # Get tenant client credentials
             tenant_client = await UserDataManager(self.session).retrieve_by_fields(
