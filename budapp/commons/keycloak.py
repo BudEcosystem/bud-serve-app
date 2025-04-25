@@ -194,8 +194,7 @@ class KeycloakManager:
                 break
 
         if not resource_data:
-            resource_data =  realm_admin.create_client_authz_resource(client_id, resource)
-
+            resource_data = realm_admin.create_client_authz_resource(client_id, resource)
 
         # Create Permission For The Resource
         kc_scopes = realm_admin.get_client_authz_scopes(client_id)
@@ -224,7 +223,6 @@ class KeycloakManager:
             permission_id = data_raw.json()["id"]
 
             logger.debug(f"Permission ID: {permission_id}")
-
 
     async def create_client(self, client_id: str, realm_name: str) -> Tuple[str, str]:
         """Create a new client in Keycloak.
@@ -352,7 +350,6 @@ class KeycloakManager:
                         user_permission_map[key] = []
                     user_permission_map[key].append(scope_name)
 
-
             # User Policy Name
             policy_name = f"urn:bud:policy:{user_id}"
 
@@ -409,7 +406,7 @@ class KeycloakManager:
 
                     logger.debug(f"Permission ID: {permission_id}")
 
-                     # Get The Permission
+                    # Get The Permission
                     permission_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/permission/scope/{permission_id}"
                     permission_data_raw = realm_admin.connection.raw_get(
                         permission_url,
@@ -418,7 +415,6 @@ class KeycloakManager:
                     )
 
                     logger.debug(f"Permission response: {permission_data_raw.json()}")
-
 
                     permission_resources_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/{permission_id}/resources"
                     permission_resources_data_raw = realm_admin.connection.raw_get(
@@ -429,7 +425,7 @@ class KeycloakManager:
 
                     logger.debug(f"Permission resources response: {permission_resources_data_raw.json()}")
 
-                     # get the scopes
+                    # get the scopes
                     permission_scopes_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/{permission_id}/scopes"
                     permission_scopes_data_raw = realm_admin.connection.raw_get(
                         permission_scopes_url,
@@ -658,8 +654,6 @@ class KeycloakManager:
                     if user_policy_id not in update_policy:
                         update_policy.append(user_policy_id)
 
-
-
                     #                     [
                     #     {
                     #         "id": "41149b8f-dac0-4fc2-8fa6-02d18f6c71b0",
@@ -717,7 +711,6 @@ class KeycloakManager:
                     # logger.debug(f"Permission update response: {permission_update_data_raw.json()}")
 
                     # logger.info(f"Permission {permission_data_raw.json()['name']} assigned to user {username} for module {module}")
-
 
                 # Step 3b: Create permission (if not exists)
                 # permission_name = f"user-{user_id}-module-{module}"
@@ -778,6 +771,28 @@ class KeycloakManager:
         except Exception as e:
             logger.error(f"Error checking if realm {realm_name} exists: {str(e)}")
             return False
+
+    async def refresh_token(self, realm_name: str, credentials: TenantClientSchema, refresh_token: str) -> dict:
+        """Refresh the access token using the refresh token.
+
+        Args:
+            realm_name: Name of the Keycloak realm
+            credentials: TenantClientSchema with client_id and client_secret
+            refresh_token: The refresh token string
+
+        Returns:
+            dict: New token response from Keycloak
+        """
+        try:
+            openid_client = self.get_keycloak_openid_client(realm_name, credentials)
+            new_token = openid_client.refresh_token(refresh_token)
+            return new_token
+        except KeycloakAuthenticationError as e:
+            logger.warning(f"Failed to refresh token due to invalid credentials or expired token: {str(e)}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error while refreshing token: {str(e)}")
+            raise
 
     async def authenticate_user(
         self, username: str, password: str, realm_name: str, credentials: TenantClientSchema

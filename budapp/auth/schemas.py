@@ -160,3 +160,16 @@ class ResourceCreate(BaseModel):
     resource_type: str
     resource_id: str
     scopes: List[str]  # view , manage
+
+
+class RefreshTokenRequest(BaseModel):
+    """Refresh token request schema."""
+
+    refresh_token: str = Field(min_length=1)
+
+
+class RefreshTokenResponse(SuccessResponse):
+    """Refresh token response schema."""
+
+    model_config = ConfigDict(extra="ignore")
+    token: Any
