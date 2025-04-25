@@ -38,7 +38,8 @@ class ProviderSeeder(BaseSeeder):
     @staticmethod
     async def _seed_providers(session: Session) -> None:
         """Seed providers to the database."""
-        providers_data = await ProviderSeeder._get_providers_data()
+        # providers_data = ProviderSeeder._get_providers_data() # Commented out after credential module migration
+        providers_data = await ProviderSeeder._async_get_providers_data()
         logger.debug(f"Found {len(providers_data)} providers in the seeder file")
 
         providers_data_keys = [each for each in MODEL_SOURCES if each in list(providers_data.keys())]
@@ -53,6 +54,7 @@ class ProviderSeeder(BaseSeeder):
                 "icon": providers_data[provider.type.value]["icon"],
             }
             await ProviderDataManager(session).update_by_fields(provider, values)
+            logger.info(f"Updated provider {provider.name} with id {provider.id}")
 
             # Remove the provider from the data after it has been seeded
             providers_data.pop(provider.type.value)
@@ -62,7 +64,12 @@ class ProviderSeeder(BaseSeeder):
             create_providers_data = []
             for provider in providers_data:
                 if providers_data[provider]["type"] in MODEL_SOURCES:
-                    create_providers_data.append(ProviderModel(**providers_data[provider]))
+                    provider_create_data = providers_data[provider]
+
+                    # Remove credentials from the provider data
+                    provider_create_data.pop("credentials")
+
+                    create_providers_data.append(ProviderModel(**provider_create_data))
 
             db_providers = await ProviderDataManager(session).insert_all(create_providers_data)
             logger.debug(f"Seeded {len(db_providers)} new providers")
