@@ -234,7 +234,7 @@ class ProjectUserUpdate(BaseModel):
 class ProjectUserList(UserInfo):
     """List of users assigned to a project"""
 
-    permissions: List[PermissionList]
+    # permissions: List[PermissionList]         #commenting out TODO: add new permission logic
     project_role: str
     status: UserStatusEnum
 

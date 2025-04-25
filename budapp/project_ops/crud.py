@@ -509,7 +509,7 @@ class ProjectDataManager(DataManagerUtils):
                     User,
                     project_role,
                     ProjectPermission,
-                    Permission,
+                    # Permission,
                 )
                 .filter(User.status.in_([UserStatusEnum.INVITED, UserStatusEnum.ACTIVE]))
                 .filter(and_(*search_conditions))
@@ -529,7 +529,7 @@ class ProjectDataManager(DataManagerUtils):
                         ProjectPermission.user_id == User.id,
                     ),
                 )
-                .join(Permission, Permission.user_id == User.id)
+                # .join(Permission, Permission.user_id == User.id)
             )
 
             count_stmt = (
@@ -560,7 +560,7 @@ class ProjectDataManager(DataManagerUtils):
                     User,
                     project_role,
                     ProjectPermission,
-                    Permission,
+                    # Permission,
                 )
                 .filter(User.status.in_([UserStatusEnum.INVITED, UserStatusEnum.ACTIVE]))
                 .filter_by(**filters)
@@ -580,7 +580,7 @@ class ProjectDataManager(DataManagerUtils):
                         ProjectPermission.user_id == User.id,
                     ),
                 )
-                .join(Permission, Permission.user_id == User.id)
+                # .join(Permission, Permission.user_id == User.id)
             )
 
             count_stmt = (

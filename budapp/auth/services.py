@@ -196,7 +196,7 @@ class AuthService(SessionMixin):
         # Raise exception if email is already registered
         if email_exists:
             logger.info(f"Email already registered: {user.email}")
-            raise ClientException(detail="Email already registered")
+            raise ClientException("Email already registered")
         
         try:
             # Keycloak Integration
