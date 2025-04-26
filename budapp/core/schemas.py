@@ -25,7 +25,7 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model
 
 from budapp.commons import logging
 from budapp.commons.constants import (
-    ModelTemplateTypeEnum,
+    # ModelTemplateTypeEnum,
     NotificationCategory,
     NotificationType,
 )
@@ -166,7 +166,7 @@ class ModelTemplateCreate(BaseModel):
     name: str
     description: str
     icon: str
-    template_type: ModelTemplateTypeEnum
+    template_type: str
     avg_sequence_length: Optional[int] = None
     avg_context_length: Optional[int] = None
     per_session_tokens_per_sec: Optional[list[int]] = None
@@ -197,7 +197,8 @@ class ModelTemplateResponse(BaseModel):
     name: str
     description: str
     icon: str
-    template_type: ModelTemplateTypeEnum
+    # template_type: ModelTemplateTypeEnum
+    template_type: str
     avg_sequence_length: Optional[int] = None
     avg_context_length: Optional[int] = None
     per_session_tokens_per_sec: Optional[list[int]] = None
@@ -217,7 +218,8 @@ class ModelTemplateListResponse(PaginatedSuccessResponse):
 class ModelTemplateFilter(BaseModel):
     """Model template filter schema."""
 
-    template_type: Optional[ModelTemplateTypeEnum] = None
+    # template_type: Optional[ModelTemplateTypeEnum] = None
+    template_type: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
 
