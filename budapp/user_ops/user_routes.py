@@ -297,7 +297,7 @@ async def retrieve_user(
     "/{user_id}",
     responses={
         status.HTTP_200_OK: {
-            "model": UserResponse,
+            "model": SuccessResponse,
             "description": "Delete an active user from the database",
         },
         status.HTTP_400_BAD_REQUEST: {
@@ -329,4 +329,44 @@ async def delete_user(
         logger.exception(f"Failed to delete user: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete user"
+        ).to_http_response()
+
+
+@user_router.patch(
+    "/{user_id}/reactivate",
+    responses={
+        status.HTTP_200_OK: {
+            "model": UserResponse,
+            "description": "Reactivate an inactive user from the database",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Reactivate an inactive user from the database",
+)
+async def reactivate_user(
+    user_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Session = Depends(get_session),
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Reactivate an inactive user from the database"""
+    try:
+        db_user = await UserService(session).reactivate_user(user_id)
+        logger.debug(f"User reactivated: {user_id}")
+        return UserResponse(
+            object="user.retrieve", code=status.HTTP_200_OK, message="Successfully reactivate user", user=db_user
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to reactivate user: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to reactivate user: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to reactivate user"
         ).to_http_response()

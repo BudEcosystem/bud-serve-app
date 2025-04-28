@@ -27,7 +27,7 @@ from budapp.commons.config import app_settings
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import BudNotifyException
 from budapp.commons.keycloak import KeycloakManager
-from budapp.core.schemas import SubscriberUpdate
+from budapp.core.schemas import SubscriberUpdate, SubscriberCreate
 from budapp.shared.notification_service import BudNotifyHandler
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient
@@ -236,5 +236,35 @@ class UserService(SessionMixin):
             data["is_subscriber"] = True
         except BudNotifyException as e:
             logger.error(f"Failed to delete user from budnotify subscribers: {e}")
+
+        return await UserDataManager(self.session).update_by_fields(db_user, data)
+
+    async def reactivate_user(self, user_id: UUID) -> UserModel:
+        """Reactivate a user"""
+        db_user = await UserDataManager(self.session).retrieve_by_fields(
+            UserModel, {"id": user_id, "status": UserStatusEnum.DELETED}, missing_ok=True
+        )
+
+        if not db_user:
+            raise ClientException(message="Inactive user not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Update user fields
+        data = {"status": UserStatusEnum.ACTIVE}
+
+        # Add user to budnotify subscribers
+        try:
+            subscriber_data = SubscriberCreate(
+                subscriber_id=str(db_user.id),
+                email=db_user.email,
+                first_name=db_user.name,
+            )
+            response = await BudNotifyHandler().create_subscriber(subscriber_data)
+            logger.info("Reactivated Budserve user in BudNotify subscriber")
+
+            # In order to prevent this user sync in periodic task, set is_subscriber to True
+            data["is_subscriber"] = True
+        except BudNotifyException as e:
+            data["is_subscriber"] = False
+            logger.error(f"Failed to reactivate user in budnotify subscribers: {e}")
 
         return await UserDataManager(self.session).update_by_fields(db_user, data)
