@@ -22,6 +22,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from budapp.commons import logging
+from budapp.commons.exceptions import ClientException
 from budapp.commons.config import app_settings
 from budapp.commons.constants import UserStatusEnum
 from budapp.commons.db_utils import SessionMixin
@@ -169,3 +170,19 @@ class UserService(SessionMixin):
     ) -> Tuple[List[UserModel], int]:
         """Get all users from the database"""
         return await UserDataManager(self.session).get_all_users(offset, limit, filters, order_by, search)
+
+    async def complete_user_onboarding(self, db_user: UserModel) -> UserModel:
+        """Complete user onboarding"""
+        if db_user.status == UserStatusEnum.DELETED or db_user.status == UserStatusEnum.INVITED:
+            raise ClientException(
+                "Only active users can complete onboarding",
+            )
+
+        if not db_user.first_login:
+            raise ClientException(
+                "User already completed onboarding",
+            )
+
+        db_user = await UserDataManager(self.session).update_by_fields(db_user, {"first_login": False})
+
+        return db_user
