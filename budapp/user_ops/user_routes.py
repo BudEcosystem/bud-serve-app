@@ -28,7 +28,7 @@ from budapp.commons.constants import PermissionEnum
 from budapp.commons.dependencies import get_current_active_invite_user, get_session, get_user_realm, get_current_active_user, parse_ordering_fields
 from budapp.commons.exceptions import ClientException
 from budapp.commons.permission_handler import require_permissions
-from budapp.commons.schemas import ErrorResponse
+from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 from budapp.user_ops.services import UserService
 
@@ -290,4 +290,43 @@ async def retrieve_user(
         logger.exception(f"Failed to get user by id: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get user by id"
+        ).to_http_response()
+
+
+@user_router.delete(
+    "/{user_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": UserResponse,
+            "description": "Delete an active user from the database",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Delete an active user from the database",
+)
+async def delete_user(
+    user_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    remove_credential: bool = True,
+    session: Session = Depends(get_session),
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete an active user from the database"""
+    try:
+        _ = await UserService(session).delete_active_user(user_id, remove_credential)
+        logger.debug(f"User deleted: {user_id}")
+        return SuccessResponse(message="User deleted successfully", code=status.HTTP_200_OK).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to delete user: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete user: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete user"
         ).to_http_response()

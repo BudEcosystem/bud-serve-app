@@ -24,7 +24,6 @@ from fastapi import HTTPException, status
 from budapp.commons import logging
 from budapp.commons.exceptions import ClientException
 from budapp.commons.config import app_settings
-from budapp.commons.constants import UserStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import BudNotifyException
 from budapp.commons.keycloak import KeycloakManager
@@ -35,6 +34,11 @@ from budapp.user_ops.models import Tenant, TenantClient
 from budapp.user_ops.models import User as UserModel
 from budapp.user_ops.schemas import TenantClientSchema
 
+from ..commons.constants import UserStatusEnum, EndpointStatusEnum
+from ..endpoint_ops.crud import EndpointDataManager
+from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..credential_ops.crud import CredentialDataManager
+from ..credential_ops.models import Credential as CredentialModel
 
 logger = logging.get_logger(__name__)
 settings = app_settings
@@ -190,3 +194,47 @@ class UserService(SessionMixin):
     async def retrieve_active_user(self, user_id: UUID) -> Optional[UserModel]:
         """Retrieve active user by id."""
         return await UserDataManager(self.session).retrieve_active_or_invited_user(user_id)
+
+    async def delete_active_user(self, user_id: UUID, remove_credential: bool) -> UserModel:
+        db_user = await UserDataManager(self.session).retrieve_by_fields(
+            UserModel, {"id": user_id, "status": UserStatusEnum.ACTIVE}
+        )
+
+        if db_user.is_superuser:
+            raise ClientException("Cannot delete superuser")
+
+        # Delete active endpoints created by user
+        db_endpoints = await EndpointDataManager(self.session).get_all_by_fields(
+            EndpointModel, fields={"created_by": user_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+        )
+
+        if db_endpoints:
+            raise ClientException("User has active endpoints")
+
+        # Delete user credentials
+        db_credentials = await CredentialDataManager(self.session).get_all_by_fields(
+            CredentialModel, fields={"user_id": db_user.id}
+        )
+
+        if db_credentials and not remove_credential:
+            logger.info("Found user created credentials related to user")
+            raise ClientException("Credentials need to be removed")
+        else:
+            # Delete all credentials related to the user
+            await CredentialDataManager(self.session).delete_credential_by_fields({"user_id": db_user.id})
+            logger.info("Deleted project credentials related to user")
+
+        # Update user fields
+        data = {"status": UserStatusEnum.DELETED}
+
+        # Add user to budnotify subscribers
+        try:
+            response = await BudNotifyHandler().delete_subscriber(str(db_user.id))
+            logger.info("Deleted Budserve user from BudNotify subscriber")
+
+            # In order to prevent this user sync in periodic task, set is_subscriber to True
+            data["is_subscriber"] = True
+        except BudNotifyException as e:
+            logger.error(f"Failed to delete user from budnotify subscribers: {e}")
+
+        return await UserDataManager(self.session).update_by_fields(db_user, data)
