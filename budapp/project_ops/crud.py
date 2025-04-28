@@ -115,7 +115,7 @@ class ProjectDataManager(DataManagerUtils):
             .filter_by(status=UserStatusEnum.ACTIVE)
         )
 
-        return await self.scalars_all(stmt)
+        return self.scalars_all(stmt)
 
     async def search_tags_by_name(self, search_value: str, offset: int, limit: int) -> Tuple[List[dict], int]:
         """Search tags in the database filtered by the tag name with pagination."""
