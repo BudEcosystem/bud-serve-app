@@ -65,8 +65,8 @@ class UserService(SessionMixin):
                 )
 
         # Check if user exists
-        db_user = await UserDataManager(self.session).retrieve_user_by_fields(
-            {"id": user_id}
+        db_user = await UserDataManager(self.session).retrieve_by_fields(
+            UserModel, {"id": user_id}
         )
 
         if db_user.is_superuser and "role" in fields:
@@ -119,7 +119,7 @@ class UserService(SessionMixin):
                 fields["is_subscriber"] = False
                 logger.error(f"Failed to update user in budnotify subscriber: {e}")
 
-        return await UserDataManager(self.session).update_user_by_fields(
+        return await UserDataManager(self.session).update_by_fields(
             db_user, fields
         )
 
