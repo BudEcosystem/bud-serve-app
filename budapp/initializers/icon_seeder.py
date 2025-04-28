@@ -49,7 +49,7 @@ class IconSeeder(BaseSeeder):
         icons_to_create = []
         if app_settings.static_dir != os.path.join(str(app_settings.base_dir), "static"):
             default_icons_path = os.path.join(str(app_settings.base_dir), "static", "icons")
-            replicate_dir(default_icons_path, app_settings.icon_dir, is_override=False)
+            replicate_dir(default_icons_path, app_settings.icon_dir, is_override=True)
 
         for category in os.listdir(app_settings.icon_dir):
             category_dir = os.path.join(app_settings.icon_dir, category)
