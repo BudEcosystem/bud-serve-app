@@ -16,7 +16,7 @@
 
 """The user ops package, containing essential business logic, services, and routing configurations for the user ops."""
 
-from typing import Dict
+from typing import Dict, List, Tuple
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -158,3 +158,14 @@ class UserService(SessionMixin):
         logger.debug(f"::KEYCLOAK::User {auth_id} roles and permissions: {result}")
 
         return result
+
+    async def get_all_users(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[UserModel], int]:
+        """Get all users from the database"""
+        return await UserDataManager(self.session).get_all_users(offset, limit, filters, order_by, search)

@@ -16,10 +16,10 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the user ops."""
 
-from typing import List
+from typing import Dict, List, Tuple
 from uuid import UUID
 
-from sqlalchemy import select, or_, update
+from sqlalchemy import and_, func, or_, select, update
 
 from budapp.commons import logging
 from budapp.commons.constants import UserStatusEnum
@@ -36,7 +36,6 @@ class UserDataManager(DataManagerUtils):
 
     async def get_active_invited_users_by_ids(self, user_ids: List[UUID]) -> List[User]:
         """Get users by ids from database."""
-
         stmt = select(User).filter(
             User.id.in_(user_ids),
             or_(
@@ -48,13 +47,11 @@ class UserDataManager(DataManagerUtils):
 
     async def get_users_by_emails(self, emails: List[str]) -> List[User]:
         """Get users by emails from database."""
-
         stmt = select(User).filter(User.email.in_(emails))
         return self.scalars_all(stmt)
 
     async def update_subscriber_status(self, user_ids: List[int], is_subscriber: bool) -> None:
         """Update the is_subscriber status for a list of user IDs."""
-
         if not user_ids:
             raise ValueError("The list of user IDs must not be empty.")
 
@@ -65,3 +62,38 @@ class UserDataManager(DataManagerUtils):
 
         logger.info(f"Updated is_subscriber status for {len(user_ids)} users.")
         return
+
+    async def get_all_users(
+        self,
+        offset: int,
+        limit: int,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[User], int]:
+        """List all users in the database."""
+        await self.validate_fields(User, filters)
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(User, filters)
+            stmt = select(User).filter(or_(*search_conditions))
+            count_stmt = select(func.count()).select_from(User).filter(and_(*search_conditions))
+        else:
+            stmt = select(User).filter_by(**filters)
+            count_stmt = select(func.count()).select_from(User).filter_by(**filters)
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(User, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.scalars_all(stmt)
+
+        return result, count

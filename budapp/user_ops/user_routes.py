@@ -19,19 +19,20 @@
 from typing import Union
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
-from typing_extensions import Annotated
+from typing_extensions import Annotated, Optional, List
 
 from budapp.commons import logging
 from budapp.commons.constants import PermissionEnum
-from budapp.commons.dependencies import get_current_active_invite_user, get_session, get_user_realm
+from budapp.commons.dependencies import get_current_active_invite_user, get_session, get_user_realm, get_current_active_user, parse_ordering_fields
+from budapp.commons.exceptions import ClientException
 from budapp.commons.permission_handler import require_permissions
 from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
 from budapp.user_ops.services import UserService
 
-from .schemas import MyPermissions, UserResponse, UserUpdate
+from .schemas import MyPermissions, UserResponse, UserUpdate, UserListResponse, UserListFilter
 
 
 logger = logging.get_logger(__name__)
@@ -152,3 +153,58 @@ async def get_user_roles(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get user roles"
         ).to_http_response()
+
+
+@user_router.get(
+    "/",
+    responses={
+        status.HTTP_200_OK: {
+            "model": UserListResponse,
+            "description": "Successfully get user list",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Get all active users from the database",
+)
+async def get_all_users(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    filters: UserListFilter = Depends(),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+    session: Session = Depends(get_session),
+) -> Union[MyPermissions, ErrorResponse]:
+    """Get all active users from the database"""
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Convert UserFilter to dictionary
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    try:
+        db_users, count = await UserService(session).get_all_users(offset, limit, filters_dict, order_by, search)
+    except ClientException as e:
+        logger.error(f"Failed to get user list: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get user list: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all users"
+        ).to_http_response()
+
+    return UserListResponse(
+        users=db_users,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="users.list",
+        code=status.HTTP_200_OK,
+    ).to_http_response()
