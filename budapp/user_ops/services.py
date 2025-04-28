@@ -16,24 +16,29 @@
 
 """The user ops package, containing essential business logic, services, and routing configurations for the user ops."""
 
-from typing import Dict
+from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import HTTPException, status
 
 from budapp.commons import logging
+from budapp.commons.exceptions import ClientException
 from budapp.commons.config import app_settings
-from budapp.commons.constants import UserStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import BudNotifyException
 from budapp.commons.keycloak import KeycloakManager
-from budapp.core.schemas import SubscriberUpdate
+from budapp.core.schemas import SubscriberUpdate, SubscriberCreate
 from budapp.shared.notification_service import BudNotifyHandler
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient
 from budapp.user_ops.models import User as UserModel
 from budapp.user_ops.schemas import TenantClientSchema
 
+from ..commons.constants import UserStatusEnum, EndpointStatusEnum
+from ..endpoint_ops.crud import EndpointDataManager
+from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..credential_ops.crud import CredentialDataManager
+from ..credential_ops.models import Credential as CredentialModel
 
 logger = logging.get_logger(__name__)
 settings = app_settings
@@ -60,8 +65,8 @@ class UserService(SessionMixin):
                 )
 
         # Check if user exists
-        db_user = await UserDataManager(self.session).retrieve_user_by_fields(
-            {"id": user_id}
+        db_user = await UserDataManager(self.session).retrieve_by_fields(
+            UserModel, {"id": user_id}
         )
 
         if db_user.is_superuser and "role" in fields:
@@ -114,7 +119,7 @@ class UserService(SessionMixin):
                 fields["is_subscriber"] = False
                 logger.error(f"Failed to update user in budnotify subscriber: {e}")
 
-        return await UserDataManager(self.session).update_user_by_fields(
+        return await UserDataManager(self.session).update_by_fields(
             db_user, fields
         )
 
@@ -158,3 +163,108 @@ class UserService(SessionMixin):
         logger.debug(f"::KEYCLOAK::User {auth_id} roles and permissions: {result}")
 
         return result
+
+    async def get_all_users(
+        self,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[UserModel], int]:
+        """Get all users from the database"""
+        return await UserDataManager(self.session).get_all_users(offset, limit, filters, order_by, search)
+
+    async def complete_user_onboarding(self, db_user: UserModel) -> UserModel:
+        """Complete user onboarding"""
+        if db_user.status == UserStatusEnum.DELETED or db_user.status == UserStatusEnum.INVITED:
+            raise ClientException(
+                "Only active users can complete onboarding",
+            )
+
+        if not db_user.first_login:
+            raise ClientException(
+                "User already completed onboarding",
+            )
+
+        db_user = await UserDataManager(self.session).update_by_fields(db_user, {"first_login": False})
+
+        return db_user
+
+    async def retrieve_active_user(self, user_id: UUID) -> Optional[UserModel]:
+        """Retrieve active user by id."""
+        return await UserDataManager(self.session).retrieve_active_or_invited_user(user_id)
+
+    async def delete_active_user(self, user_id: UUID, remove_credential: bool) -> UserModel:
+        db_user = await UserDataManager(self.session).retrieve_by_fields(
+            UserModel, {"id": user_id, "status": UserStatusEnum.ACTIVE}
+        )
+
+        if db_user.is_superuser:
+            raise ClientException("Cannot delete superuser")
+
+        # Delete active endpoints created by user
+        db_endpoints = await EndpointDataManager(self.session).get_all_by_fields(
+            EndpointModel, fields={"created_by": user_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+        )
+
+        if db_endpoints:
+            raise ClientException("User has active endpoints")
+
+        # Delete user credentials
+        db_credentials = await CredentialDataManager(self.session).get_all_by_fields(
+            CredentialModel, fields={"user_id": db_user.id}
+        )
+
+        if db_credentials and not remove_credential:
+            logger.info("Found user created credentials related to user")
+            raise ClientException("Credentials need to be removed")
+        else:
+            # Delete all credentials related to the user
+            await CredentialDataManager(self.session).delete_credential_by_fields({"user_id": db_user.id})
+            logger.info("Deleted project credentials related to user")
+
+        # Update user fields
+        data = {"status": UserStatusEnum.DELETED}
+
+        # Add user to budnotify subscribers
+        try:
+            response = await BudNotifyHandler().delete_subscriber(str(db_user.id))
+            logger.info("Deleted Budserve user from BudNotify subscriber")
+
+            # In order to prevent this user sync in periodic task, set is_subscriber to True
+            data["is_subscriber"] = True
+        except BudNotifyException as e:
+            logger.error(f"Failed to delete user from budnotify subscribers: {e}")
+
+        return await UserDataManager(self.session).update_by_fields(db_user, data)
+
+    async def reactivate_user(self, user_id: UUID) -> UserModel:
+        """Reactivate a user"""
+        db_user = await UserDataManager(self.session).retrieve_by_fields(
+            UserModel, {"id": user_id, "status": UserStatusEnum.DELETED}, missing_ok=True
+        )
+
+        if not db_user:
+            raise ClientException(message="Inactive user not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Update user fields
+        data = {"status": UserStatusEnum.ACTIVE}
+
+        # Add user to budnotify subscribers
+        try:
+            subscriber_data = SubscriberCreate(
+                subscriber_id=str(db_user.id),
+                email=db_user.email,
+                first_name=db_user.name,
+            )
+            response = await BudNotifyHandler().create_subscriber(subscriber_data)
+            logger.info("Reactivated Budserve user in BudNotify subscriber")
+
+            # In order to prevent this user sync in periodic task, set is_subscriber to True
+            data["is_subscriber"] = True
+        except BudNotifyException as e:
+            data["is_subscriber"] = False
+            logger.error(f"Failed to reactivate user in budnotify subscribers: {e}")
+
+        return await UserDataManager(self.session).update_by_fields(db_user, data)

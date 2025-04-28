@@ -23,11 +23,21 @@ from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
-from budapp.commons.dependencies import get_session
+from budapp.commons.dependencies import get_current_user, get_session
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
+from budapp.user_ops.schemas import User
 
-from .schemas import LogoutRequest, LogoutResponse, UserCreate, UserLogin, UserLoginResponse, UserRegisterResponse
+from .schemas import (
+    LogoutRequest,
+    LogoutResponse,
+    RefreshTokenRequest,
+    RefreshTokenResponse,
+    UserCreate,
+    UserLogin,
+    UserLoginResponse,
+    UserRegisterResponse,
+)
 from .services import AuthService
 
 
@@ -143,6 +153,41 @@ async def logout_user(
             code=status.HTTP_200_OK,
             message="User logged out successfully"
         ).to_http_response()
+    except ClientException as e:
+        logger.error(f"ClientException: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Exception: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Something went wrong"
+        ).to_http_response()
+
+# refresh token
+@auth_router.post(
+    "/refresh-token",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RefreshTokenResponse,
+            "description": "Successfully refreshed user's access token",
+        },
+    },
+    description="Refresh a user's access token using their refresh token",
+)
+async def refresh_token(
+    token: RefreshTokenRequest, session: Annotated[Session, Depends(get_session)]
+) -> Union[RefreshTokenResponse, ErrorResponse]:
+    """Refresh a user's access token using their refresh token."""
+    try:
+        auth_token_response = await AuthService(session).refresh_token(token)
+        return auth_token_response.to_http_response()
     except ClientException as e:
         logger.error(f"ClientException: {e}")
         return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()

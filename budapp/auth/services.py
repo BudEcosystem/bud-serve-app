@@ -17,30 +17,23 @@
 
 """Implements auth services and business logic that power the microservices, including key functionality and integrations."""
 
+from fastapi import status
 from budapp.commons import logging
-from budapp.commons.config import secrets_settings
-from budapp.commons.constants import UserStatusEnum, UserColorEnum, PermissionEnum
+from budapp.commons.config import app_settings
+from budapp.commons.constants import UserColorEnum, UserStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.keycloak import KeycloakManager
-from budapp.commons.security import HashManager
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
-from budapp.user_ops.schemas import TenantClientSchema
+from budapp.user_ops.schemas import TenantClientSchema, User, UserCreate
 
-from .schemas import UserLogin, UserLoginData, LogoutRequest
-from .token import TokenService
-from budapp.commons.config import app_settings
-from budapp.user_ops.schemas import UserCreate
-from .schemas import UserLogin, UserLoginData
-from .token import TokenService
-from ..permissions.crud import PermissionDataManager
-from ..permissions.models import Permission as PermissionModel
-from ..permissions.schemas import PermissionCreate
-from ..core.schemas import SubscriberCreate
 from ..commons.exceptions import BudNotifyException
+from ..core.schemas import SubscriberCreate
 from ..shared.notification_service import BudNotifyHandler
+from .schemas import LogoutRequest, RefreshTokenRequest, RefreshTokenResponse, UserLogin, UserLoginData
+
 
 logger = logging.get_logger(__name__)
 
@@ -48,9 +41,8 @@ logger = logging.get_logger(__name__)
 class AuthService(SessionMixin):
     async def login_user(self, user: UserLogin) -> UserLoginData:
         """Login a user with email and password."""
-        
         logger.debug(f"::USER:: User: {user}")
-        
+
         # Get user
         db_user = await UserDataManager(self.session).retrieve_by_fields(
             UserModel, {"email": user.email}, missing_ok=True
@@ -72,24 +64,20 @@ class AuthService(SessionMixin):
 
             # Verify user belongs to tenant
             tenant_mapping = await UserDataManager(self.session).retrieve_by_fields(
-                TenantUserMapping,
-                {"tenant_id": user.tenant_id, "user_id": db_user.id},
-                missing_ok=True
+                TenantUserMapping, {"tenant_id": user.tenant_id, "user_id": db_user.id}, missing_ok=True
             )
             if not tenant_mapping:
                 raise ClientException("User does not belong to this tenant")
         else:
             # If no tenant specified, get the first tenant the user belongs to
             tenant_mapping = await UserDataManager(self.session).retrieve_by_fields(
-                TenantUserMapping,
-                {"user_id": db_user.id},
-                missing_ok=True
+                TenantUserMapping, {"user_id": db_user.id}, missing_ok=True
             )
             if tenant_mapping:
                 tenant = await UserDataManager(self.session).retrieve_by_fields(
                     Tenant, {"id": tenant_mapping.tenant_id}, missing_ok=True
                 )
-                
+
         logger.debug(f"::USER:: Tenant: {tenant.realm_name} {tenant_mapping.id}")
 
         if not tenant:
@@ -97,13 +85,11 @@ class AuthService(SessionMixin):
 
         # Get tenant client credentials
         tenant_client = await UserDataManager(self.session).retrieve_by_fields(
-            TenantClient,
-            {"tenant_id": tenant.id},
-            missing_ok=True
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
         )
         if not tenant_client:
             raise ClientException("Tenant client configuration not found")
-        
+
         logger.debug(f"::USER:: Tenant client: {tenant_client.id} {tenant_client.client_id}")
 
         # Authenticate with Keycloak
@@ -112,14 +98,14 @@ class AuthService(SessionMixin):
             id=tenant_client.id,
             client_id=tenant_client.client_id,
             client_named_id=tenant_client.client_named_id,
-            client_secret=tenant_client.client_secret
+            client_secret=tenant_client.client_secret,
         )
 
         token_data = await keycloak_manager.authenticate_user(
             username=user.email,
             password=user.password,
-            realm_name=tenant.realm_name, # default realm name
-            credentials=credentials
+            realm_name=tenant.realm_name,  # default realm name
+            credentials=credentials,
         )
 
         logger.debug(f"Token data: {token_data}")
@@ -143,6 +129,82 @@ class AuthService(SessionMixin):
             is_reset_password=db_user.is_reset_password,
         )
 
+    async def refresh_token(self, token: RefreshTokenRequest) -> RefreshTokenResponse:
+        """Refresh a user's access token using their refresh token."""
+        try:
+            # realm_name = app_settings.default_realm_name
+
+            # Get default tenant with realm_name
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+            )
+            if not tenant:
+                raise ClientException("Default tenant not found")
+
+            # Get user
+            # db_user = await UserDataManager(self.session).retrieve_by_fields(
+            #     UserModel, {"email": current_user.email}, missing_ok=True
+            # )
+
+            # tenant = None
+            # # if current_user.tenant_id:
+            # #     tenant = await UserDataManager(self.session).retrieve_by_fields(
+            # #         Tenant, {"id": current_user.tenant_id}, missing_ok=True
+            # #     )
+            # #     if not tenant:
+            # #         raise ClientException("Invalid tenant ID")
+
+            # #     # Verify user belongs to tenant
+            # #     tenant_mapping = await UserDataManager(self.session).retrieve_by_fields(
+            # #         TenantUserMapping, {"tenant_id": current_user.tenant_id, "user_id": db_user.id}, missing_ok=True
+            # #     )
+            # #     if not tenant_mapping:
+            # #         raise ClientException("User does not belong to this tenant")
+            # # else:
+            # # If no tenant specified, get the first tenant the user belongs to
+            # tenant_mapping = await UserDataManager(self.session).retrieve_by_fields(
+            #     TenantUserMapping, {"user_id": db_user.id}, missing_ok=True
+            # )
+            # if tenant_mapping:
+            #     tenant = await UserDataManager(self.session).retrieve_by_fields(
+            #         Tenant, {"id": tenant_mapping.tenant_id}, missing_ok=True
+            #     )
+
+            # logger.debug(f"::USER:: Tenant: {tenant.realm_name} {tenant_mapping.id}")
+
+            # Get tenant client credentials
+            tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+                TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+            )
+
+            logger.debug(f"::USER:: Tenant client: {tenant_client.id} {tenant_client.client_id}")
+
+            keycloak_manager = KeycloakManager()
+            credentials = TenantClientSchema(
+                id=tenant_client.id,
+                client_id=tenant_client.client_id,
+                client_named_id=tenant_client.client_named_id,
+                client_secret=tenant_client.client_secret,
+            )
+
+            # Refresh Token
+            token_data = await keycloak_manager.refresh_token(
+                realm_name=tenant.realm_name,
+                credentials=credentials,
+                refresh_token=token.refresh_token,
+            )
+
+            logger.debug(f"Token data: {token_data}")
+
+            return RefreshTokenResponse(
+                code=status.HTTP_200_OK,
+                message="Token refreshed successfully",
+                token=token_data,
+            )
+        except Exception as e:
+            logger.error(f"Failed to refresh token: {e}")
+            raise ClientException("Failed to refresh token") from e
+
     async def logout_user(self, logout_data: LogoutRequest) -> None:
         """Logout a user by invalidating their refresh token."""
         # Get tenant information
@@ -163,9 +225,7 @@ class AuthService(SessionMixin):
 
         # Get tenant client credentials
         tenant_client = await UserDataManager(self.session).retrieve_by_fields(
-            TenantClient,
-            {"tenant_id": tenant.id},
-            missing_ok=True
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
         )
         if not tenant_client:
             raise ClientException("Tenant client configuration not found")
@@ -173,20 +233,16 @@ class AuthService(SessionMixin):
         # Logout from Keycloak
         keycloak_manager = KeycloakManager()
         credentials = TenantClientSchema(
-            id=tenant_client.id,
-            client_id=tenant_client.client_id,
-            client_secret=tenant_client.client_secret
+            id=tenant_client.id, client_id=tenant_client.client_id, client_secret=tenant_client.client_secret
         )
 
         success = await keycloak_manager.logout_user(
-            refresh_token=logout_data.refresh_token,
-            realm_name=tenant.realm_name,
-            credentials=credentials
+            refresh_token=logout_data.refresh_token, realm_name=tenant.realm_name, credentials=credentials
         )
 
         if not success:
             raise ClientException("Failed to logout user")
-        
+
     async def register_user(self, user: UserCreate) -> UserModel:
         # Check if email is already registered
         email_exists = await UserDataManager(self.session).retrieve_by_fields(
@@ -196,29 +252,29 @@ class AuthService(SessionMixin):
         # Raise exception if email is already registered
         if email_exists:
             logger.info(f"Email already registered: {user.email}")
-            raise ClientException(detail="Email already registered")
-        
+            raise ClientException("Email already registered")
+
         try:
             # Keycloak Integration
             keycloak_manager = KeycloakManager()
-            
+
             # get the default tenant
             tenant = await UserDataManager(self.session).retrieve_by_fields(
                 Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
             )
             if not tenant:
                 raise ClientException("Default tenant not found")
-            
+
             # get the default tenant client
             tenant_client = await UserDataManager(self.session).retrieve_by_fields(
                 TenantClient, {"tenant_id": tenant.id}, missing_ok=True
             )
             if not tenant_client:
                 raise ClientException("Default tenant client not found")
-            
-        
-            user_auth_id = await keycloak_manager.create_user_with_permissions(user, app_settings.default_realm_name, tenant_client.client_id)
-            
+
+            user_auth_id = await keycloak_manager.create_user_with_permissions(
+                user, app_settings.default_realm_name, tenant_client.client_id
+            )
 
             # Hash password
             # salted_password = user.password + secrets_settings.password_salt
@@ -237,7 +293,7 @@ class AuthService(SessionMixin):
             # NOTE: status wil be invited by default
             # Create user
             db_user = await UserDataManager(self.session).insert_one(user_model)
-            
+
             subscriber_data = SubscriberCreate(
                 subscriber_id=str(db_user.id),
                 email=db_user.email,
@@ -247,13 +303,12 @@ class AuthService(SessionMixin):
             logger.info("User added to budnotify subscriber")
 
             _ = await UserDataManager(self.session).update_subscriber_status(user_ids=[db_user.id], is_subscriber=True)
-            
+
             return db_user
 
         except Exception as e:
             logger.error(f"Failed to register user: {e}")
             raise ClientException(detail="Failed to register user")
-        
+
         except BudNotifyException as e:
             logger.error(f"Failed to add user to budnotify subscribers: {e}")
-

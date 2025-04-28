@@ -394,20 +394,25 @@ class ProjectService(SessionMixin):
         filters_dict["status"] = ProjectStatusEnum.ACTIVE
         filters_dict["benchmark"] = False
 
+        # commenting out TODO: add new permission logic
         # Get current user scopes
-        db_permissions = await PermissionDataManager(self.session).retrieve_by_fields(Permission, {"user_id": user_id})
-        user_scopes = db_permissions.scopes_list
+        # db_permissions = await PermissionDataManager(self.session).retrieve_by_fields(Permission, {"user_id": user_id})
+        # user_scopes = db_permissions.scopes_list
 
         # NOTE: Only project manager can list all projects, otherwise only participated projects will be listed
-        if PermissionEnum.PROJECT_MANAGE.value in user_scopes:
-            result, count = await ProjectDataManager(self.session).get_all_active_projects(
-                offset, limit, filters_dict, order_by, search
-            )
-        else:
-            result, count = await ProjectDataManager(self.session).get_all_participated_projects(
-                user_id, offset, limit, filters_dict, order_by, search
-            )
+        # if PermissionEnum.PROJECT_MANAGE.value in user_scopes:
+        #     result, count = await ProjectDataManager(self.session).get_all_active_projects(
+        #         offset, limit, filters_dict, order_by, search
+        #     )
+        # else:
+        #     result, count = await ProjectDataManager(self.session).get_all_participated_projects(
+        #         user_id, offset, limit, filters_dict, order_by, search
+        #     )
 
+        # temporary fix
+        result, count = await ProjectDataManager(self.session).get_all_active_projects(
+            offset, limit, filters_dict, order_by, search
+        )
         return await self.parse_project_list_results(result), count
 
     async def parse_project_list_results(self, db_results: List) -> List[ProjectListResponse]:

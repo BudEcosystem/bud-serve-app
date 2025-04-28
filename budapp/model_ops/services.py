@@ -1073,10 +1073,10 @@ class LocalModelWorkflowService(SessionMixin):
             )
             provider_id = db_provider.id
 
-        elif required_data["provider_type"] == ModelProviderTypeEnum.DISK:
+        elif required_data["provider_type"] == ModelProviderTypeEnum.DISK.value:
             if not icon:
                 icon = APP_ICONS["general"]["default_disk_model"]
-        elif required_data["provider_type"] == ModelProviderTypeEnum.URL:
+        elif required_data["provider_type"] == ModelProviderTypeEnum.URL.value:
             if not icon:
                 icon = APP_ICONS["general"]["default_url_model"]
 

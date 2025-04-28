@@ -24,7 +24,7 @@ from ..commons.helpers import validate_password_string
 from ..permissions.schemas import PermissionList
 
 from budapp.commons.constants import UserRoleEnum, UserStatusEnum
-from budapp.commons.schemas import SuccessResponse
+from budapp.commons.schemas import SuccessResponse, PaginatedSuccessResponse
 
 
 class UserBase(BaseModel):
@@ -42,6 +42,7 @@ class UserInfo(UserBase):
     id: UUID4
     color: str
     role: UserRoleEnum
+    status: UserStatusEnum
 
 
 class User(UserInfo):
@@ -51,7 +52,6 @@ class User(UserInfo):
 
     auth_id: UUID4
     password: str
-    status: UserStatusEnum
     created_at: datetime
     modified_at: datetime
     raw_token: str | None = None
@@ -123,11 +123,24 @@ class UserUpdate(BaseModel):
         if value == UserRoleEnum.SUPER_ADMIN:
             raise ValueError("The SUPER_ADMIN role is not permitted.")
         return value
-    
+
 
 class MyPermissions(SuccessResponse):
     """User permissions schema"""
 
     model_config = ConfigDict(from_attributes=True)
     permissions: List[Dict[str, Union[str, List[str]]]] = []
-    
+
+
+class UserListResponse(PaginatedSuccessResponse):
+    """User list response to client schema"""
+
+    model_config = ConfigDict(extra="ignore")
+
+    users: list[UserInfo] = []
+
+
+class UserListFilter(UserFilter):
+    """Filter user list schema"""
+
+    status: UserStatusEnum | None = None
