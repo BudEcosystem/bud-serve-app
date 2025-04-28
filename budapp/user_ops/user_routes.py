@@ -19,19 +19,20 @@
 from typing import Union
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
-from typing_extensions import Annotated
+from typing_extensions import Annotated, Optional, List
 
 from budapp.commons import logging
 from budapp.commons.constants import PermissionEnum
-from budapp.commons.dependencies import get_current_active_invite_user, get_session, get_user_realm
+from budapp.commons.dependencies import get_current_active_invite_user, get_session, get_user_realm, get_current_active_user, parse_ordering_fields
+from budapp.commons.exceptions import ClientException
 from budapp.commons.permission_handler import require_permissions
-from budapp.commons.schemas import ErrorResponse
+from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 from budapp.user_ops.services import UserService
 
-from .schemas import MyPermissions, UserResponse, UserUpdate
+from .schemas import MyPermissions, UserResponse, UserUpdate, UserListResponse, UserListFilter
 
 
 logger = logging.get_logger(__name__)
@@ -73,6 +74,50 @@ async def get_current_user(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get current user"
         ).to_http_response()
+
+
+@user_router.patch(
+    "/onboard",
+    responses={
+        status.HTTP_200_OK: {
+            "model": UserResponse,
+            "description": "Set user onboarding status to completed",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Api to set user onboarding status to completed",
+)
+async def complete_user_onboarding(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Session = Depends(get_session),
+) -> Union[UserResponse, ErrorResponse]:
+    """Complete user onboarding"""
+    try:
+        db_user = await UserService(session).complete_user_onboarding(current_user)
+        logger.info(f"User onboarding completed: {current_user.id}")
+
+        return UserResponse(
+            object="user.retrieve",
+            code=status.HTTP_200_OK,
+            message="Successfully set user onboarding status to completed",
+            user=db_user,
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to complete user onboarding: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to complete user onboarding: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to complete user onboarding"
+        ).to_http_response()
+
 
 @user_router.patch(
     "/{user_id}",
@@ -151,4 +196,177 @@ async def get_user_roles(
         logger.exception(f"Failed to get user permissions: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get user roles"
+        ).to_http_response()
+
+
+@user_router.get(
+    "/",
+    responses={
+        status.HTTP_200_OK: {
+            "model": UserListResponse,
+            "description": "Successfully get user list",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Get all active users from the database",
+)
+async def get_all_users(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    filters: UserListFilter = Depends(),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+    session: Session = Depends(get_session),
+) -> Union[MyPermissions, ErrorResponse]:
+    """Get all active users from the database"""
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Convert UserFilter to dictionary
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    try:
+        db_users, count = await UserService(session).get_all_users(offset, limit, filters_dict, order_by, search)
+    except ClientException as e:
+        logger.error(f"Failed to get user list: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get user list: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all users"
+        ).to_http_response()
+
+    return UserListResponse(
+        users=db_users,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="users.list",
+        code=status.HTTP_200_OK,
+    ).to_http_response()
+
+
+@user_router.get(
+    "/{user_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": UserResponse,
+            "description": "Successfully get user by id",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Get a single active user from the database",
+)
+async def retrieve_user(
+    user_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Session = Depends(get_session),
+) -> Union[UserResponse, ErrorResponse]:
+    """Get a single active user from the database"""
+    try:
+        db_user = await UserService(session).retrieve_active_user(user_id)
+        return UserResponse(
+            object="user.retrieve", code=status.HTTP_200_OK, message="Successfully get user by id", user=db_user
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to get user by id: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get user by id: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get user by id"
+        ).to_http_response()
+
+
+@user_router.delete(
+    "/{user_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Delete an active user from the database",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Delete an active user from the database",
+)
+async def delete_user(
+    user_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    remove_credential: bool = True,
+    session: Session = Depends(get_session),
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete an active user from the database"""
+    try:
+        _ = await UserService(session).delete_active_user(user_id, remove_credential)
+        logger.debug(f"User deleted: {user_id}")
+        return SuccessResponse(message="User deleted successfully", code=status.HTTP_200_OK).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to delete user: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete user: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete user"
+        ).to_http_response()
+
+
+@user_router.patch(
+    "/{user_id}/reactivate",
+    responses={
+        status.HTTP_200_OK: {
+            "model": UserResponse,
+            "description": "Reactivate an inactive user from the database",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Reactivate an inactive user from the database",
+)
+async def reactivate_user(
+    user_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Session = Depends(get_session),
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Reactivate an inactive user from the database"""
+    try:
+        db_user = await UserService(session).reactivate_user(user_id)
+        logger.debug(f"User reactivated: {user_id}")
+        return UserResponse(
+            object="user.retrieve", code=status.HTTP_200_OK, message="Successfully reactivate user", user=db_user
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to reactivate user: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to reactivate user: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to reactivate user"
         ).to_http_response()
