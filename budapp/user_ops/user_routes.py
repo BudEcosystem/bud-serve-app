@@ -75,6 +75,50 @@ async def get_current_user(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get current user"
         ).to_http_response()
 
+
+@user_router.patch(
+    "/onboard",
+    responses={
+        status.HTTP_200_OK: {
+            "model": UserResponse,
+            "description": "Set user onboarding status to completed",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Api to set user onboarding status to completed",
+)
+async def complete_user_onboarding(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Session = Depends(get_session),
+) -> Union[UserResponse, ErrorResponse]:
+    """Complete user onboarding"""
+    try:
+        db_user = await UserService(session).complete_user_onboarding(current_user)
+        logger.info(f"User onboarding completed: {current_user.id}")
+
+        return UserResponse(
+            object="user.retrieve",
+            code=status.HTTP_200_OK,
+            message="Successfully set user onboarding status to completed",
+            user=db_user,
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to complete user onboarding: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to complete user onboarding: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to complete user onboarding"
+        ).to_http_response()
+
+
 @user_router.patch(
     "/{user_id}",
     responses={
@@ -208,49 +252,6 @@ async def get_all_users(
         object="users.list",
         code=status.HTTP_200_OK,
     ).to_http_response()
-
-
-@user_router.patch(
-    "/onboard",
-    responses={
-        status.HTTP_200_OK: {
-            "model": UserResponse,
-            "description": "Set user onboarding status to completed",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
-    },
-    description="Api to set user onboarding status to completed",
-)
-async def complete_user_onboarding(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Session = Depends(get_session),
-) -> Union[UserResponse, ErrorResponse]:
-    """Complete user onboarding"""
-    try:
-        db_user = await UserService(session).complete_user_onboarding(current_user)
-        logger.info(f"User onboarding completed: {current_user.id}")
-
-        return UserResponse(
-            object="user.retrieve",
-            code=status.HTTP_200_OK,
-            message="Successfully set user onboarding status to completed",
-            user=db_user,
-        ).to_http_response()
-    except ClientException as e:
-        logger.error(f"Failed to complete user onboarding: {e}")
-        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
-    except Exception as e:
-        logger.exception(f"Failed to complete user onboarding: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to complete user onboarding"
-        ).to_http_response()
 
 
 @user_router.get(
