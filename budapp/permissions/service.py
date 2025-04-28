@@ -2,6 +2,7 @@ from budapp.auth.schemas import ResourceCreate
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.db_utils import SessionMixin
+from budapp.commons.exceptions import ClientException
 from budapp.commons.keycloak import KeycloakManager
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient
@@ -27,12 +28,17 @@ class PermissionService(SessionMixin):
             TenantClient, {"tenant_id": tenant.id}, missing_ok=True
         )
 
+        logger.debug(f"::PERMISSION:: Tenant client: {tenant_client.client_named_id}")
+
+        if not tenant_client:
+            raise ClientException("Tenant client not found")
+
         try:
             # Keycloak Manager
             kc_manager = KeycloakManager()
             _ = await kc_manager.create_resource_with_permissions(
                 realm_name=app_settings.default_realm_name,
-                client_id=tenant_client.client_named_id,
+                client_id=str(tenant_client.client_id),
                 resource=resource,
                 user_auth_id=user.auth_id,
             )

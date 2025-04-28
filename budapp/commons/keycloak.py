@@ -986,95 +986,84 @@ class KeycloakManager:
             logger.error(f"Error getting realm admin: {str(e)}")
             raise
 
+    # ----------------------------------------------------------------------
+    # FINE-GRAINED  ►  one concrete entity (Project, Cluster, …)
+    # ----------------------------------------------------------------------
     async def create_resource_with_permissions(
-        self, realm_name: str, client_id: str, resource: ResourceCreate, user_auth_id: str
+        self,
+        realm_name: str,
+        client_id: str,  # internal KC UUID (returned by create_client)
+        resource: ResourceCreate,  # {resource_type, resource_id, scopes=[view,manage]}
+        user_auth_id: str,  # Keycloak user UUID (the “sub” claim)
     ) -> None:
-        """Create a resource with permissions."""
+        """1, Create *one* Resource Server “resource” named
+            URN::<rtype>::<rid>::<scope>
+        2,Create (or reuse) a *user* policy for `user_auth_id`
+        3,Create (or reuse) a *permission* that ties the resource + policy
+        so Keycloak can later answer:  Does this user have <scope> on this object?
+
+        The helper is **idempotent**  calling it twice won't duplicate anything.
+        """  # noqa: D205
         try:
             realm_admin = self.get_realm_admin(realm_name)
 
-            scopes = ["view", "manage"]
+            # ----------
+            # ACCEPTED SCOPES
+            # ----------
+            #  - If caller sent an empty list we fallback to the canonical pair
+            #  - Everything else is validated against the module-level scopes
+            module_scopes = {"view", "manage"}
+            scopes = set(resource.scopes or module_scopes)  # insure not empty
+            unknown = scopes - module_scopes
+            if unknown:
+                raise ValueError(f"Unknown scope(s) {unknown} - supported: {module_scopes}")
+
+            # ----------------------------------------------------------
+            # 1. RESOURCE  (one per scope so that the RPT carries it)
+            # ----------------------------------------------------------
+            res_name = f"URN::{resource.resource_type}::{resource.resource_id}"
+            payload = {
+                "name": res_name,
+                "type": resource.resource_type.capitalize(),
+                "owner": {"id": client_id},
+                "ownerManagedAccess": True,
+                "displayName": f"{resource.resource_type.capitalize()} {resource.resource_id}",
+                "scopes": [
+                    {"name": "view"},
+                    {"name": "manage"},
+                ],
+            }
+            resource_data = realm_admin.create_client_authz_resource(client_id, payload)
+
+            # Scoped From Keycloak
+            kc_scopes = realm_admin.get_client_authz_scopes(client_id)
+
+            # Get The User Policy
+            policy_name = f"urn:bud:policy:{user_auth_id}"
+            policy_data = next(
+                (p for p in realm_admin.get_client_authz_policies(client_id) if p["name"] == policy_name),
+                None,
+            )
+            user_policy_id = policy_data["id"]
 
             for scope in scopes:
-                resource_name = f"URN::{resource.resource_type}::{resource.resource_id}::{scope}"
+                scope_id = next(s["id"] for s in kc_scopes if s["name"] == scope)
 
-                # Check if resource already exists
-                resources = realm_admin.get_client_authz_resources(client_id)
-                module_resource = next((r for r in resources if r["name"] == resource_name), None)
-
-                if not module_resource:
-                    resource = {
-                        "name": f"{resource_name}",
-                        "type": resource.resource_type.capitalize(),
-                        "owner": {"id": client_id},
-                        "ownerManagedAccess": True,
-                        "displayName": f"{resource_name.capitalize()} Entity",
-                        "scopes": [
-                            {
-                                "name": resource.scopes[0],
-                            },
-                            {
-                                "name": resource.scopes[1],
-                            },
-                        ],
-                    }
-
-                    realm_admin.create_client_authz_resource(client_id, resource)
-                    logger.info(f"Resource {resource_name} created successfully")
-
-                # Continue only if the resource has a scope equal to "scope"
-                if scope not in resource.scopes:
-                    logger.info(f"Resource {resource_name} does not have a scope equal to {scope} — skipping.")
-                    continue
-
-                resource_id = module_resource["_id"]
-                policy_name = f"user-policy-{user_auth_id}-{resource_name}"
-                existing_policies = realm_admin.get_client_authz_policies(client_id)
-                logger.debug(f"Existing policies: {existing_policies}")
-                user_policy = next((p for p in existing_policies if p["name"] == policy_name), None)
-
-                if not user_policy:
-                    user_policy = {
-                        "name": policy_name,
-                        "description": f"User policy for {user_auth_id}",
-                        "logic": "POSITIVE",
-                        "users": [user_auth_id],
-                    }
-
-                    logger.debug(f"Creating user policy: {json.dumps(user_policy, indent=4)}")
-
-                    policy_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/user"
-
-                    data_raw = realm_admin.connection.raw_post(
-                        policy_url,
-                        data=json.dumps(user_policy),
-                        max=-1,
-                        permission=False,
-                    )
-
-                    logger.debug(f"User policy response: {data_raw.json()}")
-                    policy_id = data_raw.json()["id"]
-                else:
-                    policy_id = user_policy["id"]
-
-                # Create permission (if not exists)
-                permission_name = f"user-{user_auth_id}-entity-{resource.resource_type}-{resource.resource_id}-{scope}"
-                existing_permissions = realm_admin.get_client_authz_permissions(client_id)
-                if any(p["name"] == permission_name for p in existing_permissions):
-                    logger.info(f"Permission {permission_name} already exists — skipping.")
-                    return
+                logger.info(f"Scope ID: {scope_id}")
 
                 permission = {
-                    "name": permission_name,
+                    "name": f"urn:bud:permission:{resource.resource_type}:{resource.resource_id}:{scope}",
+                    "description": f"Permission for {resource.resource_type} {resource.resource_id} to {scope}",
+                    "resources": [resource_data["_id"]],
+                    "policies": [user_policy_id],
+                    "type": "scope",
+                    "logic": "POSITIVE",
+                    "scopes": [scope_id],
                     "decisionStrategy": "UNANIMOUS",
-                    "description": f"Permission for {user_auth_id} to view and manage {resource.resource_type}",
-                    "resources": [resource_id],
-                    "policies": [policy_id],
                 }
 
                 logger.debug(f"Creating permission: {json.dumps(permission, indent=4)}")
-
-                permission_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/permission/resource"
+                permission_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/permission/scope"
                 data_raw = realm_admin.connection.raw_post(
                     permission_url,
                     data=json.dumps(permission),
@@ -1087,11 +1076,8 @@ class KeycloakManager:
 
                 logger.debug(f"Permission ID: {permission_id}")
 
-                logger.info(
-                    f"Permission {permission_name} assigned to user {user_auth_id} for {resource.resource_type}"
-                )
         except Exception as e:
-            logger.error(f"Error creating resource with permissions: {str(e)}")
+            logger.error(f"Error creating resource with permissions: {str(e)}", exc_info=True)
             raise
 
     async def validate_token(self, token: str, realm_name: str, credentials: TenantClientSchema) -> dict:
