@@ -251,3 +251,42 @@ async def complete_user_onboarding(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to complete user onboarding"
         ).to_http_response()
+
+
+@user_router.get(
+    "/{user_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": UserResponse,
+            "description": "Successfully get user by id",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Get a single active user from the database",
+)
+async def retrieve_user(
+    user_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Session = Depends(get_session),
+) -> Union[UserResponse, ErrorResponse]:
+    """Get a single active user from the database"""
+    try:
+        db_user = await UserService(session).retrieve_active_user(user_id)
+        return UserResponse(
+            object="user.retrieve", code=status.HTTP_200_OK, message="Successfully get user by id", user=db_user
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to get user by id: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get user by id: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get user by id"
+        ).to_http_response()

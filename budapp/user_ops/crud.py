@@ -19,11 +19,13 @@
 from typing import Dict, List, Tuple
 from uuid import UUID
 
+from fastapi import status
 from sqlalchemy import and_, func, or_, select, update
 
 from budapp.commons import logging
 from budapp.commons.constants import UserStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
+from budapp.commons.exceptions import ClientException
 
 from .models import User
 
@@ -97,3 +99,16 @@ class UserDataManager(DataManagerUtils):
         result = self.scalars_all(stmt)
 
         return result, count
+
+    async def retrieve_active_or_invited_user(self, user_id: UUID, missing_ok: bool = False) -> User:
+        """Retrieve active or invited user by id."""
+        stmt = select(User).filter(
+            User.id == user_id, or_(User.status == UserStatusEnum.ACTIVE, User.status == UserStatusEnum.INVITED)
+        )
+        db_user = self.scalar_one_or_none(stmt)
+
+        if not missing_ok and db_user is None:
+            logger.error("User not found in database")
+            raise ClientException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        return db_user if db_user else None

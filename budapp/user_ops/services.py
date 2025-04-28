@@ -16,7 +16,7 @@
 
 """The user ops package, containing essential business logic, services, and routing configurations for the user ops."""
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -186,3 +186,7 @@ class UserService(SessionMixin):
         db_user = await UserDataManager(self.session).update_by_fields(db_user, {"first_login": False})
 
         return db_user
+
+    async def retrieve_active_user(self, user_id: UUID) -> Optional[UserModel]:
+        """Retrieve active user by id."""
+        return await UserDataManager(self.session).retrieve_active_or_invited_user(user_id)
