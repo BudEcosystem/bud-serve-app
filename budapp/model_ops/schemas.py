@@ -920,8 +920,8 @@ class DeploymentTemplateCreate(BaseModel):
     """Deployment template request schema."""
 
     concurrent_requests: int = Field(gt=0)
-    avg_sequence_length: int = Field(ge=10, le=2000)
-    avg_context_length: int = Field(ge=30, le=32000)
+    avg_sequence_length: int = Field(ge=0, le=10000)
+    avg_context_length: int = Field(ge=0, le=200000)
     per_session_tokens_per_sec: Optional[list[int]] = None
     ttft: Optional[list[int]] = None
     e2e_latency: Optional[list[int]] = None
@@ -939,9 +939,9 @@ class DeploymentTemplateCreate(BaseModel):
     def validate_ranges(self) -> "DeploymentTemplateCreate":
         # Define range validations
         range_validations = {
-            "ttft": (50, 5000),
-            "per_session_tokens_per_sec": (5, 100),
-            "e2e_latency": (1, 300),
+            "ttft": (1, 60000),
+            "per_session_tokens_per_sec": (0, 1000),
+            "e2e_latency": (0, 600),
         }
         for field, (min_val, max_val) in range_validations.items():
             field_value = getattr(self, field)
