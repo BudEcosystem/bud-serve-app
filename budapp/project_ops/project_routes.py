@@ -375,7 +375,7 @@ async def get_all_projects(
 
     try:
         db_projects, count = await ProjectService(session).get_all_active_projects(
-            current_user.id, offset, limit, filters_dict, order_by, search
+            current_user, offset, limit, filters_dict, order_by, search
         )
     except ClientException as e:
         logger.exception(f"Failed to retrieve projects: {e}")

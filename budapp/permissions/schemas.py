@@ -1,9 +1,16 @@
 import json
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, field_validator
 
+
+class CheckUserResourceScope(BaseModel):
+    """Check user resource scope."""
+
+    resource_type: str
+    entity_id: Optional[str] = None
+    scope: str # Only One Scope
 
 class PermissionCreate(BaseModel):
     user_id: UUID

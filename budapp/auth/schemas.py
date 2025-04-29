@@ -160,6 +160,8 @@ class ResourceCreate(BaseModel):
     resource_type: str
     resource_id: str
     scopes: List[str]  # view , manage
+    
+
 
 
 class RefreshTokenRequest(BaseModel):

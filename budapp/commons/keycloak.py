@@ -859,6 +859,18 @@ class KeycloakManager:
         credentials: TenantClientSchema,
         token: str,
     ) -> Dict[str, List[str]]:
+        """Get user roles and permissions from Keycloak.
+
+        Args:
+            user_id: The ID of the user to get roles and permissions for
+            realm_name: The name of the realm to get roles and permissions for
+            client_id: The ID of the client to get roles and permissions for
+            credentials: The credentials of the client to get roles and permissions for
+            token: The token of the user to get roles and permissions for
+
+        Returns:
+            Dict[str, List[str]]: A dictionary containing the user's roles and permissions
+        """
         try:
             keycloak_openid = self.get_keycloak_openid_client(realm_name, credentials)
 

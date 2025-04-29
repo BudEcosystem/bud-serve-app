@@ -48,11 +48,11 @@ from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..permissions.crud import ProjectPermissionDataManager
 from ..permissions.models import Permission, ProjectPermission
-from ..permissions.schemas import PermissionList, ProjectPermissionCreate
+from ..permissions.schemas import CheckUserResourceScope, PermissionList, ProjectPermissionCreate
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..user_ops.crud import UserDataManager
 from ..user_ops.models import User as UserModel
-from ..user_ops.schemas import UserCreate
+from ..user_ops.schemas import User, UserCreate
 from .crud import ProjectDataManager
 from .models import Project as ProjectModel
 from .schemas import (
@@ -406,7 +406,7 @@ class ProjectService(SessionMixin):
 
     async def get_all_active_projects(
         self,
-        user_id: UUID,
+        current_user: User,
         offset: int = 0,
         limit: int = 10,
         filters: Dict = {},
@@ -416,6 +416,16 @@ class ProjectService(SessionMixin):
         filters_dict = filters
         filters_dict["status"] = ProjectStatusEnum.ACTIVE
         filters_dict["benchmark"] = False
+
+        permission_manager = PermissionService(self.session)
+
+        permission_payload = CheckUserResourceScope(
+            resource_type="project",
+            scope="manage"
+        )
+
+        is_allowed = await permission_manager.check_resource_permission_by_user(current_user,permission_payload)
+        logger.debug(f"is_allowed: {is_allowed}")
 
         # commenting out TODO: add new permission logic
         # Get current user scopes
