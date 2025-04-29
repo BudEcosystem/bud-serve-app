@@ -23,6 +23,7 @@ from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.services import ProjectService
 from budapp.shared.redis_service import RedisService, cache
 
+from ..project_ops.models import Project as ProjectModel
 from .crud import CloudProviderDataManager, CredentialDataManager, ProprietaryCredentialDataManager
 from .helpers import generate_random_string
 from .models import CloudCredentials, CloudProviders
@@ -284,7 +285,7 @@ class CredentialService(SessionMixin):
             db_project = db_credential.project
         elif current_user_id and project_id:
             db_project = await ProjectDataManager(self.session).retrieve_by_fields(
-                {"id": project_id, "status": ProjectStatusEnum.ACTIVE}
+                ProjectModel, {"id": project_id, "status": ProjectStatusEnum.ACTIVE}
             )
         else:
             raise HTTPException(
