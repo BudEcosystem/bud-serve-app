@@ -21,49 +21,50 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
+from budapp.auth.schemas import ResourceCreate
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
-from ..commons.config import app_settings
-from ..shared.notification_service import BudNotifyService, NotificationBuilder
+from budapp.permissions.service import PermissionService
 
+from ..auth.services import AuthService
 from ..cluster_ops.crud import ClusterDataManager
-from ..endpoint_ops.crud import EndpointDataManager
-from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..commons.config import app_settings
+from ..commons.constants import (
+    PROJECT_INVITATION_WORKFLOW,
+    EndpointStatusEnum,
+    NotificationCategory,
+    NotificationTypeEnum,
+    PermissionEnum,
+    ProjectStatusEnum,
+    UserRoleEnum,
+)
+from ..commons.exceptions import BudNotifyException
+from ..commons.helpers import generate_valid_password, get_hardware_types
+from ..core.schemas import NotificationResult
 from ..credential_ops.crud import CredentialDataManager
 from ..credential_ops.models import Credential as CredentialModel
-from ..commons.constants import (
-    ProjectStatusEnum,
-    PermissionEnum,
-    NotificationCategory,
-    UserRoleEnum,
-    PROJECT_INVITATION_WORKFLOW,
-    BUD_NOTIFICATION_WORKFLOW,
-    EndpointStatusEnum,
-    NotificationTypeEnum,
-)
-from ..commons.helpers import get_hardware_types, generate_valid_password
-from ..commons.exceptions import BudNotifyException
+from ..endpoint_ops.crud import EndpointDataManager
+from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..permissions.crud import ProjectPermissionDataManager
+from ..permissions.models import Permission, ProjectPermission
+from ..permissions.schemas import CheckUserResourceScope, PermissionList, ProjectPermissionCreate
+from ..shared.notification_service import BudNotifyService, NotificationBuilder
+from ..user_ops.crud import UserDataManager
+from ..user_ops.models import User as UserModel
+from ..user_ops.schemas import User, UserCreate
 from .crud import ProjectDataManager
 from .models import Project as ProjectModel
 from .schemas import (
     ProjectClusterListResponse,
+    ProjectListResponse,
     # ProjectCreate,
     # ProjectRequest,
     ProjectResponse,
     ProjectUserAdd,
-    ProjectUserAdd,
-    ProjectListResponse,
     ProjectUserList,
 )
-from ..permissions.models import ProjectPermission, Permission
-from ..permissions.schemas import ProjectPermissionCreate, PermissionList
-from ..permissions.crud import ProjectPermissionDataManager, PermissionDataManager
-from ..user_ops.crud import UserDataManager
-from ..user_ops.schemas import UserCreate
-from ..user_ops.models import User as UserModel
-from ..auth.services import AuthService
-from ..core.schemas import NotificationContent, NotificationResult
+
 
 logger = logging.get_logger(__name__)
 
@@ -72,6 +73,11 @@ class ProjectService(SessionMixin):
     """Project service."""
 
     async def create_project(self, project_data: Dict[str, Any], current_user_id: UUID) -> ProjectModel:
+        """Create a project."""
+        # Permission check
+        permission_service = PermissionService(self.session)
+
+
         if await ProjectDataManager(self.session).retrieve_by_fields(
             ProjectModel,
             {"name": project_data["name"], "status": ProjectStatusEnum.ACTIVE},
@@ -89,7 +95,24 @@ class ProjectService(SessionMixin):
         add_users_data = ProjectUserAdd(user_id=current_user_id, scopes=default_project_level_scopes)
         db_project = await self.add_users_to_project(db_project.id, [add_users_data])
 
-        return db_project
+        # Get user with id
+        db_user = await UserDataManager(self.session).retrieve_by_fields(UserModel, {"id": current_user_id}, missing_ok=True)
+
+        try:
+
+            # Update Permission in Keycloak
+            payload : ResourceCreate = ResourceCreate(
+                resource_id=str(db_project.id),
+                resource_type="project",
+                scopes=["view", "manage"],
+            )
+            await permission_service.create_resource_permission_by_user(db_user, payload)
+            return db_project
+        except Exception as e:
+            logger.error(f"Failed to update permission in Keycloak: {e}")
+            raise ClientException("Failed to update permission in Keycloak")
+
+
 
     async def edit_project(self, project_id: UUID, data: Dict[str, Any]) -> ProjectResponse:
         """Edit project by validating and updating specific fields."""
@@ -167,7 +190,7 @@ class ProjectService(SessionMixin):
         project_id: UUID,
         users_to_add: List[ProjectUserAdd],
     ) -> ProjectModel:
-        """Function to add users to project
+        """Function to add users to project.
 
         - For existing budserve users, user_id must be provided.
             - App, Email notification will be sent to the users.
@@ -383,7 +406,7 @@ class ProjectService(SessionMixin):
 
     async def get_all_active_projects(
         self,
-        user_id: UUID,
+        current_user: User,
         offset: int = 0,
         limit: int = 10,
         filters: Dict = {},
@@ -393,6 +416,16 @@ class ProjectService(SessionMixin):
         filters_dict = filters
         filters_dict["status"] = ProjectStatusEnum.ACTIVE
         filters_dict["benchmark"] = False
+
+        permission_manager = PermissionService(self.session)
+
+        permission_payload = CheckUserResourceScope(
+            resource_type="project",
+            scope="manage"
+        )
+
+        is_allowed = await permission_manager.check_resource_permission_by_user(current_user,permission_payload)
+        logger.debug(f"is_allowed: {is_allowed}")
 
         # commenting out TODO: add new permission logic
         # Get current user scopes
@@ -446,7 +479,6 @@ class ProjectService(SessionMixin):
         is_benchmark: bool = False,
     ) -> ProjectModel:
         """Delete a project from the database."""
-
         db_project = await ProjectDataManager(self.session).retrieve_by_fields(
             ProjectModel, {"id": project_id, "status": ProjectStatusEnum.ACTIVE}
         )
@@ -567,7 +599,6 @@ class ProjectService(SessionMixin):
         results: List[Tuple[UserModel, str, ProjectPermission, Permission]],
     ) -> List[ProjectUserList]:
         """Get parsed project user list response"""
-
         data = []
         project_level_permissions = PermissionEnum.get_project_level_scopes()
         global_project_permissions = [
