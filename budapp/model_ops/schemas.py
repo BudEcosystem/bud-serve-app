@@ -48,7 +48,7 @@ from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Ta
 from budapp.user_ops.schemas import UserInfo
 
 from ..commons.config import app_settings
-from ..commons.constants import ModelLicenseObjectTypeEnum
+from ..commons.constants import ModelLicenseObjectTypeEnum, ScalingMetricEnum, ScalingTypeEnum
 from ..commons.helpers import validate_icon
 from ..commons.schemas import BudNotificationMetadata
 from ..shared.minio_store import ModelStore
@@ -955,6 +955,18 @@ class DeploymentTemplateCreate(BaseModel):
         return self
 
 
+class ScalingSpecification(BaseModel):
+    """Scaling specification schema."""
+
+    scalingType: ScalingTypeEnum = Field(...)
+    scalingMetric: ScalingMetricEnum = Field(...)
+    scalingValue: int = Field(ge=0)
+    minReplicas: int = Field(ge=1)
+    maxReplicas: int = Field(ge=1)
+    scaleUpTolerance: float = Field(ge=0)
+    scaleDownTolerance: float = Field(ge=0)
+    window: int = Field(ge=1)
+
 class ModelDeployStepRequest(BaseModel):
     """Request to deploy a model by step."""
 
@@ -969,6 +981,7 @@ class ModelDeployStepRequest(BaseModel):
     endpoint_name: str | None = Field(None, min_length=1, max_length=100)
     deploy_config: DeploymentTemplateCreate | None = None
     credential_id: UUID4 | None = None
+    scaling_specification: ScalingSpecification | None = None
 
     @field_validator("endpoint_name")
     @classmethod
@@ -1030,6 +1043,7 @@ class DeploymentWorkflowStepData(BaseModel):
     template_id: UUID4 | None = None
     deploy_config: DeploymentTemplateCreate | None = None
     credential_id: UUID4 | None = None
+    scaling_specification: ScalingSpecification | None = None
 
 
 class ModelDeploymentRequest(BaseModel):

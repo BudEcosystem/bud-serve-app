@@ -1080,6 +1080,7 @@ async def deploy_model_by_step(
             template_id=deploy_request.template_id,
             trigger_workflow=deploy_request.trigger_workflow,
             credential_id=deploy_request.credential_id,
+            scaling_specification=deploy_request.scaling_specification,
         )
 
         return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)

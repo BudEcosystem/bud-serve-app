@@ -589,6 +589,21 @@ class AdapterStatusEnum(StrEnum):
     DELETED = auto()
     PENDING = auto()
 
+class ScalingTypeEnum(StrEnum):
+    """Scaling type types."""
+
+    METRIC = auto()
+    OPTIMIZER = auto()
+
+
+class ScalingMetricEnum(StrEnum):
+    """Scaling metric types."""
+
+    TIME_TO_FIRST_TOKENS_SECONDS = auto()
+    E2E_REQUEST_LATENCY_SECONDS = auto()
+    GPU_CACHE_USAGE_PERC = auto()
+    TIME_PER_OUTPUT_TOKEN_SECONDS = auto()
+
 
 # class ModelTemplateTypeEnum(StrEnum):
 #     """Model template types."""

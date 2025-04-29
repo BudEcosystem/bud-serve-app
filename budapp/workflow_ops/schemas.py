@@ -15,7 +15,7 @@ from ..commons.constants import (
 from ..core.schemas import ModelTemplateResponse
 from ..credential_ops.schemas import ProprietaryCredentialResponse
 from ..endpoint_ops.schemas import AddAdapterWorkflowStepData, EndpointResponse
-from ..model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider, QuantizeModelWorkflowStepData
+from ..model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider, QuantizeModelWorkflowStepData, ScalingSpecification
 from ..project_ops.schemas import ProjectResponse
 
 
@@ -70,6 +70,7 @@ class RetrieveWorkflowStepData(BaseModel):
     credential: ProprietaryCredentialResponse | None = None
     endpoint_name: str | None = None
     deploy_config: dict | None = None
+    scaling_specification: ScalingSpecification | None = None
     simulator_id: UUID4 | None = None
     template_id: UUID4 | None = None
     endpoint_details: dict | None = None

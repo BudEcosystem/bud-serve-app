@@ -118,6 +118,7 @@ from .schemas import (
     ModelSecurityScanResultCreate,
     ModelTree,
     PaperPublishedCreate,
+    ScalingSpecification,
     TopLeaderboard,
     TopLeaderboardBenchmark,
 )
@@ -2855,6 +2856,7 @@ class ModelService(SessionMixin):
         template_id: Optional[UUID] = None,
         trigger_workflow: bool = False,
         credential_id: Optional[UUID] = None,
+        scaling_specification: Optional[ScalingSpecification] = None,
     ) -> EndpointModel:
         """Create workflow steps and execute deployment workflow.
 
@@ -2945,6 +2947,7 @@ class ModelService(SessionMixin):
             deploy_config=deploy_config,
             template_id=template_id,
             credential_id=credential_id,
+            scaling_specification=scaling_specification,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
@@ -3114,6 +3117,7 @@ class ModelService(SessionMixin):
                 "simulator_id",
                 "deploy_config",
                 "credential_id",
+                "scaling_specification",
             ]
 
             # from workflow steps extract necessary information
@@ -3132,6 +3136,7 @@ class ModelService(SessionMixin):
                 "endpoint_name",
                 "simulator_id",
                 "deploy_config",
+                "scaling_specification",
             ]
 
             if "model_id" in required_data:
@@ -3173,6 +3178,7 @@ class ModelService(SessionMixin):
                 workflow_id=db_workflow.id,
                 subscriber_id=current_user_id,
                 credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
+                scaling_specification=required_data["scaling_specification"],
             )
             model_deployment_events = {
                 "budserve_cluster_events": model_deployment_response,
