@@ -2659,6 +2659,11 @@ BENCHMARK_FIELDS_TYPE_MAPPER = {
     "livecodebench": "Code Generation",
     "lcwinrate": "Instruction Following",
     "ugiscore": "Uncensored",
+    "drop": "Reasoning",
+    "gpqa": "Knowledge",
+    "humaneval": "Coding",
+    "mmlu": "Knowledge",
+    "mmlupro": "Knowledge",
 }
 
 
@@ -2683,6 +2688,11 @@ BENCHMARK_FIELDS_LABEL_MAPPER = {
     "livecodebench": "Live Code Bench",
     "lcwinrate": "AlpacaEval2.0",
     "ugiscore": "UGI",
+    "drop": "DROP",
+    "gpqa": "GPQA",
+    "humaneval": "HumanEval",
+    "mmlu": "MMLU",
+    "mmlupro": "MMLU Pro",
 }
 
 
