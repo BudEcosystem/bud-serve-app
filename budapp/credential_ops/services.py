@@ -17,7 +17,7 @@ from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.model_ops.crud import ProviderDataManager
 
 # from ..models import Route as RouteModel
-from budapp.model_ops.models import Model
+from budapp.model_ops.models import Model, Provider as ProviderModel
 from budapp.permissions.crud import PermissionDataManager, ProjectPermissionDataManager
 from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.services import ProjectService
@@ -575,8 +575,8 @@ class ProprietaryCredentialService(SessionMixin):
 
         # get provider id
         if not credential.provider_id:
-            db_provider = await ProviderDataManager(self.session).retrieve_provider_by_fields(
-                {"type": credential.type.value}
+            db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                ProviderModel, {"type": credential.type.value}
             )
             credential.provider_id = db_provider.id
 
