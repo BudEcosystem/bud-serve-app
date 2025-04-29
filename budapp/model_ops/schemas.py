@@ -1063,6 +1063,7 @@ class ModelDeploymentRequest(BaseModel):
     notification_metadata: BudNotificationMetadata
     source_topic: str
     credential_id: UUID4 | None = None
+    podscaler: ScalingSpecification | None = None
 
 
 class TopLeaderboardRequest(BaseModel):

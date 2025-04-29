@@ -3293,6 +3293,7 @@ class ModelService(SessionMixin):
         workflow_id: UUID,
         subscriber_id: UUID,
         credential_id: UUID | None = None,
+        scaling_specification: Optional[ScalingSpecification] = None,
     ) -> Dict[str, Any]:
         """Trigger model deployment by step."""
         logger.debug("Triggering model deployment")
@@ -3339,6 +3340,7 @@ class ModelService(SessionMixin):
             notification_metadata=notification_metadata,
             source_topic=app_settings.source_topic,
             credential_id=credential_id,
+            podscaler=scaling_specification,
         )
         model_deployment_endpoint = (
             f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"
