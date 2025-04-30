@@ -75,7 +75,7 @@ class RetrieveWorkflowStepData(BaseModel):
     template_id: UUID4 | None = None
     endpoint_details: dict | None = None
     template: ModelTemplateResponse | None = None
-    modality: AddModelModalityEnum | None = None
+    add_model_modality: list[AddModelModalityEnum] | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):

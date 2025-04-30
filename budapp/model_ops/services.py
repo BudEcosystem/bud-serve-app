@@ -738,7 +738,7 @@ class LocalModelWorkflowService(SessionMixin):
         tags = request.tags
         icon = request.icon
         trigger_workflow = request.trigger_workflow
-        modality = request.modality
+        add_model_modality = request.add_model_modality
 
         current_step_number = step_number
 
@@ -810,7 +810,7 @@ class LocalModelWorkflowService(SessionMixin):
             tags=tags,
             icon=icon,
             provider_id=provider_id,
-            modality=modality,
+            add_model_modality=add_model_modality,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
