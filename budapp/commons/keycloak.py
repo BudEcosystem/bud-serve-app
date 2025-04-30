@@ -1213,7 +1213,7 @@ class KeycloakManager:
                 # Determine permission URN
                 if resource_name.startswith("URN::project::"):
                     project_uuid = resource_name.split("::")[-1]
-                    perm_name = f"project:{scope_name}"
+                    perm_name = f"endpoint:{scope_name}"
                     urn = f"urn:bud:permission:project:{project_uuid}:{scope_name}"
                 elif resource_name.startswith("URN::user::"):
                     user_uuid = resource_name.split("::")[-1]
