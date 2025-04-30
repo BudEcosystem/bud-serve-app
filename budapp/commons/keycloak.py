@@ -1250,31 +1250,36 @@ class KeycloakManager:
                 global_scopes.extend(scoped_permissions)
             elif resource_name.startswith("URN::project::"):
                 project_scopes.append({
-                    "id": resource_id,
+                    "id": project_uuid,
+                    "rs_id": resource_id,
                     "name": display_name,
                     "permissions": scoped_permissions
                 })
             elif resource_name.startswith("URN::user::"):
                 user_scopes.append({
-                    "id": resource_id,
+                    "id": user_uuid,
+                    "rs_id": resource_id,
                     "name": display_name,
                     "permissions": scoped_permissions
                 })
             elif resource_name.startswith("URN::model::"):
                 model_scopes.append({
-                    "id": resource_id,
+                    "id": model_uuid,
+                    "rs_id": resource_id,
                     "name": display_name,
                     "permissions": scoped_permissions
                 })
             elif resource_name.startswith("URN::cluster::"):
                 cluster_scopes.append({
-                    "id": resource_id,
+                    "id": cluster_uuid,
+                    "rs_id": resource_id,
                     "name": display_name,
                     "permissions": scoped_permissions
                 })
             elif resource_name.startswith("URN::endpoint::"):
                 endpoint_scopes.append({
-                    "id": resource_id,
+                    "id": endpoint_uuid,
+                    "rs_id": resource_id,
                     "name": display_name,
                     "permissions": scoped_permissions
                 })
