@@ -17,14 +17,15 @@
 """The schemas package, containing the schemas for the user ops."""
 
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field, field_validator
-from typing import Dict, List, Optional, Union
-from ..commons.helpers import validate_password_string
-from ..permissions.schemas import PermissionList
 
 from budapp.commons.constants import UserRoleEnum, UserStatusEnum
-from budapp.commons.schemas import SuccessResponse, PaginatedSuccessResponse
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
+
+from ..commons.helpers import validate_password_string
+from ..permissions.schemas import PermissionList
 
 
 class UserBase(BaseModel):
@@ -130,6 +131,12 @@ class MyPermissions(SuccessResponse):
 
     model_config = ConfigDict(from_attributes=True)
     permissions: List[Dict[str, Union[str, List[str]]]] = []
+
+class UserPermissions(SuccessResponse):
+    """User permissions schema"""
+
+    model_config = ConfigDict(from_attributes=True)
+    result: Any
 
 
 class UserListResponse(PaginatedSuccessResponse):

@@ -1069,9 +1069,9 @@ class KeycloakManager:
         realm_name: str,
         client_id: str,  # internal KC UUID (returned by create_client)
         resource: ResourceCreate,  # {resource_type, resource_id, scopes=[view,manage]}
-        user_auth_id: str,  # Keycloak user UUID (the “sub” claim)
+        user_auth_id: str,  # Keycloak user UUID (the "sub" claim)
     ) -> None:
-        """1, Create *one* Resource Server “resource” named
+        """1, Create *one* Resource Server "resource" named
             URN::<rtype>::<rid>::<scope>
         2,Create (or reuse) a *user* policy for `user_auth_id`
         3,Create (or reuse) a *permission* that ties the resource + policy
@@ -1195,6 +1195,10 @@ class KeycloakManager:
 
         global_scopes = []
         project_scopes = []
+        user_scopes = []
+        model_scopes = []
+        cluster_scopes = []
+        endpoint_scopes = []
 
         for resource in resources:
             resource_name = resource["name"]
@@ -1211,6 +1215,22 @@ class KeycloakManager:
                     project_uuid = resource_name.split("::")[-1]
                     perm_name = f"project:{scope_name}"
                     urn = f"urn:bud:permission:project:{project_uuid}:{scope_name}"
+                elif resource_name.startswith("URN::user::"):
+                    user_uuid = resource_name.split("::")[-1]
+                    perm_name = f"user:{scope_name}"
+                    urn = f"urn:bud:permission:user:{user_uuid}:{scope_name}"
+                elif resource_name.startswith("URN::model::"):
+                    model_uuid = resource_name.split("::")[-1]
+                    perm_name = f"model:{scope_name}"
+                    urn = f"urn:bud:permission:model:{model_uuid}:{scope_name}"
+                elif resource_name.startswith("URN::cluster::"):
+                    cluster_uuid = resource_name.split("::")[-1]
+                    perm_name = f"cluster:{scope_name}"
+                    urn = f"urn:bud:permission:cluster:{cluster_uuid}:{scope_name}"
+                elif resource_name.startswith("URN::endpoint::"):
+                    endpoint_uuid = resource_name.split("::")[-1]
+                    perm_name = f"endpoint:{scope_name}"
+                    urn = f"urn:bud:permission:endpoint:{endpoint_uuid}:{scope_name}"
                 elif resource_name.startswith("module_"):
                     module_name = resource_name.replace("module_", "")
                     perm_name = f"{module_name}:{scope_name}"
@@ -1225,7 +1245,7 @@ class KeycloakManager:
                     "has_permission": has_permission
                 })
 
-            # Separate global module scopes from resource/project-specific ones
+            # Separate global module scopes from resource-specific ones
             if resource_name.startswith("module_"):
                 global_scopes.extend(scoped_permissions)
             elif resource_name.startswith("URN::project::"):
@@ -1234,13 +1254,39 @@ class KeycloakManager:
                     "name": display_name,
                     "permissions": scoped_permissions
                 })
+            elif resource_name.startswith("URN::user::"):
+                user_scopes.append({
+                    "id": resource_id,
+                    "name": display_name,
+                    "permissions": scoped_permissions
+                })
+            elif resource_name.startswith("URN::model::"):
+                model_scopes.append({
+                    "id": resource_id,
+                    "name": display_name,
+                    "permissions": scoped_permissions
+                })
+            elif resource_name.startswith("URN::cluster::"):
+                cluster_scopes.append({
+                    "id": resource_id,
+                    "name": display_name,
+                    "permissions": scoped_permissions
+                })
+            elif resource_name.startswith("URN::endpoint::"):
+                endpoint_scopes.append({
+                    "id": resource_id,
+                    "name": display_name,
+                    "permissions": scoped_permissions
+                })
 
         return {
-            "success": True,
-            "message": "Permissions retrieved",
             "result": {
                 "global_scopes": global_scopes,
-                "project_scopes": project_scopes
+                "project_scopes": project_scopes,
+                "user_scopes": user_scopes,
+                "model_scopes": model_scopes,
+                "cluster_scopes": cluster_scopes,
+                "endpoint_scopes": endpoint_scopes
             }
         }
 
@@ -1311,87 +1357,7 @@ class KeycloakManager:
 
             logger.info(f"Formatted Permissions: {formatted}")
 
-            # return formatted
-
-
-
-            # user_permissions = data_raw.json()
-
-            # for resource in resources:
-                # if resource in u
-
-
-           # permissions = []
-
-            # for each policy, get the permissions
-            # for policy in user_permissions:
-
-            #     result = {}
-            #     result['id'] = policy["id"]
-            #     result['name'] = policy["name"]
-
-            #     policy_id = policy["id"]
-
-
-
-            #     # get the scope id
-            #     #http://100.84.162.116:8080/admin/realms/bud-dev14/clients/5cb5597f-1ea4-43a5-88fa-63ff509636aa/authz/resource-server/policy/a9f9e220-274f-41ac-8b31-8dac92ad76df/scopes
-            #     url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/{policy_id}/scopes"
-            #     raw_scopes = realm_admin.connection.raw_get(
-            #         url,
-            #         max=-1,
-            #         permission=False,
-            #     )
-
-            #     result['scopes'] = raw_scopes.json()
-
-            #     logger.info(f"Result: {result}")
-
-            #     permissions.append(result)
-
-            #     # Get the scope by scope id
-
-            # # Format the permissions
-            # global_scopes = []
-            # project_scopes = []
-            # for permission in permissions:
-            #     # split the name by :  and get 3rd element
-            #     scope = permission['name'].split(':')[4]
-            #     if scope == 'module':
-            #         global_scopes.append(permission)
-            #     else:
-            #         project_scopes.append(permission)
-
-
-
-            # 2. Get all permissions
-            # permissions = realm_admin.get_client_authz_permissions(client_id)
-            # logger.info(f"Permissions: {permissions}")
-            # user_permissions = [
-            #     p for p in permissions if user_policy_id in (p.get("policies") or [])
-            # ]
-            # logger.info(f"User permissions: {user_permissions}")
-            # # 3. Map each permission to resource and scopes
-            # resource_map = {
-            #     r["_id"]: r["name"] for r in realm_admin.get_client_authz_resources(client_id)
-            # }
-
-            # scope_map = {
-            #     s["id"]: s["name"] for s in realm_admin.get_client_authz_scopes(client_id)
-            # }
-
-            # formatted_permissions = []
-            # for perm in user_permissions:
-            #     scopes = [scope_map.get(sid, sid) for sid in perm.get("scopes", [])]
-            #     resource_ids = perm.get("resources", [])
-            #     for rid in resource_ids:
-            #         formatted_permissions.append({
-            #             "rsid": rid,
-            #             "rsname": resource_map.get(rid, f"<unknown:{rid}>"),
-            #             "scopes": scopes,
-            #         })
-
-            # return {"permissions": formatted_permissions}
+            return formatted
 
         except Exception as e:
             logger.error(f"Failed to retrieve permissions for user {user_id}: {str(e)}", exc_info=True)
