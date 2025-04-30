@@ -1154,6 +1154,248 @@ class KeycloakManager:
         except Exception as e:
             logger.error(f"Error creating resource with permissions: {str(e)}", exc_info=True)
             raise
+    def annotate_resources_with_permissions(self,resources: List[Dict], user_permissions: List[Dict]) -> List[Dict]:
+        user_permission_names = {perm["name"] for perm in user_permissions}
+
+        for resource in resources:
+            scopes = resource.get("scopes", [])
+            resource_name = resource.get("name")
+            resource_type = resource.get("type")
+
+            # Skip if resource doesn't have scopes
+            if not scopes:
+                resource["has_permission"] = False
+                continue
+
+            # Generate possible permission names to match against user permissions
+            matched = False
+            for scope in scopes:
+                scope_name = scope["name"]
+
+                # Handle dynamic and static permission formats
+                if resource_name.startswith("URN::project::"):
+                    project_id = resource_name.split("::")[-1]
+                    permission_urn = f"urn:bud:permission:project:{project_id}:{scope_name}"
+                elif resource_name.startswith("module_"):
+                    module_type = resource_name.split("module_")[-1]
+                    permission_urn = f"urn:bud:permission:{module_type}:module:{scope_name}"
+                else:
+                    continue
+
+                if permission_urn in user_permission_names:
+                    matched = True
+                    break
+
+            resource["has_permission"] = matched
+
+        return resources
+
+    def format_permissions_output(self,resources, user_permissions):
+        user_permission_names = {perm["name"] for perm in user_permissions}
+
+        global_scopes = []
+        project_scopes = []
+
+        for resource in resources:
+            resource_name = resource["name"]
+            display_name = resource.get("displayName", resource_name)
+            resource_id = resource.get("_id")
+
+            scoped_permissions = []
+
+            for scope in resource.get("scopes", []):
+                scope_name = scope["name"]
+
+                # Determine permission URN
+                if resource_name.startswith("URN::project::"):
+                    project_uuid = resource_name.split("::")[-1]
+                    perm_name = f"project:{scope_name}"
+                    urn = f"urn:bud:permission:project:{project_uuid}:{scope_name}"
+                elif resource_name.startswith("module_"):
+                    module_name = resource_name.replace("module_", "")
+                    perm_name = f"{module_name}:{scope_name}"
+                    urn = f"urn:bud:permission:{module_name}:module:{scope_name}"
+                else:
+                    continue  # skip unknown patterns
+
+                has_permission = urn in user_permission_names
+
+                scoped_permissions.append({
+                    "name": perm_name,
+                    "has_permission": has_permission
+                })
+
+            # Separate global module scopes from resource/project-specific ones
+            if resource_name.startswith("module_"):
+                global_scopes.extend(scoped_permissions)
+            elif resource_name.startswith("URN::project::"):
+                project_scopes.append({
+                    "id": resource_id,
+                    "name": display_name,
+                    "permissions": scoped_permissions
+                })
+
+        return {
+            "success": True,
+            "message": "Permissions retrieved",
+            "result": {
+                "global_scopes": global_scopes,
+                "project_scopes": project_scopes
+            }
+        }
+
+    async def get_user_permissions_via_admin(
+        self,
+        user_id: str,
+        realm_name: str,
+        client_id: str,
+    ) -> Dict[str, List[str]]:
+        """Get the fine-grained permissions assigned to a user (without needing a token).
+
+        Args:
+            user_id: The Keycloak user ID
+            realm_name: The name of the realm
+            client_id: The Keycloak internal client UUID
+
+        Returns:
+            Dict[str, List[str]]: A dictionary of resource names and allowed scopes
+        """
+        try:
+            realm_admin = self.get_realm_admin(realm_name)
+            policy_name = f"urn:bud:policy:{user_id}"
+
+            logger.info(f"Policy name: {policy_name}")
+
+            # 1. Find the user's policy
+            policies = realm_admin.get_client_authz_policies(client_id)
+            logger.info(f"Policies: {policies}")
+            user_policy = next((p for p in policies if p["name"] == policy_name), None)
+            if not user_policy:
+                logger.warning(f"No policy found for user {user_id}")
+                return {"permissions": []}
+
+            user_policy_id = user_policy["id"]
+
+            logger.info(f"User policy ID: {user_policy_id}")
+
+            # call the the keycloak using api
+            url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/{user_policy_id}/dependentPolicies"
+            data_raw = realm_admin.connection.raw_get(
+                url,
+                max=-1,
+                permission=False,
+            )
+
+            logger.info(f"All User Perimission: {data_raw.json()}")
+
+            # Get all the permissions
+            permissions = realm_admin.get_client_authz_permissions(client_id)
+            logger.info(f"All Permissions: {permissions}")
+
+            # Get all the resources
+            resources = realm_admin.get_client_authz_resources(client_id)
+            logger.info(f"All Resources: {resources}")
+
+            annotated_resources = self.annotate_resources_with_permissions(
+                resources=resources,
+                user_permissions=data_raw.json()
+            )
+
+            logger.info(f"Annotated Resources: {annotated_resources}")
+
+            # formatted
+            formatted = self.format_permissions_output(
+                resources=resources,
+                user_permissions=data_raw.json()
+            )
+
+            logger.info(f"Formatted Permissions: {formatted}")
+
+            # return formatted
+
+
+
+            # user_permissions = data_raw.json()
+
+            # for resource in resources:
+                # if resource in u
+
+
+           # permissions = []
+
+            # for each policy, get the permissions
+            # for policy in user_permissions:
+
+            #     result = {}
+            #     result['id'] = policy["id"]
+            #     result['name'] = policy["name"]
+
+            #     policy_id = policy["id"]
+
+
+
+            #     # get the scope id
+            #     #http://100.84.162.116:8080/admin/realms/bud-dev14/clients/5cb5597f-1ea4-43a5-88fa-63ff509636aa/authz/resource-server/policy/a9f9e220-274f-41ac-8b31-8dac92ad76df/scopes
+            #     url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/{policy_id}/scopes"
+            #     raw_scopes = realm_admin.connection.raw_get(
+            #         url,
+            #         max=-1,
+            #         permission=False,
+            #     )
+
+            #     result['scopes'] = raw_scopes.json()
+
+            #     logger.info(f"Result: {result}")
+
+            #     permissions.append(result)
+
+            #     # Get the scope by scope id
+
+            # # Format the permissions
+            # global_scopes = []
+            # project_scopes = []
+            # for permission in permissions:
+            #     # split the name by :  and get 3rd element
+            #     scope = permission['name'].split(':')[4]
+            #     if scope == 'module':
+            #         global_scopes.append(permission)
+            #     else:
+            #         project_scopes.append(permission)
+
+
+
+            # 2. Get all permissions
+            # permissions = realm_admin.get_client_authz_permissions(client_id)
+            # logger.info(f"Permissions: {permissions}")
+            # user_permissions = [
+            #     p for p in permissions if user_policy_id in (p.get("policies") or [])
+            # ]
+            # logger.info(f"User permissions: {user_permissions}")
+            # # 3. Map each permission to resource and scopes
+            # resource_map = {
+            #     r["_id"]: r["name"] for r in realm_admin.get_client_authz_resources(client_id)
+            # }
+
+            # scope_map = {
+            #     s["id"]: s["name"] for s in realm_admin.get_client_authz_scopes(client_id)
+            # }
+
+            # formatted_permissions = []
+            # for perm in user_permissions:
+            #     scopes = [scope_map.get(sid, sid) for sid in perm.get("scopes", [])]
+            #     resource_ids = perm.get("resources", [])
+            #     for rid in resource_ids:
+            #         formatted_permissions.append({
+            #             "rsid": rid,
+            #             "rsname": resource_map.get(rid, f"<unknown:{rid}>"),
+            #             "scopes": scopes,
+            #         })
+
+            # return {"permissions": formatted_permissions}
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve permissions for user {user_id}: {str(e)}", exc_info=True)
+            raise
 
     async def validate_token(self, token: str, realm_name: str, credentials: TenantClientSchema) -> dict:
         """Validate a JWT token and return the decoded claims if valid.
