@@ -163,7 +163,7 @@ class WorkflowService(SessionMixin):
             simulator_id = required_data.get("simulator_id")
             template_id = required_data.get("template_id")
             endpoint_details = required_data.get("endpoint_details")
-            modality = required_data.get("modality")
+            add_model_modality = required_data.get("add_model_modality")
             quantization_config = QuantizeModelWorkflowStepData(
                 model_id=model_id,
                 quantized_model_name=required_data.get("quantized_model_name"),
@@ -309,7 +309,7 @@ class WorkflowService(SessionMixin):
                 template_id=template_id if template_id else None,
                 endpoint_details=endpoint_details if endpoint_details else None,
                 template=db_template if db_template else None,
-                modality=modality if modality else None,
+                add_model_modality=add_model_modality if add_model_modality else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -344,6 +344,7 @@ class WorkflowService(SessionMixin):
                 "model_id",
                 "workflow_execution_status",
                 "leaderboard",
+                "add_model_modality",
             ],
             "create_cluster": [
                 "name",
@@ -363,6 +364,7 @@ class WorkflowService(SessionMixin):
                 BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value,
                 "model_id",
                 "description",
+                "add_model_modality",
             ],
             "scan_local_model": [
                 "model_id",

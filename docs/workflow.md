@@ -53,7 +53,8 @@
 {
   "workflow_total_steps": 6,
   "step_number": 1,
-  "provider_type": "cloud_model"
+  "provider_type": "cloud_model",
+  "add_model_modality": ["llm", "mllm"]
 }
 
 // Select provider
@@ -90,7 +91,7 @@
     "workflow_total_steps": 6,
     "step_number": 1,
     "trigger_workflow": false,
-    "modality": "llm"
+    "add_model_modality": ["llm", "mllm"]
 }
 
 {

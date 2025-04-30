@@ -359,6 +359,7 @@ class CreateCloudModelWorkflowRequest(BaseModel):
     uri: str | None = None
     tags: list[Tag] | None = None
     cloud_model_id: UUID4 | None = None
+    add_model_modality: list[AddModelModalityEnum] | None = None
 
     @model_validator(mode="after")
     def validate_fields(self) -> "CreateCloudModelWorkflowRequest":
@@ -403,7 +404,7 @@ class CreateLocalModelWorkflowRequest(BaseModel):
     author: str | None = None
     tags: list[Tag] | None = None
     icon: str | None = None
-    modality: AddModelModalityEnum | None = None
+    add_model_modality: list[AddModelModalityEnum] | None = None
 
     @model_validator(mode="after")
     def validate_fields(self) -> "CreateLocalModelWorkflowRequest":
@@ -455,7 +456,7 @@ class CreateLocalModelWorkflowSteps(BaseModel):
     author: str | None = None
     tags: list[Tag] | None = None
     provider_id: UUID4 | None
-    modality: AddModelModalityEnum | None = None
+    add_model_modality: list[AddModelModalityEnum] | None = None
 
 
 class EditModel(BaseModel):
@@ -742,6 +743,7 @@ class CreateCloudModelWorkflowSteps(BaseModel):
     icon: str | None = None
     provider_id: UUID4 | None = None
     cloud_model_id: UUID4 | None = None
+    add_model_modality: list[AddModelModalityEnum] | None = None
 
 
 class CreateCloudModelWorkflowStepData(BaseModel):
