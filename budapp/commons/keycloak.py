@@ -998,6 +998,71 @@ class KeycloakManager:
             logger.error(f"Error getting realm admin: {str(e)}")
             raise
 
+    async def delete_permission_for_resource(
+        self,
+        realm_name: str,
+        client_id: str,
+        user_id: str,
+        resource_type: str,
+        resource_id: str,
+        delete_resource: bool = False,
+    ) -> None:
+            """Deletes all permissions and associated scopes for a given user and resource.
+
+            Args:
+                realm_name (str): Keycloak realm name
+                client_id (str): Internal Keycloak client UUID
+                user_id (str): User's Keycloak ID (sub)
+                resource_type (str): Type of the resource (e.g., "cluster", "project")
+                resource_id (str): Entity-specific resource ID.
+            """  # noqa: D401
+            try:
+                realm_admin = self.get_realm_admin(realm_name)
+                resource_name = f"URN::{resource_type}::{resource_id}"
+                permission_prefix = f"urn:bud:permission:{resource_type}:{resource_id}:"
+                policy_name = f"urn:bud:policy:{user_id}"
+
+                # 1. Locate the resource
+                resources = realm_admin.get_client_authz_resources(client_id)
+                resource_obj = next((r for r in resources if r["name"] == resource_name), None)
+                if not resource_obj:
+                    logger.warning(f"Resource {resource_name} not found — skipping.")
+                    return
+
+                resource_id_internal = resource_obj["_id"]
+
+                # 2. Delete matching permissions
+                permissions = realm_admin.get_client_authz_permissions(client_id)
+                for perm in permissions:
+                    if perm.get("resources") and resource_id_internal in perm["resources"] and perm["name"].startswith(permission_prefix):
+                        logger.info(f"Deleting permission: {perm['name']}")
+                        realm_admin.delete_client_authz_permission(client_id, perm["id"])
+
+                # 3. Delete associated scopes if needed
+                # Assuming scopes are not reused across resources — otherwise skip this
+                # scopes_to_check = ["view", "manage"]
+                # kc_scopes = realm_admin.get_client_authz_scopes(client_id)
+                # for s in kc_scopes:
+                #     if s["name"] in scopes_to_check:
+                #         # Optional: Only remove custom scopes if not in default
+                #         logger.info(f"Checking if scope {s['name']} is removable — skipping (shared scope)")
+
+                # 4. Delete resource itself
+                if delete_resource:
+                    realm_admin.delete_client_authz_resource(client_id, resource_id_internal)
+                    logger.info(f"Deleted resource {resource_name}")
+
+                # 5. (Optional) Delete user policy if no more permissions reference it
+                # policies = realm_admin.get_client_authz_policies(client_id)
+                # user_policy = next((p for p in policies if p["name"] == policy_name), None)
+                # if user_policy:
+                #     realm_admin.delete_client_authz_policy(client_id, user_policy["id"])
+                #     logger.info(f"Deleted user policy: {policy_name}")
+
+            except Exception as e:
+                logger.error(f"Failed to delete permission for user {user_id}, resource {resource_type}:{resource_id} — {str(e)}")
+                raise
+
     # ----------------------------------------------------------------------
     # FINE-GRAINED  ►  one concrete entity (Project, Cluster, …)
     # ----------------------------------------------------------------------
