@@ -48,7 +48,7 @@ class PermissionService(SessionMixin):
             raise
 
 
-    async def delete_permission_for_resource(self, user: UserModel, resource: DeletePermissionRequest) -> None:
+    async def delete_permission_for_resource(self, resource: DeletePermissionRequest) -> None:
         """Delete a resource permission for a user."""
         # Get the default tenant
         tenant = await UserDataManager(self.session).retrieve_by_fields(
@@ -68,7 +68,6 @@ class PermissionService(SessionMixin):
             _ = await kc_manager.delete_permission_for_resource(
                 realm_name=app_settings.default_realm_name,
                 client_id=str(tenant_client.client_id),
-                user_id=user.auth_id,
                 resource_type=resource.resource_type,
                 resource_id=resource.resource_id,
                 delete_resource=resource.delete_resource,

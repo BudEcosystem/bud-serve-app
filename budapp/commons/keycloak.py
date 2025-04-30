@@ -1002,7 +1002,6 @@ class KeycloakManager:
         self,
         realm_name: str,
         client_id: str,
-        user_id: str,
         resource_type: str,
         resource_id: str,
         delete_resource: bool = False,
@@ -1020,7 +1019,6 @@ class KeycloakManager:
                 realm_admin = self.get_realm_admin(realm_name)
                 resource_name = f"URN::{resource_type}::{resource_id}"
                 permission_prefix = f"urn:bud:permission:{resource_type}:{resource_id}:"
-                policy_name = f"urn:bud:policy:{user_id}"
 
                 # 1. Locate the resource
                 resources = realm_admin.get_client_authz_resources(client_id)
@@ -1060,7 +1058,7 @@ class KeycloakManager:
                 #     logger.info(f"Deleted user policy: {policy_name}")
 
             except Exception as e:
-                logger.error(f"Failed to delete permission for user {user_id}, resource {resource_type}:{resource_id} — {str(e)}")
+                logger.error(f"Failed to delete permission for user, resource {resource_type}:{resource_id} — {str(e)}")
                 raise
 
     # ----------------------------------------------------------------------
