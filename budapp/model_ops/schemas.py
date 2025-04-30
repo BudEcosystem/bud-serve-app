@@ -359,6 +359,7 @@ class CreateCloudModelWorkflowRequest(BaseModel):
     uri: str | None = None
     tags: list[Tag] | None = None
     cloud_model_id: UUID4 | None = None
+    add_model_modality: list[AddModelModalityEnum] | None = None
 
     @model_validator(mode="after")
     def validate_fields(self) -> "CreateCloudModelWorkflowRequest":
@@ -742,6 +743,7 @@ class CreateCloudModelWorkflowSteps(BaseModel):
     icon: str | None = None
     provider_id: UUID4 | None = None
     cloud_model_id: UUID4 | None = None
+    add_model_modality: list[AddModelModalityEnum] | None = None
 
 
 class CreateCloudModelWorkflowStepData(BaseModel):

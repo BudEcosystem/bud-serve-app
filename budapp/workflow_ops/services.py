@@ -344,6 +344,7 @@ class WorkflowService(SessionMixin):
                 "model_id",
                 "workflow_execution_status",
                 "leaderboard",
+                "add_model_modality",
             ],
             "create_cluster": [
                 "name",

@@ -159,6 +159,7 @@ class CloudModelWorkflowService(SessionMixin):
         trigger_workflow = request.trigger_workflow
         provider_id = request.provider_id
         cloud_model_id = request.cloud_model_id
+        add_model_modality = request.add_model_modality
 
         current_step_number = step_number
 
@@ -231,6 +232,7 @@ class CloudModelWorkflowService(SessionMixin):
             tags=tags,
             provider_id=provider_id,
             cloud_model_id=cloud_model_id,
+            add_model_modality=add_model_modality,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
