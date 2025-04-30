@@ -1,4 +1,4 @@
-from budapp.auth.schemas import ResourceCreate
+from budapp.auth.schemas import DeletePermissionRequest, ResourceCreate
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.db_utils import SessionMixin
@@ -47,9 +47,37 @@ class PermissionService(SessionMixin):
             logger.error(f"Error creating resource permission: {e}")
             raise
 
+
+    async def delete_permission_for_resource(self, resource: DeletePermissionRequest) -> None:
+        """Delete a resource permission for a user."""
+        # Get the default tenant
+        tenant = await UserDataManager(self.session).retrieve_by_fields(
+            Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+        )
+
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+        )
+
+        if not tenant_client:
+            raise ClientException("Tenant client not found")
+
+        try:
+            # Keycloak Manager
+            kc_manager = KeycloakManager()
+            _ = await kc_manager.delete_permission_for_resource(
+                realm_name=app_settings.default_realm_name,
+                client_id=str(tenant_client.client_id),
+                resource_type=resource.resource_type,
+                resource_id=resource.resource_id,
+                delete_resource=resource.delete_resource,
+            )
+        except Exception as e:
+            logger.error(f"Error deleting resource permission: {e}")
+            raise
+
     async def check_resource_permission_by_user(self, user: UserModel, payload: CheckUserResourceScope) -> bool:
         """Check if a user has a resource permission."""
-
         logger.debug(f"::PERMISSION::Checking permissions for user: {user.raw_token}")
 
         # if user.is_superuser:

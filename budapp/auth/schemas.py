@@ -162,6 +162,12 @@ class ResourceCreate(BaseModel):
     scopes: List[str]  # view , manage
     
 
+class DeletePermissionRequest(BaseModel):
+    """Delete permission request schema."""
+
+    resource_type: str
+    resource_id: str
+    delete_resource: bool = False
 
 
 class RefreshTokenRequest(BaseModel):

@@ -22,23 +22,23 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from budapp.commons import logging
-from budapp.commons.exceptions import ClientException
 from budapp.commons.config import app_settings
 from budapp.commons.db_utils import SessionMixin
-from budapp.commons.exceptions import BudNotifyException
+from budapp.commons.exceptions import BudNotifyException, ClientException
 from budapp.commons.keycloak import KeycloakManager
-from budapp.core.schemas import SubscriberUpdate, SubscriberCreate
+from budapp.core.schemas import SubscriberCreate, SubscriberUpdate
 from budapp.shared.notification_service import BudNotifyHandler
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient
 from budapp.user_ops.models import User as UserModel
 from budapp.user_ops.schemas import TenantClientSchema
 
-from ..commons.constants import UserStatusEnum, EndpointStatusEnum
-from ..endpoint_ops.crud import EndpointDataManager
-from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..commons.constants import EndpointStatusEnum, UserStatusEnum
 from ..credential_ops.crud import CredentialDataManager
 from ..credential_ops.models import Credential as CredentialModel
+from ..endpoint_ops.crud import EndpointDataManager
+from ..endpoint_ops.models import Endpoint as EndpointModel
+
 
 logger = logging.get_logger(__name__)
 settings = app_settings
@@ -161,6 +161,43 @@ class UserService(SessionMixin):
         )
 
         logger.debug(f"::KEYCLOAK::User {auth_id} roles and permissions: {result}")
+
+        return result
+
+    async def get_user_permissions_by_id(
+        self,
+        user_id: UUID,
+    ) -> UserModel:
+        """Get user roles and permissions."""
+        # Relan Name
+        realm_name = app_settings.default_realm_name
+
+        # Get the user from db
+        db_user = await UserDataManager(self.session).retrieve_by_fields(
+            UserModel, {"id": user_id}, missing_ok=True
+        )
+
+        if not db_user:
+            raise ClientException(message="User not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Default Client Details
+        tenant = await UserDataManager(self.session).retrieve_by_fields(
+            Tenant, {"realm_name": realm_name}, missing_ok=True
+        )
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+        )
+
+
+        # Keycloak Manager
+        keycloak_manager = KeycloakManager()
+        result = await keycloak_manager.get_user_permissions_via_admin(
+            str(db_user.auth_id),
+            realm_name,
+            tenant_client.client_id,
+        )
+
+        logger.debug(f"::KEYCLOAK::User {db_user.auth_id} roles and permissions: {result}")
 
         return result
 

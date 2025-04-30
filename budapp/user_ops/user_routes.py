@@ -21,18 +21,22 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
-from typing_extensions import Annotated, Optional, List
+from typing_extensions import Annotated, List, Optional
 
 from budapp.commons import logging
-from budapp.commons.constants import PermissionEnum
-from budapp.commons.dependencies import get_current_active_invite_user, get_session, get_user_realm, get_current_active_user, parse_ordering_fields
+from budapp.commons.dependencies import (
+    get_current_active_invite_user,
+    get_current_active_user,
+    get_session,
+    get_user_realm,
+    parse_ordering_fields,
+)
 from budapp.commons.exceptions import ClientException
-from budapp.commons.permission_handler import require_permissions
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 from budapp.user_ops.services import UserService
 
-from .schemas import MyPermissions, UserResponse, UserUpdate, UserListResponse, UserListFilter
+from .schemas import MyPermissions, UserListFilter, UserListResponse, UserPermissions, UserResponse, UserUpdate
 
 
 logger = logging.get_logger(__name__)
@@ -290,6 +294,42 @@ async def retrieve_user(
         logger.exception(f"Failed to get user by id: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get user by id"
+        ).to_http_response()
+
+@user_router.get(
+    "/{user_id}/permissions",
+    responses={
+        status.HTTP_200_OK: {
+            "model": UserPermissions,
+            "description": "Successfully get user permissions",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Get user roles",
+)
+async def get_user_permissions_by_id(
+    user_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_invite_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[UserPermissions, ErrorResponse]:
+    """Get user roles."""
+    try:
+        kc_user = await UserService(session).get_user_permissions_by_id(user_id)
+        permissions_list = kc_user.get("result", [])
+        return UserPermissions(
+            object="user.permissions", code=status.HTTP_200_OK, message="Successfully get user permissions", result=permissions_list
+        ).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get user permissions: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get user roles"
         ).to_http_response()
 
 
