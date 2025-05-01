@@ -2619,8 +2619,8 @@ class ModelService(SessionMixin):
                         value=bud_model_benchmark.get("eval_score"),
                         label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, label_alternative),
                     )
-
-            leaderboard_tables.append(LeaderboardTable(model=model, benchmarks=benchmarks))
+            if benchmarks:
+                leaderboard_tables.append(LeaderboardTable(model=model, benchmarks=benchmarks))
 
         return leaderboard_tables
 
