@@ -70,6 +70,7 @@ from ..commons.constants import (
 )
 from ..commons.helpers import validate_huggingface_repo_format
 from ..commons.schemas import BudNotificationMetadata
+from ..commons.security import RSAHandler
 from ..core.crud import ModelTemplateDataManager
 from ..core.models import ModelTemplate as ModelTemplateModel
 from ..core.schemas import NotificationPayload, NotificationResult
@@ -1290,9 +1291,11 @@ class LocalModelWorkflowService(SessionMixin):
             )
             hf_token = db_proprietary_credential.other_provider_creds.get("api_key")
 
-            # TODO: remove this after implementing token decryption, decryption not required here
-            # Send decrypted token to model extraction endpoint
-            hf_token = await self._get_decrypted_token(proprietary_credential_id)
+            try:
+                hf_token = await RSAHandler().decrypt(hf_token)
+            except Exception as e:
+                logger.error(f"Failed to decrypt token: {e}")
+                raise ClientException("Invalid credential found while adding model") from e
 
         model_extraction_request = {
             "model_name": data["name"],
@@ -1320,21 +1323,6 @@ class LocalModelWorkflowService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to perform model extraction request: {e}")
             raise ClientException("Unable to perform model extraction") from e
-
-    @staticmethod
-    async def _get_decrypted_token(credential_id: UUID) -> str:
-        """Get decrypted token."""
-        # TODO: remove this function after implementing dapr decryption
-        url = f"{app_settings.budserve_host}/proprietary/credentials/{credential_id}/details"
-
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                response_data = await response.json()
-                try:
-                    decrypted_token = response_data["result"]["other_provider_creds"]["api_key"]
-                    return decrypted_token
-                except (KeyError, TypeError):
-                    raise ClientException("Unable to get decrypted token")
 
     async def _create_papers_from_model_info(
         self, extracted_papers: list[dict], model_id: UUID

@@ -134,9 +134,6 @@ class AppConfig(BaseAppConfig):
     bud_notify_app_id: str = Field(alias="BUD_NOTIFY_APP_ID")
     source_topic: str = Field(alias="SOURCE_TOPIC", default="budAppMessages")
 
-    # Budserve host
-    budserve_host: str = Field(alias="BUD_SERVE_HOST", default="https://api-dev.bud.studio")
-
     # Prometheus URL
     prometheus_url: str = Field(alias="PROMETHEUS_URL", default="https://metrics.fmops.in")
 
