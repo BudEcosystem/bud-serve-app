@@ -29,6 +29,8 @@ from budapp.commons.dependencies import (
     get_session,
     parse_ordering_fields,
 )
+from budapp.commons.constants import PermissionEnum
+from budapp.commons.permission_handler import require_permissions
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse, SingleResponse, SuccessResponse
 from budapp.user_ops.schemas import User
@@ -97,6 +99,7 @@ project_router = APIRouter(prefix="/projects", tags=["project"])
     },
     description="Edit project",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
 async def edit_project(
     project_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -142,6 +145,7 @@ async def edit_project(
     },
     description="List all clusters in a project.\n\nOrder by values are: name, endpoint_count, hardware_type, node_count, worker_count, status, created_at, modified_at",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW])
 async def list_all_clusters(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -201,6 +205,7 @@ async def list_all_clusters(
     },
     description="Search tags by name",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW])
 async def search_project_tags(
     session: Annotated[Session, Depends(get_session)],
     search_term: str = Query(..., description="Tag name to search for"),
@@ -251,6 +256,7 @@ async def search_project_tags(
     },
     description="List all project tags",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW])
 async def get_project_tags(
     session: Annotated[Session, Depends(get_session)],
 ) -> Union[PaginatedTagsResponse, ErrorResponse]:
@@ -298,6 +304,7 @@ async def get_project_tags(
     },
     description="Create a new project",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
 async def create_project(
     project_data: ProjectCreateRequest,
     current_user: Annotated[
@@ -350,6 +357,7 @@ async def create_project(
     },
     description="Get all active projects from the database",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW, PermissionEnum.PROJECT_MANAGE])
 async def get_all_projects(
     current_user: Annotated[
         User,
@@ -415,6 +423,7 @@ async def get_all_projects(
     },
     description="Get a single active project from the database",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW])
 async def retrieve_project(
     project_id: UUID,
     current_user: Annotated[
@@ -470,6 +479,7 @@ async def retrieve_project(
     },
     description="Delete an active project from the database",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
 async def delete_project(
     project_id: UUID,
     current_user: Annotated[
@@ -521,6 +531,7 @@ async def delete_project(
     },
     description="For existing users, user_id must be provided. For new users, email must be provided.",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
 async def add_users_to_project(
     project_id: UUID,
     users_to_add: ProjectUserAddList,
@@ -572,6 +583,7 @@ async def add_users_to_project(
     },
     description="Remove users from an active project",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
 async def remove_users_from_project(
     project_id: UUID,
     users: ProjectUserUpdate,
@@ -624,6 +636,7 @@ async def remove_users_from_project(
     },
     description="Get all active users in a project. Additional Sorting: project_role",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW])
 async def list_project_users(
     project_id: UUID,
     current_user: Annotated[
