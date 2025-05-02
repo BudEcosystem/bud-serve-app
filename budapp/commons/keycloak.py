@@ -368,6 +368,8 @@ class KeycloakManager:
                 logger.debug(f"Existing policies: {existing_policies}")
                 user_policy = next((p for p in existing_policies if p["name"] == policy_name), None)
 
+                logger.debug(f"User policy: {user_policy}")
+
                 if not user_policy:
                     user_policy = {
                         "name": policy_name,
@@ -446,12 +448,18 @@ class KeycloakManager:
 
                     update_policy = []
                     for policy in permission_policies_data_raw.json():
-                        if policy["name"] == policy_name:
+                        
+                        logger.debug(f"Policy: {policy}")
+                        logger.debug(f"Policy Name: {policy['name']}")
+                        
+                        if policy["name"] != policy_name:
                             update_policy.append(policy["id"])
 
                     # add policy id to the update policy if not already in the list
                     if user_policy_id not in update_policy:
                         update_policy.append(user_policy_id)
+                        
+                    logger.debug(f"Update policy: {update_policy}")
 
                     # Update
                     permission_update_payload = {
@@ -1437,3 +1445,17 @@ class KeycloakManager:
         except Exception as e:
             logger.error(f"Unexpected error validating token: {str(e)}")
             raise
+
+    async def assign_user_to_resource(self, user_id: str, resource_id: str, realm_name: str, client_id: str) -> None:
+        """Assign a user to a resource in Keycloak.
+
+        Args:
+            user_id: The Keycloak user ID
+            resource_id: The Keycloak resource ID
+            realm_name: The name of the realm
+            client_id: The Keycloak internal client UUID
+
+        Returns:
+            None
+        """
+        pass
