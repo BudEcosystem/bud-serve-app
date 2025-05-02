@@ -208,7 +208,7 @@ class KeycloakManager:
                 "type": "scope",
                 "logic": "POSITIVE",
                 "scopes": [scope["id"]],
-                "decisionStrategy": "UNANIMOUS",
+                "decisionStrategy": "AFFIRMATIVE",
             }
             logger.debug(f"Creating permission: {json.dumps(permission, indent=4)}")
             permission_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/permission/scope"
@@ -448,17 +448,17 @@ class KeycloakManager:
 
                     update_policy = []
                     for policy in permission_policies_data_raw.json():
-                        
+
                         logger.debug(f"Policy: {policy}")
                         logger.debug(f"Policy Name: {policy['name']}")
-                        
+
                         if policy["name"] != policy_name:
                             update_policy.append(policy["id"])
 
                     # add policy id to the update policy if not already in the list
                     if user_policy_id not in update_policy:
                         update_policy.append(user_policy_id)
-                        
+
                     logger.debug(f"Update policy: {update_policy}")
 
                     # Update
@@ -1142,7 +1142,7 @@ class KeycloakManager:
                     "type": "scope",
                     "logic": "POSITIVE",
                     "scopes": [scope_id],
-                    "decisionStrategy": "UNANIMOUS",
+                    "decisionStrategy": "AFFIRMATIVE",
                 }
 
                 logger.debug(f"Creating permission: {json.dumps(permission, indent=4)}")
