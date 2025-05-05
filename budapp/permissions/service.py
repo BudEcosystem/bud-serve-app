@@ -4,7 +4,12 @@ from budapp.commons.config import app_settings
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.keycloak import KeycloakManager
-from budapp.permissions.schemas import AssignResourceScopeToUser, CheckUserResourceScope, RemoveUserFromResource
+from budapp.permissions.schemas import (
+    AssignResourceScopeToUser,
+    CheckUserResourceScope,
+    RemoveResource,
+    RemoveUserFromResource,
+)
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient
 from budapp.user_ops.models import User as UserModel
@@ -16,6 +21,32 @@ logger = logging.get_logger(__name__)
 
 class PermissionService(SessionMixin):
     """Keycloak Permission Service."""
+
+    async def remove_resource(self, resource: RemoveResource) -> None:
+        """Remove a resource."""
+        tenant = await UserDataManager(self.session).retrieve_by_fields(
+            Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+        )
+
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+        )
+
+        if not tenant_client:
+            raise ClientException("Tenant client not found")
+
+        try:
+            kc_manager = KeycloakManager()
+            _ = await kc_manager.delete_permission_for_resource(
+                realm_name=app_settings.default_realm_name,
+                client_id=str(tenant_client.client_id),
+                resource_type=resource.resource_type,
+                resource_id=resource.entity_id,
+                delete_resource=True,
+            )
+        except Exception as e:
+            logger.error(f"Error removing resource: {e}")
+            raise
 
     async def create_resource_permission_by_user(self, user: UserModel, resource: ResourceCreate) -> None:
         """Create a resource permission for a user."""

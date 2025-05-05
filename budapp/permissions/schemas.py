@@ -4,6 +4,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, field_validator
 
+class RemoveResource(BaseModel):
+    """Remove resource."""
+
+    resource_type: str
+    entity_id: str = None
 
 class RemoveUserScopeFromResource(BaseModel):
     """Remove user scope from resource."""
