@@ -1,10 +1,10 @@
-from budapp.auth.schemas import DeletePermissionRequest, ResourceCreate
+from budapp.auth.schemas import ResourceCreate
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.keycloak import KeycloakManager
-from budapp.permissions.schemas import CheckUserResourceScope
+from budapp.permissions.schemas import AssignResourceScopeToUser, CheckUserResourceScope, RemoveUserFromResource
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient
 from budapp.user_ops.models import User as UserModel
@@ -46,9 +46,31 @@ class PermissionService(SessionMixin):
         except Exception as e:
             logger.error(f"Error creating resource permission: {e}")
             raise
+    async def assign_resource_scope_to_user(self,resource: AssignResourceScopeToUser) -> None:
+        """Assign a resource scope to a user."""
+        tenant = await UserDataManager(self.session).retrieve_by_fields(
+            Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+        )
 
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+        )
 
-    async def delete_permission_for_resource(self, resource: DeletePermissionRequest) -> None:
+        if not tenant_client:
+            raise ClientException("Tenant client not found")
+
+        try:
+            kc_manager = KeycloakManager()
+            _ = await kc_manager.assign_user_to_resource(
+                payload=resource,
+                realm_name=app_settings.default_realm_name,
+                client_id=str(tenant_client.client_id),
+            )
+        except Exception as e:
+            logger.error(f"Error assigning resource scope to user: {e}")
+            raise
+
+    async def delete_permission_for_resource(self, resource: RemoveUserFromResource) -> None:
         """Delete a resource permission for a user."""
         # Get the default tenant
         tenant = await UserDataManager(self.session).retrieve_by_fields(
@@ -64,13 +86,18 @@ class PermissionService(SessionMixin):
 
         try:
             # Keycloak Manager
+
+            payload = RemoveUserFromResource(
+                resource_type=resource.resource_type,
+                entity_id=resource.entity_id,
+                user_auth_id=resource.user_auth_id,
+            )
+
             kc_manager = KeycloakManager()
-            _ = await kc_manager.delete_permission_for_resource(
+            _ = await kc_manager.remove_user_from_resource(
                 realm_name=app_settings.default_realm_name,
                 client_id=str(tenant_client.client_id),
-                resource_type=resource.resource_type,
-                resource_id=resource.resource_id,
-                delete_resource=resource.delete_resource,
+                payload=payload,
             )
         except Exception as e:
             logger.error(f"Error deleting resource permission: {e}")

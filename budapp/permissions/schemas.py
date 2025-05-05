@@ -5,6 +5,28 @@ from uuid import UUID
 from pydantic import BaseModel, field_validator
 
 
+class RemoveUserScopeFromResource(BaseModel):
+    """Remove user scope from resource."""
+
+    resource_type: str
+    entity_id: Optional[str] = None
+    user_auth_id: UUID
+    scope: str
+
+class RemoveUserFromResource(BaseModel):
+    """Remove user from resource."""
+
+    resource_type: str
+    entity_id: Optional[str] = None
+    user_auth_id: UUID
+
+class AssignResourceScopeToUser(BaseModel):
+    """Assign resource scope to user."""
+    resource_type: str
+    entity_id: Optional[str] = None
+    user_auth_id: UUID
+    scopes: List[str] 
+
 class CheckUserResourceScope(BaseModel):
     """Check user resource scope."""
 
