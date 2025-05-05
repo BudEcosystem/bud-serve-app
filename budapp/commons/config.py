@@ -100,14 +100,6 @@ class AppConfig(BaseAppConfig):
     # Profiling
     profiler_enabled: bool = Field(False, alias="ENABLE_PROFILER")
 
-    # DB connection
-    # postgres_host: str = Field("localhost", alias="POSTGRES_HOST")
-    # postgres_port: int = Field(5432, alias="POSTGRES_PORT")
-    # postgres_user: str = Field(alias="POSTGRES_USER")
-    # postgres_password: str = Field(alias="POSTGRES_PASSWORD")
-    # postgres_db: str = Field(alias="POSTGRES_DB")
-    postgres_url: Optional[str] = None
-
     # Superuser
     superuser_email: str = Field(alias="SUPER_USER_EMAIL")
     superuser_password: str = Field(alias="SUPER_USER_PASSWORD")
@@ -187,7 +179,7 @@ class AppConfig(BaseAppConfig):
 
 
 # class SecretsConfig(BaseSecretsConfig):
-class SecretsConfig(BaseConfig):
+class SecretsConfig(BaseSecretsConfig):
     """Manages secret configurations for the microservice.
 
     This class handles the configuration of secrets required by the microservice. It supports secret management via
@@ -233,26 +225,6 @@ class SecretsConfig(BaseConfig):
     )
     redis_uri: Optional[str] = Field(
         None, alias="REDIS_URI", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
-    )
-    # postgres_user: Optional[str] = Field(
-    #     None,
-    #     alias="POSTGRES_USER",
-    #     json_schema_extra=enable_periodic_sync_from_store(is_global=True),
-    # )
-    # postgres_password: Optional[str] = Field(
-    #     None,
-    #     alias="POSTGRES_PASSWORD",
-    #     json_schema_extra=enable_periodic_sync_from_store(is_global=True),
-    # )
-    psql_user: Optional[str] = Field(
-        None,
-        alias="POSTGRES_USER",
-        json_schema_extra=enable_periodic_sync_from_store(is_global=True),
-    )
-    psql_password: Optional[str] = Field(
-        None,
-        alias="POSTGRES_PASSWORD",
-        json_schema_extra=enable_periodic_sync_from_store(is_global=True),
     )
     hf_token: Optional[str] = Field(
         None, alias="HF_TOKEN", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
@@ -324,25 +296,6 @@ class SecretsConfig(BaseConfig):
 app_settings = AppConfig()
 secrets_settings = SecretsConfig()
 
-
-def postgres_url(app_settings: BaseAppConfig, secrets_settings: BaseSecretsConfig) -> str:
-    """Construct and returns a PostgreSQL connection URL.
-
-    This property combines the individual PostgreSQL connection parameters
-    into a single connection URL string.
-
-    Returns:
-        A formatted PostgreSQL connection string.
-    """
-    return f"postgresql://{secrets_settings.psql_user}:{secrets_settings.psql_password}@{app_settings.psql_host}:{app_settings.psql_port}/{app_settings.psql_dbname}"
-
-
 logging.configure_logging(app_settings.log_dir, app_settings.log_level)
-
-
-app_settings.postgres_url = postgres_url(app_settings=app_settings, secrets_settings=secrets_settings)
-
-# secrets_settings.psql_user = secrets_settings.postgres_user
-# secrets_settings.psql_password = secrets_settings.postgres_password
 
 register_settings(app_settings, secrets_settings)
