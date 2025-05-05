@@ -31,16 +31,16 @@ target_metadata = Base.metadata
 
 
 def get_psql_url() -> PostgresDsn:
-    if os.getenv("POSTGRES_HOST") is None or os.getenv("POSTGRES_PORT") is None or os.getenv("POSTGRES_DB") is None:
-        raise ValueError("POSTGRES_HOST, POSTGRES_PORT, and POSTGRES_DB must be set")
+    if os.getenv("PSQL_HOST") is None or os.getenv("PSQL_PORT") is None or os.getenv("PSQL_DB_NAME") is None:
+        raise ValueError("PSQL_HOST, PSQL_PORT, and PSQL_DB_NAME must be set")
 
     return PostgresDsn.build(
-        scheme="postgresql",
-        username=os.getenv("POSTGRES_USER"),
-        password=os.getenv("POSTGRES_PASSWORD"),
-        host=os.getenv("POSTGRES_HOST"),
-        port=int(os.getenv("POSTGRES_PORT")),
-        path=os.getenv("POSTGRES_DB"),
+        scheme="postgresql+psycopg",
+        username=os.getenv("SECRETS_PSQL_USER"),
+        password=os.getenv("SECRETS_PSQL_PASSWORD"),
+        host=os.getenv("PSQL_HOST"),
+        port=int(os.getenv("PSQL_PORT")),
+        path=os.getenv("PSQL_DB_NAME"),
     ).__str__()
 
 
