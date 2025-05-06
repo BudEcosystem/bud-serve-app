@@ -1106,6 +1106,21 @@ class KeycloakManager:
             # 1. RESOURCE  (one per scope so that the RPT carries it)
             # ----------------------------------------------------------
             res_name = f"URN::{resource.resource_type}::{resource.resource_id}"
+
+            # check if the resource already exists
+            resource_data = realm_admin.get_client_authz_resources(client_id)
+            resource_obj = next((r for r in resource_data if r["name"] == res_name), None)
+            if resource_obj:
+                logger.info(f"Resource {res_name} already exists — assigning scopes to user and skipping the rest")
+                payload_assing = AssignResourceScopeToUser(
+                    resource_type=resource.resource_type,
+                    entity_id=resource.resource_id,
+                    user_auth_id=user_auth_id,
+                    scopes=resource.scopes,
+                )
+                await self.assign_user_to_resource(payload=payload_assing, realm_name=realm_name, client_id=client_id)
+                return
+
             payload = {
                 "name": res_name,
                 "type": resource.resource_type.capitalize(),
