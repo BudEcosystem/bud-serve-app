@@ -1376,57 +1376,18 @@ class LocalModelWorkflowService(SessionMixin):
                     }
                 )
 
-        license_object_type, updated_license_url = await self._license_url_type_identifier(
-            local_path, license_url, model_id
-        )
-
         license_data = ModelLicensesCreate(
             name=license_name,
-            url=updated_license_url,
+            url=license_url,
             faqs=updated_license_faqs if updated_license_faqs else None,
             model_id=model_id,
             license_type=license_type,
             description=license_description,
             suitability=license_suitability,
-            data_type=license_object_type,
         )
         return await ModelLicensesDataManager(self.session).insert_one(
             ModelLicenses(**license_data.model_dump(exclude_none=True))
         )
-
-    async def _license_url_type_identifier(
-        self, local_path: str, license_url: str, model_id: UUID
-    ) -> Tuple[ModelLicenseObjectTypeEnum, str]:
-        """Identify license url type.
-
-        Args:
-            local_path (str): Local path.
-            license_url (str): License url.
-
-        Returns:
-            str: Model license object type.
-        """
-        if license_url.startswith(local_path):
-            # Check if object exists in minio
-            model_store = ModelStore()
-            is_minio_object_exists = model_store.check_file_exists(app_settings.minio_bucket, license_url)
-            if is_minio_object_exists:
-                # Download to a temp file and upload to minio
-                with tempfile.TemporaryDirectory() as temp_dir:
-                    minio_store = ModelStore()
-                    file_name = os.path.basename(license_url)
-                    download_path = os.path.join(temp_dir, file_name)
-                    minio_store.download_object(app_settings.minio_bucket, license_url, download_path)
-
-                    # License object name
-                    license_object_name = f"{model_id}/{file_name}"
-                    minio_store.upload_file(app_settings.minio_model_bucket, download_path, license_object_name)
-                    return ModelLicenseObjectTypeEnum.MINIO, license_object_name
-            else:
-                logger.error("License url %s does not exist in minio.", license_url)
-                return ModelLicenseObjectTypeEnum.URL, license_url
-        else:
-            return ModelLicenseObjectTypeEnum.URL, license_url
 
     @staticmethod
     async def get_base_model_relation(model_tree: dict) -> Optional[BaseModelRelationEnum]:
