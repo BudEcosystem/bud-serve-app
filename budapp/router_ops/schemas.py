@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, model_validator
 
-from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
+from budapp.commons.schemas import PaginatedSuccessResponse, Tag
 
 
 class RouterFilter(BaseModel):
@@ -36,7 +36,7 @@ class RouterRequest(BaseModel):
     project_id: UUID
     name: str
     description: str
-    tags: Optional[List[str]] = None
+    tags: Optional[List[Tag]] = None
     routing_strategy: Optional[List[Dict[str, Any]]] = None
     endpoints: List[RouterEndpoints]
 
@@ -46,7 +46,7 @@ class RouterResponse(BaseModel):
     project_id: UUID
     name: str
     description: str
-    tags: Optional[List[str]] = None
+    tags: Optional[List[Tag]] = None
     routing_strategy: Optional[List[Dict[str, Any]]] = None
     endpoints: List[RouterEndpoints]
 

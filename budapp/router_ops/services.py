@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from budapp.commons import logging
+from budapp.commons.schemas import Tag
 from budapp.commons.constants import ProjectStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.endpoint_ops.crud import EndpointDataManager
@@ -55,6 +56,7 @@ class RouterService(SessionMixin):
 
         router_data = request.model_dump()
         router_data["routing_strategy"] = router_data["routing_strategy"] or []
+        router_data["tags"] = router_data["tags"] or []
         router_endpoints_data = router_data.pop("endpoints") or []
 
         router = Router(**router_data)
@@ -77,7 +79,7 @@ class RouterService(SessionMixin):
             project_id=db_router.project_id,
             name=db_router.name,
             description=db_router.description,
-            tags=db_router.tags,
+            tags=[Tag(**tag) for tag in db_router.tags] if db_router.tags else [],
             routing_strategy=db_router.routing_strategy,
             endpoints=[
                 RouterEndpoints(
