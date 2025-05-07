@@ -442,7 +442,7 @@ class ProjectDataManager(DataManagerUtils):
 
         return search_conditions
 
-    async def retrieve_project_details(self, project_id: UUID) -> Union[Tuple[Project, int], None]:
+    async def retrieve_project_details(self, project_id: UUID, user_id: UUID) -> Union[Tuple[Project, int], None]:
         """Retrieve project details with endpoint count for detail page."""
 
         # Subquery to count endpoints per project
@@ -466,9 +466,14 @@ class ProjectDataManager(DataManagerUtils):
                 endpoint_count_subquery,
                 Project.id == endpoint_count_subquery.c.project_id,
             )
+            .join(
+                project_user_association,
+                Project.id == project_user_association.c.project_id,
+            )
             .filter(
                 Project.id == project_id,
-                Project.status == ProjectStatusEnum.ACTIVE,  # Filter for active projects
+                Project.status == ProjectStatusEnum.ACTIVE,
+                project_user_association.c.user_id == user_id,  # Ensure user is associated
             )
         )
 
@@ -508,8 +513,6 @@ class ProjectDataManager(DataManagerUtils):
                 select(
                     User,
                     project_role,
-                    ProjectPermission,
-                    Permission,
                 )
                 .filter(User.status.in_([UserStatusEnum.INVITED, UserStatusEnum.ACTIVE]))
                 .filter(and_(*search_conditions))
@@ -522,14 +525,6 @@ class ProjectDataManager(DataManagerUtils):
                     project_user_association.c.project_id == Project.id,
                 )
                 .where(project_user_association.c.project_id == project_id)
-                .join(
-                    ProjectPermission,
-                    and_(
-                        ProjectPermission.project_id == Project.id,
-                        ProjectPermission.user_id == User.id,
-                    ),
-                )
-                .join(Permission, Permission.user_id == User.id)
             )
 
             count_stmt = (
@@ -546,22 +541,10 @@ class ProjectDataManager(DataManagerUtils):
                     project_user_association.c.project_id == Project.id,
                 )
                 .where(project_user_association.c.project_id == project_id)
-                .join(
-                    ProjectPermission,
-                    and_(
-                        ProjectPermission.project_id == Project.id,
-                        ProjectPermission.user_id == User.id,
-                    ),
-                )
             )
         else:
             stmt = (
-                select(
-                    User,
-                    project_role,
-                    ProjectPermission,
-                    Permission,
-                )
+                select(User, project_role)
                 .filter(User.status.in_([UserStatusEnum.INVITED, UserStatusEnum.ACTIVE]))
                 .filter_by(**filters)
                 .join(
@@ -573,14 +556,6 @@ class ProjectDataManager(DataManagerUtils):
                     project_user_association.c.project_id == Project.id,
                 )
                 .where(project_user_association.c.project_id == project_id)
-                .join(
-                    ProjectPermission,
-                    and_(
-                        ProjectPermission.project_id == Project.id,
-                        ProjectPermission.user_id == User.id,
-                    ),
-                )
-                .join(Permission, Permission.user_id == User.id)
             )
 
             count_stmt = (
@@ -597,13 +572,6 @@ class ProjectDataManager(DataManagerUtils):
                     project_user_association.c.project_id == Project.id,
                 )
                 .where(project_user_association.c.project_id == project_id)
-                .join(
-                    ProjectPermission,
-                    and_(
-                        ProjectPermission.project_id == Project.id,
-                        ProjectPermission.user_id == User.id,
-                    ),
-                )
             )
 
         # Apply limit and offset

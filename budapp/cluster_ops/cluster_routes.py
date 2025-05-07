@@ -32,6 +32,8 @@ from budapp.commons.dependencies import (
     get_session,
     parse_ordering_fields,
 )
+from budapp.commons.permission_handler import require_permissions
+from budapp.commons.constants import PermissionEnum
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.shared.grafana import Grafana
@@ -67,6 +69,7 @@ logger = logging.get_logger(__name__)
 
 cluster_router = APIRouter(prefix="/clusters", tags=["cluster"])
 
+
 @cluster_router.get(
     "/{cluster_id}/grafana-dashboard",
     responses={
@@ -85,6 +88,7 @@ cluster_router = APIRouter(prefix="/clusters", tags=["cluster"])
     },
     description="Get Grafana dashboard URL by cluster id",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def get_grafana_dashboard_url(
     cluster_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -99,7 +103,7 @@ async def get_grafana_dashboard_url(
             message="Successfully retrieved Grafana dashboard URL",
             code=status.HTTP_200_OK,
             object="cluster.grafana-dashboard",
-            url=url
+            url=url,
         )
     except Exception as e:
         logger.exception(f"Error retrieving Grafana dashboard URL: {e}")
@@ -127,28 +131,26 @@ async def get_grafana_dashboard_url(
     },
     description="Create cluster workflow",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_MANAGE])
 async def create_cluster_workflow(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     step_number: Annotated[int, Form(gt=0)],
     name: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
     icon: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
-
-
     ingress_url: Annotated[AnyHttpUrl | None, Form()] = None,
     configuration_file: Annotated[
         UploadFile | None, File(description="The configuration file for the cluster")
     ] = None,
-
     workflow_id: Annotated[UUID | None, Form()] = None,
     workflow_total_steps: Annotated[int | None, Form()] = None,
     trigger_workflow: Annotated[bool, Form()] = False,
     # Cloud Cluster
     cluster_type: Annotated[str, Form(description="Type of cluster", enum=["ON_PREM", "CLOUD"])] = "ON_PREM",
     # Cluster Specific Inputs
-    credential_id:  Annotated[UUID | None, Form()] = None,
-    provider_id:  Annotated[UUID | None, Form()] = None,
-    region: Annotated[str | None, Form()] = None
+    credential_id: Annotated[UUID | None, Form()] = None,
+    provider_id: Annotated[UUID | None, Form()] = None,
+    region: Annotated[str | None, Form()] = None,
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Create cluster workflow."""
     # Perform router level validation
@@ -196,7 +198,7 @@ async def create_cluster_workflow(
                 credential_id=credential_id,
                 provider_id=provider_id,
                 region=region,
-                cluster_type=cluster_type
+                cluster_type=cluster_type,
             ),
             configuration_file=configuration_file,
         )
@@ -233,6 +235,7 @@ async def create_cluster_workflow(
     },
     description="List all clusters",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def list_clusters(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -285,6 +288,7 @@ async def list_clusters(
     },
     description="Edit cluster",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_MANAGE])
 async def edit_cluster(
     cluster_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -330,6 +334,7 @@ async def edit_cluster(
     },
     description="Retrieve details of a cluster by ID",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def get_cluster_details(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -374,6 +379,7 @@ async def get_cluster_details(
     },
     description="Delete a cluster by ID",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_MANAGE])
 async def delete_cluster(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -417,6 +423,7 @@ async def delete_cluster(
     },
     description="Cancel cluster onboarding",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_MANAGE])
 async def cancel_cluster_onboarding(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -458,6 +465,7 @@ async def cancel_cluster_onboarding(
     },
     description="List all endpoints in a cluster.\n\nOrder by values are: name, status, created_at, project_name, model_name.",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def list_all_endpoints(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -518,6 +526,7 @@ async def list_all_endpoints(
     },
     description="Get detailed metrics for a specific cluster including CPU, memory, disk, GPU, HPU, and network statistics. Use metric_type to filter specific metrics.",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def get_cluster_metrics(
     cluster_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -562,6 +571,7 @@ async def get_cluster_metrics(
     },
     description="Get node-wise metrics for a cluster",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def get_node_wise_metrics(
     cluster_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -571,9 +581,7 @@ async def get_node_wise_metrics(
     try:
         metrics = await ClusterService(session).get_node_wise_metrics(cluster_id)
 
-        return NodeMetricsResponse(
-            code=status.HTTP_200_OK, message="Successfully retrieved node metrics", **metrics
-        )
+        return NodeMetricsResponse(code=status.HTTP_200_OK, message="Successfully retrieved node metrics", **metrics)
     except ClientException as e:
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
@@ -582,6 +590,7 @@ async def get_node_wise_metrics(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Error retrieving node-wise metrics",
         ).to_http_response()
+
 
 @cluster_router.get(
     "/{cluster_id}/node-events/{node_hostname}",
@@ -601,6 +610,7 @@ async def get_node_wise_metrics(
     },
     description="Get node-wise Events by hostname with pagination",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def get_node_wise_events_by_hostname(
     cluster_id: UUID,
     node_hostname: str,
@@ -614,8 +624,7 @@ async def get_node_wise_events_by_hostname(
         events = events_raw.get("events", [])
 
         return ClusterNodeWiseEventsResponse(
-            code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname",
-            events=events
+            code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname", events=events
         )
     except ClientException as e:
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
@@ -670,6 +679,7 @@ async def recommended_scheduler():
     },
     description="Get all recommended clusters by id",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def get_recommended_clusters(
     workflow_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],

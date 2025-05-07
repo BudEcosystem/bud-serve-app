@@ -19,9 +19,9 @@
 
 from typing import Any, List
 
-from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
-from budapp.commons.constants import TokenTypeEnum, UserRoleEnum
+from budapp.commons.constants import TokenTypeEnum, UserRoleEnum, PermissionEnum
 from budapp.commons.helpers import validate_password_string
 from budapp.commons.schemas import SuccessResponse
 from budapp.permissions.schemas import PermissionList
@@ -142,6 +142,29 @@ class UserCreate(UserBase):
             raise ValueError("The SUPER_ADMIN role is not permitted.")
         return value
 
+    @model_validator(mode="after")
+    def ensure_view_permissions(self) -> "UserCreate":
+        if self.permissions is None:
+            return self
+
+        # Map manage -> view counterparts
+        manage_to_view_map = {
+            PermissionEnum.MODEL_MANAGE.value: PermissionEnum.MODEL_VIEW.value,
+            PermissionEnum.PROJECT_MANAGE.value: PermissionEnum.PROJECT_VIEW.value,
+            PermissionEnum.ENDPOINT_MANAGE.value: PermissionEnum.ENDPOINT_VIEW.value,
+            PermissionEnum.CLUSTER_MANAGE.value: PermissionEnum.CLUSTER_VIEW.value,
+        }
+
+        existing_names = {perm.name for perm in self.permissions}
+        additional_permissions = []
+
+        for manage, view in manage_to_view_map.items():
+            if manage in existing_names and view not in existing_names:
+                additional_permissions.append(PermissionList(name=view, has_permission=True))
+
+        self.permissions.extend(additional_permissions)
+        return self
+
 
 class UserRegisterResponse(SuccessResponse):
     """User register response schema."""
@@ -160,7 +183,7 @@ class ResourceCreate(BaseModel):
     resource_type: str
     resource_id: str
     scopes: List[str]  # view , manage
-    
+
 
 class DeletePermissionRequest(BaseModel):
     """Delete permission request schema."""
