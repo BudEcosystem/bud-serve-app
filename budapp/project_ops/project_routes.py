@@ -441,7 +441,9 @@ async def retrieve_project(
 ) -> Union[ProjectDetailResponse, ErrorResponse]:
     """Retrieve a single active project."""
     try:
-        db_project, endpoints_count = await ProjectService(session).retrieve_active_project_details(project_id)
+        db_project, endpoints_count = await ProjectService(session).retrieve_active_project_details(
+            project_id, current_user.id
+        )
         logger.info(f"Project retrieved: {project_id}")
     except ClientException as e:
         logger.exception(f"Failed to retrieve project: {e}")
