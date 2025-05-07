@@ -323,7 +323,8 @@ class PermissionEnum(Enum):
     Attributes:
         MODEL_VIEW (str): Permission to view models.
         MODEL_MANAGE (str): Permission to manage models.
-        MODEL_BENCHMARK (str): Permission to benchmark models.
+        BENCHMARK_VIEW (str): Permission to view benchmark.
+        BENCHMARK_MANAGE (str): Permission to manage benchmark.
         PROJECT_VIEW (str): Permission to view projects.
         PROJECT_MANAGE (str): Permission to manage projects.
         ENDPOINT_VIEW (str): Permission to view endpoints.
@@ -335,7 +336,8 @@ class PermissionEnum(Enum):
 
     MODEL_VIEW = "model:view"
     MODEL_MANAGE = "model:manage"
-    MODEL_BENCHMARK = "model:benchmark"
+    BENCHMARK_VIEW = "benchmark:view"
+    BENCHMARK_MANAGE = "benchmark:manage"
 
     PROJECT_VIEW = "project:view"
     PROJECT_MANAGE = "project:manage"
@@ -354,7 +356,8 @@ class PermissionEnum(Enum):
         return [
             cls.MODEL_VIEW.value,
             cls.MODEL_MANAGE.value,
-            cls.MODEL_BENCHMARK.value,
+            cls.BENCHMARK_VIEW.value,
+            cls.BENCHMARK_MANAGE.value,
             cls.PROJECT_VIEW.value,
             cls.PROJECT_MANAGE.value,
             cls.CLUSTER_VIEW.value,
@@ -588,6 +591,7 @@ class AdapterStatusEnum(StrEnum):
     DELETING = auto()
     DELETED = auto()
     PENDING = auto()
+
 
 class ScalingTypeEnum(StrEnum):
     """Scaling type types."""
