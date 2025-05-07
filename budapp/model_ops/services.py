@@ -17,9 +17,10 @@
 """The model ops services. Contains business logic for model ops."""
 
 import os
+import re
 import tempfile
 from typing import Any, Dict, List, Literal, Optional, Tuple
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 from uuid import UUID, uuid4
 
 import aiohttp
@@ -67,6 +68,7 @@ from ..commons.constants import (
     VisibilityEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
+    MINIO_LICENSE_OBJECT_NAME
 )
 from ..commons.helpers import validate_huggingface_repo_format
 from ..commons.schemas import BudNotificationMetadata
@@ -2043,20 +2045,35 @@ class ModelService(SessionMixin):
             file = data.pop("license_file")
 
             # Save to minio
-            license_object_name = await self._save_license_to_minio(file, model_id)
+            license_object_name = await self._save_license_file_to_minio(file, model_id)
 
             # Create or update license entry
             await self._create_or_update_license_entry(
-                model_id, file.filename, license_object_name, current_user_id, ModelLicenseObjectTypeEnum.MINIO
+                model_id, file.filename, license_object_name, current_user_id
             )
 
         elif data.get("license_url"):
             # If a license URL is provided, store the URL in the DB instead of the file path
             license_url = data.pop("license_url")
-            filename = license_url.split("/")[-1]  # Extract filename from the URL
-            filename = filename if filename else "sample license"
+
+            # get file name with extension from url
+            parsed = urlparse(license_url)
+            path = unquote(parsed.path)
+            filename = path.split('/')[-1]
+
+            # Handle query parameters
+            if '?' in filename:
+                filename = filename.split('?')[0]
+
+            # Validate filename
+            if not filename or not re.match(r'^[\w\-\.]+$', filename):
+                filename = "LICENSE"
+
+            # Save to minio
+            license_object_name = await self._save_license_url_to_minio(license_url, filename, model_id)
+
             await self._create_or_update_license_entry(
-                model_id, filename, str(license_url), current_user_id, ModelLicenseObjectTypeEnum.URL
+                model_id, filename, license_object_name, current_user_id
             )  # TODO: modify filename arg when license service implemented
 
         # Add papers if provided
@@ -2067,11 +2084,11 @@ class ModelService(SessionMixin):
         # Update model with validated data
         await ModelDataManager(self.session).update_by_fields(db_model, data)
 
-    async def _save_license_to_minio(self, file: UploadFile, model_id: UUID) -> str:
+    async def _save_license_file_to_minio(self, file: UploadFile, model_id: UUID) -> str:
         """Save uploaded file and return file path."""
         # Check if the license file already exists in minio
         minio_store = ModelStore()
-        license_object_prefix = f"{model_id}"
+        license_object_prefix = f"{MINIO_LICENSE_OBJECT_NAME}/{model_id}"
         try:
             # is_minio_object_exists = minio_store.check_file_exists(app_settings.minio_model_bucket, license_object_prefix)
             minio_store.remove_objects(app_settings.minio_model_bucket, license_object_prefix, recursive=True)
@@ -2081,13 +2098,45 @@ class ModelService(SessionMixin):
                 file_path = os.path.join(temp_dir, file.filename)
                 with open(file_path, "wb") as f:
                     f.write(await file.read())
-                license_object_name = f"{model_id}/{file.filename}"
+                license_object_name = f"{MINIO_LICENSE_OBJECT_NAME}/{model_id}/{file.filename}"
 
                 # Upload file to minio
                 minio_store.upload_file(app_settings.minio_model_bucket, file_path, license_object_name)
 
             return license_object_name
         except MinioException as e:
+            logger.exception(f"Error uploading file to minio: {e}")
+            raise ClientException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Unable to save license file"
+            ) from e
+    
+    async def _save_license_url_to_minio(self, license_url: str, filename: str, model_id: UUID) -> str:
+        """Save uploaded file and return file path."""
+        # Check if the license file already exists in minio
+        minio_store = ModelStore()
+        license_object_prefix = f"{MINIO_LICENSE_OBJECT_NAME}/{model_id}"
+        try:
+            # is_minio_object_exists = minio_store.check_file_exists(app_settings.minio_model_bucket, license_object_prefix)
+            minio_store.remove_objects(app_settings.minio_model_bucket, license_object_prefix, recursive=True)
+
+            # Download file to a temp folder and save it to minio
+            with tempfile.TemporaryDirectory() as temp_dir:
+                response = requests.get(license_url, timeout=30)
+                response.raise_for_status()
+
+                # Save file to temp folder
+                file_path = os.path.join(temp_dir, filename)
+                with open(file_path, "wb") as f:
+                    f.write(response.content)
+                
+                # Generate license object name
+                license_object_name = f"{MINIO_LICENSE_OBJECT_NAME}/{model_id}/{filename}"
+
+                # Upload file to minio
+                minio_store.upload_file(app_settings.minio_model_bucket, file_path, license_object_name)
+
+            return license_object_name
+        except (MinioException, Exception) as e:
             logger.exception(f"Error uploading file to minio: {e}")
             raise ClientException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Unable to save license file"
@@ -2099,15 +2148,11 @@ class ModelService(SessionMixin):
         filename: str,
         license_url: str,
         current_user_id: UUID,
-        data_type: ModelLicenseObjectTypeEnum,
     ) -> None:
         """Create or update a license entry in the database."""
         # Set license source
-        if data_type == ModelLicenseObjectTypeEnum.MINIO:
-            minio_store = ModelStore()
-            license_source = minio_store.get_object_url(app_settings.minio_model_bucket, license_url)
-        else:
-            license_source = license_url
+        minio_store = ModelStore()
+        license_source = minio_store.get_object_url(app_settings.minio_model_bucket, license_url)
 
         # Check if a license entry with the given model_id exists
         existing_license = await ModelLicensesDataManager(self.session).retrieve_by_fields(
@@ -2120,7 +2165,6 @@ class ModelService(SessionMixin):
             update_license_data = {
                 "name": filename,
                 "url": license_url,
-                "data_type": data_type,
                 "faqs": None,
                 "description": None,
                 "suitability": None,
@@ -2138,7 +2182,6 @@ class ModelService(SessionMixin):
                 id=uuid4(),
                 name=filename,
                 url=license_url,
-                data_type=data_type,
                 model_id=model_id,
                 faqs=None,
                 description=None,

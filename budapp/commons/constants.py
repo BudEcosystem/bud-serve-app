@@ -2739,3 +2739,6 @@ class ModelLicenseObjectTypeEnum(StrEnum):
 
 # Grafana Dashboard ID
 GRAFANA_CLUSTER_WORKLOAD_NAME_PATTERN = "Kubernetes / Compute Resources / Workload"
+
+# Minio License Object Name
+MINIO_LICENSE_OBJECT_NAME = "licenses"
