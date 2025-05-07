@@ -31,6 +31,8 @@ from budapp.commons.dependencies import (
     get_session,
     parse_ordering_fields,
 )
+from budapp.commons.constants import PermissionEnum
+from budapp.commons.permission_handler import require_permissions
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
 from budapp.endpoint_ops.schemas import ModelClusterDetailResponse
@@ -65,6 +67,7 @@ benchmark_router = APIRouter(prefix="/benchmark", tags=["benchmark"])
     },
     description="Run benchmark workflow",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_MANAGE])
 async def run_benchmark_workflow(
     request: RunBenchmarkWorkflowRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -106,6 +109,7 @@ async def run_benchmark_workflow(
     },
     description="List all benchmarks. \n\n order_by fields are: name, status, created_at, cluster_name, model_name",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def list_all_benchmarks(
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -164,6 +168,7 @@ async def list_all_benchmarks(
     },
     description="Fetch benchmark result",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def get_benchmark_result(
     benchmark_id: UUID,
     _: Annotated[User, Depends(get_current_active_user)],
@@ -185,9 +190,7 @@ async def get_benchmark_result(
         response = ErrorResponse(code=e.status_code, message=e.message)
     except Exception as e:
         logger.exception(f"Failed to get benchmark result: {e}")
-        response = ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get benchmark result"
-        )
+        response = ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get benchmark result")
 
     return response.to_http_response()
 
@@ -210,6 +213,7 @@ async def get_benchmark_result(
     },
     description="Fetch benchmark's model and cluster details",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def get_benchmark_model_cluster_detail(
     benchmark_id: UUID,
     _: Annotated[User, Depends(get_current_active_user)],
@@ -256,6 +260,7 @@ async def get_benchmark_model_cluster_detail(
     },
     description="Fetchetched analysis data",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def get_field1_vs_field2_data(
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -298,6 +303,7 @@ async def get_field1_vs_field2_data(
     },
     description="Fetchetched analysis data",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def get_field1_vs_field2_benchmark_data(
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -307,7 +313,9 @@ async def get_field1_vs_field2_benchmark_data(
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Fetch field1 vs field2 analysis."""
     try:
-        field1_vs_field2_data = BenchmarkRequestMetricsService(session).get_field1_vs_field2_data(field1, field2,benchmark_id)
+        field1_vs_field2_data = BenchmarkRequestMetricsService(session).get_field1_vs_field2_data(
+            field1, field2, benchmark_id
+        )
         response = SuccessResponse(
             object="benchmark.request.metrics.detail",
             param={"result": field1_vs_field2_data},
@@ -316,11 +324,11 @@ async def get_field1_vs_field2_benchmark_data(
     except Exception as e:
         logger.exception(f"Failed to fetch {field1} vs {field2} data for benchmark : {benchmark_id} : {e}")
         response = ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=f"Failed to fetch {field1} vs {field2} data for benchmark : {benchmark_id} : {e}"
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed to fetch {field1} vs {field2} data for benchmark : {benchmark_id} : {e}",
         )
 
     return response.to_http_response()
-
 
 
 @benchmark_router.post(
@@ -341,6 +349,7 @@ async def get_field1_vs_field2_benchmark_data(
     },
     description="Add request metrics",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def add_request_metrics(
     session: Annotated[Session, Depends(get_session)],
     request: AddRequestMetricsRequest,
@@ -358,15 +367,13 @@ async def add_request_metrics(
         response = ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=str(e))
     except Exception as e:
         logger.exception(f"Failed to add request metrics: {e}")
-        response = ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add request metrics"
-        )
+        response = ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add request metrics")
 
     return response.to_http_response()
 
 
 @benchmark_router.post(
-   "/dataset/input-distribution",
+    "/dataset/input-distribution",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
@@ -383,12 +390,13 @@ async def add_request_metrics(
     },
     description="Get dataset vs input-distribution",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def get_dataset_input_distribution(
     dataset_ids: List[UUID],
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    benchmark_id: Optional[UUID]=None,
-    num_bins: int=10,
+    benchmark_id: Optional[UUID] = None,
+    num_bins: int = 10,
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Get dataset input distribution."""
     try:
@@ -402,9 +410,7 @@ async def get_dataset_input_distribution(
         )
     except HTTPException as http_exc:
         logger.exception(f"Failed to fetch dataset input distribution: {http_exc}")
-        response = ErrorResponse(
-            code=http_exc.status_code, message=http_exc.detail
-        )
+        response = ErrorResponse(code=http_exc.status_code, message=http_exc.detail)
     except Exception as e:
         logger.exception(f"Failed to fetch dataset input distribution: {e}")
         response = ErrorResponse(
@@ -415,7 +421,7 @@ async def get_dataset_input_distribution(
 
 
 @benchmark_router.post(
-   "/dataset/output-distribution",
+    "/dataset/output-distribution",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
@@ -432,12 +438,13 @@ async def get_dataset_input_distribution(
     },
     description="Get dataset vs output-distribution",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def get_dataset_output_distribution(
     dataset_ids: List[UUID],
     _: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    benchmark_id: Optional[UUID]=None,
-    num_bins: int=10,
+    benchmark_id: Optional[UUID] = None,
+    num_bins: int = 10,
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Get dataset output distribution."""
     try:
@@ -451,9 +458,7 @@ async def get_dataset_output_distribution(
         )
     except HTTPException as http_exc:
         logger.exception(f"Failed to fetch dataset output distribution: {http_exc}")
-        response = ErrorResponse(
-            code=http_exc.status_code, message=http_exc.detail
-        )
+        response = ErrorResponse(code=http_exc.status_code, message=http_exc.detail)
     except Exception as e:
         logger.exception(f"Failed to fetch dataset output distribution: {e}")
         response = ErrorResponse(
@@ -464,7 +469,7 @@ async def get_dataset_output_distribution(
 
 
 @benchmark_router.get(
-   "/request-metrics",
+    "/request-metrics",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
@@ -481,6 +486,7 @@ async def get_dataset_output_distribution(
     },
     description="Get benchmark request metrics",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def get_request_metrics(
     benchmark_id: UUID,
     _: Annotated[User, Depends(get_current_active_user)],
@@ -490,7 +496,9 @@ async def get_request_metrics(
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Get benchmark request metrics."""
     try:
-        request_metrics, count = await BenchmarkRequestMetricsService(session).get_request_metrics(benchmark_id=benchmark_id, offset=(page-1)*limit, limit=limit)
+        request_metrics, count = await BenchmarkRequestMetricsService(session).get_request_metrics(
+            benchmark_id=benchmark_id, offset=(page - 1) * limit, limit=limit
+        )
         response = PaginatedResponse(
             object="benchmark.request.metrics.list",
             items=request_metrics,
