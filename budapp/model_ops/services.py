@@ -58,7 +58,6 @@ from ..commons.constants import (
     ClusterStatusEnum,
     CredentialTypeEnum,
     EndpointStatusEnum,
-    ModelLicenseObjectTypeEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
@@ -2333,9 +2332,8 @@ class ModelService(SessionMixin):
         # Delete existing license from minio
         if db_model.model_licenses:
             logger.debug(f"Deleting license from minio for model {db_model.id}")
-            if db_model.model_licenses.data_type == ModelLicenseObjectTypeEnum.MINIO:
-                minio_store = ModelStore()
-                minio_store.remove_objects(app_settings.minio_model_bucket, f"{db_model.id}", recursive=True)
+            minio_store = ModelStore()
+            minio_store.remove_objects(app_settings.minio_model_bucket, f"{MINIO_LICENSE_OBJECT_NAME}/{db_model.id}", recursive=True)
 
             # Delete license from db
             await ModelLicensesDataManager(self.session).delete_by_fields(ModelLicenses, {"model_id": db_model.id})

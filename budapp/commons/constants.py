@@ -2729,14 +2729,6 @@ class DatasetStatusEnum(Enum):
 # Recommended cluster scheduler state store key
 RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY = "recommended_cluster_scheduler_state"
 
-
-class ModelLicenseObjectTypeEnum(StrEnum):
-    """Model license object type."""
-
-    URL = "url"
-    MINIO = "minio"
-
-
 # Grafana Dashboard ID
 GRAFANA_CLUSTER_WORKLOAD_NAME_PATTERN = "Kubernetes / Compute Resources / Workload"
 
