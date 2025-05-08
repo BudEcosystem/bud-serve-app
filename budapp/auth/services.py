@@ -69,16 +69,23 @@ class AuthService(SessionMixin):
             if not tenant_mapping:
                 raise ClientException("User does not belong to this tenant")
         else:
-            # If no tenant specified, get the first tenant the user belongs to
-            tenant_mapping = await UserDataManager(self.session).retrieve_by_fields(
-                TenantUserMapping, {"user_id": db_user.id}, missing_ok=True
+            # Get the default tenant
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
             )
-            if tenant_mapping:
-                tenant = await UserDataManager(self.session).retrieve_by_fields(
-                    Tenant, {"id": tenant_mapping.tenant_id}, missing_ok=True
-                )
+            if not tenant:
+                raise ClientException("Default tenant not found")
 
-        logger.debug(f"::USER:: Tenant: {tenant.realm_name} {tenant_mapping.id}")
+            # # If no tenant specified, get the first tenant the user belongs to
+            # tenant_mapping = await UserDataManager(self.session).retrieve_by_fields(
+            #     TenantUserMapping, {"user_id": db_user.id}, missing_ok=True
+            # )
+            # if tenant_mapping:
+            #     tenant = await UserDataManager(self.session).retrieve_by_fields(
+            #         Tenant, {"id": tenant_mapping.tenant_id}, missing_ok=True
+              #  )
+
+        logger.debug(f"::USER:: Tenant: {tenant.realm_name}")
 
         if not tenant:
             raise ClientException("User does not belong to any tenant")
@@ -299,6 +306,15 @@ class AuthService(SessionMixin):
                 email=db_user.email,
                 first_name=db_user.name,
             )
+
+            tenant_user_mapping = TenantUserMapping(
+                tenant_id=tenant.id,
+                user_id=db_user.id,
+            )
+
+            await UserDataManager(self.session).insert_one(tenant_user_mapping)
+            logger.info(f"User {db_user.email} mapped to tenant {tenant.name}")
+
             response = await BudNotifyHandler().create_subscriber(subscriber_data)
             logger.info("User added to budnotify subscriber")
 
