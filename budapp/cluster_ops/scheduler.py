@@ -239,8 +239,8 @@ class RecommendedClusterScheduler:
         if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
             bud_simulator_request = BudSimulatorRequest(
                 pretrained_model_uri=db_model.uri,
-                input_tokens=50,  # context length
-                output_tokens=100,  # sequence length
+                input_tokens=1024,  # context length
+                output_tokens=128,  # sequence length
                 concurrency=10,  # concurrent requests
                 target_throughput_per_user=0,  # minimum ttft
                 target_ttft=0,  # maximum per session tokens/second
@@ -252,11 +252,11 @@ class RecommendedClusterScheduler:
         else:
             bud_simulator_request = BudSimulatorRequest(
                 pretrained_model_uri=db_model.local_path,
-                input_tokens=50,
-                output_tokens=100,
+                input_tokens=1024,
+                output_tokens=128,
                 concurrency=10,
-                target_throughput_per_user=25,
-                target_ttft=300,
+                target_throughput_per_user=7,
+                target_ttft=1000,
                 target_e2e_latency=10,
                 notification_metadata=None,
                 source_topic=app_settings.source_topic,
