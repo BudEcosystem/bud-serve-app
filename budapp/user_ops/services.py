@@ -109,6 +109,7 @@ class UserService(SessionMixin):
             if user_id == current_user.id:
                 # Updating user own password doesn't require password after login
                 fields["is_reset_password"] = False
+                fields["first_login"] = False
 
                 if db_user.first_login and db_user.status == UserStatusEnum.INVITED:
                     fields["status"] = UserStatusEnum.ACTIVE
