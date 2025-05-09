@@ -115,7 +115,6 @@ from .schemas import (
     ModelDetailSuccessResponse,
     ModelIssue,
     ModelLicensesCreate,
-    ModelLicensesModel,
     ModelListResponse,
     ModelResponse,
     ModelSecurityScanResultCreate,
@@ -2176,8 +2175,7 @@ class ModelService(SessionMixin):
             await self.fetch_license_faqs(model_id, existing_license.id, current_user_id, license_source)
         else:
             # Create a new license entry
-            license_entry = ModelLicensesModel(
-                id=uuid4(),
+            license_entry = ModelLicensesCreate(
                 name=filename,
                 url=license_url,
                 model_id=model_id,
