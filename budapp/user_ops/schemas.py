@@ -151,3 +151,21 @@ class UserListFilter(UserFilter):
     """Filter user list schema"""
 
     status: UserStatusEnum | None = None
+
+
+class ResetPasswordResponse(SuccessResponse):
+    """Reset password response schema"""
+
+    acknowledged: bool
+    status: str
+    transaction_id: str
+
+
+class ResetPasswordRequest(BaseModel):
+    """Reset password request schema"""
+
+    email: EmailStr = Field(min_length=1, max_length=100)
+    tenant_id: UUID4 | None = Field(
+        None,
+        description="The ID of the tenant. If not provided, the user will be considered in to the first tenant they belong to.",
+    )

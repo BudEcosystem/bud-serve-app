@@ -710,6 +710,7 @@ class ProjectStatusEnum(StrEnum):
 BUD_NOTIFICATION_WORKFLOW = "bud-notification"
 BUD_INTERNAL_WORKFLOW = "bud-internal"
 PROJECT_INVITATION_WORKFLOW = "bud-project-invite"
+BUD_RESET_PASSWORD_WORKFLOW = "bud-reset-password"
 
 
 class NotificationStatus(Enum):

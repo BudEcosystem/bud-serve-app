@@ -33,7 +33,7 @@ from budapp.commons.dependencies import (
 )
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
-from budapp.user_ops.schemas import User
+from budapp.user_ops.schemas import User, ResetPasswordResponse, ResetPasswordRequest
 from budapp.user_ops.services import UserService
 
 from .schemas import MyPermissions, UserListFilter, UserListResponse, UserPermissions, UserResponse, UserUpdate
@@ -120,6 +120,51 @@ async def complete_user_onboarding(
         logger.exception(f"Failed to complete user onboarding: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to complete user onboarding"
+        ).to_http_response()
+
+
+@user_router.post(
+    "/reset-password",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ResetPasswordResponse,
+            "description": "Set user onboarding status to completed",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Trigger a reset password email notification",
+)
+async def reset_password(
+    request: ResetPasswordRequest, 
+    session: Session = Depends(get_session),
+) -> Union[ResetPasswordResponse, ErrorResponse]:
+    """Trigger a reset password email notification"""
+    try:
+        response = await UserService(session).reset_password_email(request)
+        logger.debug("Email notification triggered for reset password. %s", response)
+        
+        return ResetPasswordResponse(
+            object="user.reset-password",
+            code=status.HTTP_200_OK,
+            message="Email notification triggered for reset password",
+            acknowledged=response["acknowledged"],
+            status=response["status"],
+            transaction_id=response["transaction_id"]
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to trigger reset password email: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to trigger reset password email: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to trigger reset password email"
         ).to_http_response()
 
 

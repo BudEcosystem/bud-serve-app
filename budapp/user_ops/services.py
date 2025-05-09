@@ -29,15 +29,17 @@ from budapp.commons.keycloak import KeycloakManager
 from budapp.core.schemas import SubscriberCreate, SubscriberUpdate
 from budapp.shared.notification_service import BudNotifyHandler
 from budapp.user_ops.crud import UserDataManager
-from budapp.user_ops.models import Tenant, TenantClient
+from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
-from budapp.user_ops.schemas import TenantClientSchema
+from budapp.user_ops.schemas import TenantClientSchema, ResetPasswordRequest
 
-from ..commons.constants import EndpointStatusEnum, UserStatusEnum
+from ..commons.constants import EndpointStatusEnum, UserStatusEnum, NotificationCategory, BUD_RESET_PASSWORD_WORKFLOW
 from ..credential_ops.crud import CredentialDataManager
 from ..credential_ops.models import Credential as CredentialModel
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..commons.helpers import generate_valid_password, validate_password_string
+from ..shared.notification_service import BudNotifyService, NotificationBuilder
 
 
 logger = logging.get_logger(__name__)
@@ -321,3 +323,111 @@ class UserService(SessionMixin):
             logger.error(f"Failed to reactivate user in budnotify subscribers: {e}")
 
         return await UserDataManager(self.session).update_by_fields(db_user, data)
+
+    async def reset_password_email(self, request: ResetPasswordRequest):
+        """Trigger a reset password email notification"""
+        
+        # Check if user exists
+        db_user = await UserDataManager(self.session).retrieve_by_fields(
+            UserModel, {"email": request.email}, missing_ok=True
+        )
+
+        if not db_user:
+            raise ClientException(message="Email not registered", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Check if user is active
+        if db_user.status == UserStatusEnum.DELETED:
+            raise ClientException(message="Inactive user not allowed to reset password", status_code=status.HTTP_400_BAD_REQUEST)
+
+        # Check user is super admin
+        if db_user.is_superuser:
+            raise ClientException(message="Super user not allowed to reset password", status_code=status.HTTP_400_BAD_REQUEST)
+
+        # Check max reset password attempts exceeded
+        if db_user.reset_password_attempt == 3:
+            raise ClientException(message="Reset password attempt limit exceeded", status_code=status.HTTP_400_BAD_REQUEST)
+
+        # Generate a temporary password
+        temp_password = ""
+        while True:
+            logger.debug("Generating temporary password")
+            temp_password = generate_valid_password()
+            is_valid, message = validate_password_string(temp_password)
+            if is_valid:
+                break
+            logger.debug(f"Temp password invalid: {message}")
+
+        # Get tenant information
+        tenant = None
+        if request.tenant_id:
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"id": request.tenant_id}, missing_ok=True
+            )
+            if not tenant:
+                raise ClientException("Invalid tenant ID")
+
+            # Verify user belongs to tenant
+            tenant_mapping = await UserDataManager(self.session).retrieve_by_fields(
+                TenantUserMapping, {"tenant_id": request.tenant_id, "user_id": db_user.id}, missing_ok=True
+            )
+            if not tenant_mapping:
+                raise ClientException("User does not belong to this tenant")
+        else:
+            # Get the default tenant
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+            )
+            if not tenant:
+                raise ClientException("Default tenant not found")
+
+        logger.debug(f"::USER:: Tenant: {tenant.realm_name}")
+
+        if not tenant:
+            raise ClientException("User does not belong to any tenant")
+
+        # Update user password in Keycloak
+        keycloak_manager = KeycloakManager()
+        await keycloak_manager.update_user_password(
+            db_user.auth_id,
+            temp_password,
+            tenant.realm_name,  # default realm name,
+        )
+
+        # Increment reset password attempt
+        fields = {}
+        reset_password_attempt = db_user.reset_password_attempt
+        fields["reset_password_attempt"] = reset_password_attempt + 1
+
+        # User need to change password after next login
+        fields["is_reset_password"] = True
+
+        # Update in database
+        db_user = await UserDataManager(self.session).update_by_fields(db_user, fields)
+        logger.debug("Temporary password updated in database")
+
+        # Send email notification to user
+        content = {"password": temp_password}
+        notification_request = (
+            NotificationBuilder()
+            .set_content(content=content)
+            .set_payload(category=NotificationCategory.INTERNAL)
+            .set_notification_request(subscriber_ids=[str(db_user.id)], name=BUD_RESET_PASSWORD_WORKFLOW)
+            .build()
+        )
+        notification_request.payload.content = content
+
+        try:
+            response = await BudNotifyService().send_notification(notification_request)
+            if "object" in response and response["object"] == "error":
+                logger.error(f"Failed to send notification {response}")
+                raise ClientException(
+                    message="Failed to send email", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                ) from None
+
+            logger.debug(f"Sent email notification to {db_user.id}")
+            return response
+        except BudNotifyException as err:
+            logger.error(f"Failed to send notification {err.message}")
+            raise ClientException(
+                message="Failed to send email", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from None
