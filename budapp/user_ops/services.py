@@ -45,6 +45,21 @@ settings = app_settings
 
 class UserService(SessionMixin):
 
+    async def get_permissions_for_users(
+        self,
+        user_ids: List[UUID],
+    ) -> Dict[str, Dict[str, List[str]]]:
+        """Get permissions for users."""
+        # Default Client Details
+        tenant = await UserDataManager(self.session).retrieve_by_fields(
+            Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+        )
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+        )
+
+        return await KeycloakManager().get_multiple_users_permissions_via_admin(user_ids, app_settings.default_realm_name, tenant_client.client_id)
+
     async def update_active_user(
         self,
         user_id: UUID,

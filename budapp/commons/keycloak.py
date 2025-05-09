@@ -1446,6 +1446,38 @@ class KeycloakManager:
             logger.error(f"Unexpected error validating token: {str(e)}")
             raise
 
+    async def get_multiple_users_permissions_via_admin(
+        self,
+        user_ids: List[str],
+        realm_name: str,
+        client_id: str,
+    ) -> Dict[str, Dict[str, List[str]]]:
+        """Fetch fine-grained permissions for multiple users via admin API.
+
+        Args:
+            user_ids (List[str]): List of Keycloak user IDs
+            realm_name (str): Name of the realm
+            client_id (str): Keycloak internal client UUID
+
+        Returns:
+            Dict[str, Dict[str, List[str]]]: Permissions per user, keyed by user ID
+        """
+        results = {}
+
+        for user_id in user_ids:
+            try:
+                permissions = await self.get_user_permissions_via_admin(
+                    user_id=user_id,
+                    realm_name=realm_name,
+                    client_id=client_id,
+                )
+                results[user_id] = permissions
+            except Exception as e:
+                logger.warning(f"Failed to fetch permissions for user {user_id}: {str(e)}")
+                results[user_id] = {"error": str(e)}
+
+        return results
+
     async def assign_user_to_resource(self, user_id: str, resource_id: str, realm_name: str, client_id: str) -> None:
         """Assign a user to a resource in Keycloak.
 
