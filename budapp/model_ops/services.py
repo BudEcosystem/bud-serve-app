@@ -2050,6 +2050,8 @@ class ModelService(SessionMixin):
             # Validate license file
             license_content = await self._get_content_from_file(file)
             word_count = await count_words(license_content)
+            logger.debug(f"word_count: {word_count}")
+
             if word_count > MAX_LICENSE_WORD_COUNT:
                 raise ClientException(message="License content is too long")
 
