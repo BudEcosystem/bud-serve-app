@@ -25,9 +25,9 @@ from uuid import UUID, uuid4
 
 import aiohttp
 import requests
+from bs4 import BeautifulSoup
 from fastapi import UploadFile, status
 from pydantic import HttpUrl
-from bs4 import BeautifulSoup
 from PyPDF2 import PdfReader
 
 from budapp.commons import logging
@@ -48,6 +48,7 @@ from ..cluster_ops.models import Cluster as ClusterModel
 from ..cluster_ops.models import ModelClusterRecommended as ModelClusterRecommendedModel
 from ..cluster_ops.schemas import RecommendedClusterRequest
 from ..cluster_ops.workflows import ClusterRecommendedSchedulerWorkflows
+from ..commons.async_utils import count_words
 from ..commons.constants import (
     APP_ICONS,
     BENCHMARK_FIELDS_LABEL_MAPPER,
@@ -55,6 +56,7 @@ from ..commons.constants import (
     BUD_INTERNAL_WORKFLOW,
     COMMON_LICENSE_MINIO_OBJECT_NAME,
     HF_AUTHORS_DIR,
+    MAX_LICENSE_WORD_COUNT,
     MINIO_LICENSE_OBJECT_NAME,
     BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
@@ -71,10 +73,8 @@ from ..commons.constants import (
     VisibilityEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
-    MAX_LICENSE_WORD_COUNT,
 )
 from ..commons.helpers import validate_huggingface_repo_format
-from ..commons.async_utils import count_words
 from ..commons.schemas import BudNotificationMetadata
 from ..commons.security import RSAHandler
 from ..core.crud import ModelTemplateDataManager
@@ -2225,19 +2225,19 @@ class ModelService(SessionMixin):
         except (Exception, requests.exceptions.RequestException) as e:
             logger.exception(f"Error validating license url: {e}")
             raise ClientException(message="Unable to get license text from given url") from e
-    
+
     async def _get_content_from_file(self, license_file: UploadFile) -> None:
         """Get content from file."""
         # 10MB in bytes
         MAX_FILE_SIZE = 0.4 * 1024 * 1024  # 10MB
         if license_file.size > MAX_FILE_SIZE:
             raise ClientException(message="File size exceeds the maximum allowed limit of 10MB")
-        
+
         # Get the file extension
         file_extension = os.path.splitext(license_file.filename)[1]
         if file_extension not in [".txt", ".pdf", ".rst", ".md"]:
             raise ClientException(message="File extension must be .txt or .pdf or .rst or .md")
-        
+
         if file_extension in [".txt", ".rst", ".md"]:
             return await self._get_text_file_content(license_file)
         elif file_extension == ".pdf":
@@ -2253,7 +2253,6 @@ class ModelService(SessionMixin):
 
         # Extract text from each page as a new line and join them
         return "\n".join([page.extract_text() for page in reader.pages])
-
 
     async def _update_papers(self, model_id: UUID, paper_urls: list[str]) -> None:
         """Update paper entries for the given model by adding new URLs and removing old ones."""

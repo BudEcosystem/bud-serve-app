@@ -162,8 +162,8 @@ async def get_range_label(
     else:
         return "Expected"
 
+
 async def count_words(source_text: str) -> int:
     """Count words in license file."""
-
-    text = re.findall(r'\b\w+\b', re.sub(r'[\n\r\t\s]+', ' ', source_text.strip()))
+    text = re.findall(r"\b\w+\b", re.sub(r"[\n\r\t\s]+", " ", source_text.strip()))
     return len(text)
