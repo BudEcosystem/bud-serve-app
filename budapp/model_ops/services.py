@@ -27,6 +27,8 @@ import aiohttp
 import requests
 from fastapi import UploadFile, status
 from pydantic import HttpUrl
+from bs4 import BeautifulSoup
+from PyPDF2 import PdfReader
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
@@ -69,8 +71,10 @@ from ..commons.constants import (
     VisibilityEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
+    MAX_LICENSE_WORD_COUNT,
 )
 from ..commons.helpers import validate_huggingface_repo_format
+from ..commons.async_utils import count_words
 from ..commons.schemas import BudNotificationMetadata
 from ..commons.security import RSAHandler
 from ..core.crud import ModelTemplateDataManager
@@ -2043,6 +2047,12 @@ class ModelService(SessionMixin):
             # If a file is provided, save it locally and update the DB with the local path
             file = data.pop("license_file")
 
+            # Validate license file
+            license_content = await self._get_content_from_file(file)
+            word_count = await count_words(license_content)
+            if word_count > MAX_LICENSE_WORD_COUNT:
+                raise ClientException(message="License content is too long")
+
             # Save to minio
             license_object_name = await self._save_license_file_to_minio(file, model_id)
 
@@ -2065,6 +2075,13 @@ class ModelService(SessionMixin):
             # Validate filename
             if not filename or not re.match(r"^[\w\-\.]+$", filename):
                 filename = "LICENSE"
+
+            # Validate license url
+            license_content = await self._validate_license_url(license_url)
+            word_count = await count_words(license_content)
+            logger.debug(f"word_count: {word_count}")
+            if word_count > MAX_LICENSE_WORD_COUNT:
+                raise ClientException(message="License content is too long")
 
             # Save to minio
             license_object_name = await self._save_license_url_to_minio(license_url, filename, model_id)
@@ -2192,6 +2209,51 @@ class ModelService(SessionMixin):
 
             # Execute license faqs workflow
             await self.fetch_license_faqs(model_id, license_entry.id, current_user_id, license_source)
+
+    async def _validate_license_url(self, license_url: str) -> str:
+        """Validate license url."""
+        try:
+            response = requests.get(license_url, timeout=10)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.content, "html.parser")
+            license_content = str(soup.text).strip()
+            if license_content:
+                return license_content
+            else:
+                logger.error(f"Unable to get license text from given url: {license_url}")
+                raise ClientException(message="Unable to get license text from given url")
+        except (Exception, requests.exceptions.RequestException) as e:
+            logger.exception(f"Error validating license url: {e}")
+            raise ClientException(message="Unable to get license text from given url") from e
+    
+    async def _get_content_from_file(self, license_file: UploadFile) -> None:
+        """Get content from file."""
+        # 10MB in bytes
+        MAX_FILE_SIZE = 0.4 * 1024 * 1024  # 10MB
+        if license_file.size > MAX_FILE_SIZE:
+            raise ClientException(message="File size exceeds the maximum allowed limit of 10MB")
+        
+        # Get the file extension
+        file_extension = os.path.splitext(license_file.filename)[1]
+        if file_extension not in [".txt", ".pdf", ".rst", ".md"]:
+            raise ClientException(message="File extension must be .txt or .pdf or .rst or .md")
+        
+        if file_extension in [".txt", ".rst", ".md"]:
+            return await self._get_text_file_content(license_file)
+        elif file_extension == ".pdf":
+            return await self._get_pdf_file_content(license_file)
+
+    async def _get_text_file_content(self, license_file: UploadFile) -> None:
+        """Get content from text file."""
+        return license_file.file.read().decode("utf-8")
+
+    async def _get_pdf_file_content(self, license_file: UploadFile) -> None:
+        """Get content from pdf file."""
+        reader = PdfReader(license_file.file)
+
+        # Extract text from each page as a new line and join them
+        return "\n".join([page.extract_text() for page in reader.pages])
+
 
     async def _update_papers(self, model_id: UUID, paper_urls: list[str]) -> None:
         """Update paper entries for the given model by adding new URLs and removing old ones."""

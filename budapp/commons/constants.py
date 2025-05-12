@@ -2736,3 +2736,6 @@ GRAFANA_CLUSTER_WORKLOAD_NAME_PATTERN = "Kubernetes / Compute Resources / Worklo
 # Minio License Object Name
 MINIO_LICENSE_OBJECT_NAME = "licenses"
 COMMON_LICENSE_MINIO_OBJECT_NAME = f"{MINIO_LICENSE_OBJECT_NAME}/common_licenses"
+
+# Max license word count
+MAX_LICENSE_WORD_COUNT = 50000
