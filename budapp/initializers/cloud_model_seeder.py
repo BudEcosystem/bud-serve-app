@@ -81,6 +81,9 @@ class CloudModelSeeder(BaseSeeder):
                         "uri": provider_model[existing_model.uri]["uri"],
                         "provider_type": ModelProviderTypeEnum.CLOUD_MODEL.value,
                         "provider_id": db_provider.id,
+                        "max_input_tokens": provider_model[existing_model.uri]["max_input_tokens"],
+                        "input_cost": provider_model[existing_model.uri]["input_cost"],
+                        "output_cost": provider_model[existing_model.uri]["output_cost"],
                     }
 
                     # Update existing model in the database

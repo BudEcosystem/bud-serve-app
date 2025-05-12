@@ -1,17 +1,17 @@
+import os
 from logging.config import fileConfig
 
-import alembic_postgresql_enum
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from pydantic import PostgresDsn
+from sqlalchemy import create_engine, engine_from_config, pool
+from sqlalchemy_utils import create_database, database_exists
 
 from budapp.commons import Base
-from budapp.commons.config import app_settings
 
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-config.set_main_option("sqlalchemy.url", app_settings.postgres_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -30,6 +30,34 @@ target_metadata = Base.metadata
 # ... etc.
 
 
+def get_psql_url() -> PostgresDsn:
+    if os.getenv("PSQL_HOST") is None or os.getenv("PSQL_PORT") is None or os.getenv("PSQL_DB_NAME") is None:
+        raise ValueError("PSQL_HOST, PSQL_PORT, and PSQL_DB_NAME must be set")
+
+    return PostgresDsn.build(
+        scheme="postgresql+psycopg",
+        username=os.getenv("SECRETS_PSQL_USER"),
+        password=os.getenv("SECRETS_PSQL_PASSWORD"),
+        host=os.getenv("PSQL_HOST"),
+        port=int(os.getenv("PSQL_PORT")),
+        path=os.getenv("PSQL_DB_NAME"),
+    ).__str__()
+
+
+def create_db() -> None:
+    """Create the database."""
+    DATABASE_URL = get_psql_url()
+
+    engine = create_engine(DATABASE_URL)
+
+    # Check if the database exists, and create it if not
+    if not database_exists(engine.url):
+        create_database(engine.url)
+        print(f"Database created at {DATABASE_URL}")
+    else:
+        print(f"Database already exists at {DATABASE_URL}")
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
@@ -42,7 +70,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = get_psql_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -61,8 +89,13 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    configuration = config.get_section(config.config_ini_section, {})
+    configuration["sqlalchemy.url"] = get_psql_url()
+
+    print(configuration["sqlalchemy.url"])
+
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
@@ -73,6 +106,8 @@ def run_migrations_online() -> None:
         with context.begin_transaction():
             context.run_migrations()
 
+
+create_db()
 
 if context.is_offline_mode():
     run_migrations_offline()

@@ -157,6 +157,15 @@ class ClusterDataManager(DataManagerUtils):
             Cluster.status != ClusterStatusEnum.DELETED,
             Endpoint.status != EndpointStatusEnum.DELETED,
         ]
+        # Subquery to get distinct nodes
+        unique_nodes_subq = (
+            select(
+                Endpoint.cluster_id,
+                func.jsonb_array_elements_text(Endpoint.node_list).label("node")
+            )
+            .distinct()  # Ensure unique (cluster_id, node) pairs
+            .subquery()
+        )
         if search:
             search_conditions = await self.generate_search_stmt(Cluster, filters)
 
@@ -164,7 +173,8 @@ class ClusterDataManager(DataManagerUtils):
                 select(
                     Cluster,
                     func.count(Endpoint.id).label("endpoint_count"),
-                    func.coalesce(func.sum(Endpoint.number_of_nodes), 0).label("total_nodes"),
+                    # func.coalesce(func.sum(Endpoint.number_of_nodes), 0).label("total_nodes"),
+                    func.coalesce(func.count(func.distinct(unique_nodes_subq.c.node)), 0).label("total_nodes"),  # Count unique nodes
                     func.coalesce(func.sum(Endpoint.total_replicas), 0).label("total_replicas"),
                 )
                 .join(Endpoint, Endpoint.cluster_id == Cluster.id)
@@ -185,7 +195,8 @@ class ClusterDataManager(DataManagerUtils):
                 select(
                     Cluster,
                     func.count(Endpoint.id).label("endpoint_count"),
-                    func.coalesce(func.sum(Endpoint.number_of_nodes), 0).label("total_nodes"),
+                    # func.coalesce(func.sum(Endpoint.number_of_nodes), 0).label("total_nodes"),
+                    func.coalesce(func.count(func.distinct(unique_nodes_subq.c.node)), 0).label("total_nodes"),  # Count unique nodes
                     func.coalesce(func.sum(Endpoint.total_replicas), 0).label("total_replicas"),
                 )
                 .join(Endpoint, Endpoint.cluster_id == Cluster.id)
@@ -237,3 +248,9 @@ class ClusterDataManager(DataManagerUtils):
         result = self.session.execute(stmt)
 
         return result, count
+
+
+class ModelClusterRecommendedDataManager(DataManagerUtils):
+    """Data manager for the ModelClusterRecommended model."""
+
+    pass

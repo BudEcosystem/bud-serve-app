@@ -49,6 +49,8 @@ done
 # Set dummy env to skip warnings & errors
 export APP_NAME=dummy
 export REDIS_PASSWORD=dummy
+export SECRETS_REDIS_PASSWORD=dummy
+export REDIS_PORT=6379
 export APP_PORT=9081
 export DAPR_HTTP_PORT=3510
 export DAPR_GRPC_PORT=50001
@@ -57,6 +59,13 @@ export DEPLOYMENT_ENV=
 export LOG_LEVEL=
 export CONFIGSTORE_NAME=
 export SECRETSTORE_NAME=
+
+export POSTGRES_USER=dummy
+export POSTGRES_PASSWORD=dummy
+export POSTGRES_DB=dummy
+export POSTGRES_PORT=5432
+export PGADMIN_DEFAULT_EMAIL=dummy
+export PGADMIN_DEFAULT_PASSWORD=dummy
 
 # Stop Docker Compose services
 echo "Stopping services defined in: $DOCKER_COMPOSE_FILE"

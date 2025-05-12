@@ -34,30 +34,79 @@ from budapp.commons.dependencies import (
 )
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
+from budapp.shared.grafana import Grafana
 from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
 from .schemas import (
+    AnalyticsPanelResponse,
+    AnalyticsPanelsResponse,
     CancelClusterOnboardingRequest,
     ClusterEndpointFilter,
     ClusterEndpointPaginatedResponse,
     ClusterFilter,
     ClusterListResponse,
+    ClusterMetricsResponse,
+    ClusterMetricsResponse,
     ClusterNodeWiseEventsResponse,
     CreateClusterWorkflowRequest,
     EditClusterRequest,
-    NodeMetricsResponse,
-    SingleClusterResponse,
-    ClusterMetricsResponse,
+    GrafanaDashboardResponse,
     MetricTypeEnum,
+    NodeMetricsResponse,
+    RecommendedClusterResponse,
+    SingleClusterResponse,
+    SingleClusterResponse,
 )
 from .services import ClusterService
+from .workflows import ClusterRecommendedSchedulerWorkflows
 
 
 logger = logging.get_logger(__name__)
 
 cluster_router = APIRouter(prefix="/clusters", tags=["cluster"])
+
+@cluster_router.get(
+    "/{cluster_id}/grafana-dashboard",
+    responses={
+        status.HTTP_200_OK: {
+            "model": GrafanaDashboardResponse,
+            "description": "Successfully retrieved Grafana dashboard URL",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+    },
+    description="Get Grafana dashboard URL by cluster id",
+)
+async def get_grafana_dashboard_url(
+    cluster_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[GrafanaDashboardResponse, ErrorResponse]:
+    """Get Grafana dashboard URL by cluster id."""
+    try:
+        cluster_details = await ClusterService(session).get_cluster_details(cluster_id)
+        grafana = Grafana()
+        url = grafana.get_public_dashboard_url_by_uid(cluster_details.cluster_id)
+        return GrafanaDashboardResponse(
+            message="Successfully retrieved Grafana dashboard URL",
+            code=status.HTTP_200_OK,
+            object="cluster.grafana-dashboard",
+            url=url
+        )
+    except Exception as e:
+        logger.exception(f"Error retrieving Grafana dashboard URL: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Error retrieving Grafana dashboard URL",
+        ).to_http_response()
 
 
 @cluster_router.post(
@@ -84,13 +133,22 @@ async def create_cluster_workflow(
     step_number: Annotated[int, Form(gt=0)],
     name: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
     icon: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
+
+
     ingress_url: Annotated[AnyHttpUrl | None, Form()] = None,
     configuration_file: Annotated[
         UploadFile | None, File(description="The configuration file for the cluster")
     ] = None,
+
     workflow_id: Annotated[UUID | None, Form()] = None,
     workflow_total_steps: Annotated[int | None, Form()] = None,
     trigger_workflow: Annotated[bool, Form()] = False,
+    # Cloud Cluster
+    cluster_type: Annotated[str, Form(description="Type of cluster", enum=["ON_PREM", "CLOUD"])] = "ON_PREM",
+    # Cluster Specific Inputs
+    credential_id:  Annotated[UUID | None, Form()] = None,
+    provider_id:  Annotated[UUID | None, Form()] = None,
+    region: Annotated[str | None, Form()] = None
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Create cluster workflow."""
     # Perform router level validation
@@ -105,6 +163,15 @@ async def create_cluster_workflow(
             code=status.HTTP_400_BAD_REQUEST,
             message="workflow_total_steps and workflow_id cannot be provided together",
         ).to_http_response()
+
+    if cluster_type == "CLOUD" and workflow_id is not None and trigger_workflow:
+        # validate all the details are
+        required_fields = [credential_id, provider_id, region]
+        if None in required_fields:
+            return ErrorResponse(
+                code=status.HTTP_400_BAD_REQUEST,
+                message="credential_id, provider_id, and region are required for CLOUD cluster creation",
+            ).to_http_response()
 
     # Check if at least one of the other fields is provided
     other_fields = [name, ingress_url, configuration_file]
@@ -126,6 +193,10 @@ async def create_cluster_workflow(
                 workflow_total_steps=workflow_total_steps,
                 step_number=step_number,
                 trigger_workflow=trigger_workflow,
+                credential_id=credential_id,
+                provider_id=provider_id,
+                region=region,
+                cluster_type=cluster_type
             ),
             configuration_file=configuration_file,
         )
@@ -138,7 +209,7 @@ async def create_cluster_workflow(
         logger.exception(f"ValidationErrors: {str(e)}")
         raise RequestValidationError(e.errors())
     except Exception as e:
-        logger.error(f"Error occurred while executing create cluster workflow: {str(e)}")
+        logger.error(f"Error occurred while executing create cluster workflow: {str(e)}", exc_info=True)
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to execute create cluster workflow"
         ).to_http_response()
@@ -499,7 +570,7 @@ async def get_node_wise_metrics(
     """Get node-wise metrics for a cluster."""
     try:
         metrics = await ClusterService(session).get_node_wise_metrics(cluster_id)
-        
+
         return NodeMetricsResponse(
             code=status.HTTP_200_OK, message="Successfully retrieved node metrics", **metrics
         )
@@ -541,9 +612,9 @@ async def get_node_wise_events_by_hostname(
         events_raw = await ClusterService(session).get_node_wise_events_by_hostname(cluster_id, node_hostname)
 
         events = events_raw.get("events", [])
-        
+
         return ClusterNodeWiseEventsResponse(
-            code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname",     
+            code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname",
             events=events
         )
     except ClientException as e:
@@ -553,4 +624,73 @@ async def get_node_wise_events_by_hostname(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Error retrieving node-wise metrics by hostname",
+        ).to_http_response()
+
+
+@cluster_router.post("/recommended-scheduler")
+async def recommended_scheduler():
+    """Recommended scheduler cron job.
+
+    This endpoint processes the recommended scheduler cron job.
+
+    Returns:
+        HTTP response containing the recommended scheduler.
+    """
+    response: Union[SuccessResponse, ErrorResponse]
+    try:
+        await ClusterRecommendedSchedulerWorkflows().__call__()
+        logger.debug("Recommended cluster scheduler triggered")
+        response = SuccessResponse(
+            message="Recommended cluster scheduler triggered",
+            code=status.HTTP_200_OK,
+            object="cluster.recommended-scheduler",
+        )
+    except Exception as e:
+        logger.exception("Error recommended scheduler: %s", str(e))
+        response = ErrorResponse(message="Error recommended scheduler", code=500)
+
+    return response.to_http_response()
+
+
+@cluster_router.get(
+    "/recommended/{workflow_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RecommendedClusterResponse,
+            "description": "Successfully retrieved recommended clusters",
+        },
+    },
+    description="Get all recommended clusters by id",
+)
+async def get_recommended_clusters(
+    workflow_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[RecommendedClusterResponse, ErrorResponse]:
+    """Get recommended clusters by workflow id."""
+    try:
+        recommended_clusters = await ClusterService(session).get_recommended_clusters(workflow_id)
+
+        return RecommendedClusterResponse(
+            code=status.HTTP_200_OK,
+            message="Successfully retrieved recommended clusters",
+            clusters=recommended_clusters,
+            object="cluster.recommended_clusters",
+            workflow_id=workflow_id,
+        )
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Error retrieving recommended clusters: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Error retrieving recommended clusters",
         ).to_http_response()

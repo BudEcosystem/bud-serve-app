@@ -22,17 +22,25 @@ from uuid import UUID
 from fastapi import status
 
 from ..commons import logging
+from ..commons.constants import EndpointStatusEnum
 from ..commons.db_utils import SessionMixin
 from ..commons.exceptions import ClientException
-from ..commons.constants import EndpointStatusEnum
 from ..credential_ops.crud import CredentialDataManager
 from ..credential_ops.models import Credential as CredentialModel
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..model_ops.services import ModelService
 from ..project_ops.crud import ProjectDataManager
-from .crud import ChatSessionDataManager, MessageDataManager, ChatSettingDataManager, NoteDataManager
-from .models import ChatSession, Message, ChatSetting, Note
-from .schemas import ChatSessionCreate, ChatSessionListResponse, MessageResponse, ChatSettingListResponse, NoteResponse
+from .crud import ChatSessionDataManager, ChatSettingDataManager, MessageDataManager, NoteDataManager
+from .models import ChatSession, ChatSetting, Message, Note
+from .schemas import (
+    ChatSessionCreate,
+    ChatSessionListResponse,
+    ChatSettingListResponse,
+    EndpointListResponse,
+    MessageResponse,
+    NoteResponse,
+)
 
 
 logger = logging.get_logger(__name__)
@@ -66,9 +74,30 @@ class PlaygroundService(SessionMixin):
             order_by,
             search,
         )
-        logger.debug("found %s deployments", count)
+        db_deployments_list = []
+        model_uris = []
+        for db_endpoint in db_endpoints:
+            deployment, input_cost, output_cost, context_length = db_endpoint
+            model_uris.append(deployment.model.uri)
+            db_deployment = EndpointListResponse(
+                id=deployment.id,
+                name=deployment.name,
+                status=deployment.status,
+                model=deployment.model,
+                project=deployment.project,
+                created_at=deployment.created_at,
+                modified_at=deployment.modified_at,
+                input_cost=input_cost,
+                output_cost=output_cost,
+                context_length=context_length,
+                leaderboard=None,
+            )
+            db_deployments_list.append(db_deployment)
+        db_leaderboards = await ModelService(self.session).get_leaderboard_by_model_uris(model_uris)
+        for db_deployment in db_deployments_list:
+            db_deployment.leaderboard = db_leaderboards.get(db_deployment.model.uri, None)
 
-        return db_endpoints, count
+        return db_deployments_list, count
 
     async def _get_authorized_project_ids(
         self, current_user_id: Optional[UUID] = None, api_key: Optional[str] = None
@@ -177,7 +206,6 @@ class MessageService(SessionMixin):
 
     async def create_message(self, user_id: UUID, message_data: dict) -> Message:
         """Create a new message and insert it into the database."""
-
         # validate deployment id
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
             EndpointModel,
@@ -191,7 +219,10 @@ class MessageService(SessionMixin):
 
         # If chat_session_id is not provided, create a new chat session first
         if not message_data.get("chat_session_id"):
-            chat_session_data = ChatSessionCreate(name=None, chat_setting_id=chat_setting_id).model_dump(
+            prompt = message_data.get("prompt")
+            chat_session_name = prompt[:20].strip()
+
+            chat_session_data = ChatSessionCreate(name=chat_session_name, chat_setting_id=chat_setting_id).model_dump(
                 exclude_unset=True, exclude_none=True
             )
             chat_session_data["user_id"] = user_id

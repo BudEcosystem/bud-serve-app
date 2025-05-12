@@ -19,22 +19,26 @@
 import json
 import tempfile
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 import aiohttp
 import yaml
 from fastapi import UploadFile, status
+from pydantic import ValidationError
 
 from budapp.cluster_ops.utils import ClusterMetricsFetcher
 from budapp.commons import logging
-from budapp.commons.async_utils import check_file_extension
+from budapp.commons.async_utils import check_file_extension, get_range_label
 from budapp.commons.config import app_settings
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.core.schemas import NotificationPayload
+from budapp.credential_ops.crud import CloudProviderCredentialDataManager
+from budapp.credential_ops.models import CloudCredentials
 from budapp.endpoint_ops.crud import EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
+from budapp.shared.grafana import Grafana
 from budapp.shared.promql_service import PrometheusMetricsClient
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
@@ -44,9 +48,11 @@ from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 from ..commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
+    RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY,
     BudServeWorkflowStepEventName,
     ClusterStatusEnum,
     EndpointStatusEnum,
+    ModelProviderTypeEnum,
     ModelStatusEnum,
     NotificationTypeEnum,
     WorkflowStatusEnum,
@@ -56,13 +62,16 @@ from ..commons.helpers import get_hardware_types
 from ..core.schemas import NotificationResult
 from ..model_ops.crud import ModelDataManager
 from ..model_ops.models import Model
+from ..model_ops.schemas import DeploymentTemplateCreate
 from ..model_ops.schemas import Model as ModelSchema
 from ..model_ops.services import ModelServiceUtil
 from ..project_ops.schemas import Project as ProjectSchema
+from ..shared.dapr_service import DaprService
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.schemas import WorkflowUtilCreate
-from .crud import ClusterDataManager
+from .crud import ClusterDataManager, ModelClusterRecommendedDataManager
 from .models import Cluster as ClusterModel
+from .models import ModelClusterRecommended as ModelClusterRecommendedModel
 from .schemas import (
     ClusterCreate,
     ClusterDetailResponse,
@@ -73,7 +82,11 @@ from .schemas import (
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
     MetricTypeEnum,
+    ModelClusterRecommendedCreate,
+    ModelClusterRecommendedUpdate,
     PrometheusConfig,
+    RecommendedCluster,
+    RecommendedClusterData,
 )
 
 
@@ -149,6 +162,16 @@ class ClusterService(SessionMixin):
         ingress_url = request.ingress_url
         trigger_workflow = request.trigger_workflow
 
+        # Cloud Specific
+        cluster_type = request.cluster_type or "ON_PREM"
+        credential_id = request.credential_id
+        provider_id = request.provider_id
+        region = request.region
+
+        # Get Cluster Credential
+        credentials = None
+        cloud_credentials = None
+
         current_step_number = step_number
 
         # Retrieve or create workflow
@@ -162,18 +185,45 @@ class ClusterService(SessionMixin):
         db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
             workflow_id, workflow_create, current_user_id
         )
+        configuration_yaml = None
 
         # Validate the configuration file
         if configuration_file:
-            if not await check_file_extension(configuration_file.filename, ["yaml", "yml"]):
-                logger.error("Invalid file extension for configuration file")
-                raise ClientException("Invalid file extension for configuration file")
+            # Validate the configuration file for ON_PERM cluster
+
+            if cluster_type == "ON_PREM" and configuration_file:
+                if not await check_file_extension(configuration_file.filename, ["yaml", "yml"]):
+                    logger.error("Invalid file extension for configuration file")
+                    raise ClientException("Invalid file extension for configuration file")
 
             try:
                 configuration_yaml = yaml.safe_load(configuration_file.file)
             except yaml.YAMLError as e:
                 logger.exception(f"Invalid cluster configuration yaml file found: {e}")
                 raise ClientException("Invalid cluster configuration yaml file found") from e
+
+        # For CLOUD clusters, validate required cloud parameters
+        if cluster_type == "CLOUD":
+            if not credential_id:
+                raise ClientException("Credential ID is required for cloud clusters")
+            if not provider_id:
+                raise ClientException("Provider ID is required for cloud clusters")
+            if not region:
+                raise ClientException("Region is required for cloud clusters")
+
+        # Data Validation & Credential Fetching
+        if cluster_type == "CLOUD":
+            cloud_credentials = await CloudProviderCredentialDataManager(self.session).retrieve_by_fields(
+                CloudCredentials,
+                fields={"id": credential_id, "provider_id": provider_id},
+                missing_ok=False,
+            )
+            if not cloud_credentials:
+                raise ClientException("Cloud provider credential not found")
+
+            credentials = cloud_credentials.credential  # type: ignore
+
+            logger.debug(f"====== Unique ID {cloud_credentials.provider.unique_id}")  # type: ignore
 
         if cluster_name:
             # Check duplicate cluster name
@@ -201,13 +251,23 @@ class ClusterService(SessionMixin):
                 {"icon": cluster_icon},
             )
 
-        # Prepare workflow step data
+        logger.debug("====== Preparing The Payload")
+
+        # Prepare workflow step data (UI Steps)
         workflow_step_data = CreateClusterWorkflowSteps(
             name=cluster_name,
             icon=cluster_icon,
             ingress_url=ingress_url,
-            configuration_yaml=configuration_yaml if configuration_file else None,
+            configuration_yaml=configuration_yaml,
+            cluster_type=cluster_type,
+            credential_id=credential_id if cluster_type == "CLOUD" else None,
+            provider_id=provider_id if cluster_type == "CLOUD" else None,
+            region=region if cluster_type == "CLOUD" else None,
+            credentials=credentials if cluster_type == "CLOUD" else None,
+            cloud_provider_unique_id=cloud_credentials.provider.unique_id if cluster_type == "CLOUD" else None,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+
+        logger.debug(f"====== {workflow_step_data}")
 
         # Get workflow steps
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -270,9 +330,17 @@ class ClusterService(SessionMixin):
             keys_of_interest = [
                 "name",
                 "icon",
-                "ingress_url",
-                "configuration_yaml",
+                # "configuration_yaml",
+                "cluster_type",  # Addition For Cloud Cluster
             ]
+
+            # Add type-specific keys
+            if cluster_type == "ON_PREM":
+                keys_of_interest.extend(["configuration_yaml", "ingress_url"])
+            elif cluster_type == "CLOUD":
+                keys_of_interest.extend(
+                    ["credential_id", "provider_id", "region", "credentials", "cloud_provider_unique_id"]
+                )
 
             # from workflow steps extract necessary information
             required_data = {}
@@ -282,8 +350,8 @@ class ClusterService(SessionMixin):
                         required_data[key] = db_workflow_step.data[key]
 
             # Check if all required keys are present
-            required_keys = ["name", "icon", "ingress_url", "configuration_yaml"]
-            missing_keys = [key for key in required_keys if key not in required_data]
+            # required_keys = ["name", "icon", "ingress_url", "configuration_yaml"]
+            missing_keys = [key for key in keys_of_interest if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
 
@@ -356,7 +424,7 @@ class ClusterService(SessionMixin):
         cluster_create_request = {
             "enable_master_node": True,
             "name": data["name"],
-            "ingress_url": data["ingress_url"],
+            "ingress_url": data.get("ingress_url", ""),  # Empty String
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
@@ -365,59 +433,119 @@ class ClusterService(SessionMixin):
             "source_topic": f"{app_settings.source_topic}",
         }
 
-        # Create temporary yaml file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".yaml", mode="w") as temp_file:
-            try:
-                # Write configuration yaml to temporary yaml file
-                yaml.safe_dump(data["configuration_yaml"], temp_file)
+        # Extra Values
+        cluster_type = data.get("cluster_type", "ON_PREM")
+        cluster_create_request["cluster_type"] = cluster_type
 
-                logger.debug(f"cluster_create_request: {cluster_create_request}")
-                # Perform the request as a form data
-                async with aiohttp.ClientSession() as session:
+        # Add cloud-specific parameters if it's a cloud cluster
+        if cluster_type == "CLOUD":
+            # TODO: Replace with cloud-specific cedentials and provider information
+            cluster_create_request["credential_id"] = str(data["credential_id"])
+            cluster_create_request["provider_id"] = str(data["provider_id"])
+            cluster_create_request["region"] = data["region"]
+            cluster_create_request["credentials"] = data["credentials"]
+            cluster_create_request["cluster_type"] = cluster_type
+            cluster_create_request["cloud_provider_unique_id"] = data["cloud_provider_unique_id"]
+
+            logger.debug(f"=====Cluster create request: {cluster_create_request}")
+
+            # Make the request for cloud cluster
+            async with aiohttp.ClientSession() as session:
+                try:
                     form = aiohttp.FormData()
                     form.add_field("cluster_create_request", json.dumps(cluster_create_request))
+                    # For cloud cluster, we create a temporary YAML file with minimal configuration
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".yaml", mode="w") as temp_file:
+                        # Write minimal configuration to the temporary file
+                        yaml.safe_dump({"name": "dummy-cluster"}, temp_file)
+                        # temp_file.flush()
+                        # Open the file as a binary for proper upload
+                        with open(temp_file.name, "rb") as config_file:
+                            form.add_field("configuration", config_file, filename="dummy.yaml")
+                            # Log Form data
+                            logger.debug(f"Form data: {json.dumps(cluster_create_request)}")
 
-                    # Open the file for reading after writing is complete
-                    with open(temp_file.name, "rb") as config_file:
-                        form.add_field("configuration", config_file, filename=temp_file.name)
-                        try:
                             async with session.post(create_cluster_endpoint, data=form) as response:
                                 response_data = await response.json()
                                 logger.debug(f"Response from budcluster service: {response_data}")
 
                                 if response.status != 200 or response_data.get("object") == "error":
-                                    error_message = response_data.get("message", "Failed to create cluster")
-                                    logger.error(f"Failed to create cluster with external service: {error_message}")
+                                    error_message = response_data.get("message", "Failed to create cloud cluster")
+                                    logger.error(
+                                        f"Failed to create cloud cluster with external service: {error_message}"
+                                    )
                                     raise ClientException(error_message)
 
-                                logger.debug("Successfully created cluster with budcluster service")
+                                logger.debug("Successfully created cloud cluster with budcluster service")
                                 return response_data
 
-                        except ClientException as e:
-                            raise e
+                except ClientException as e:
+                    raise e
 
-                        except Exception as e:
-                            logger.error(f"Failed to make request to budcluster service: {e}")
-                            raise ClientException("Unable to create cluster with external service") from e
+                except Exception as e:
+                    logger.error(f"Failed to make request to budcluster service: {e}")
+                    raise ClientException("Unable to create cloud cluster with external service") from e
 
-            except yaml.YAMLError as e:
-                logger.error(f"Failed to process YAML configuration: {e}")
-                raise ClientException("Invalid YAML configuration") from e
+        else:
+            # Create temporary yaml file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".yaml", mode="w") as temp_file:
+                try:
+                    # Write configuration yaml to temporary yaml file
+                    yaml.safe_dump(data["configuration_yaml"], temp_file)
 
-            except IOError as e:
-                logger.error(f"Failed to write temporary file: {e}")
-                raise ClientException("Failed to process configuration file") from e
+                    logger.debug(f"cluster_create_request: {cluster_create_request}")
+                    # Perform the request as a form data
+                    async with aiohttp.ClientSession() as session:
+                        form = aiohttp.FormData()
+                        form.add_field("cluster_create_request", json.dumps(cluster_create_request))
 
-            except ClientException as e:
-                raise e
+                        # Open the file for reading after writing is complete
+                        with open(temp_file.name, "rb") as config_file:
+                            form.add_field("configuration", config_file, filename=temp_file.name)
+                            try:
+                                logger.debug("************************")
+                                logger.debug(config_file)
+                                logger.debug("************************")
 
-            except Exception as e:
-                logger.exception(f"Unexpected error during cluster creation request {e}")
-                raise ClientException("Unexpected error during cluster creation") from e
+                                async with session.post(create_cluster_endpoint, data=form) as response:
+                                    response_data = await response.json()
+                                    logger.debug(f"Response from budcluster service: {response_data}")
 
-            finally:
-                # Delete the temporary file
-                temp_file.close()
+                                    if response.status != 200 or response_data.get("object") == "error":
+                                        error_message = response_data.get("message", "Failed to create cluster")
+                                        logger.error(
+                                            f"Failed to create cluster with external service: {error_message}"
+                                        )
+                                        raise ClientException(error_message)
+
+                                    logger.debug("Successfully created cluster with budcluster service")
+                                    return response_data
+
+                            except ClientException as e:
+                                raise e
+
+                            except Exception as e:
+                                logger.error(f"Failed to make request to budcluster service: {e}")
+                                raise ClientException("Unable to create cluster with external service") from e
+
+                except yaml.YAMLError as e:
+                    logger.error(f"Failed to process YAML configuration: {e}")
+                    raise ClientException("Invalid YAML configuration") from e
+
+                except IOError as e:
+                    logger.error(f"Failed to write temporary file: {e}")
+                    raise ClientException("Failed to process configuration file") from e
+
+                except ClientException as e:
+                    raise e
+
+                except Exception as e:
+                    logger.exception(f"Unexpected error during cluster creation request {e}")
+                    raise ClientException("Unexpected error during cluster creation") from e
+
+                finally:
+                    # Delete the temporary file
+                    temp_file.close()
 
     async def create_cluster_from_notification_event(self, payload: NotificationPayload) -> None:
         """Create a cluster in database.
@@ -429,6 +557,8 @@ class ClusterService(SessionMixin):
             ClientException: If the cluster already exists.
         """
         logger.debug("Received event for creating cluster")
+
+        # TODO : ask varun if this is can actuallt get data saved in workflow in cluster repo
 
         # Get workflow and steps
         workflow_id = payload.workflow_id
@@ -442,6 +572,10 @@ class ClusterService(SessionMixin):
             "name",
             "icon",
             "ingress_url",
+            "cluster_type",
+            "provider_id",
+            "credential_id",
+            "region",
         ]
 
         # from workflow steps extract necessary information
@@ -476,12 +610,17 @@ class ClusterService(SessionMixin):
         cluster_data = ClusterCreate(
             name=required_data["name"],
             icon=required_data["icon"],
-            ingress_url=required_data["ingress_url"],
+            ingress_url=required_data.get("ingress_url"),
             created_by=db_workflow.created_by,
             cluster_id=UUID(bud_cluster_id),
             **cluster_resources.model_dump(exclude_unset=True, exclude_none=True),
             status=ClusterStatusEnum.AVAILABLE,
             status_sync_at=datetime.now(tz=timezone.utc),
+            # Cloud Cluster
+            cluster_type=required_data.get("cluster_type", "ON_PERM"),
+            cloud_provider_id=required_data.get("provider_id"),
+            credential_id=required_data.get("credential_id"),
+            region=required_data.get("region"),
         )
 
         # Mark workflow as completed
@@ -493,6 +632,11 @@ class ClusterService(SessionMixin):
             db_cluster = await ClusterDataManager(self.session).insert_one(
                 ClusterModel(**cluster_data.model_dump(exclude_unset=True, exclude_none=True))
             )
+
+            # Run The Grafana Creation Workflow
+            grafana = Grafana()
+            await grafana.create_dashboard_from_file(bud_cluster_id, "prometheus",cluster_data.name)
+
             logger.debug(f"Cluster created successfully: {db_cluster.id}")
         except Exception as e:
             logger.exception(f"Failed to create cluster: {e}")
@@ -592,6 +736,12 @@ class ClusterService(SessionMixin):
         # Mark workflow as completed
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
         logger.debug(f"Workflow {db_workflow.id} marked as completed")
+
+        # Remove from recommended clusters
+        await ModelClusterRecommendedDataManager(self.session).delete_by_fields(
+            ModelClusterRecommendedModel, {"cluster_id": db_cluster.id}
+        )
+        logger.debug(f"Model recommended cluster data for cluster {db_cluster.id} deleted")
 
         # Send notification to workflow creator
         notification_request = (
@@ -698,18 +848,14 @@ class ClusterService(SessionMixin):
             available_nodes=available_nodes,
         )
 
-    async def _perform_bud_cluster_edit_request(
-        self, bud_cluster_id: UUID, data: Dict[str, Any]
-    ) -> Dict:
+    async def _perform_bud_cluster_edit_request(self, bud_cluster_id: UUID, data: Dict[str, Any]) -> Dict:
         """Perform edit cluster request to bud_cluster app.
 
         Args:
             bud_cluster_id: The ID of the cluster to edit.
             data: The data to edit the cluster with.
         """
-        edit_cluster_endpoint = (
-            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/{bud_cluster_id}"
-        )
+        edit_cluster_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/{bud_cluster_id}"
 
         payload = {"ingress_url": data["ingress_url"]}
 
@@ -729,7 +875,6 @@ class ClusterService(SessionMixin):
         except Exception as e:
             logger.exception(f"Failed to send edit cluster request: {e}")
             raise ClientException("Failed to edit cluster", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR) from e
-
 
     async def edit_cluster(self, cluster_id: UUID, data: Dict[str, Any]) -> ClusterResponse:
         """Edit cloud model by validating and updating specific fields, and saving an uploaded file if provided."""
@@ -810,7 +955,6 @@ class ClusterService(SessionMixin):
             raise ClientException("Cannot delete cluster with active deployments")
 
         current_step_number = 1
-
         # Retrieve or create workflow
         workflow_create = WorkflowUtilCreate(
             workflow_type=WorkflowTypeEnum.CLUSTER_DELETION,
@@ -824,10 +968,43 @@ class ClusterService(SessionMixin):
         )
         logger.debug(f"Delete cluster workflow {db_workflow.id} created")
 
+        cloud_payload = None
+        # # Branch For Cloud & On Perm
+        if db_cluster.cluster_type == "CLOUD":
+            # Get Credentials
+            credential_id = db_cluster.credential_id
+            provider_id = db_cluster.cloud_provider_id
+
+            # Debug
+            logger.debug(f"+++ CLOUD +++ {credential_id}")
+            logger.debug(f"+++ CLOUD +++ {provider_id}")
+
+            cloud_credentials = await CloudProviderCredentialDataManager(self.session).retrieve_by_fields(
+                CloudCredentials,
+                fields={"id": credential_id, "provider_id": provider_id},
+                missing_ok=False,
+            )
+
+            if not cloud_credentials:
+                raise ClientException("Cloud provider credential not found")
+
+            credentials = cloud_credentials.credential
+            provider_unique_id = cloud_credentials.provider.unique_id
+
+            cloud_payload = {
+                "credentail_id": str(credential_id),
+                "provider_id": str(provider_id),
+                "region": db_cluster.region,
+                "credentials": credentials,
+                "provider_unique_id": str(provider_unique_id),
+                "cluster_type": db_cluster.cluster_type,
+                "name": db_cluster.name
+            }
+
         # Perform delete cluster request to bud_cluster app
         try:
             bud_cluster_response = await self._perform_bud_cluster_delete_request(
-                db_cluster.cluster_id, current_user_id, db_workflow.id
+                db_cluster.cluster_id, current_user_id, db_workflow.id, cloud_payload
             )
         except ClientException as e:
             await WorkflowDataManager(self.session).update_by_fields(
@@ -869,7 +1046,11 @@ class ClusterService(SessionMixin):
         return db_workflow
 
     async def _perform_bud_cluster_delete_request(
-        self, bud_cluster_id: UUID, current_user_id: UUID, workflow_id: UUID
+        self,
+        bud_cluster_id: UUID,
+        current_user_id: UUID,
+        workflow_id: UUID,
+        cloud_payload: Optional[Dict[str, Any]] = None,
     ) -> Dict:
         """Perform delete cluster request to bud_cluster app.
 
@@ -880,8 +1061,15 @@ class ClusterService(SessionMixin):
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/delete"
         )
 
+        cluster_type = (
+            cloud_payload.get("cluster_type", "ON_PREM")
+            if cloud_payload is not None
+            else "ON_PREM"
+        )
+
         payload = {
             "cluster_id": str(bud_cluster_id),
+            "cluster_type": cluster_type,
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
@@ -889,6 +1077,9 @@ class ClusterService(SessionMixin):
             },
             "source_topic": f"{app_settings.source_topic}",
         }
+
+        if cloud_payload:
+                payload["cloud_payload"] = json.dumps(cloud_payload)
 
         logger.debug(f"Performing delete cluster request to budcluster {payload}")
         try:
@@ -906,6 +1097,244 @@ class ClusterService(SessionMixin):
         except Exception as e:
             logger.exception(f"Failed to send delete cluster request: {e}")
             raise ClientException("Failed to delete cluster", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR) from e
+
+    async def handle_recommended_cluster_events(self, payload: NotificationPayload) -> None:
+        """Handle recommended cluster events."""
+        logger.debug("Received event of recommending cluster")
+
+        workflow_id = payload.workflow_id
+        dapr_service = DaprService()
+        state_store_key = RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY
+
+        # Check the event belongs to recommended cluster scheduler workflow (Dapr state store)
+        try:
+            recommended_cluster_scheduler_state = dapr_service.get_state(
+                store_name=app_settings.statestore_name, key=state_store_key
+            ).json()
+            logger.debug("State store %s already exists", state_store_key)
+        except Exception as e:
+            logger.exception("Failed to get state store %s", e)
+            return
+
+        if workflow_id in recommended_cluster_scheduler_state:
+            logger.debug("Workflow %s found in state store", workflow_id)
+            logger.debug("Identified as recommended cluster scheduler workflow")
+            await self._handle_recommended_cluster_scheduler_workflow_event(
+                payload, recommended_cluster_scheduler_state
+            )
+        else:
+            logger.debug("Workflow %s not found in state store", workflow_id)
+            logger.debug("Identified as recommended cluster notification event")
+            await self._notify_recommended_cluster_from_notification_event(payload)
+
+    async def _handle_recommended_cluster_scheduler_workflow_event(
+        self, payload: NotificationPayload, recommended_cluster_scheduler_state: Dict[str, Any]
+    ) -> None:
+        """Handle recommended cluster scheduler workflow."""
+        from .workflows import ClusterRecommendedSchedulerWorkflows
+
+        logger.debug("Received event of recommending cluster scheduler workflow")
+
+        # Get workflow and steps
+        workflow_id = payload.workflow_id
+
+        try:
+            # Get workflow data from state store
+            recommended_cluster_scheduler_data = recommended_cluster_scheduler_state.get(str(workflow_id))
+            model_id = UUID(recommended_cluster_scheduler_data["model_id"])
+
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, fields={"id": model_id, "status": ModelStatusEnum.ACTIVE}, missing_ok=True
+            )
+
+            if not db_model:
+                logger.debug("Model not found")
+                await self._cleanup_recommended_cluster_data(
+                    model_id, workflow_id, recommended_cluster_scheduler_state
+                )
+                return
+
+            recommended_clusters = payload.content.result.get("recommendations", [])
+
+            if not recommended_clusters:
+                logger.debug("No recommended clusters found")
+                await self._cleanup_recommended_cluster_data(
+                    model_id, workflow_id, recommended_cluster_scheduler_state
+                )
+                return
+
+            recommended_cluster = recommended_clusters[0]
+            bud_cluster_id = recommended_cluster["cluster_id"]
+            db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+                ClusterModel,
+                fields={"cluster_id": bud_cluster_id},
+                exclude_fields={"status": ClusterStatusEnum.DELETED},
+                missing_ok=True,
+            )
+
+            if not db_cluster:
+                logger.debug("Cluster not found")
+                await self._cleanup_recommended_cluster_data(
+                    model_id, workflow_id, recommended_cluster_scheduler_state
+                )
+                return
+
+            device_types = [
+                device["device_type"].lower()
+                for device in recommended_cluster.get("metrics", {}).get("device_types", [])
+                if device.get("device_type")
+            ]
+            cost_per_million_tokens = recommended_cluster.get("metrics", {}).get("cost_per_million_tokens")
+
+            # Check if model cluster recommended already exists
+            db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).retrieve_by_fields(
+                ModelClusterRecommendedModel, fields={"model_id": model_id}, missing_ok=True
+            )
+
+            if db_model_cluster_recommended:
+                # Update model cluster recommended
+                model_cluster_recommended_update = ModelClusterRecommendedUpdate(
+                    model_id=model_id,
+                    cluster_id=db_cluster.id,
+                    hardware_type=device_types,
+                    cost_per_million_tokens=cost_per_million_tokens,
+                )
+                db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).update_by_fields(
+                    db_model_cluster_recommended, model_cluster_recommended_update.model_dump()
+                )
+                logger.debug("Updated model cluster recommended %s", db_model_cluster_recommended.id)
+            else:
+                # Create model cluster recommended
+                model_cluster_recommended_create = ModelClusterRecommendedCreate(
+                    model_id=model_id,
+                    cluster_id=db_cluster.id,
+                    hardware_type=device_types,
+                    cost_per_million_tokens=cost_per_million_tokens,
+                )
+                db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).insert_one(
+                    ModelClusterRecommendedModel(**model_cluster_recommended_create.model_dump())
+                )
+                logger.debug("Created model cluster recommended %s", db_model_cluster_recommended.id)
+
+            # Remove workflow specific state store data
+            recommended_cluster_scheduler_state.pop(str(workflow_id))
+            try:
+                dapr_service = DaprService()
+                await dapr_service.save_to_statestore(
+                    store_name=app_settings.statestore_name,
+                    key=RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY,
+                    value=recommended_cluster_scheduler_state,
+                )
+                logger.debug("State store %s updated", RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY)
+            except Exception as e:
+                logger.exception("Failed to save state store %s", e)
+
+            # Trigger recommended cluster scheduler workflow
+            await ClusterRecommendedSchedulerWorkflows().__call__()
+            logger.debug("Recommended cluster scheduler workflow re-triggered")
+        except Exception as e:
+            logger.error("Error occurred while handling recommended cluster scheduler workflow %s", e)
+
+            # Remove workflow specific state store data
+            recommended_cluster_scheduler_state.pop(str(workflow_id))
+
+            try:
+                dapr_service = DaprService()
+                await dapr_service.save_to_statestore(
+                    store_name=app_settings.statestore_name,
+                    key=RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY,
+                    value=recommended_cluster_scheduler_state,
+                )
+                logger.debug("State store %s updated", RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY)
+            except Exception as e:
+                logger.error("Failed to update state store data %s", e)
+
+            # Trigger recommended cluster scheduler workflow
+            await ClusterRecommendedSchedulerWorkflows().__call__()
+            logger.debug("Recommended cluster scheduler workflow re-triggered")
+
+    async def _cleanup_recommended_cluster_data(
+        self, model_id: UUID, workflow_id: UUID, recommended_cluster_scheduler_state: Dict[str, Any]
+    ) -> None:
+        """Cleanup recommended cluster data."""
+        from .workflows import ClusterRecommendedSchedulerWorkflows
+
+        logger.debug("Cleaning up recommended cluster data for model %s", model_id)
+
+        try:
+            # Check existing recommended cluster data
+            db_model_cluster_recommended = await ModelClusterRecommendedDataManager(self.session).retrieve_by_fields(
+                ModelClusterRecommendedModel, fields={"model_id": model_id}, missing_ok=True
+            )
+
+            # Delete model cluster recommended
+            if db_model_cluster_recommended:
+                await ModelClusterRecommendedDataManager(self.session).delete_one(db_model_cluster_recommended)
+                logger.debug("Deleted model cluster recommended %s", db_model_cluster_recommended.id)
+
+            # Remove workflow specific state store data
+            recommended_cluster_scheduler_state.pop(str(workflow_id))
+            try:
+                dapr_service = DaprService()
+                await dapr_service.save_to_statestore(
+                    store_name=app_settings.statestore_name,
+                    key=RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY,
+                    value=recommended_cluster_scheduler_state,
+                )
+                logger.debug("State store %s updated", RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY)
+            except Exception as e:
+                logger.exception("Failed to save state store %s", e)
+
+            # Trigger recommended cluster scheduler workflow
+            await ClusterRecommendedSchedulerWorkflows().__call__()
+            logger.debug("Recommended cluster scheduler workflow re-triggered")
+        except Exception as e:
+            logger.error("Error occurred while cleaning up recommended cluster workflow %s", e)
+
+            # Trigger recommended cluster scheduler workflow
+            await ClusterRecommendedSchedulerWorkflows().__call__()
+            logger.debug("Recommended cluster scheduler workflow re-triggered")
+
+    async def handle_recommended_cluster_failure_events(self, payload: NotificationPayload) -> None:
+        """Handle recommended cluster failure events."""
+        from .workflows import ClusterRecommendedSchedulerWorkflows
+
+        logger.debug("Received failure event of recommending cluster")
+
+        workflow_id = payload.workflow_id
+        dapr_service = DaprService()
+        state_store_key = RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY
+
+        # Check the event belongs to recommended cluster scheduler workflow (Dapr state store)
+        try:
+            recommended_cluster_scheduler_state = dapr_service.get_state(
+                store_name=app_settings.statestore_name, key=state_store_key
+            ).json()
+            logger.debug("State store %s already exists", state_store_key)
+        except Exception as e:
+            logger.exception("Failed to get state store %s", e)
+            return
+
+        if workflow_id in recommended_cluster_scheduler_state:
+            logger.debug("Found failed events from bud simulator")
+
+            # Remove workflow specific state store data
+            recommended_cluster_scheduler_state.pop(str(workflow_id))
+
+            try:
+                dapr_service = DaprService()
+                await dapr_service.save_to_statestore(
+                    store_name=app_settings.statestore_name,
+                    key=RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY,
+                    value=recommended_cluster_scheduler_state,
+                )
+                logger.debug("State store %s updated", RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY)
+            except Exception as e:
+                logger.exception("Failed to save state store %s", e)
+
+            # Trigger recommended cluster scheduler workflow
+            await ClusterRecommendedSchedulerWorkflows().__call__()
+            logger.debug("Recommended cluster scheduler workflow re-triggered")
 
     async def _notify_recommended_cluster_from_notification_event(self, payload: NotificationPayload) -> None:
         logger.debug("Received event of recommending cluster")
@@ -1192,6 +1621,13 @@ class ClusterService(SessionMixin):
         try:
             client = PrometheusMetricsClient(config)
             nodes_status = client.get_nodes_status()
+            nodes_data = await self._perform_get_cluster_nodes_request(db_cluster.cluster_id)
+            node_name_id_mapping = {node["name"]: {"id": node["id"], "devices": node["hardware_info"]} for node in nodes_data.get("nodes", [])}
+            for _, value in nodes_status.get("nodes", {}).items():
+                hostname = value["hostname"]
+                node_map = node_name_id_mapping.get(hostname)
+                value["id"] = node_map["id"]
+                value["devices"] = node_map["devices"]
         except Exception as e:
             raise ClientException(f"Failed to get node metrics: {str(e)}")
 
@@ -1210,26 +1646,309 @@ class ClusterService(SessionMixin):
             Dict containing the node-wise events
         """
         db_cluster = await self.get_cluster_details(cluster_id)
-        
+
         try:
             events_cluster_endpoint = (
                 f"{app_settings.dapr_base_url}v1.0/invoke"
                 f"/{app_settings.bud_cluster_app_id}/method"
                 f"/cluster/{db_cluster.cluster_id}/node-wise-events/{node_hostname}"
             )
-            
+
             async with aiohttp.ClientSession() as session, session.get(events_cluster_endpoint) as response:
                 response_data = await response.json()
-                
+
                 logger.debug(f"Node-wise events response: {response_data}")
-                
+
                 if response.status != 200 or response_data.get("object") == "error":
                     logger.error(f"Failed to get node-wise events: {response.status} {response_data}")
                     raise ClientException("Failed to get node-wise events")
-                
+
                 return response_data.get("data", {})
 
         except Exception as e:
             raise ClientException(f"Failed to get node-wise events: {str(e)}")
 
+    async def _perform_get_cluster_nodes_request(self, cluster_id: UUID) -> Dict:
+        """Perform get cluster nodes request to bud_cluster app.
 
+        Args:
+            cluster_id: The ID of the cluster to update.
+        """
+        get_cluster_node_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/{cluster_id}/nodes"
+
+        try:
+            logger.debug(
+                f"Performing get cluster node request. endpoint: {get_cluster_node_endpoint}"
+            )
+            async with aiohttp.ClientSession() as session, session.get(get_cluster_node_endpoint) as response:
+                response_data = await response.json()
+                if response.status != 200 or response_data.get("object") == "error":
+                    logger.error(f"Failed to get cluster nodes: {response.status} {response_data}")
+                    raise ClientException(
+                        "Failed to get cluster nodes", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+
+                logger.debug("Successfully fetched cluster nodes")
+                return response_data["param"]
+        except Exception as e:
+            logger.exception(f"Failed to send get cluster nodes request: {e}")
+            raise ClientException(
+                "Failed to get cluster nodes", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def get_recommended_clusters(self, workflow_id: UUID) -> List[RecommendedCluster]:
+        """Get recommended clusters for a workflow.
+
+        Args:
+            workflow_id: The ID of the workflow to get recommended clusters for
+
+        Returns:
+            List of recommended clusters
+        """
+        # From workflow id get simulator_id and deploy_config
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+
+        # Get all workflow steps according with ascending order of step number
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        # Define the keys required for model deployment
+        keys_of_interest = [
+            "deploy_config",
+            "simulator_id",
+            "model_id",
+        ]
+
+        # from workflow steps extract necessary information
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        # Check if required data is present
+        if (
+            "deploy_config" not in required_data
+            or "simulator_id" not in required_data
+            or "model_id" not in required_data
+        ):
+            logger.error("Unable to find required data from workflow steps")
+            raise ClientException("Unable to find required data from workflow steps")
+
+        # Get model details
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": required_data["model_id"], "status": ModelStatusEnum.ACTIVE}
+        )
+
+        # Validate deploy_config
+        try:
+            deploy_config = DeploymentTemplateCreate(**required_data["deploy_config"])
+        except ValidationError as e:
+            logger.error("Invalid deployment configuration: %s", e)
+            raise ClientException("Invalid deployment configuration found")
+
+        # Validate simulator_id
+        try:
+            simulator_id = UUID(required_data["simulator_id"])
+            if not isinstance(simulator_id, UUID):
+                raise ClientException("Invalid simulator details found")
+        except ValueError as e:
+            logger.error("Invalid simulator ID: %s", e)
+            raise ClientException("Invalid simulator details found")
+
+        # Get recommended clusters from simulator app
+        recommended_clusters = await self._perform_get_recommended_clusters_request(simulator_id)
+
+        # Get all active clusters by recommended cluster ids
+        db_clusters, _ = await ClusterDataManager(self.session).get_available_clusters_by_cluster_ids(
+            [UUID(item["cluster_id"]) for item in recommended_clusters["items"]]
+        )
+
+        # Parse recommended clusters response
+        return await self._parse_recommended_clusters_response(
+            db_clusters, recommended_clusters, deploy_config, db_model
+        )
+
+    async def _perform_get_recommended_clusters_request(self, simulator_id: UUID) -> Dict:
+        """Perform get recommended clusters request to simulator app.
+
+        Args:
+            simulator_id: The ID of the simulator to get recommended clusters for
+        """
+        get_recommended_clusters_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/recommendations"
+        query_params = {
+            "workflow_id": str(simulator_id),
+            "limit": 20,
+        }
+
+        try:
+            logger.debug(f"Performing get recommended clusters request. endpoint: {get_recommended_clusters_endpoint}")
+            async with aiohttp.ClientSession() as session, session.get(
+                get_recommended_clusters_endpoint, params=query_params
+            ) as response:
+                response_data = await response.json()
+                if response.status != 200 or response_data.get("object") == "error":
+                    logger.error(f"Failed to get recommended clusters: {response.status} {response_data}")
+                    raise ClientException(
+                        "Failed to get recommended clusters", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+
+                logger.debug("Successfully fetched recommended clusters")
+                return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send get recommended clusters request: {e}")
+            raise ClientException(
+                "Failed to get recommended clusters", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def _parse_recommended_clusters_response(
+        self,
+        db_clusters: List[ClusterModel],
+        recommended_clusters: Dict,
+        deploy_config: DeploymentTemplateCreate,
+        db_model: Model,
+    ) -> List[RecommendedCluster]:
+        """Parse recommended clusters response.
+
+        Args:
+            db_clusters: List of active clusters
+            recommended_clusters: Recommended clusters
+        """
+        # Create a mapper for recommended cluster details with cluster id
+        recommended_cluster_mapper = {(item["cluster_id"]): item for item in recommended_clusters["items"]}
+
+        # Create a mapper for cluster details with cluster id
+        db_cluster_mapper = {(str(db_cluster.cluster_id)): db_cluster for db_cluster in db_clusters}
+
+        # Create a list to store recommended cluster data
+        data = []
+
+        # Iterate over all recommended clusters
+        for recommended_cluster_id, recommended_cluster_data in recommended_cluster_mapper.items():
+            if recommended_cluster_id not in db_cluster_mapper:
+                logger.info(f"BudSimulator cluster id {recommended_cluster_id} not found in database")
+                continue
+
+            db_cluster = db_cluster_mapper[recommended_cluster_id]
+
+            # calculate replicas
+            total_replicas = recommended_cluster_data["metrics"]["replica"]
+
+            # calculate concurrency
+            concurrency_data = {
+                "label": await get_range_label(
+                    recommended_cluster_data["metrics"]["concurrency"], deploy_config.concurrent_requests
+                ),
+                "value": recommended_cluster_data["metrics"]["concurrency"],
+            }
+
+            if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+                ttft_data = None
+                per_session_tokens_per_sec_data = None
+                over_all_throughput_data = None
+                e2e_latency_data = None
+            else:
+                # calculate ttft
+                ttft_data = {
+                    "label": await get_range_label(
+                        recommended_cluster_data["metrics"]["ttft"],
+                        deploy_config.ttft,
+                        higher_is_better=False,
+                    ),
+                    "value": recommended_cluster_data["metrics"]["ttft"],
+                }
+
+                # calculate per_session_tokens_per_sec
+                per_session_tokens_per_sec_data = {
+                    "label": await get_range_label(
+                        recommended_cluster_data["metrics"]["throughput_per_user"],
+                        deploy_config.per_session_tokens_per_sec,
+                    ),
+                    "value": recommended_cluster_data["metrics"]["throughput_per_user"],
+                }
+
+                # calculate overall throughput
+                over_all_throughput = (
+                    recommended_cluster_data["metrics"]["concurrency"]
+                    * recommended_cluster_data["metrics"]["throughput_per_user"]
+                )
+                over_all_throughput_data = {
+                    "label": per_session_tokens_per_sec_data[
+                        "label"
+                    ],  # Since overall throughput is a product of concurrency and throughput_per_user, the label is the same as throughput_per_user
+                    "value": over_all_throughput,
+                }
+
+                # calculate e2e_latency
+                e2e_latency_data = {
+                    "label": await get_range_label(
+                        recommended_cluster_data["metrics"]["e2e_latency"],
+                        deploy_config.e2e_latency,
+                        higher_is_better=False,
+                    ),
+                    "value": recommended_cluster_data["metrics"]["e2e_latency"],
+                }
+
+            # cost per million tokens
+            cost_per_million_tokens = recommended_cluster_data["metrics"]["cost_per_million_tokens"]
+
+            # Resource details
+            resource_details = []
+            if db_cluster.cpu_count > 0:
+                resource_details.append(
+                    {
+                        "type": "CPU",
+                        "available": db_cluster.cpu_available_workers,
+                        "total": db_cluster.cpu_total_workers,
+                    }
+                )
+            if db_cluster.gpu_count > 0:
+                resource_details.append(
+                    {
+                        "type": "GPU",
+                        "available": db_cluster.gpu_available_workers,
+                        "total": db_cluster.gpu_total_workers,
+                    }
+                )
+            if db_cluster.hpu_count > 0:
+                resource_details.append(
+                    {
+                        "type": "HPU",
+                        "available": db_cluster.hpu_available_workers,
+                        "total": db_cluster.hpu_total_workers,
+                    }
+                )
+
+            # Total resources
+            total_resources = sum([item["total"] for item in resource_details])
+
+            # Resources used
+            resources_used = total_resources - sum([item["available"] for item in resource_details])
+
+            # device types
+            device_types = recommended_cluster_data["metrics"].get("device_types", [])
+
+            # append recommended cluster data to the response
+            data.append(
+                RecommendedCluster(
+                    id=db_cluster.id,
+                    cluster_id=db_cluster.cluster_id,
+                    name=db_cluster.name,
+                    cost_per_token=cost_per_million_tokens,
+                    total_resources=total_resources,
+                    resources_used=resources_used,
+                    resource_details=resource_details,
+                    required_devices=device_types,
+                    benchmarks=RecommendedClusterData(
+                        replicas=total_replicas,
+                        ttft=ttft_data,
+                        per_session_tokens_per_sec=per_session_tokens_per_sec_data,
+                        e2e_latency=e2e_latency_data,
+                        over_all_throughput=over_all_throughput_data,
+                        concurrency=concurrency_data,
+                    ),
+                )
+            )
+
+        return data

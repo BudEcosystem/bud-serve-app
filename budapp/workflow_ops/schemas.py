@@ -5,9 +5,17 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 
 from ..cluster_ops.schemas import ClusterResponse
-from ..commons.constants import ModelProviderTypeEnum, VisibilityEnum, WorkflowStatusEnum, WorkflowTypeEnum
-from ..endpoint_ops.schemas import EndpointResponse
-from ..model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider, QuantizeModelWorkflowStepData
+from ..commons.constants import (
+    AddModelModalityEnum,
+    ModelProviderTypeEnum,
+    VisibilityEnum,
+    WorkflowStatusEnum,
+    WorkflowTypeEnum,
+)
+from ..core.schemas import ModelTemplateResponse
+from ..credential_ops.schemas import ProprietaryCredentialResponse
+from ..endpoint_ops.schemas import AddAdapterWorkflowStepData, EndpointResponse
+from ..model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider, QuantizeModelWorkflowStepData, ScalingSpecification
 from ..project_ops.schemas import ProjectResponse
 
 
@@ -33,6 +41,7 @@ class RetrieveWorkflowStepData(BaseModel):
     delete_worker_events: dict | None = None
     model_security_scan_events: dict | None = None
     bud_simulator_events: dict | None = None
+    budserve_cluster_events: dict | None = None
     icon: str | None = None
     uri: str | None = None
     author: str | None = None
@@ -43,10 +52,30 @@ class RetrieveWorkflowStepData(BaseModel):
     security_scan_result: ModelSecurityScanResult | None = None
     endpoint: EndpointResponse | None = None
     additional_concurrency: int | None = None
-    bud_serve_cluster_events: dict | None = None
     project: ProjectResponse | None = None
     cluster: ClusterResponse | None = None
-    qunatization_config: QuantizeModelWorkflowStepData | None = None
+    quantization_config: QuantizeModelWorkflowStepData | None = None
+    quantization_deployment_events: dict | None = None
+    quantization_simulation_events: dict | None = None
+    eval_with: str | None = None
+    max_input_tokens: int | None = None
+    max_output_tokens: int | None = None
+    datasets: list | None = None
+    nodes: list | None = None
+    credential_id: UUID4 | None = None
+    user_confirmation: bool | None = None
+    run_as_simulation: bool | None = None
+    adapter_config: AddAdapterWorkflowStepData | None = None
+    adapter_deployment_events: dict | None = None
+    credential: ProprietaryCredentialResponse | None = None
+    endpoint_name: str | None = None
+    deploy_config: dict | None = None
+    scaling_specification: ScalingSpecification | None = None
+    simulator_id: UUID4 | None = None
+    template_id: UUID4 | None = None
+    endpoint_details: dict | None = None
+    template: ModelTemplateResponse | None = None
+    add_model_modality: list[AddModelModalityEnum] | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):

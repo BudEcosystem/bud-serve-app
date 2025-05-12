@@ -17,10 +17,11 @@
 """The cluster ops package, containing essential business logic, services, and routing configurations for the cluster ops."""
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Uuid
+from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,7 +35,8 @@ class Cluster(Base, TimestampMixin):
     __tablename__ = "cluster"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    ingress_url: Mapped[str] = mapped_column(String, nullable=False)
+    ingress_url: Mapped[str] = mapped_column(String, nullable=True) # as cloud cluster doesnt have ingress url by default
+    cluster_type: Mapped[str] = mapped_column(String, nullable=False,default="ON_PERM") # New Addition ->  ON_PERM || CLOUD
     status: Mapped[str] = mapped_column(
         Enum(
             ClusterStatusEnum,
@@ -60,18 +62,46 @@ class Cluster(Base, TimestampMixin):
     total_nodes: Mapped[int] = mapped_column(Integer, default=0)
     available_nodes: Mapped[int] = mapped_column(Integer, default=0)
 
+    # Relation For Cloud Provider & Credential ID
+    cloud_provider_id: Mapped[UUID] = mapped_column(Uuid, nullable=True)
+    credential_id: Mapped[UUID] = mapped_column(Uuid, nullable=True)
+    region: Mapped[str] = mapped_column(String, nullable=True)
+
+    # cloud_credential: Mapped["CloudCredentials"] = relationship("CloudCredentials",foreign_keys=[credential_id])
+    # cloud_provider: Mapped["CloudProviders"] = relationship("CloudProviders",foreign_keys=[cloud_provider_id])
+
+
+
     endpoints: Mapped[list["Endpoint"]] = relationship(
         "Endpoint",
         back_populates="cluster",
     )
-    # benchmarks: Mapped[list["Benchmark"]] = relationship(
-    #     "Benchmark",
-    #     back_populates="cluster",
-    # )
+    benchmarks: Mapped[list["BenchmarkSchema"]] = relationship(
+        back_populates="cluster",
+    )
     created_user: Mapped["User"] = relationship(back_populates="created_clusters", foreign_keys=[created_by])
+    model_cluster_recommended: Mapped[list["ModelClusterRecommended"]] = relationship(
+        "ModelClusterRecommended",
+        back_populates="cluster",
+    )
 
     @hybrid_property
     def kubernetes_info_dict(self):
         if not self.kubernetes_metadata:
             return {}
         return json.loads(self.kubernetes_metadata)
+
+
+class ModelClusterRecommended(Base):
+    """Model cluster recommended model."""
+
+    __tablename__ = "model_cluster_recommended"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
+    cluster_id: Mapped[UUID] = mapped_column(ForeignKey("cluster.id"), nullable=False)
+    hardware_type: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=False)
+    cost_per_million_tokens: Mapped[float] = mapped_column(Float, nullable=False)
+
+    model: Mapped["Model"] = relationship("Model", back_populates="model_cluster_recommended")
+    cluster: Mapped["Cluster"] = relationship("Cluster", back_populates="model_cluster_recommended")

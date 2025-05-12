@@ -16,15 +16,16 @@
 
 """The credential ops package, containing essential business logic, services, and routing configurations for the credential ops."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Float, String, Uuid
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, String, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.commons.constants import CredentialTypeEnum
 from budapp.commons.database import Base, TimestampMixin
+from budapp.commons.security import hash_token
 
 
 class ProprietaryCredential(Base, TimestampMixin):
@@ -42,11 +43,13 @@ class ProprietaryCredential(Base, TimestampMixin):
         ),
         nullable=False,
     )
+    provider_id: Mapped[UUID] = mapped_column(ForeignKey("provider.id"), nullable=False)
 
     # placeholder for api base, project, organization, etc.
     other_provider_creds: Mapped[dict] = mapped_column(JSONB, nullable=True)
 
     endpoints: Mapped[list["Endpoint"]] = relationship("Endpoint", back_populates="credential")
+    provider: Mapped["Provider"] = relationship("Provider")
 
 
 class Credential(Base, TimestampMixin):
@@ -70,4 +73,35 @@ class Credential(Base, TimestampMixin):
 
     project: Mapped["Project"] = relationship("Project", foreign_keys=[project_id])
 
+    @staticmethod
+    def set_hashed_key(key: str):
+        hashed_key = hash_token(f"sk-{key}")
+        return hashed_key
 
+
+class CloudCredentials(Base, TimestampMixin):
+    """Cloud Credentials : model for cloud credentials."""
+
+    __tablename__ = "cloud_credentials"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    provider_id: Mapped[UUID] = mapped_column(ForeignKey("cloud_providers.id", ondelete="CASCADE"), nullable=False)
+    credential: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    credential_name: Mapped[str] = mapped_column(String, nullable=False, default="No Name")
+
+    provider = relationship("CloudProviders", back_populates="credentials")
+
+
+class CloudProviders(Base, TimestampMixin):
+    """Cloud Providers : model for cloud providers."""
+
+    __tablename__ = "cloud_providers"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=False)
+    logo_url: Mapped[str] = mapped_column(String, nullable=False)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    schema_definition: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    unique_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+
+    credentials = relationship("CloudCredentials", back_populates="provider")

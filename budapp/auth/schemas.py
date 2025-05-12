@@ -17,10 +17,14 @@
 
 """Contains Pydantic schemas used for data validation and serialization within the auth services."""
 
-from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field
+from typing import Any, List
 
-from budapp.commons.constants import TokenTypeEnum
+from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+from budapp.commons.constants import TokenTypeEnum, UserRoleEnum
+from budapp.commons.helpers import validate_password_string
 from budapp.commons.schemas import SuccessResponse
+from budapp.permissions.schemas import PermissionList
 
 
 class AuthToken(BaseModel):
@@ -56,16 +60,20 @@ class TokenCreate(BaseModel):
 
 
 class UserLogin(BaseModel):
-    """Login user schema."""
+    """User login schema."""
 
     email: EmailStr = Field(min_length=1, max_length=100)
     password: str = Field(min_length=8, max_length=100)
+    tenant_id: UUID4 | None = Field(
+        None,
+        description="The ID of the tenant. If not provided, the user will be logged in to the first tenant they belong to.",
+    )
 
 
 class UserLoginData(BaseModel):
     """User login data schema."""
 
-    token: AuthToken
+    token: Any
     first_login: bool
     is_reset_password: bool
 
@@ -74,6 +82,102 @@ class UserLoginResponse(SuccessResponse):
     """User login response schema."""
 
     model_config = ConfigDict(extra="ignore")
-    token: AuthToken
+    token: Any
     first_login: bool
     is_reset_password: bool
+
+
+class LogoutRequest(BaseModel):
+    """Schema for logout request."""
+
+    tenant_id: UUID4 | None = Field(
+        None,
+        description="The ID of the tenant. If not provided, the user will be logged in to the first tenant they belong to.",
+    )
+    refresh_token: str = Field(min_length=1)
+
+    class Config:
+        """Pydantic config."""
+
+        from_attributes = True
+
+
+class LogoutResponse(SuccessResponse):
+    """Schema for logout response."""
+
+    message: str
+
+    class Config:
+        """Pydantic config."""
+
+        from_attributes = True
+
+
+class UserBase(BaseModel):
+    """Base user schema"""
+
+    name: str = Field(min_length=1, max_length=100)
+    email: EmailStr = Field(min_length=1, max_length=100)
+
+
+class UserCreate(UserBase):
+    """Create user schema"""
+
+    password: str = Field(min_length=8, max_length=100)
+    permissions: List[PermissionList] | None = None
+    role: UserRoleEnum
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        is_valid, message = validate_password_string(value)
+        if not is_valid:
+            raise ValueError(message)
+        return value
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, value: UserRoleEnum) -> UserRoleEnum:
+        if value == UserRoleEnum.SUPER_ADMIN:
+            raise ValueError("The SUPER_ADMIN role is not permitted.")
+        return value
+
+
+class UserRegisterResponse(SuccessResponse):
+    """User register response schema."""
+
+    message: str
+
+    class Config:
+        """Pydantic config."""
+
+        from_attributes = True
+
+
+class ResourceCreate(BaseModel):
+    """Resource create schema."""
+
+    resource_type: str
+    resource_id: str
+    scopes: List[str]  # view , manage
+    
+
+class DeletePermissionRequest(BaseModel):
+    """Delete permission request schema."""
+
+    resource_type: str
+    resource_id: str
+    delete_resource: bool = False
+
+
+class RefreshTokenRequest(BaseModel):
+    """Refresh token request schema."""
+
+    refresh_token: str = Field(min_length=1)
+
+
+class RefreshTokenResponse(SuccessResponse):
+    """Refresh token response schema."""
+
+    model_config = ConfigDict(extra="ignore")
+    token: Any

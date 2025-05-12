@@ -9,8 +9,8 @@ services:
     build:
       context: ..
       dockerfile: ./deploy/Dockerfile
-    command: [ "sh", "-c", "uvicorn $APP_NAME.main:app --host 0.0.0.0 --port $APP_PORT --reload" ]
-    # command: [ "sh", "-c", "alembic -c ./budapp/alembic.ini upgrade head && uvicorn $APP_NAME.main:app --host 0.0.0.0 --port $APP_PORT --reload" ]
+    # command: [ "sh", "-c", "uvicorn $APP_NAME.main:app --host 0.0.0.0 --port $APP_PORT --reload" ]
+    command: [ "sh", "-c", "alembic -c ./budapp/alembic.ini upgrade head && uvicorn $APP_NAME.main:app --host 0.0.0.0 --port $APP_PORT --reload" ]
     ports:
       - "$DAPR_GRPC_PORT:$DAPR_GRPC_PORT" # Dapr instances communicate over gRPC so gRPC port needs to be exposed
       - "$DAPR_HTTP_PORT:$DAPR_HTTP_PORT" # Expose Dapr HTTP port for service invocation
@@ -24,6 +24,7 @@ services:
       - budapp-redis
       - budapp-placement
       - budapp-postgres
+      - budapp-scheduler
     networks:
       - bud-microframe-nw
   budapp-sidecar:
@@ -36,6 +37,8 @@ services:
       "--dapr-http-port", "$DAPR_HTTP_PORT",
       "--dapr-grpc-port", "$DAPR_GRPC_PORT",
       "--placement-host-address", "$DAPR_PLACEMENT_HOST:$DAPR_PLACEMENT_PORT", # Dapr's placement service can be reach via the docker DNS entry
+      "--scheduler-host-address", "${DAPR_SCHEDULER_HOST:-0.0.0.0}:${DAPR_SCHEDULER_PORT:-50006}",
+      "--dapr-internal-grpc-port", "${DAPR_INTERNAL_GRPC_PORT:-50002}",
       "--resources-path", "/components",
       "--config", "/config/appconfig.yaml",
       "--log-as-json"
@@ -55,6 +58,21 @@ services:
     command: [ "./placement", "--port", "50006" ]
     ports:
       - "50006:50006"
+  budapp-scheduler:
+    container_name: budserve-$NAMESPACE-$APP_NAME-scheduler
+    image: "daprio/dapr"
+    command: [ "./scheduler", "--port", "$DAPR_SCHEDULER_PORT", "--log-as-json" ]
+    ports:
+      - "$DAPR_SCHEDULER_PORT:$DAPR_SCHEDULER_PORT"
+    # WARNING - This is a tmpfs volume, your state will not be persisted across restarts
+    volumes:
+      - type: tmpfs
+        target: /data
+        tmpfs:
+          size: 10GB
+    privileged: true
+    networks:
+      - bud-microframe-nw
 
 networks:
   bud-microframe-nw:

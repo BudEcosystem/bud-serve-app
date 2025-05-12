@@ -19,18 +19,21 @@
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, asc, desc, distinct, func, or_, select
+from sqlalchemy import and_, asc, case, cast, desc, distinct, func, literal, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 
 from budapp.cluster_ops.models import Cluster as ClusterModel
 from budapp.commons import logging
 from budapp.commons.constants import EndpointStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
+from budapp.model_ops.models import CloudModel
 from budapp.model_ops.models import Model as Model
 
 from ..commons.helpers import get_param_range
+from ..commons.constants import AdapterStatusEnum, ModelProviderTypeEnum
+
 from ..project_ops.models import Project as ProjectModel
-from .models import Endpoint as EndpointModel
+from .models import Adapter as AdapterModel, Endpoint as EndpointModel
 
 
 logger = logging.get_logger(__name__)
@@ -38,6 +41,15 @@ logger = logging.get_logger(__name__)
 
 class EndpointDataManager(DataManagerUtils):
     """Data manager for the Endpoint model."""
+
+    async def get_missing_endpoints(self, endpoint_ids: List[UUID]):
+        stmt = select(EndpointModel).where(
+            and_(EndpointModel.id.in_(endpoint_ids), EndpointModel.status != EndpointStatusEnum.DELETED)
+        )
+        result = self.scalars_all(stmt)
+        existing_ids = {ep.id for ep in result}
+        missing_ids = set(endpoint_ids) - existing_ids
+        return list(missing_ids)
 
     async def get_all_active_endpoints(
         self,
@@ -306,31 +318,80 @@ class EndpointDataManager(DataManagerUtils):
 
             search_conditions = await self.generate_search_stmt(EndpointModel, filters)
             stmt = (
-                select(EndpointModel)
+                select(
+                    EndpointModel,
+                    case(
+                        (Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL, cast(CloudModel.input_cost, JSONB)),
+                        else_=literal(None),
+                    ).label("input_cost"),
+                    case(
+                        (
+                            Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
+                            cast(CloudModel.output_cost, JSONB),
+                        ),
+                        else_=literal(None),
+                    ).label("output_cost"),
+                    case(
+                        (Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL, CloudModel.max_input_tokens),
+                        (
+                            Model.provider_type == ModelProviderTypeEnum.HUGGING_FACE,
+                            Model.architecture_text_config["context_length"].as_integer(),
+                        ),
+                        else_=literal(None),
+                    ).label("context_length"),
+                )
                 .join(Model, EndpointModel.model_id == Model.id)
+                .outerjoin(
+                    CloudModel,
+                    and_(Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL, Model.uri == CloudModel.uri),
+                )
                 .filter(or_(*search_conditions, *explicit_conditions))
-                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+                .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
                 .filter(EndpointModel.project_id.in_(project_ids))
             )
             count_stmt = (
                 select(func.count(distinct(EndpointModel.id)))
                 .join(Model, EndpointModel.model_id == Model.id)
                 .filter(or_(*search_conditions, *explicit_conditions))
-                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+                .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
                 .filter(EndpointModel.project_id.in_(project_ids))
             )
         else:
             if explicit_filters["model_name"]:
-                # For filters, query using == operator
                 model_name_condition = Model.name == explicit_filters["model_name"]
                 explicit_conditions.append(model_name_condition)
 
             stmt = (
-                select((EndpointModel))
+                select(
+                    EndpointModel,
+                    case(
+                        (Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL, cast(CloudModel.input_cost, JSONB)),
+                        else_=literal(None),
+                    ).label("input_cost"),
+                    case(
+                        (
+                            Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
+                            cast(CloudModel.output_cost, JSONB),
+                        ),
+                        else_=literal(None),
+                    ).label("output_cost"),
+                    case(
+                        (Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL, CloudModel.max_input_tokens),
+                        (
+                            Model.provider_type == ModelProviderTypeEnum.HUGGING_FACE,
+                            Model.architecture_text_config["context_length"].as_integer(),
+                        ),
+                        else_=literal(None),
+                    ).label("context_length"),
+                )
                 .filter_by(**filters)
                 .join(Model, EndpointModel.model_id == Model.id)
+                .outerjoin(
+                    CloudModel,
+                    and_(Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL, Model.uri == CloudModel.uri),
+                )
                 .where(and_(*explicit_conditions))
-                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+                .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
                 .filter(EndpointModel.project_id.in_(project_ids))
             )
             count_stmt = (
@@ -338,7 +399,7 @@ class EndpointDataManager(DataManagerUtils):
                 .filter_by(**filters)
                 .join(Model, EndpointModel.model_id == Model.id)
                 .where(and_(*explicit_conditions))
-                .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
+                .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
                 .filter(EndpointModel.project_id.in_(project_ids))
             )
 
@@ -353,6 +414,98 @@ class EndpointDataManager(DataManagerUtils):
             sort_conditions = await self.generate_sorting_stmt(EndpointModel, order_by)
             stmt = stmt.order_by(*sort_conditions)
 
-        result = self.scalars_all(stmt)
+        result = self.execute_all(stmt)
 
+        return result, count
+
+
+class AdapterDataManager(DataManagerUtils):
+    """Data manager for the Adapter model."""
+
+    async def get_all_active_adapters(
+        self,
+        endpoint_id: UUID,
+        offset: int = 0,
+        limit: int = 10,
+        filters: Dict[str, Any] = {},
+        order_by: List[Tuple[str, str]] = [],
+        search: bool = False,
+    ) -> List[AdapterModel]:
+        """Get all active adapters for a given endpoint.
+
+        Args:
+            endpoint_id (UUID): The ID of the endpoint.
+            offset (int, optional): The offset for pagination. Defaults to 0.
+            limit (int, optional): The limit for pagination. Defaults to 10.
+            filters (Dict[str, Any], optional): Filters to apply. Defaults to {}.
+            order_by (List[Tuple[str, str]], optional): The order by conditions. Defaults to [].
+            search (bool, optional): Whether to perform a search. Defaults to False.
+
+        Returns:
+            List[AdapterModel]: A list of active adapters.
+        """
+        await self.validate_fields(AdapterModel, filters)
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(AdapterModel, filters)
+            stmt = (
+                select(AdapterModel)
+                .join(EndpointModel)
+                .join(Model)
+                .filter(or_(*search_conditions))
+                .filter(
+                    and_(AdapterModel.endpoint_id == endpoint_id, AdapterModel.status != AdapterStatusEnum.DELETED)
+                )
+            )
+
+            count_stmt = (
+                select(func.count())
+                .select_from(AdapterModel)
+                .join(EndpointModel)
+                .join(Model)
+                .filter(or_(*search_conditions))
+                .filter(
+                    and_(AdapterModel.endpoint_id == endpoint_id, AdapterModel.status != AdapterStatusEnum.DELETED)
+                )
+            )
+        else:
+            stmt = select(AdapterModel).join(EndpointModel).join(Model)
+            count_stmt = select(func.count()).select_from(AdapterModel).join(EndpointModel).join(Model)
+            for key, value in filters.items():
+                stmt = stmt.filter(getattr(AdapterModel, key) == value)
+                count_stmt = count_stmt.filter(getattr(AdapterModel, key) == value)
+            stmt = stmt.filter(
+                and_(AdapterModel.endpoint_id == endpoint_id, AdapterModel.status != AdapterStatusEnum.DELETED)
+            )
+            count_stmt = count_stmt.filter(
+                and_(AdapterModel.endpoint_id == endpoint_id, AdapterModel.status != AdapterStatusEnum.DELETED)
+            )
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(AdapterModel, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.scalars_all(stmt)
+        logger.info("all adapters result: %s", result)
+        return result, count
+
+    async def get_all_adapters_in_project(self, project_id: UUID) -> Tuple[List[AdapterModel], int]:
+        """Get all adapters in a project."""
+        stmt = select(AdapterModel).join(EndpointModel).filter(EndpointModel.project_id == project_id)
+        count_stmt = (
+            select(func.count())
+            .select_from(AdapterModel)
+            .join(EndpointModel)
+            .filter(EndpointModel.project_id == project_id)
+        )
+        count = self.execute_scalar(count_stmt)
+        result = self.scalars_all(stmt)
+        logger.info("all adapters result: %s", result)
         return result, count

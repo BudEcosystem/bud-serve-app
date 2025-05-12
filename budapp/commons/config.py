@@ -17,28 +17,37 @@
 """Manages application and secret configurations, utilizing environment variables and Dapr's configuration store for syncing."""
 
 import os
-from datetime import datetime, timedelta, timezone
-from distutils.util import strtobool
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any, List, Optional
 
-from dapr.conf import settings as dapr_settings
+from budmicroframe.commons.config import (
+    BaseAppConfig,
+    BaseConfig,
+    BaseSecretsConfig,
+    enable_periodic_sync_from_store,
+    register_settings,
+)
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.types import (
+    PrivateKeyTypes,
+    PublicKeyTypes,
+)
+from dotenv import load_dotenv
 from pydantic import (
     AnyHttpUrl,
     AnyUrl,
     BeforeValidator,
-    ConfigDict,
     DirectoryPath,
     Field,
     computed_field,
-    model_validator,
 )
-from pydantic_settings import BaseSettings
 
 from budapp.__about__ import __version__
 
 from . import logging
-from .constants import Environment, LogLevel
+
+
+load_dotenv()
 
 
 def parse_cors(v: Any) -> List[str] | str:
@@ -50,80 +59,7 @@ def parse_cors(v: Any) -> List[str] | str:
     raise ValueError(v)
 
 
-def enable_periodic_sync_from_store(is_global: bool = False) -> Dict[str, Any]:
-    """Enable periodic synchronization from the configuration store.
-
-    Args:
-        is_global (bool): Indicates if the configuration is global across all services.
-
-    Returns:
-        Dict[str, Any]: A dictionary with sync settings.
-    """
-    return {"sync": True, "is_global": is_global}
-
-
-class BaseConfig(BaseSettings):
-    """Base Config to be used as a parent class for other Config classes. Extra fields are not allowed."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    max_sync_interval: int = Field(
-        timedelta(hours=12).seconds, alias="MAX_STORE_SYNC_INTERVAL", ge=timedelta(hours=1).seconds
-    )
-
-    def get_fields_to_sync(self) -> List[str]:
-        """Retrieve a list of field names that are configured for synchronization with a store.
-
-        This method inspects the fields defined in the class and checks their `json_schema_extra` attribute
-        to determine if they should be synced. It collects field names based on the `sync` attribute and
-        applies any `key_prefix` or `alias` settings if provided.
-
-        Returns:
-            list: A list of field names to be synced from the store. The field names are formatted
-                  according to the `key_prefix` and `alias` settings if applicable.
-
-        Example:
-            ```python
-            fields = instance.get_fields_to_sync()
-            # Output could be something like ['description', 'config.debug', 'app.name']
-            ```
-        """
-        fields_to_sync = []
-        app_name = __version__.split("@")[0]
-        for name, info in self.__fields__.items():
-            extra = info.json_schema_extra or {}
-            if extra.get("sync") is True:
-                fields_to_sync.append(
-                    f"{app_name}." if extra.get("is_global", False) is False else "" + (info.alias or name)
-                )
-
-        return fields_to_sync
-
-    def update_fields(self, mapping: Dict[str, Any]) -> None:
-        """Update fields in the instance based on the provided mapping.
-
-        Inspect each field defined in the class and update its value using the corresponding key in the provided
-        `mapping` dictionary. The key used for lookup is determined by the field's `json_schema_extra` settings,
-        applying any `key_prefix` or `alias` if specified.
-
-        Args:
-            mapping (dict): A dictionary where keys are the names of the fields to update and values are the new
-                            values to assign to these fields.
-
-        Example:
-            ```python
-            instance.update_fields({"description": "", "config.debug": True, "app.name": "MyApp"})
-            ```
-        """
-        app_name = __version__.split("@")[0]
-        for name, info in self.__fields__.items():
-            extra = info.json_schema_extra or {}
-            key = f"{app_name}." if extra.get("is_global", False) is True else "" + (info.alias or name)
-            if key in mapping:
-                self.__setattr__(name, mapping[key])
-
-
-class AppConfig(BaseConfig):
+class AppConfig(BaseAppConfig):
     """Manages configuration settings for the microservice.
 
     This class is used to define and access the configuration settings for the microservice. It supports syncing
@@ -158,61 +94,18 @@ class AppConfig(BaseConfig):
     description: str = ""
     api_root: str = ""
 
-    # Deployment configs
-    env: Environment = Field(Environment.DEVELOPMENT, alias="NAMESPACE")
-    debug: Optional[bool] = Field(
-        None,
-        alias="DEBUG",
-        json_schema_extra=enable_periodic_sync_from_store(),
-    )
-    log_level: Optional[LogLevel] = Field(None, alias="LOG_LEVEL")
-    log_dir: Path = Field(Path("logs"), alias="LOG_DIR")
-
-    tzone: timezone = timezone.utc
-    deployed_at: datetime = datetime.now(tzone)
-
-    # Dapr configs
-    dapr_http_port: Optional[int] = Field(dapr_settings.DAPR_HTTP_PORT)
-    dapr_grpc_port: Optional[int] = Field(dapr_settings.DAPR_GRPC_PORT)
-    dapr_health_timeout: Optional[int] = Field(
-        dapr_settings.DAPR_HEALTH_TIMEOUT, json_schema_extra=enable_periodic_sync_from_store(is_global=True)
-    )
-    dapr_api_method_invocation_protocol: Optional[str] = Field(
-        "grpc", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
-    )
-
-    # Config store
-    configstore_name: Optional[str] = None
-    config_subscription_id: Optional[str] = None
-
-    # Secret store
-    secretstore_name: Optional[str] = None
-    secretstore_secret_name: Optional[str] = Field(None, alias="SECRETSTORE_SECRET_NAME")
-
-    # State store
-    statestore_name: Optional[str] = None
-
-    # Pubsub
-    pubsub_name: Optional[str] = None
-    pubsub_topic: Optional[str] = None
-    dead_letter_topic: Optional[str] = None
-
     # Base Directory
     base_dir: DirectoryPath = Field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
 
     # Profiling
     profiler_enabled: bool = Field(False, alias="ENABLE_PROFILER")
 
-    # DB connection
-    postgres_host: str = Field("localhost", alias="POSTGRES_HOST")
-    postgres_port: int = Field(5432, alias="POSTGRES_PORT")
-    postgres_user: str = Field(alias="POSTGRES_USER")
-    postgres_password: str = Field(alias="POSTGRES_PASSWORD")
-    postgres_db: str = Field(alias="POSTGRES_DB")
-
     # Superuser
     superuser_email: str = Field(alias="SUPER_USER_EMAIL")
     superuser_password: str = Field(alias="SUPER_USER_PASSWORD")
+
+    # default non master realm name
+    default_realm_name: str = Field(alias="DEFAULT_REALM_NAME", default="bud")
 
     # Token
     access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
@@ -233,11 +126,43 @@ class AppConfig(BaseConfig):
     bud_notify_app_id: str = Field(alias="BUD_NOTIFY_APP_ID")
     source_topic: str = Field(alias="SOURCE_TOPIC", default="budAppMessages")
 
-    # Budserve host
-    budserve_host: str = Field(alias="BUD_SERVE_HOST", default="https://api-dev.bud.studio")
-
     # Prometheus URL
     prometheus_url: str = Field(alias="PROMETHEUS_URL", default="https://metrics.fmops.in")
+
+    # Add model directory
+    add_model_dir: DirectoryPath = Field(os.path.expanduser("~/.cache"), alias="ADD_MODEL_DIR")
+
+    # Bud Proxy
+    cache_embedding_model: Optional[str] = Field(alias="CACHE_EMBEDDING_MODEL", default=None)
+    cache_eviction_policy: str = Field(alias="CACHE_EVICTION_POLICY", default="LRU")
+    cache_max_size: int = Field(alias="CACHE_MAX_SIZE", default=1000)
+    cache_ttl: Optional[int] = Field(alias="CACHE_TTL", default=None)
+    cache_score_threshold: float = Field(alias="CACHE_SCORE_THRESHOLD", default=0.1)
+    litellm_proxy_master_key: str = Field(alias="LITELLM_PROXY_MASTER_KEY", default="sk-1234")
+
+    # Frontend URL
+    frontend_url: AnyUrl = Field(alias="FRONTEND_URL", default="http://localhost:3000")
+
+    # Keycloak
+    keycloak_server_url: str = Field(alias="KEYCLOAK_SERVER_URL")
+    keycloak_admin_username: str = Field(alias="KEYCLOAK_ADMIN_USERNAME")
+    keycloak_admin_password: str = Field(alias="KEYCLOAK_ADMIN_PASSWORD")
+    keycloak_realm_name: str = Field(alias="KEYCLOAK_REALM_NAME")
+    keycloak_verify_ssl: bool = Field(True, alias="KEYCLOAK_VERIFY_SSL")
+    # Minio store
+    minio_endpoint: str = Field("bud-store.bud.studio", alias="MINIO_ENDPOINT")
+    minio_secure: bool = Field(True, alias="MINIO_SECURE")
+    minio_bucket: str = Field("models-registry", alias="MINIO_BUCKET")
+    minio_model_bucket: str = Field("model-info", alias="MINIO_MODEL_BUCKET")
+
+    # model download directory
+    model_download_dir: str = Field("model_registry", alias="MODEL_DOWNLOAD_DIR")
+
+    # Grafana
+    grafana_scheme: str = Field(alias="GRAFANA_SCHEME")
+    grafana_url: str = Field(alias="GRAFANA_URL")
+    grafana_username: str = Field(alias="GRAFANA_USERNAME")
+    grafana_password: str = Field(alias="GRAFANA_PASSWORD")
 
     @computed_field
     def static_dir(self) -> str:
@@ -252,81 +177,9 @@ class AppConfig(BaseConfig):
         """Directory for icon."""
         return os.path.join(self.static_dir, "icons")
 
-    @computed_field
-    def postgres_url(self) -> str:
-        """Construct and returns a PostgreSQL connection URL.
 
-        This property combines the individual PostgreSQL connection parameters
-        into a single connection URL string.
-
-        Returns:
-            A formatted PostgreSQL connection string.
-        """
-        return f"postgresql://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
-
-    @model_validator(mode="before")
-    @classmethod
-    def resolve_env(cls, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert environment and namespace values in the input data to `Environment` instances.
-
-        This method processes the provided dictionary to convert the values associated with `env` and `NAMESPACE` keys
-        into `Environment` instances, if they are given as strings.
-
-        Args:
-            data (dict): A dictionary containing configuration data. It may include the keys `env` and `NAMESPACE`
-                         which need to be converted to `Environment` instances.
-
-        Returns:
-            dict: The updated dictionary with `env` and `NAMESPACE` values converted to `Environment` instances.
-        """
-        if isinstance(data.get("env"), str):
-            data["env"] = Environment.from_string(data["env"])
-        elif isinstance(data.get("NAMESPACE"), str):
-            data["NAMESPACE"] = Environment.from_string(data["NAMESPACE"])
-        return data
-
-    @model_validator(mode="after")
-    def set_env_details(self) -> "AppConfig":
-        """Set environment-specific details in the configuration.
-
-        Update the configuration attributes `log_level` and `debug` based on the values from the `env` attribute if they
-        are not already set. This ensures that the configuration uses environment-specific defaults where applicable.
-
-        Returns:
-            AppConfig: The updated instance of `AppConfig` with environment details applied.
-        """
-        self.log_level = self.env.log_level if self.log_level is None else self.log_level
-        self.debug = self.env.debug if self.debug is None else self.debug
-
-        return self
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        """Set an attribute with type conversion based on the attribute name.
-
-        Convert the value of `log_level` to an uppercase `LogLevel` enum if it is a string, and convert the `debug`
-        attribute to a boolean using `strtobool` if it is a string. For all other attributes, set the value directly
-        using the superclass's `__setattr__`.
-
-        Args:
-            name (str): The name of the attribute to set.
-            value (Any): The value to assign to the attribute. Type conversion is applied for specific attributes.
-
-        Example:
-            ```python
-            config = AppConfig()
-            config.log_level = "debug"  # This will be converted to LogLevel.DEBUG
-            config.debug = "true"  # This will be converted to True
-            ```
-        """
-        if name == "log_level" and isinstance(value, str):
-            value = LogLevel(value.upper())
-        elif name == "debug" and isinstance(value, str):
-            value = strtobool(value)
-
-        super().__setattr__(name, value)
-
-
-class SecretsConfig(BaseConfig):
+# class SecretsConfig(BaseSecretsConfig):
+class SecretsConfig(BaseSecretsConfig):
     """Manages secret configurations for the microservice.
 
     This class handles the configuration of secrets required by the microservice. It supports secret management via
@@ -359,7 +212,12 @@ class SecretsConfig(BaseConfig):
         ```
     """
 
+    # App Info
+    name: str = __version__.split("@")[0]
+    version: str = __version__.split("@")[-1]
+
     dapr_api_token: Optional[str] = Field(None, alias="DAPR_API_TOKEN")
+
     password_salt: str = Field("bud_password_salt", alias="PASSWORD_SALT")
     jwt_secret_key: str = Field(alias="JWT_SECRET_KEY")
     redis_password: Optional[str] = Field(
@@ -368,14 +226,76 @@ class SecretsConfig(BaseConfig):
     redis_uri: Optional[str] = Field(
         None, alias="REDIS_URI", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
     )
+    hf_token: Optional[str] = Field(
+        None, alias="HF_TOKEN", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
+    )
+
+    base_dir: DirectoryPath = Field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
+    vault_path: DirectoryPath = base_dir
+
+    # Encryption
+    private_key_password: str = "bud_encryption_password"
+    aes_key_hex: str = ""
+
+    # Minio store
+    minio_access_key: Optional[str] = Field(
+        None,
+        alias="MINIO_ACCESS_KEY",
+        json_schema_extra=enable_periodic_sync_from_store(is_global=True),
+    )
+    minio_secret_key: Optional[str] = Field(
+        None,
+        alias="MINIO_SECRET_KEY",
+        json_schema_extra=enable_periodic_sync_from_store(is_global=True),
+    )
 
     @computed_field
     def redis_url(self) -> str:
         """Construct and returns a Redis connection URL."""
         return f"redis://:{self.redis_password}@{self.redis_uri}"
 
+    @property
+    def public_key(self) -> PublicKeyTypes:
+        """Return Public key loaded from the PEM file"""
+        try:
+            # Read the public key from PEM file
+            public_pem_bytes = Path(os.path.join(self.vault_path, "public_key.pem")).read_bytes()
+
+            # Load the public key
+            public_key_from_pem = serialization.load_pem_public_key(public_pem_bytes)
+
+            return public_key_from_pem
+        except (ValueError, UnboundLocalError, FileNotFoundError):
+            raise RuntimeError("Could not load public key") from None
+
+    @property
+    def private_key(self) -> PrivateKeyTypes:
+        """Return Private key loaded from the PEM file"""
+        try:
+            # Read the private key from PEM file
+            private_pem_bytes = Path(os.path.join(self.vault_path, "private_key.pem")).read_bytes()
+
+            # Load the private key
+            private_key_from_pem = serialization.load_pem_private_key(
+                private_pem_bytes, password=self.private_key_password.encode("utf-8")
+            )
+
+            return private_key_from_pem
+        except (ValueError, UnboundLocalError, FileNotFoundError):
+            raise RuntimeError("Could not load private key") from None
+
+    @property
+    def aes_key(self) -> bytes:
+        """Return AES key loaded from the HEX format"""
+        if not self.aes_key_hex:
+            raise RuntimeError("AES key is not set")
+
+        return bytes.fromhex(self.aes_key_hex)
+
 
 app_settings = AppConfig()
 secrets_settings = SecretsConfig()
 
 logging.configure_logging(app_settings.log_dir, app_settings.log_level)
+
+register_settings(app_settings, secrets_settings)

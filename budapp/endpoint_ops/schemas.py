@@ -16,13 +16,13 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional, Union
 from uuid import UUID
 
 from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator
 
 from budapp.cluster_ops.schemas import ClusterResponse
-from budapp.commons.constants import EndpointStatusEnum
+from budapp.commons.constants import AdapterStatusEnum, EndpointStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from budapp.model_ops.schemas import ModelDetailResponse, ModelResponse
 
@@ -48,6 +48,7 @@ class EndpointCreate(BaseModel):
     total_replicas: int
     number_of_nodes: int
     deployment_config: dict | None
+    node_list: list | None
 
 
 class EndpointFilter(BaseModel):
@@ -143,12 +144,18 @@ class WorkerInfoResponse(PaginatedSuccessResponse):
 
     workers: list[WorkerInfo]
 
+class WorkerLogsResponse(SuccessResponse):
+    """Worker logs response."""
+
+    model_config = ConfigDict(extra="allow")
+
+    logs: Any
+
 
 class WorkerDetailResponse(SuccessResponse):
     """Worker detail response."""
 
     model_config = ConfigDict(extra="allow")
-
     worker: WorkerInfo
 
 
@@ -162,7 +169,7 @@ class ModelClusterDetail(BaseModel):
     status: str
     model: ModelDetailResponse
     cluster: ClusterResponse
-    deployment_config: dict
+    deployment_config: Optional[dict] = None
 
 
 class ModelClusterDetailResponse(SuccessResponse):
@@ -208,3 +215,66 @@ class DeleteWorkerRequest(BaseModel):
     endpoint_id: UUID4
     worker_id: UUID4
     worker_name: str
+
+
+class WorkerMetricsResponse(SuccessResponse):
+    """Worker metrics response."""
+
+    model_config = ConfigDict(extra="allow")
+
+    metrics: Union[dict[str,Any], None] = None
+
+
+class AddAdapterRequest(BaseModel):
+
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None
+    step_number: int = Field(..., gt=0)
+    trigger_workflow: bool = False
+    endpoint_id: UUID4 | None = None
+    adapter_name: str | None = None
+    adapter_model_id: UUID4 | None = None
+
+    @model_validator(mode="after")
+    def validate_fields(self) -> "AddAdapterRequest":
+        """Validate the fields of the request."""
+        if self.workflow_id is None and self.workflow_total_steps is None:
+            raise ValueError("workflow_total_steps is required when workflow_id is not provided")
+
+        if self.workflow_id is not None and self.workflow_total_steps is not None:
+            raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
+
+        return self
+
+class AddAdapterWorkflowStepData(BaseModel):
+    """Add adapter workflow step data."""
+
+    endpoint_id: UUID4 | None = None
+    project_id: UUID4 | None = None
+    adapter_name: str | None = None
+    adapter_model_id: UUID4 | None = None
+    adapter_id: UUID4 | None = None
+
+class AdapterFilter(BaseModel):
+    """Adapter filter."""
+
+    name: str | None = None
+    status: AdapterStatusEnum | None = None
+
+
+class AdapterResponse(BaseModel):
+    """Adapter response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    status: AdapterStatusEnum
+    model: ModelResponse
+    created_at: datetime
+
+
+class AdapterPaginatedResponse(PaginatedSuccessResponse):
+    """Adapter paginated response."""
+
+    adapters: list[AdapterResponse] = []

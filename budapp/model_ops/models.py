@@ -109,15 +109,21 @@ class Model(Base, TimestampMixin):
     local_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     provider_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("provider.id"), nullable=True)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
+    recommended_cluster_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     endpoints: Mapped[list["Endpoint"]] = relationship(back_populates="model")
-    # benchmarks: Mapped[list["Benchmark"]] = relationship(back_populates="model")
+    adapters: Mapped[list["Adapter"]] = relationship(back_populates="model")
+    benchmarks: Mapped[list["BenchmarkSchema"]] = relationship(back_populates="model")
     created_user: Mapped["User"] = relationship(back_populates="created_models", foreign_keys=[created_by])
     paper_published: Mapped[List["PaperPublished"]] = relationship("PaperPublished", back_populates="model")
     model_licenses: Mapped["ModelLicenses"] = relationship("ModelLicenses", back_populates="model")
     provider: Mapped[Optional["Provider"]] = relationship("Provider", back_populates="models")
     model_security_scan_result: Mapped["ModelSecurityScanResult"] = relationship(
         "ModelSecurityScanResult", back_populates="model"
+    )
+    model_cluster_recommended: Mapped["ModelClusterRecommended"] = relationship(
+        "ModelClusterRecommended",
+        back_populates="model",
     )
 
 
@@ -146,7 +152,9 @@ class ModelLicenses(Base, TimestampMixin):
     path: Mapped[str] = mapped_column(String, nullable=True)
     faqs: Mapped[list[dict]] = mapped_column(JSONB, nullable=True)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id"), nullable=False)
-
+    license_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    suitability: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     model: Mapped["Model"] = relationship("Model", back_populates="model_licenses")
 
 
@@ -219,6 +227,10 @@ class CloudModel(Base, TimestampMixin):
     provider_id: Mapped[UUID] = mapped_column(ForeignKey("provider.id"), nullable=False)
     is_present_in_model: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    max_input_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    input_cost: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    output_cost: Mapped[dict] = mapped_column(JSONB, nullable=True)
+
     provider: Mapped[Optional["Provider"]] = relationship("Provider", back_populates="cloud_models")
 
 
@@ -249,3 +261,16 @@ class ModelSecurityScanResult(Base, TimestampMixin):
     model_issues: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
     model: Mapped["Model"] = relationship("Model", back_populates="model_security_scan_result")
+
+
+class QuantizationMethod(Base):
+    """Model for a AI model quantization method."""
+
+    __tablename__ = "quantization_method"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=True)
+    hardware_support: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=False)
+    method_type: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=False)
+    runtime_hardware_support: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=False)

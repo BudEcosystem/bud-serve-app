@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 from fastapi import status
 from sqlalchemy import BigInteger as SqlAlchemyBigInteger
 from sqlalchemy import String as SqlAlchemyString
-from sqlalchemy import cast, func, inspect, select
+from sqlalchemy import cast, delete, func, inspect, select
 from sqlalchemy.dialects.postgresql import ARRAY as PostgresArray
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Session
@@ -238,6 +238,14 @@ class SQLAlchemyMixin(SessionMixin):
             logger.exception(f"Failed to execute scalar statement: {e}")
             raise DatabaseException("Unable to execute scalar statement") from e
 
+    async def execute_commit(self, stmt: Executable) -> None:
+        try:
+            self.session.execute(stmt)
+            self.session.commit()
+        except (Exception, SQLAlchemyError) as e:
+            logger.exception(f"Failed to execute statement: {e}")
+            raise DatabaseException("Unable to execute statement") from e
+
 
 class DataManagerUtils(SQLAlchemyMixin):
     """Utility class for data management operations."""
@@ -442,6 +450,26 @@ class DataManagerUtils(SQLAlchemyMixin):
     async def delete_one(self, model: Type[DeclarativeBase]) -> None:
         """Delete a model instance from the database."""
         self.delete_model(model)
+
+    async def delete_by_fields(self, model: Type[DeclarativeBase], fields: Dict[str, Any]) -> None:
+        """Delete a model instance from the database based on the given fields.
+
+        This method deletes the model instance from the database based on the provided fields.
+        If the instance is not found and missing_ok is False, it raises an HTTPException.
+
+        Args:
+            model (Type[DeclarativeBase]): The SQLAlchemy model class to delete.
+            fields (Dict): A dictionary of field names and their values to filter by.
+
+        Raises:
+            DatabaseException: If there's an error in field validation or database operation.
+        """
+        await self.validate_fields(model, fields)
+
+        stmt = delete(model).filter_by(**fields)
+
+        self.session.execute(stmt)
+        self.session.commit()
 
     async def get_all_by_fields(
         self, model: Type[DeclarativeBase], fields: Dict[str, Any], exclude_fields: Optional[Dict[str, Any]] = None

@@ -53,7 +53,8 @@
 {
   "workflow_total_steps": 6,
   "step_number": 1,
-  "provider_type": "cloud_model"
+  "provider_type": "cloud_model",
+  "add_model_modality": ["llm", "mllm"]
 }
 
 // Select provider
@@ -87,15 +88,22 @@
 ```json
 // Select provider type
 {
-    "workflow_total_steps": 5,
+    "workflow_total_steps": 6,
     "step_number": 1,
+    "trigger_workflow": false,
+    "add_model_modality": ["llm", "mllm"]
+}
+
+{
+    "workflow_id": "fdf7972c-c649-45dd-9d8e-47b467f04fcb",
+    "step_number": 2,
     "trigger_workflow": false,
     "provider_type": "hugging_face"
 }
 // Add model details
 {
-    "workflow_id": "ee7881a5-31dd-4480-b12d-79c8fcb76106",
-    "step_number": 2,
+    "workflow_id": "fdf7972c-c649-45dd-9d8e-47b467f04fcb",
+    "step_number": 3,
     "trigger_workflow": false,
     "name": "Microsoft phi local",
     "uri": "microsoft/Phi-3.5-mini-instruct",
@@ -110,8 +118,8 @@
 }
 // Select proprietary credential if required
 {
-    "workflow_id": "ee7881a5-31dd-4480-b12d-79c8fcb76106",
-    "step_number": 3,
+    "workflow_id": "4d15bd20-249a-4755-94e8-b8803094133a",
+    "step_number": 4,
     "trigger_workflow": true,
     "proprietary_credential_id": "915b5233-85d1-44a4-a694-6d3ecd36b8c6" // not required for public, url, disk models
 }

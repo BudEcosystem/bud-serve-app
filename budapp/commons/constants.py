@@ -134,6 +134,30 @@ class ModalityEnum(Enum):
     EMBEDDING = "embedding"
     TEXT_TO_SPEECH = "text_to_speech"
     SPEECH_TO_TEXT = "speech_to_text"
+    LLM_EMBEDDING = "llm_embedding"
+    MLLM_EMBEDDING = "mllm_embedding"
+
+
+class AddModelModalityEnum(Enum):
+    """Enumeration of model modalities when adding a model.
+
+    This enum represents different types of AI model modalities or capabilities.
+
+    Attributes:
+        LLM (str): Represents Large Language Models for text generation and processing.
+        MLLM (str): Represents Multi-Modal Large Language Models for text generation and processing.
+        IMAGE (str): Represents image-related models for tasks like generation or analysis.
+        EMBEDDING (str): Represents models that create vector embeddings of input data.
+        TEXT_TO_SPEECH (str): Represents models that convert text to spoken audio.
+        SPEECH_TO_TEXT (str): Represents models that transcribe spoken audio to text.
+    """
+
+    LLM = "llm"
+    MLLM = "mllm"
+    IMAGE = "image"
+    EMBEDDING = "embedding"
+    TEXT_TO_SPEECH = "text_to_speech"
+    SPEECH_TO_TEXT = "speech_to_text"
 
 
 ModelSourceEnum = create_dynamic_enum(
@@ -422,6 +446,9 @@ class WorkflowTypeEnum(StrEnum):
     ADD_WORKER_TO_ENDPOINT = auto()
     LICENSE_FAQ_FETCH = auto()
     LOCAL_MODEL_QUANTIZATION = auto()
+    MODEL_BENCHMARK = auto()
+    ADD_ADAPTER = auto()
+    DELETE_ADAPTER = auto()
 
 
 class NotificationType(Enum):
@@ -470,6 +497,10 @@ class PayloadType(str, Enum):
     DELETE_WORKER = "delete_worker"
     ADD_WORKER = "add_worker"
     FETCH_LICENSE_FAQS = "fetch_license_faqs"
+    DEPLOY_QUANTIZATION = "deploy_quantization"
+    RUN_BENCHMARK = "performance_benchmark"
+    ADD_ADAPTER = "add_adapter"
+    DELETE_ADAPTER = "delete_adapter"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -492,6 +523,10 @@ class BudServeWorkflowStepEventName(str, Enum):
     DELETE_ENDPOINT_EVENTS = "delete_endpoint_events"
     DELETE_WORKER_EVENTS = "delete_worker_events"
     LICENSE_FAQ_EVENTS = "license_faq_events"
+    QUANTIZATION_SIMULATION_EVENTS = "bud_simulator_events"
+    QUANTIZATION_DEPLOYMENT_EVENTS = "quantization_deployment_events"
+    ADAPTER_DEPLOYMENT_EVENTS = "adapter_deployment_events"
+    ADAPTER_DELETE_EVENTS = "adapter_delete_events"
 
 
 class ClusterStatusEnum(StrEnum):
@@ -533,19 +568,56 @@ class EndpointStatusEnum(StrEnum):
     PENDING = auto()
 
 
-class ModelTemplateTypeEnum(StrEnum):
-    """Model template types."""
+class AdapterStatusEnum(StrEnum):
+    """Adapter status types.
 
-    SUMMARIZATION = auto()
-    CHAT = auto()
-    QUESTION_ANSWERING = auto()
-    RAG = auto()
-    CODE_GEN = auto()
-    CODE_TRANSLATION = auto()
-    ENTITY_EXTRACTION = auto()
-    SENTIMENT_ANALYSIS = auto()
-    DOCUMENT_ANALYSIS = auto()
-    OTHER = auto()
+    Attributes:
+        RUNNING: Represents the running endpoint status.
+        FAILURE: Represents the failure endpoint status.
+        DEPLOYING: Represents the deploying endpoint status.
+        UNHEALTHY: Represents the unhealthy endpoint status.
+        DELETING: Represents the deleting endpoint status.
+        DELETED: Represents the deleted endpoint status.
+        PENDING: Represents the pending endpoint status.
+    """
+
+    RUNNING = auto()
+    FAILURE = auto()
+    DEPLOYING = auto()
+    UNHEALTHY = auto()
+    DELETING = auto()
+    DELETED = auto()
+    PENDING = auto()
+
+class ScalingTypeEnum(StrEnum):
+    """Scaling type types."""
+
+    METRIC = auto()
+    OPTIMIZER = auto()
+
+
+class ScalingMetricEnum(StrEnum):
+    """Scaling metric types."""
+
+    TIME_TO_FIRST_TOKENS_SECONDS = "bud:time_to_first_token_seconds_average"
+    E2E_REQUEST_LATENCY_SECONDS = "bud:e2e_request_latency_seconds_average"
+    GPU_CACHE_USAGE_PERC = "bud:gpu_cache_usage_perc_average"
+    TIME_PER_OUTPUT_TOKEN_SECONDS = "bud:time_per_output_token_seconds_average"
+
+
+# class ModelTemplateTypeEnum(StrEnum):
+#     """Model template types."""
+
+#     SUMMARIZATION = auto()
+#     CHAT = auto()
+#     QUESTION_ANSWERING = auto()
+#     RAG = auto()
+#     CODE_GEN = auto()
+#     CODE_TRANSLATION = auto()
+#     ENTITY_EXTRACTION = auto()
+#     SENTIMENT_ANALYSIS = auto()
+#     DOCUMENT_ANALYSIS = auto()
+#     OTHER = auto()
 
 
 class DropdownBackgroundColor(str, Enum):
@@ -637,6 +709,8 @@ class ProjectStatusEnum(StrEnum):
 # Bud Notify Workflow
 BUD_NOTIFICATION_WORKFLOW = "bud-notification"
 BUD_INTERNAL_WORKFLOW = "bud-internal"
+PROJECT_INVITATION_WORKFLOW = "bud-project-invite"
+BUD_RESET_PASSWORD_WORKFLOW = "bud-reset-password"
 
 
 class NotificationStatus(Enum):
@@ -677,8 +751,13 @@ APP_ICONS = {
         "model_mono": "icons/general/model_mono.png",
         "cluster_mono": "icons/general/cluster_mono.png",
         "deployment_mono": "icons/general/deployment_mono.png",
-    }
+        "default_url_model": "icons/general/default_url_model.png",
+        "default_disk_model": "icons/general/default_disk_model.png",
+    },
+    "providers": {"default_hugging_face_model": "icons/providers/huggingface.png"},
 }
+
+HF_AUTHORS_DIR = "hf_authors"
 
 EMOJIS = [
     "😀",
@@ -2568,12 +2647,17 @@ class NotificationTypeEnum(StrEnum):
     UPDATE_PASSWORD_SUCCESS = auto()
     CLUSTER_DELETION_SUCCESS = auto()
     DEPLOYMENT_DELETION_SUCCESS = auto()
+    MODEL_QUANTIZATION_SUCCESS = auto()
+    MODEL_BENCHMARK_SUCCESS = auto()
+    ADAPTER_DEPLOYMENT_SUCCESS = auto()
+    ADAPTER_DELETION_SUCCESS = auto()
+    PROJECT_INVITATION_SUCCESS = auto()
 
 
 BENCHMARK_FIELDS_TYPE_MAPPER = {
     "classification": "Classification",
     "clustering": "Clustering",
-    "pair_classification": "Classification",
+    "pairclassification": "Classification",
     "reranking": "Reranking",
     "retrieval": "Retrieval",
     "semantic": "Semantic",
@@ -2581,20 +2665,28 @@ BENCHMARK_FIELDS_TYPE_MAPPER = {
     "mmbench": "Reasoning",
     "mmstar": "Reasoning",
     "mmmu": "Knowledge",
-    "math_vista": "Math",
-    "ocr_bench": "OCR",
+    "mathvista": "Math",
+    "ocrbench": "OCR",
     "ai2d": "Visual QA",
-    "hallucination_bench": "Hallucination",
+    "hallucinationbench": "Hallucination",
     "mmvet": "Visual QA",
-    "lmsys_areana": "Human Preference",
+    "lmsysareana": "Human Preference",
     "bcfl": "Tool Use",
-    "live_code_bench": "Code Generation",
+    "livecodebench": "Code Generation",
+    "lcwinrate": "Instruction Following",
+    "ugiscore": "Uncensored",
+    "drop": "Reasoning",
+    "gpqa": "Knowledge",
+    "humaneval": "Coding",
+    "mmlu": "Knowledge",
+    "mmlupro": "Knowledge",
 }
+
 
 BENCHMARK_FIELDS_LABEL_MAPPER = {
     "classification": "Classification",
     "clustering": "Clustering",
-    "pair_classification": "Pair Classification",
+    "pairclassification": "Pair Classification",
     "reranking": "Reranking",
     "retrieval": "Retrieval",
     "semantic": "Semantic",
@@ -2602,12 +2694,48 @@ BENCHMARK_FIELDS_LABEL_MAPPER = {
     "mmbench": "MMBench",
     "mmstar": "MMStar",
     "mmmu": "MMMU",
-    "math_vista": "Math Vista",
-    "ocr_bench": "OCRBench",
+    "mathvista": "Math Vista",
+    "ocrbench": "OCRBench",
     "ai2d": "AI2D",
-    "hallucination_bench": "HallucinationBench",
+    "hallucinationbench": "HallucinationBench",
     "mmvet": "MMVet",
-    "lmsys_areana": "LMSYS Areana",
+    "lmsysareana": "LMSYS Areana",
     "bcfl": "BCFL",
-    "live_code_bench": "Live Code Bench",
+    "livecodebench": "Live Code Bench",
+    "lcwinrate": "AlpacaEval2.0",
+    "ugiscore": "UGI",
+    "drop": "DROP",
+    "gpqa": "GPQA",
+    "humaneval": "HumanEval",
+    "mmlu": "MMLU",
+    "mmlupro": "MMLU Pro",
 }
+
+
+class BenchmarkStatusEnum(Enum):
+    """Benchmark status."""
+
+    SUCCESS = "success"
+    FAILED = "failed"
+    PROCESSING = "processing"
+
+
+class DatasetStatusEnum(Enum):
+    """Dataset status."""
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
+# Recommended cluster scheduler state store key
+RECOMMENDED_CLUSTER_SCHEDULER_STATE_STORE_KEY = "recommended_cluster_scheduler_state"
+
+# Grafana Dashboard ID
+GRAFANA_CLUSTER_WORKLOAD_NAME_PATTERN = "Kubernetes / Compute Resources / Workload"
+
+# Minio License Object Name
+MINIO_LICENSE_OBJECT_NAME = "licenses"
+COMMON_LICENSE_MINIO_OBJECT_NAME = f"{MINIO_LICENSE_OBJECT_NAME}/common_licenses"
+
+# Max license word count
+MAX_LICENSE_WORD_COUNT = 50000

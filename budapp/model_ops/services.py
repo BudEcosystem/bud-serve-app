@@ -17,18 +17,23 @@
 """The model ops services. Contains business logic for model ops."""
 
 import os
-from pathlib import Path
+import re
+import tempfile
 from typing import Any, Dict, List, Literal, Optional, Tuple
+from urllib.parse import unquote, urlparse
 from uuid import UUID, uuid4
 
 import aiohttp
+import requests
+from bs4 import BeautifulSoup
 from fastapi import UploadFile, status
 from pydantic import HttpUrl
+from PyPDF2 import PdfReader
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.db_utils import SessionMixin
-from budapp.commons.exceptions import ClientException
+from budapp.commons.exceptions import ClientException, MinioException
 from budapp.commons.helpers import assign_random_colors_to_names, normalize_value
 from budapp.commons.schemas import Tag, Task
 from budapp.credential_ops.crud import ProprietaryCredentialDataManager
@@ -38,15 +43,25 @@ from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
+from ..cluster_ops.crud import ClusterDataManager, ModelClusterRecommendedDataManager
+from ..cluster_ops.models import Cluster as ClusterModel
+from ..cluster_ops.models import ModelClusterRecommended as ModelClusterRecommendedModel
+from ..cluster_ops.schemas import RecommendedClusterRequest
+from ..cluster_ops.workflows import ClusterRecommendedSchedulerWorkflows
+from ..commons.async_utils import count_words
 from ..commons.constants import (
     APP_ICONS,
     BENCHMARK_FIELDS_LABEL_MAPPER,
     BENCHMARK_FIELDS_TYPE_MAPPER,
     BUD_INTERNAL_WORKFLOW,
-    LICENSE_DIR,
+    COMMON_LICENSE_MINIO_OBJECT_NAME,
+    HF_AUTHORS_DIR,
+    MAX_LICENSE_WORD_COUNT,
+    MINIO_LICENSE_OBJECT_NAME,
     BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     CloudModelStatusEnum,
+    ClusterStatusEnum,
     CredentialTypeEnum,
     EndpointStatusEnum,
     ModelProviderTypeEnum,
@@ -54,14 +69,22 @@ from ..commons.constants import (
     ModelSourceEnum,
     ModelStatusEnum,
     NotificationTypeEnum,
+    ProjectStatusEnum,
     VisibilityEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
 from ..commons.helpers import validate_huggingface_repo_format
+from ..commons.schemas import BudNotificationMetadata
+from ..commons.security import RSAHandler
+from ..core.crud import ModelTemplateDataManager
+from ..core.models import ModelTemplate as ModelTemplateModel
 from ..core.schemas import NotificationPayload, NotificationResult
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..project_ops.crud import ProjectDataManager
+from ..project_ops.models import Project as ProjectModel
+from ..shared.minio_store import ModelStore
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from .crud import (
@@ -82,7 +105,8 @@ from .schemas import (
     CreateCloudModelWorkflowSteps,
     CreateLocalModelWorkflowRequest,
     CreateLocalModelWorkflowSteps,
-    Leaderboard,
+    DeploymentTemplateCreate,
+    DeploymentWorkflowStepData,
     LeaderboardBenchmark,
     LeaderboardModelInfo,
     LeaderboardTable,
@@ -91,15 +115,16 @@ from .schemas import (
     ModelArchitectureLLMConfig,
     ModelArchitectureVisionConfig,
     ModelCreate,
+    ModelDeploymentRequest,
     ModelDetailSuccessResponse,
     ModelIssue,
     ModelLicensesCreate,
-    ModelLicensesModel,
     ModelListResponse,
     ModelResponse,
     ModelSecurityScanResultCreate,
     ModelTree,
     PaperPublishedCreate,
+    ScalingSpecification,
     TopLeaderboard,
     TopLeaderboardBenchmark,
 )
@@ -140,6 +165,7 @@ class CloudModelWorkflowService(SessionMixin):
         trigger_workflow = request.trigger_workflow
         provider_id = request.provider_id
         cloud_model_id = request.cloud_model_id
+        add_model_modality = request.add_model_modality
 
         current_step_number = step_number
 
@@ -212,6 +238,7 @@ class CloudModelWorkflowService(SessionMixin):
             tags=tags,
             provider_id=provider_id,
             cloud_model_id=cloud_model_id,
+            add_model_modality=add_model_modality,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
@@ -416,6 +443,9 @@ class CloudModelWorkflowService(SessionMixin):
                 db_workflow,
                 {"current_step": end_step_number, "status": WorkflowStatusEnum.COMPLETED},
             )
+
+            # Trigger recommended cluster scheduler workflow
+            await ClusterRecommendedSchedulerWorkflows().__call__(model_id=db_model.id)
 
             # Send notification to workflow creator
             model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
@@ -716,6 +746,7 @@ class LocalModelWorkflowService(SessionMixin):
         tags = request.tags
         icon = request.icon
         trigger_workflow = request.trigger_workflow
+        add_model_modality = request.add_model_modality
 
         current_step_number = step_number
 
@@ -768,13 +799,13 @@ class LocalModelWorkflowService(SessionMixin):
             # Update icon, title on workflow
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
                 db_workflow,
-                {"icon": APP_ICONS["general"]["model_mono"], "title": "URL"},
+                {"icon": APP_ICONS["general"]["default_url_model"], "title": "URL"},
             )
         elif provider_type == ModelProviderTypeEnum.DISK:
             # Update icon, title on workflow
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
                 db_workflow,
-                {"icon": APP_ICONS["general"]["model_mono"], "title": "Disk"},
+                {"icon": APP_ICONS["general"]["default_disk_model"], "title": "Disk"},
             )
 
         # Prepare workflow step data
@@ -787,6 +818,7 @@ class LocalModelWorkflowService(SessionMixin):
             tags=tags,
             icon=icon,
             provider_id=provider_id,
+            add_model_modality=add_model_modality,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
@@ -994,20 +1026,25 @@ class LocalModelWorkflowService(SessionMixin):
             vision_config = None
 
         # Get base model relation
+        base_model = None
+        base_model_relation = None
         model_tree = model_info.get("model_tree", {})
-        base_model_relation = await self.get_base_model_relation(model_tree)
 
-        # Sanitize base model
-        base_model = model_tree.get("base_model", [])
-        if isinstance(base_model, list) and len(base_model) > 0:
-            base_model = base_model
-        elif isinstance(base_model, str):
-            base_model = [base_model]
-        base_model = normalize_value(base_model)
+        # Model tree only available for HuggingFace
+        if model_tree:
+            base_model_relation = await self.get_base_model_relation(model_tree)
 
-        # If base model is the same as the model uri, set base model to None
-        if required_data["uri"] == base_model:
-            base_model = None
+            # Sanitize base model
+            base_model = model_tree.get("base_model", [])
+            if isinstance(base_model, list) and len(base_model) > 0:
+                base_model = base_model
+            elif isinstance(base_model, str):
+                base_model = [base_model]
+            base_model = normalize_value(base_model)
+
+            # If base model is the same as the model uri, set base model to None
+            if required_data["uri"] == base_model:
+                base_model = None
 
         # Dummy Values
         # TODO: remove this after implementing actual service
@@ -1030,16 +1067,27 @@ class LocalModelWorkflowService(SessionMixin):
         minimum_requirements = {"device_name": "Xenon Dev", "core": 3, "memory": "32 GB", "RAM": "32 GB"}
 
         # Set provider id and icon
+        author_icon = model_info.get("logo_url")
+        if author_icon:
+            author_icon = LocalModelWorkflowService.save_author_logo(author_icon)
         provider_id = None
-        icon = required_data.get("icon")
+        icon = required_data.get("icon") if required_data.get("icon") else author_icon
         if required_data["provider_type"] == ModelProviderTypeEnum.HUGGING_FACE.value:
             # icon is not supported for hugging face models
             # Add provider id for hugging face models to retrieve icon for frontend
-            icon = None
+            if not icon:
+                icon = APP_ICONS["providers"]["default_hugging_face_model"]
             db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
                 ProviderModel, {"type": "huggingface"}
             )
             provider_id = db_provider.id
+
+        elif required_data["provider_type"] == ModelProviderTypeEnum.DISK.value:
+            if not icon:
+                icon = APP_ICONS["general"]["default_disk_model"]
+        elif required_data["provider_type"] == ModelProviderTypeEnum.URL.value:
+            if not icon:
+                icon = APP_ICONS["general"]["default_url_model"]
 
         model_data = ModelCreate(
             name=required_data["name"],
@@ -1088,7 +1136,9 @@ class LocalModelWorkflowService(SessionMixin):
         # Create model licenses
         extracted_license = model_info.get("license", {})
         if extracted_license:
-            db_model_licenses = await self._create_model_licenses_from_model_info(extracted_license, db_model.id)
+            db_model_licenses = await self._create_model_licenses_from_model_info(
+                extracted_license, db_model.id, local_path
+            )
             logger.debug(f"Model licenses created for model {db_model.id}")
 
         # Update to workflow step
@@ -1112,6 +1162,9 @@ class LocalModelWorkflowService(SessionMixin):
         await WorkflowDataManager(self.session).update_by_fields(
             db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
         )
+
+        # Trigger recommended cluster scheduler workflow
+        await ClusterRecommendedSchedulerWorkflows().__call__(model_id=db_model.id)
 
         # Send notification to workflow creator
         model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
@@ -1184,7 +1237,8 @@ class LocalModelWorkflowService(SessionMixin):
 
         if query_uri and query_provider_type and query_provider_type == ModelProviderTypeEnum.DISK.value:
             # Check for valid local path
-            if not os.path.exists(query_uri):
+            model_path = os.path.join(app_settings.add_model_dir, query_uri)
+            if not os.path.exists(model_path):
                 raise ClientException("Given local path does not exist")
 
         # Check duplicate hugging face uri
@@ -1242,9 +1296,11 @@ class LocalModelWorkflowService(SessionMixin):
             )
             hf_token = db_proprietary_credential.other_provider_creds.get("api_key")
 
-            # TODO: remove this after implementing token decryption, decryption not required here
-            # Send decrypted token to model extraction endpoint
-            hf_token = await self._get_decrypted_token(proprietary_credential_id)
+            try:
+                hf_token = await RSAHandler().decrypt(hf_token)
+            except Exception as e:
+                logger.error(f"Failed to decrypt token: {e}")
+                raise ClientException("Invalid credential found while adding model") from e
 
         model_extraction_request = {
             "model_name": data["name"],
@@ -1273,21 +1329,6 @@ class LocalModelWorkflowService(SessionMixin):
             logger.error(f"Failed to perform model extraction request: {e}")
             raise ClientException("Unable to perform model extraction") from e
 
-    @staticmethod
-    async def _get_decrypted_token(credential_id: UUID) -> str:
-        """Get decrypted token."""
-        # TODO: remove this function after implementing dapr decryption
-        url = f"{app_settings.budserve_host}/proprietary/credentials/{credential_id}/details"
-
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                response_data = await response.json()
-                try:
-                    decrypted_token = response_data["result"]["other_provider_creds"]["api_key"]
-                    return decrypted_token
-                except (KeyError, TypeError):
-                    raise ClientException("Unable to get decrypted token")
-
     async def _create_papers_from_model_info(
         self, extracted_papers: list[dict], model_id: UUID
     ) -> List[PaperPublished]:
@@ -1314,17 +1355,40 @@ class LocalModelWorkflowService(SessionMixin):
         return await PaperPublishedDataManager(self.session).insert_all(paper_models)
 
     async def _create_model_licenses_from_model_info(
-        self, extracted_license: dict, model_id: UUID
+        self, extracted_license: dict, model_id: UUID, local_path: str
     ) -> List[ModelLicenses]:
         """Create model licenses from model info."""
-        license_name = normalize_value(extracted_license.get("name"))
+        license_name = normalize_value(extracted_license.get("name", "license"))
         license_url = normalize_value(extracted_license.get("url"))
-        license_faqs = normalize_value(extracted_license.get("faqs"))
+        license_faqs = normalize_value(extracted_license.get("faqs", []))
+        license_type = normalize_value(extracted_license.get("type"))
+        license_description = normalize_value(extracted_license.get("description"))
+        license_suitability = normalize_value(extracted_license.get("suitability"))
+        updated_license_faqs = []
+        if license_faqs:
+            for faq in license_faqs:
+                faq_description = " ".join(faq.get("reason", [])).strip()
+                impact = faq.get("impact", "")
+                if impact == "POSITIVE":
+                    answer = "YES"
+                else:
+                    answer = "NO"
+                updated_license_faqs.append(
+                    {
+                        "question": faq.get("question"),
+                        "description": faq_description,
+                        "answer": answer,
+                    }
+                )
+
         license_data = ModelLicensesCreate(
             name=license_name,
             url=license_url,
-            faqs=license_faqs,
+            faqs=updated_license_faqs if updated_license_faqs else None,
             model_id=model_id,
+            license_type=license_type,
+            description=license_description,
+            suitability=license_suitability,
         )
         return await ModelLicensesDataManager(self.session).insert_one(
             ModelLicenses(**license_data.model_dump(exclude_none=True))
@@ -1775,6 +1839,62 @@ class LocalModelWorkflowService(SessionMixin):
         else:
             return ModelSecurityScanStatusEnum.SAFE  # Default to SAFE if no issues are found
 
+    @staticmethod
+    def save_author_logo(img_url: str) -> str:
+        """Downloads and saves the logo from the given image URL locally with a unique name.
+
+        Args:
+            img_url (str): The URL of the logo image.
+
+        Returns:
+            str: The local file path of the saved logo.
+        """
+        # Create logo directory if it doesn't exist
+        logo_dir = os.path.join(app_settings.icon_dir, HF_AUTHORS_DIR)
+        os.makedirs(logo_dir, exist_ok=True)
+
+        try:
+            # Parse the URL
+            parsed_url = urlparse(img_url)
+            path_parts = parsed_url.path.strip("/").split("/")
+
+            # Use the last two parts as the filename
+            logo_name = f"{path_parts[-2]}_{path_parts[-1]}"
+
+        except Exception:
+            # Fallback to entire URL path with `/` replaced by `_`
+            logo_name = parsed_url.path.strip("/").replace("/", "_")
+
+        # Ensure the filename ends with .png
+        if not logo_name.endswith(".png"):
+            logo_name += ".png"
+
+        # Construct the local logo path
+        logo_path = os.path.join(logo_dir, logo_name)
+        icon_index = logo_path.find("/icons/")
+        formatted_logo_path = logo_path[icon_index + 1 :]
+
+        # Check if the logo already exists
+        if os.path.exists(logo_path):
+            logger.debug(f"Logo already saved at: {logo_path}")
+            return formatted_logo_path
+
+        # Download and save the image
+        try:
+            response = requests.get(img_url)
+            response.raise_for_status()
+
+            # Save the image locally
+            with open(logo_path, "wb") as f:
+                f.write(response.content)
+
+            logger.debug(f"Logo saved at: {logo_path}")
+            return formatted_logo_path
+
+        except Exception as e:
+            logger.debug(f"Failed to download logo: {e}")
+            return ""
+
 
 class CloudModelService(SessionMixin):
     """Cloud model service."""
@@ -1926,15 +2046,48 @@ class ModelService(SessionMixin):
         if data.get("license_file"):
             # If a file is provided, save it locally and update the DB with the local path
             file = data.pop("license_file")
-            file_path = await self._save_uploaded_file(file)
-            await self._create_or_update_license_entry(model_id, file.filename, file_path, None, current_user_id)
+
+            # Validate license file
+            license_content = await self._get_content_from_file(file)
+            word_count = await count_words(license_content)
+            if word_count > MAX_LICENSE_WORD_COUNT:
+                raise ClientException(message="License content is too long")
+
+            # Save to minio
+            license_object_name = await self._save_license_file_to_minio(file, model_id)
+
+            # Create or update license entry
+            await self._create_or_update_license_entry(model_id, file.filename, license_object_name, current_user_id)
 
         elif data.get("license_url"):
             # If a license URL is provided, store the URL in the DB instead of the file path
             license_url = data.pop("license_url")
-            filename = license_url.split("/")[-1]  # Extract filename from the URL
+
+            # get file name with extension from url
+            parsed = urlparse(license_url)
+            path = unquote(parsed.path)
+            filename = path.split("/")[-1]
+
+            # Handle query parameters
+            if "?" in filename:
+                filename = filename.split("?")[0]
+
+            # Validate filename
+            if not filename or not re.match(r"^[\w\-\.]+$", filename):
+                filename = "LICENSE"
+
+            # Validate license url
+            license_content = await self._validate_license_url(license_url)
+            word_count = await count_words(license_content)
+            logger.debug(f"word_count: {word_count}")
+            if word_count > MAX_LICENSE_WORD_COUNT:
+                raise ClientException(message="License content is too long")
+
+            # Save to minio
+            license_object_name = await self._save_license_url_to_minio(license_url, filename, model_id)
+
             await self._create_or_update_license_entry(
-                model_id, filename if filename else "sample license", None, str(license_url), current_user_id
+                model_id, filename, license_object_name, current_user_id
             )  # TODO: modify filename arg when license service implemented
 
         # Add papers if provided
@@ -1945,59 +2098,161 @@ class ModelService(SessionMixin):
         # Update model with validated data
         await ModelDataManager(self.session).update_by_fields(db_model, data)
 
-    async def _save_uploaded_file(self, file: UploadFile) -> str:
+    async def _save_license_file_to_minio(self, file: UploadFile, model_id: UUID) -> str:
         """Save uploaded file and return file path."""
-        # create the license directory if not present already
-        os.makedirs(os.path.join(app_settings.static_dir, LICENSE_DIR), exist_ok=True)
-        file_path = os.path.join(app_settings.static_dir, LICENSE_DIR, file.filename)
-        with Path(file_path).open("wb") as f:
-            f.write(await file.read())
-        return os.path.join(LICENSE_DIR, file.filename)
+        # Check if the license file already exists in minio
+        minio_store = ModelStore()
+        license_object_prefix = f"{MINIO_LICENSE_OBJECT_NAME}/{model_id}"
+        try:
+            # is_minio_object_exists = minio_store.check_file_exists(app_settings.minio_model_bucket, license_object_prefix)
+            minio_store.remove_objects(app_settings.minio_model_bucket, license_object_prefix, recursive=True)
+
+            # Download file to a temp folder and save it to minio
+            with tempfile.TemporaryDirectory() as temp_dir:
+                file_path = os.path.join(temp_dir, file.filename)
+                with open(file_path, "wb") as f:
+                    f.write(await file.read())
+                license_object_name = f"{MINIO_LICENSE_OBJECT_NAME}/{model_id}/{file.filename}"
+
+                # Upload file to minio
+                minio_store.upload_file(app_settings.minio_model_bucket, file_path, license_object_name)
+
+            return license_object_name
+        except MinioException as e:
+            logger.exception(f"Error uploading file to minio: {e}")
+            raise ClientException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Unable to save license file"
+            ) from e
+
+    async def _save_license_url_to_minio(self, license_url: str, filename: str, model_id: UUID) -> str:
+        """Save uploaded file and return file path."""
+        # Check if the license file already exists in minio
+        minio_store = ModelStore()
+        license_object_prefix = f"{MINIO_LICENSE_OBJECT_NAME}/{model_id}"
+        try:
+            # is_minio_object_exists = minio_store.check_file_exists(app_settings.minio_model_bucket, license_object_prefix)
+            minio_store.remove_objects(app_settings.minio_model_bucket, license_object_prefix, recursive=True)
+
+            # Download file to a temp folder and save it to minio
+            with tempfile.TemporaryDirectory() as temp_dir:
+                response = requests.get(license_url, timeout=30)
+                response.raise_for_status()
+
+                # Save file to temp folder
+                file_path = os.path.join(temp_dir, filename)
+                with open(file_path, "wb") as f:
+                    f.write(response.content)
+
+                # Generate license object name
+                license_object_name = f"{MINIO_LICENSE_OBJECT_NAME}/{model_id}/{filename}"
+
+                # Upload file to minio
+                minio_store.upload_file(app_settings.minio_model_bucket, file_path, license_object_name)
+
+            return license_object_name
+        except (MinioException, Exception) as e:
+            logger.exception(f"Error uploading file to minio: {e}")
+            raise ClientException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Unable to save license file"
+            ) from e
 
     async def _create_or_update_license_entry(
-        self, model_id: UUID, filename: str, file_path: str, license_url: str, current_user_id: UUID
+        self,
+        model_id: UUID,
+        filename: str,
+        license_url: str,
+        current_user_id: UUID,
     ) -> None:
         """Create or update a license entry in the database."""
+        # Set license source
+        minio_store = ModelStore()
+        license_source = minio_store.get_object_url(app_settings.minio_model_bucket, license_url)
+
         # Check if a license entry with the given model_id exists
         existing_license = await ModelLicensesDataManager(self.session).retrieve_by_fields(
             ModelLicenses, fields={"model_id": model_id}, missing_ok=True
         )
+
         if existing_license:
             logger.debug(f"existing license: {existing_license}")
-            existing_license_path = (
-                os.path.join(app_settings.static_dir, existing_license.path) if existing_license.path else ""
-            )
-            if existing_license_path and os.path.exists(existing_license_path):
-                try:
-                    os.remove(existing_license_path)
-                except PermissionError:
-                    raise ClientException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        message=f"Permission denied while accessing the file: {existing_license.name}",
-                    )
 
             update_license_data = {
                 "name": filename,
-                "path": file_path if file_path else None,
-                "url": license_url if license_url else None,
+                "url": license_url,
+                "faqs": None,
+                "description": None,
+                "suitability": None,
+                "license_type": None,
             }
-            license_source = file_path if file_path else license_url
+
+            # Update database
             await ModelLicensesDataManager(self.session).update_by_fields(existing_license, update_license_data)
+
+            # Execute license faqs workflow
             await self.fetch_license_faqs(model_id, existing_license.id, current_user_id, license_source)
         else:
             # Create a new license entry
-            license_entry = ModelLicensesModel(
-                id=uuid4(),
+            license_entry = ModelLicensesCreate(
                 name=filename,
-                path=file_path if file_path else None,
-                url=license_url if license_url else None,
+                url=license_url,
                 model_id=model_id,
+                faqs=None,
+                description=None,
+                suitability=None,
+                license_type=None,
             )
-            license_source = file_path if file_path else license_url
+
+            # Update database
             await ModelLicensesDataManager(self.session).insert_one(
                 ModelLicenses(**license_entry.model_dump(exclude_unset=True))
             )
+
+            # Execute license faqs workflow
             await self.fetch_license_faqs(model_id, license_entry.id, current_user_id, license_source)
+
+    async def _validate_license_url(self, license_url: str) -> str:
+        """Validate license url."""
+        try:
+            response = requests.get(license_url, timeout=10)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.content, "html.parser")
+            license_content = str(soup.text).strip()
+            if license_content:
+                return license_content
+            else:
+                logger.error(f"Unable to get license text from given url: {license_url}")
+                raise ClientException(message="Unable to get license text from given url")
+        except (Exception, requests.exceptions.RequestException) as e:
+            logger.exception(f"Error validating license url: {e}")
+            raise ClientException(message="Unable to get license text from given url") from e
+
+    async def _get_content_from_file(self, license_file: UploadFile) -> None:
+        """Get content from file."""
+        # 10MB in bytes
+        MAX_FILE_SIZE = 0.4 * 1024 * 1024  # 10MB
+        if license_file.size > MAX_FILE_SIZE:
+            raise ClientException(message="File size exceeds the maximum allowed limit of 10MB")
+
+        # Get the file extension
+        file_extension = os.path.splitext(license_file.filename)[1]
+        if file_extension not in [".txt", ".pdf", ".rst", ".md"]:
+            raise ClientException(message="File extension must be .txt or .pdf or .rst or .md")
+
+        if file_extension in [".txt", ".rst", ".md"]:
+            return await self._get_text_file_content(license_file)
+        elif file_extension == ".pdf":
+            return await self._get_pdf_file_content(license_file)
+
+    async def _get_text_file_content(self, license_file: UploadFile) -> None:
+        """Get content from text file."""
+        return license_file.file.read().decode("utf-8")
+
+    async def _get_pdf_file_content(self, license_file: UploadFile) -> None:
+        """Get content from pdf file."""
+        reader = PdfReader(license_file.file)
+
+        # Extract text from each page as a new line and join them
+        return "\n".join([page.extract_text() for page in reader.pages])
 
     async def _update_papers(self, model_id: UUID, paper_urls: list[str]) -> None:
         """Update paper entries for the given model by adding new URLs and removing old ones."""
@@ -2132,7 +2387,24 @@ class ModelService(SessionMixin):
             await self._perform_model_deletion_request(db_model.local_path)
             logger.debug(f"Model deletion successful for {db_model.local_path}")
 
+        # Delete existing license from minio
+        if db_model.model_licenses and not db_model.model_licenses.url.startswith(COMMON_LICENSE_MINIO_OBJECT_NAME):
+            logger.debug(f"Deleting license from minio for model {db_model.id}")
+            minio_store = ModelStore()
+            minio_store.remove_objects(
+                app_settings.minio_model_bucket, f"{MINIO_LICENSE_OBJECT_NAME}/{db_model.id}", recursive=True
+            )
+
+            # Delete license from db
+            await ModelLicensesDataManager(self.session).delete_by_fields(ModelLicenses, {"model_id": db_model.id})
+
         db_model = await ModelDataManager(self.session).update_by_fields(db_model, {"status": ModelStatusEnum.DELETED})
+
+        # Remove from recommended models
+        await ModelClusterRecommendedDataManager(self.session).delete_by_fields(
+            ModelClusterRecommendedModel, {"model_id": db_model.id}
+        )
+        logger.debug(f"Model recommended cluster data for model {db_model.id} deleted")
 
         return db_model
 
@@ -2296,9 +2568,33 @@ class ModelService(SessionMixin):
         )
         logger.debug(f"license retrieved successfully: {db_license.id}")
 
-        # update faqs
-        faqs = payload.content.result["faqs"]
-        db_license = await ModelLicensesDataManager(self.session).update_by_fields(db_license, {"faqs": faqs})
+        # update license details
+        license_details = payload.content.result["license_details"]
+
+        license_faqs = normalize_value(license_details.get("faqs", []))
+        updated_license_faqs = []
+        if license_faqs:
+            for faq in license_faqs:
+                faq_description = " ".join(faq.get("reason", [])).strip()
+                impact = faq.get("impact", "")
+                answer = "YES" if impact == "POSITIVE" else "NO"
+                updated_license_faqs.append(
+                    {
+                        "question": faq.get("question"),
+                        "description": faq_description,
+                        "answer": answer,
+                    }
+                )
+
+        license_data = {
+            "name": normalize_value(license_details.get("name", "license")),
+            "license_type": normalize_value(license_details.get("type")),
+            "description": normalize_value(license_details.get("type_description")),
+            "suitability": normalize_value(license_details.get("type_suitability")),
+            "faqs": updated_license_faqs,
+        }
+
+        db_license = await ModelLicensesDataManager(self.session).update_by_fields(db_license, license_data)
         logger.debug(f"updated FAQs for license {db_license.id}")
 
         # Mark workflow as completed
@@ -2350,21 +2646,24 @@ class ModelService(SessionMixin):
         selected_model_leaderboard = None
         for leaderboard in bud_model_leaderboards:
             if leaderboard.get("model_info", {}).get("uri") == selected_model_uri:
-                selected_model_leaderboard = Leaderboard(**leaderboard)
+                selected_model_leaderboard = leaderboard
                 break
         if not selected_model_leaderboard:
             logger.debug("No leaderboard found for selected model %s", selected_model_uri)
             return []
 
         # Ignore fields with None values
-        valid_fields = selected_model_leaderboard.model_dump(exclude_none=True).keys()
+        valid_fields = []
+        for benchmark in selected_model_leaderboard.get("benchmarks", []):
+            valid_fields.append(benchmark.get("eval_name"))
+        # valid_fields = [key for key in selected_model_leaderboard.keys() if key != "model_info"]
         logger.debug("Valid fields: %s", valid_fields)
 
         leaderboard_tables: List[LeaderboardTable] = []
 
         for leaderboard in bud_model_leaderboards:
             model_info = leaderboard.get("model_info", {})
-
+            bud_model_benchmarks = leaderboard.get("benchmarks", [])
             # Create model info
             model = LeaderboardModelInfo(
                 uri=model_info.get("uri"),
@@ -2372,15 +2671,18 @@ class ModelService(SessionMixin):
                 is_selected=model_info.get("uri") == selected_model_uri,
             )
 
-            # Create benchmark entries for each valid field
             benchmarks = {}
-            for field in valid_fields:
-                value = leaderboard.get(field)
-                benchmarks[field] = LeaderboardBenchmark(
-                    type=BENCHMARK_FIELDS_TYPE_MAPPER[field], value=value, label=BENCHMARK_FIELDS_LABEL_MAPPER[field]
-                )
-
-            leaderboard_tables.append(LeaderboardTable(model=model, benchmarks=benchmarks))
+            for bud_model_benchmark in bud_model_benchmarks:
+                field = bud_model_benchmark.get("eval_name")
+                if field in valid_fields:
+                    label_alternative = bud_model_benchmark.get("eval_label")
+                    benchmarks[field] = LeaderboardBenchmark(
+                        type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, None),
+                        value=bud_model_benchmark.get("eval_score"),
+                        label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, label_alternative),
+                    )
+            if benchmarks:
+                leaderboard_tables.append(LeaderboardTable(model=model, benchmarks=benchmarks))
 
         return leaderboard_tables
 
@@ -2425,13 +2727,14 @@ class ModelService(SessionMixin):
 
         # Fetch top leaderboards from bud_model app
         bud_model_response = await self._perform_top_leaderboard_by_uri_request(db_model_uris, benchmarks, limit)
+
         bud_model_leaderboards = bud_model_response.get("leaderboards", [])
 
         if len(bud_model_leaderboards) == 0:
             return []
 
         # Get model info by uris
-        leaderboard_uris = [leaderboard.get("model_info", {}).get("uri") for leaderboard in bud_model_leaderboards]
+        leaderboard_uris = [leaderboard.get("uri") for leaderboard in bud_model_leaderboards]
         db_models = await ModelDataManager(self.session).get_models_by_uris(leaderboard_uris)
 
         # If no models found, return empty list
@@ -2451,22 +2754,25 @@ class ModelService(SessionMixin):
 
         # Iterate over leaderboards
         for leaderboard in bud_model_leaderboards:
-            leaderboard_model_uri = leaderboard.get("model_info", {}).get("uri")
+            leaderboard_model_uri = leaderboard.get("uri")
 
             # If model not found, skip
             if leaderboard_model_uri not in db_model_info:
                 continue
 
             benchmarks = []
-            for field in fields:
-                benchmarks.append(
-                    TopLeaderboardBenchmark(
-                        field=field,
-                        value=leaderboard.get(field),
-                        type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, ""),
-                        label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, ""),
-                    ).model_dump()
-                )
+            for bud_model_benchmark in leaderboard.get("benchmarks", []):
+                field = bud_model_benchmark.get("eval_name")
+                if field in fields:
+                    label_alternative = bud_model_benchmark.get("eval_label")
+                    benchmarks.append(
+                        TopLeaderboardBenchmark(
+                            field=field,
+                            value=bud_model_benchmark.get("eval_score"),
+                            type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, None),
+                            label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, label_alternative),
+                        ).model_dump()
+                    )
             result.append(
                 TopLeaderboard(
                     benchmarks=benchmarks,
@@ -2521,11 +2827,608 @@ class ModelService(SessionMixin):
             logger.exception(f"Failed to send top leaderboard by uris request: {e}")
             raise ClientException("Failed to fetch top leaderboards") from e
 
+    async def get_leaderboard_by_model_uris(self, model_uris: List[str]) -> dict:
+        """Service method to fetch and parse leaderboard for a given model URI.
+
+        Args:
+            model_uris (str): Model URIs to query leaderboard for.
+
+        Returns:
+            List[LeaderboardTable]: Parsed leaderboard table data.
+        """
+        # Fetch leaderboard data from bud_model app
+        bud_model_response = await self._perform_leaderboard_by_uris_request(model_uris)
+        bud_model_leaderboards = bud_model_response.get("leaderboards", {})
+        parsed_leaderboards = {}
+        for leaderboard in bud_model_leaderboards:
+            leaderboard_model_uri = leaderboard.get("uri")
+
+            # If model not found, skip
+            if leaderboard_model_uri not in model_uris:
+                continue
+
+            benchmarks = []
+            for bud_model_benchmark in leaderboard.get("benchmarks", []):
+                field = bud_model_benchmark.get("eval_name")
+                label_alternative = bud_model_benchmark.get("eval_label")
+                benchmarks.append(
+                    TopLeaderboardBenchmark(
+                        field=field,
+                        value=bud_model_benchmark.get("eval_score"),
+                        type=BENCHMARK_FIELDS_TYPE_MAPPER.get(field, None),
+                        label=BENCHMARK_FIELDS_LABEL_MAPPER.get(field, label_alternative),
+                    ).model_dump()
+                )
+            parsed_leaderboards[leaderboard_model_uri] = benchmarks
+
+        return parsed_leaderboards
+
+    async def _perform_leaderboard_by_uris_request(self, uris: List[str]) -> Dict:
+        """Perform top leaderboard fetch request to bud_model app.
+
+        Args:
+            uris: The uris of the models.
+            benchmark_fields: The benchmarks to return.
+            k: The maximum number of leaderboards to return.
+        """
+        bud_model_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/leaderboard/models-uris"
+        )
+
+        query_params = {"model_uris": uris}
+
+        logger.debug(f"Performing leaderboard by uri request to budmodel {query_params}")
+        try:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(bud_model_endpoint, params=query_params) as response,
+            ):
+                response_data = await response.json()
+                if response.status != 200:
+                    logger.error(f"Failed to fetch leaderboards: {response.status} {response_data}")
+                    raise ClientException("Failed to fetch leaderboards")
+
+                logger.debug("Successfully fetched leaderboards from budmodel")
+                return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send leaderboard by uris request: {e}")
+            raise ClientException("Failed to fetch leaderboards") from e
+
+    async def deploy_model_by_step(
+        self,
+        current_user_id: UUID,
+        step_number: int,
+        workflow_id: Optional[UUID] = None,
+        workflow_total_steps: Optional[int] = None,
+        model_id: Optional[UUID] = None,
+        project_id: Optional[UUID] = None,
+        cluster_id: Optional[UUID] = None,
+        endpoint_name: Optional[str] = None,
+        deploy_config: Optional[DeploymentTemplateCreate] = None,
+        template_id: Optional[UUID] = None,
+        trigger_workflow: bool = False,
+        credential_id: Optional[UUID] = None,
+        scaling_specification: Optional[ScalingSpecification] = None,
+    ) -> EndpointModel:
+        """Create workflow steps and execute deployment workflow.
+
+        Arguments availability handled in router pydantic validation
+        - If workflow_id is provided, then step_number and either of (model_id, project_id, cluster_id, endpoint_name, replicas) should be provided
+        - If workflow_id is not provided, the function will create a new workflow and a new workflow step.
+            - Also for workflow step creation needed step_number and either of (model_id, project_id, cluster_id, endpoint_name, replicas)
+        """
+        current_step_number = step_number
+
+        # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.MODEL_DEPLOYMENT,
+            title="Deploying Model",
+            total_steps=workflow_total_steps,
+            icon=APP_ICONS["general"]["deployment_mono"],
+            created_by=current_user_id,
+        )
+
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id, workflow_create, current_user_id
+        )
+
+        # Validate project
+        if project_id:
+            db_project = await ProjectDataManager(self.session).retrieve_by_fields(
+                ProjectModel, {"id": project_id, "status": ProjectStatusEnum.ACTIVE}
+            )
+
+            # Update workflow tag
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"tag": db_project.name}
+            )
+
+        # Validate model
+        if model_id:
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
+            )
+
+            # Update workflow icon
+            if db_model.provider_type in [ModelProviderTypeEnum.HUGGING_FACE, ModelProviderTypeEnum.CLOUD_MODEL]:
+                db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                    ProviderModel, {"id": db_model.provider_id}
+                )
+                model_icon = db_provider.icon
+            else:
+                model_icon = db_model.icon
+
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"icon": model_icon, "title": db_model.name}
+            )
+
+        # Validate template
+        if template_id:
+            db_template = await ModelTemplateDataManager(self.session).retrieve_by_fields(
+                ModelTemplateModel, {"id": template_id}
+            )
+
+        # Validate cluster
+        if cluster_id:
+            db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+                ClusterModel, {"cluster_id": cluster_id}, exclude_fields={"status": ClusterStatusEnum.DELETED}
+            )
+
+            if db_cluster.status != ClusterStatusEnum.AVAILABLE:
+                logger.error(f"Cluster {cluster_id} is currently not available.")
+                raise ClientException("Cluster is not available")
+
+        # Validate credential
+        if credential_id:
+            db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_by_fields(
+                ProprietaryCredentialModel, {"id": credential_id}
+            )
+
+        # Update workflow title
+        if endpoint_name:
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"title": endpoint_name}
+            )
+
+        # Prepare workflow step data
+        workflow_step_data = DeploymentWorkflowStepData(
+            model_id=model_id,
+            project_id=project_id,
+            cluster_id=cluster_id,
+            endpoint_name=endpoint_name,
+            deploy_config=deploy_config,
+            template_id=template_id,
+            credential_id=credential_id,
+            scaling_specification=scaling_specification,
+        ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+
+        # Get workflow steps
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": db_workflow.id}
+        )
+
+        # For avoiding another db call for record retrieval, storing db object while iterating over db_workflow_steps
+        db_current_workflow_step = None
+
+        if db_workflow_steps:
+            db_step_project_id = None
+            db_step_endpoint_name = None
+
+            for db_step in db_workflow_steps:
+                # Get current workflow step
+                if db_step.step_number == current_step_number:
+                    db_current_workflow_step = db_step
+
+                if "project_id" in db_step.data:
+                    db_step_project_id = db_step.data["project_id"]
+                if "endpoint_name" in db_step.data:
+                    db_step_endpoint_name = db_step.data["endpoint_name"]
+
+            # Check duplicate endpoint in project
+            query_endpoint_name = None
+            query_project_id = None
+            if project_id and db_step_endpoint_name:
+                # If user gives project_id but endpoint_name given in earlier step
+                query_endpoint_name = db_step_endpoint_name
+                query_project_id = project_id
+            elif endpoint_name and db_step_project_id:
+                # If user gives endpoint_name but project_id given in earlier step
+                query_endpoint_name = endpoint_name
+                query_project_id = db_step_project_id
+            elif endpoint_name and project_id:
+                # if user gives both endpoint_name and project_id
+                query_endpoint_name = endpoint_name
+                query_project_id = project_id
+            elif db_step_endpoint_name and db_step_project_id:
+                # if user gives endpoint_name and project_id in earlier step
+                query_endpoint_name = db_step_endpoint_name
+                query_project_id = db_step_project_id
+
+            if query_endpoint_name and query_project_id:
+                # NOTE: A model can only be deployed once in a project
+                db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                    EndpointModel,
+                    {
+                        "name": query_endpoint_name,
+                        "project_id": query_project_id,
+                    },
+                    exclude_fields={"status": EndpointStatusEnum.DELETED},
+                    missing_ok=True,
+                    case_sensitive=False,
+                )
+                if db_endpoint:
+                    logger.info(
+                        f"An endpoint with name {query_endpoint_name} already exists in project: {query_project_id}"
+                    )
+                    raise ClientException("An endpoint with this name already exists in this project")
+
+        if db_current_workflow_step:
+            logger.debug(f"Workflow {db_workflow.id} step {current_step_number} already exists")
+
+            # Update workflow step data in db
+            db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
+                db_current_workflow_step,
+                {"data": workflow_step_data},
+            )
+            logger.info(f"Workflow {db_workflow.id} step {current_step_number} updated")
+        else:
+            logger.info(f"Creating workflow step {current_step_number} for workflow {db_workflow.id}")
+
+            # Insert step details in db
+            db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+                WorkflowStepModel(
+                    workflow_id=db_workflow.id,
+                    step_number=current_step_number,
+                    data=workflow_step_data,
+                )
+            )
+
+        # Update workflow current step as the highest step_number
+        db_max_workflow_step_number = max(step.step_number for step in db_workflow_steps) if db_workflow_steps else 0
+        workflow_current_step = max(current_step_number, db_max_workflow_step_number)
+        logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
+
+        # This will ensure workflow step number is updated to the latest step number
+        db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow,
+            {"current_step": workflow_current_step},
+        )
+
+        if deploy_config:
+            # Fetch model information from previous steps
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": db_workflow.id}
+            )
+
+            # Get latest model_id from workflow steps
+            model_id = None
+            for db_workflow_step in db_workflow_steps:
+                if "model_id" in db_workflow_step.data:
+                    model_id = db_workflow_step.data["model_id"]
+
+            if not model_id:
+                raise ClientException("Model ID is not provided")
+
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
+            )
+
+            # Create next step from backend
+            # Increment workflow_current_step with 1
+            current_step_number = current_step_number + 1
+            workflow_current_step = current_step_number
+
+            bud_simulator_events = await self._perform_cluster_simulation(
+                db_workflow.id,
+                deploy_config,
+                current_user_id,
+                db_model.uri,
+                db_model.provider_type,
+                db_model.local_path,
+            )
+            simulator_id = bud_simulator_events.pop("workflow_id")
+            recommended_cluster_events = {
+                "simulator_id": simulator_id,
+                "bud_simulator_events": bud_simulator_events,
+            }
+
+            # Update or create next workflow step
+            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                db_workflow.id, current_step_number, recommended_cluster_events
+            )
+            logger.debug(f"Workflow step updated {db_workflow_step.id}")
+
+            # Update workflow progress
+            bud_simulator_events["progress_type"] = "bud_simulator_events"
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"progress": bud_simulator_events, "current_step": workflow_current_step},
+            )
+
+        # Execute workflow
+        if trigger_workflow:
+            logger.info("Workflow triggered")
+
+            # Increment step number of workflow and workflow step
+            current_step_number = current_step_number + 1
+            workflow_current_step = current_step_number
+
+            # TODO: Currently querying workflow steps again by ordering steps in ascending order
+            # To ensure the latest step update is fetched, Consider excluding it later
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": db_workflow.id}
+            )
+
+            # Define the keys required for model deployment
+            keys_of_interest = [
+                "model_id",
+                "project_id",
+                "cluster_id",
+                # "created_by",
+                "endpoint_name",
+                "simulator_id",
+                "deploy_config",
+                "credential_id",
+                "scaling_specification",
+            ]
+
+            # from workflow steps extract necessary information
+            required_data = {}
+            for db_workflow_step in db_workflow_steps:
+                for key in keys_of_interest:
+                    if key in db_workflow_step.data:
+                        required_data[key] = db_workflow_step.data[key]
+
+            required_keys = [
+                "model_id",
+                "project_id",
+                "cluster_id",
+                # "created_by",
+                # "replicas",
+                "endpoint_name",
+                "simulator_id",
+                "deploy_config",
+                "scaling_specification",
+            ]
+
+            if "model_id" in required_data:
+                db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                    Model,
+                    {"id": required_data["model_id"], "status": ModelStatusEnum.ACTIVE},
+                )
+
+                if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+                    required_keys.append("credential_id")
+
+            # Check if all required keys are present
+            missing_keys = [key for key in required_keys if key not in required_data]
+            if missing_keys:
+                raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
+
+            # Perform duplicate endpoint check
+            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel,
+                {
+                    "name": required_data["endpoint_name"],
+                    "project_id": required_data["project_id"],
+                },
+                exclude_fields={"status": EndpointStatusEnum.DELETED},
+                missing_ok=True,
+                case_sensitive=False,
+            )
+
+            if db_endpoint:
+                raise ClientException("An endpoint with this name already exists in this project")
+
+            # Trigger model deployment and get deployment events
+            model_deployment_response = await self._initiate_model_deployment(
+                cluster_id=UUID(required_data["cluster_id"]),
+                endpoint_name=required_data["endpoint_name"],
+                simulator_id=UUID(required_data["simulator_id"]),
+                model_id=UUID(required_data["model_id"]),
+                deploy_config=DeploymentTemplateCreate(**required_data["deploy_config"]),
+                workflow_id=db_workflow.id,
+                subscriber_id=current_user_id,
+                credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
+                scaling_specification=required_data["scaling_specification"],
+            )
+            model_deployment_events = {
+                "budserve_cluster_events": model_deployment_response,
+            }
+
+            # Update or create next workflow step
+            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                db_workflow.id, current_step_number, model_deployment_events
+            )
+            logger.debug(f"Workflow step updated {db_workflow_step.id}")
+
+            # Update workflow progress
+            model_deployment_response["progress_type"] = "budserve_cluster_events"
+            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"progress": model_deployment_response, "current_step": workflow_current_step},
+            )
+            logger.debug("Successfully triggered model deployment")
+
+        return db_workflow
+
+    @staticmethod
+    async def _perform_cluster_simulation(
+        workflow_id: UUID,
+        deploy_config: DeploymentTemplateCreate,
+        subscriber_id: UUID,
+        model_uri: str,
+        provider_type: ModelProviderTypeEnum,
+        local_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get recommended cluster events."""
+        logger.info("Getting recommended cluster events")
+
+        notification_metadata = BudNotificationMetadata(
+            workflow_id=str(workflow_id),
+            subscriber_ids=str(subscriber_id),
+            name=BUD_INTERNAL_WORKFLOW,
+        )
+
+        if provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            recommended_cluster_request = RecommendedClusterRequest(
+                pretrained_model_uri=model_uri,
+                input_tokens=deploy_config.avg_context_length,
+                output_tokens=deploy_config.avg_sequence_length,
+                concurrency=deploy_config.concurrent_requests,
+                target_ttft=0,
+                target_throughput_per_user=0,
+                target_e2e_latency=0,
+                notification_metadata=notification_metadata,
+                source_topic=app_settings.source_topic,
+                is_proprietary_model=True,
+            )
+        else:
+            # Only applicable for local model deployment
+            # ttft and e2e latency minimum values
+            # throughput maximum value
+            target_throughput_per_user_max = (
+                deploy_config.per_session_tokens_per_sec[1] if deploy_config.per_session_tokens_per_sec else None
+            )
+            ttft_min = deploy_config.ttft[0] if deploy_config.ttft else None
+            e2e_latency_min = deploy_config.e2e_latency[0] if deploy_config.e2e_latency else None
+            recommended_cluster_request = RecommendedClusterRequest(
+                pretrained_model_uri=local_path,
+                # pretrained_model_uri=model_uri, # Uncomment this for model uri
+                input_tokens=deploy_config.avg_context_length,
+                output_tokens=deploy_config.avg_sequence_length,
+                concurrency=deploy_config.concurrent_requests,
+                target_ttft=ttft_min,
+                target_throughput_per_user=target_throughput_per_user_max,
+                target_e2e_latency=e2e_latency_min,
+                notification_metadata=notification_metadata,
+                source_topic=app_settings.source_topic,
+                is_proprietary_model=False,
+            )
+
+        # Get recommended cluster info from Bud Simulator
+        recommended_cluster_endpoint = (
+            f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_simulator_app_id}/method/simulator/run"
+        )
+
+        # Perform recommended cluster simulation
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    recommended_cluster_endpoint, json=recommended_cluster_request.model_dump()
+                ) as response:
+                    response_data = await response.json()
+                    if response.status >= 400:
+                        raise ClientException("Unable to perform recommended cluster simulation")
+
+                    # Add payload key to steps
+                    if "steps" in response_data:
+                        steps = response_data["steps"]
+                        for step in steps:
+                            step["payload"] = {}
+                        response_data["steps"] = steps
+
+                    return response_data
+        except ClientException as e:
+            raise e
+        except Exception as e:
+            logger.error(f"Failed to perform recommended cluster simulation: {e}")
+            raise ClientException("Unable to perform recommended cluster simulation") from e
+
+    async def _initiate_model_deployment(
+        self,
+        cluster_id: UUID,
+        endpoint_name: str,
+        simulator_id: UUID,
+        model_id: UUID,
+        deploy_config: DeploymentTemplateCreate,
+        workflow_id: UUID,
+        subscriber_id: UUID,
+        credential_id: UUID | None = None,
+        scaling_specification: Optional[ScalingSpecification] = None,
+    ) -> Dict[str, Any]:
+        """Trigger model deployment by step."""
+        logger.debug("Triggering model deployment")
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
+        )
+        logger.debug(f"Found model: {db_model.source}")
+
+        target_throughput_per_user_max = (
+            deploy_config.per_session_tokens_per_sec[1] if deploy_config.per_session_tokens_per_sec else None
+        )
+        ttft_min = deploy_config.ttft[0] if deploy_config.ttft else None
+        e2e_latency_min = deploy_config.e2e_latency[0] if deploy_config.e2e_latency else None
+
+        notification_metadata = BudNotificationMetadata(
+            workflow_id=str(workflow_id),
+            subscriber_ids=str(subscriber_id),
+            name=BUD_INTERNAL_WORKFLOW,
+        )
+
+        if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            model_uri = db_model.uri
+            model_source = db_model.source
+            if model_uri.startswith(f"{model_source}/"):
+                model_uri = model_uri.removeprefix(f"{model_source}/")
+            deploy_model_uri = model_uri if not credential_id else f"{model_source}/{model_uri}"
+            # Update made in lite-llm pr merge
+        else:
+            deploy_model_uri = db_model.local_path
+            # deploy_model_uri = db_model.uri # Uncomment this for model uri
+
+        # Perform model deployment
+        model_deployment_request = ModelDeploymentRequest(
+            cluster_id=cluster_id,
+            simulator_id=simulator_id,
+            endpoint_name=endpoint_name,
+            model=deploy_model_uri,
+            target_ttft=ttft_min,
+            target_e2e_latency=e2e_latency_min,
+            target_throughput_per_user=target_throughput_per_user_max,
+            concurrency=deploy_config.concurrent_requests,
+            input_tokens=deploy_config.avg_context_length,
+            output_tokens=deploy_config.avg_sequence_length,
+            notification_metadata=notification_metadata,
+            source_topic=app_settings.source_topic,
+            credential_id=credential_id,
+            podscaler=scaling_specification,
+        )
+        model_deployment_endpoint = (
+            f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"
+        )
+        model_deployment_payload = model_deployment_request.model_dump(mode="json", exclude_none=True)
+        logger.debug("model_deployment_payload: %s", model_deployment_payload)
+
+        # Perform model deployment
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(model_deployment_endpoint, json=model_deployment_payload) as response:
+                    response_data = await response.json()
+                    logger.debug("model_deployment_response: %s", response_data)
+
+                    if response.status >= 400:
+                        raise ClientException("Unable to perform model deployment")
+
+                    # Add payload key to steps
+                    if "steps" in response_data:
+                        steps = response_data["steps"]
+                        for step in steps:
+                            step["payload"] = {}
+                        response_data["steps"] = steps
+
+                    return response_data
+        except ClientException as e:
+            raise e
+        except Exception as e:
+            logger.error(f"Failed to perform model deployment: {e}")
+            raise ClientException("Unable to perform model deployment") from e
+
 
 class ModelServiceUtil(SessionMixin):
     """Model util service."""
 
-    async def get_model_icon(self, db_model: Model) -> Optional[str]:
+    async def get_model_icon(self, db_model: Optional[Model] = None, model_id: Optional[UUID] = None) -> Optional[str]:
         """Get model icon.
 
         Args:
@@ -2534,6 +3437,12 @@ class ModelServiceUtil(SessionMixin):
         Returns:
             The model icon.
         """
+        if db_model is None and model_id is None:
+            raise ValueError("Atleast one of model instance or model id must be provided")
+        if db_model is None:
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
+            )
         if db_model.provider_type in [ModelProviderTypeEnum.CLOUD_MODEL, ModelProviderTypeEnum.HUGGING_FACE]:
             return db_model.provider.icon
         else:

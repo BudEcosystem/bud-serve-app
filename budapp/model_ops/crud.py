@@ -16,6 +16,7 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the model ops."""
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -30,6 +31,7 @@ from budapp.commons.exceptions import DatabaseException
 from budapp.endpoint_ops.models import Endpoint
 from budapp.model_ops.models import CloudModel, Model, PaperPublished
 from budapp.model_ops.models import Provider as ProviderModel
+from budapp.model_ops.models import QuantizationMethod as QuantizationMethodModel
 
 
 logger = logging.get_logger(__name__)
@@ -443,6 +445,35 @@ class ModelDataManager(DataManagerUtils):
         stmt = select(Model).filter(Model.uri.in_(uris), Model.status == ModelStatusEnum.ACTIVE)
         return self.scalars_all(stmt)
 
+    async def get_stale_model_recommendation(self, older_than: datetime) -> Optional[Model]:
+        """Get model that needs cluster recommendation update.
+
+        Args:
+            older_than: datetime to compare against recommended_cluster_sync_at
+
+        Returns:
+            Model if found and needs update (stale or never synced), None otherwise
+        """
+        query = (
+            select(Model)
+            .where(
+                and_(
+                    Model.status == ModelStatusEnum.ACTIVE,
+                    or_(
+                        Model.recommended_cluster_sync_at.is_(None),  # Never synced
+                        Model.recommended_cluster_sync_at < older_than,
+                    ),
+                )
+            )
+            .order_by(
+                Model.recommended_cluster_sync_at.asc().nulls_first()  # Prioritize never synced models
+            )
+            .limit(1)
+        )
+
+        result = self.session.execute(query)
+        return result.scalar_one_or_none()
+
 
 class CloudModelDataManager(DataManagerUtils):
     """Data manager for the CloudModel model."""
@@ -610,3 +641,44 @@ class ModelSecurityScanResultDataManager(DataManagerUtils):
     """Data manager for the ModelSecurityScanResult model."""
 
     pass
+
+
+class QuantizationMethodDataManager(DataManagerUtils):
+    """Data manager for the QuantizationMethod model."""
+
+    async def get_all_quantization_methods(
+        self,
+        offset: int,
+        limit: int,
+        filters: Dict[str, Any] = {},
+        order_by: List[Tuple[str, str]] = [],
+        search: bool = False,
+    ) -> Tuple[List[QuantizationMethodModel], int]:
+        """List all quantization methods in the database."""
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(QuantizationMethodModel, filters)
+            stmt = select(
+                QuantizationMethodModel,
+            ).filter(or_(*search_conditions))
+            count_stmt = select(func.count()).select_from(QuantizationMethodModel).filter(or_(*search_conditions))
+        else:
+            stmt = select(
+                QuantizationMethodModel,
+            ).filter_by(**filters)
+            count_stmt = select(func.count()).select_from(QuantizationMethodModel).filter_by(**filters)
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(QuantizationMethodModel, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.scalars_all(stmt)
+        logger.info(f"result: {result}")
+        return result, count

@@ -45,8 +45,13 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
 from ..cluster_ops.crud import ClusterDataManager
 from ..cluster_ops.models import Cluster as ClusterModel
+from ..core.crud import ModelTemplateDataManager
+from ..core.models import ModelTemplate as ModelTemplateModel
+from ..credential_ops.crud import ProprietaryCredentialDataManager
+from ..credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..endpoint_ops.schemas import AddAdapterWorkflowStepData
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
 from .crud import WorkflowDataManager, WorkflowStepDataManager
@@ -128,6 +133,13 @@ class WorkflowService(SessionMixin):
                 BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value
             )
             bud_simulator_events = required_data.get(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value)
+            quantization_deployment_events = required_data.get(
+                BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value
+            )
+            quantization_simulation_events = required_data.get(
+                BudServeWorkflowStepEventName.QUANTIZATION_SIMULATION_EVENTS.value
+            )
+            adapter_deployment_events = required_data.get(BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value)
             security_scan_result_id = required_data.get("security_scan_result_id")
             icon = required_data.get("icon")
             uri = required_data.get("uri")
@@ -136,7 +148,22 @@ class WorkflowService(SessionMixin):
             description = required_data.get("description")
             additional_concurrency = required_data.get("additional_concurrency")
             quantized_model_name = required_data.get("quantized_model_name")
-
+            eval_with = required_data.get("eval_with")
+            max_input_tokens = required_data.get("max_input_tokens")
+            max_output_tokens = required_data.get("max_output_tokens")
+            datasets = required_data.get("datasets")
+            nodes = required_data.get("nodes")
+            credential_id = required_data.get("credential_id")
+            user_confirmation = required_data.get("user_confirmation")
+            run_as_simulation = required_data.get("run_as_simulation")
+            adapter_model_id = required_data.get("adapter_model_id")
+            endpoint_name = required_data.get("endpoint_name")
+            deploy_config = required_data.get("deploy_config")
+            scaling_specification = required_data.get("scaling_specification")
+            simulator_id = required_data.get("simulator_id")
+            template_id = required_data.get("template_id")
+            endpoint_details = required_data.get("endpoint_details")
+            add_model_modality = required_data.get("add_model_modality")
             quantization_config = QuantizeModelWorkflowStepData(
                 model_id=model_id,
                 quantized_model_name=required_data.get("quantized_model_name"),
@@ -145,7 +172,18 @@ class WorkflowService(SessionMixin):
                 method=required_data.get("method"),
                 weight_config=required_data.get("weight_config"),
                 activation_config=required_data.get("activation_config"),
+                cluster_id=required_data.get("cluster_id"),
+                simulation_id=required_data.get("simulation_id"),
+                quantization_data=required_data.get("quantization_data"),
+                quantized_model_id=required_data.get("quantized_model_id"),
             ) if quantized_model_name else None
+
+            adapter_config = AddAdapterWorkflowStepData(
+                adapter_model_id=adapter_model_id,
+                adapter_name=required_data.get("adapter_name"),
+                endpoint_id=required_data.get("endpoint_id"),
+                adapter_id=required_data.get("adapter_id")
+            ) if adapter_model_id else None
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -203,6 +241,22 @@ class WorkflowService(SessionMixin):
                 else None
             )
 
+            db_credential = (
+                await ProprietaryCredentialDataManager(self.session).retrieve_by_fields(
+                    ProprietaryCredentialModel, {"id": UUID(required_data["credential_id"])}, missing_ok=True
+                )
+                if "credential_id" in required_data
+                else None
+            )
+
+            db_template = (
+                await ModelTemplateDataManager(self.session).retrieve_by_fields(
+                    ModelTemplateModel, {"id": UUID(required_data["template_id"])}, missing_ok=True
+                )
+                if "template_id" in required_data
+                else None
+            )
+
             workflow_steps = RetrieveWorkflowStepData(
                 provider_type=provider_type if provider_type else None,
                 provider=db_provider if db_provider else None,
@@ -224,7 +278,7 @@ class WorkflowService(SessionMixin):
                 description=description if description else None,
                 security_scan_result_id=security_scan_result_id if security_scan_result_id else None,
                 model_security_scan_events=model_security_scan_events if model_security_scan_events else None,
-                bud_serve_cluster_events=bud_serve_cluster_events if bud_serve_cluster_events else None,
+                budserve_cluster_events=bud_serve_cluster_events if bud_serve_cluster_events else None,
                 security_scan_result=db_model_security_scan_result if db_model_security_scan_result else None,
                 delete_cluster_events=delete_cluster_events if delete_cluster_events else None,
                 delete_endpoint_events=delete_endpoint_events if delete_endpoint_events else None,
@@ -234,7 +288,28 @@ class WorkflowService(SessionMixin):
                 bud_simulator_events=bud_simulator_events if bud_simulator_events else None,
                 project=db_project if db_project else None,
                 cluster=db_cluster if db_cluster else None,
-                qunatization_config=quantization_config if quantization_config else None
+                quantization_config=quantization_config if quantization_config else None,
+                quantization_deployment_events=quantization_deployment_events if quantization_deployment_events else None,
+                quantization_simulation_events=quantization_simulation_events if quantization_simulation_events else None,
+                eval_with=eval_with,
+                max_input_tokens=max_input_tokens,
+                max_output_tokens=max_output_tokens,
+                datasets=datasets,
+                nodes=nodes,
+                credential_id=credential_id,
+                user_confirmation=user_confirmation,
+                run_as_simulation=run_as_simulation,
+                adapter_config=adapter_config if adapter_config else None,
+                adapter_deployment_events=adapter_deployment_events if adapter_deployment_events else None,
+                credential=db_credential if db_credential else None,
+                endpoint_name=endpoint_name if endpoint_name else None,
+                deploy_config=deploy_config if deploy_config else None,
+                scaling_specification=scaling_specification if scaling_specification else None,
+                simulator_id=simulator_id if simulator_id else None,
+                template_id=template_id if template_id else None,
+                endpoint_details=endpoint_details if endpoint_details else None,
+                template=db_template if db_template else None,
+                add_model_modality=add_model_modality if add_model_modality else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -269,6 +344,7 @@ class WorkflowService(SessionMixin):
                 "model_id",
                 "workflow_execution_status",
                 "leaderboard",
+                "add_model_modality",
             ],
             "create_cluster": [
                 "name",
@@ -288,6 +364,7 @@ class WorkflowService(SessionMixin):
                 BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value,
                 "model_id",
                 "description",
+                "add_model_modality",
             ],
             "scan_local_model": [
                 "model_id",
@@ -319,8 +396,54 @@ class WorkflowService(SessionMixin):
                 "quantized_model_name",
                 "method",
                 "weight_config",
-                "activation_config"
-            ]
+                "activation_config",
+                BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value,
+                BudServeWorkflowStepEventName.QUANTIZATION_SIMULATION_EVENTS.value,
+                "cluster_id",
+                "simulation_id",
+                "quantization_data",
+                "quantized_model_id",
+            ],
+            "model_benchmark": [
+                "name",
+                "tags",
+                "description",
+                "concurrent_requests",
+                "eval_with",
+                "datasets",
+                "max_input_tokens",
+                "max_output_tokens",
+                "cluster_id",
+                "bud_cluster_id",
+                "nodes",
+                "model_id",
+                "model",
+                "provider_type",
+                "credential_id",
+                "user_confirmation",
+                "run_as_simulation",
+            ],
+            "add_adapter": [
+                "adapter_model_id",
+                "adapter_name",
+                "endpoint_id",
+                BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value,
+                "adapter_id",
+            ],
+            "deploy_model": [
+                "model_id",
+                "project_id",
+                "cluster_id",
+                "endpoint_name",
+                "budserve_cluster_events",
+                "bud_simulator_events",
+                "deploy_config",
+                "template_id",
+                "simulator_id",
+                "credential_id",
+                "endpoint_details",
+                "scaling_specification",
+            ],
         }
 
         # Combine all lists using set union

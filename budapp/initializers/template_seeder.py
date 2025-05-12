@@ -75,9 +75,9 @@ class TemplateSeeder(BaseSeeder):
 
         # Update existing template with seeder data
         for db_template in existing_db_templates:
-            if db_template.template_type.value in template_seeder_data_mapping:
+            if db_template.template_type in template_seeder_data_mapping:
                 update_template_data = ModelTemplateUpdate(
-                    **template_seeder_data_mapping[db_template.template_type.value]
+                    **template_seeder_data_mapping[db_template.template_type]
                 )
                 db_updated_template = await ModelTemplateDataManager(
                     session
@@ -87,7 +87,7 @@ class TemplateSeeder(BaseSeeder):
                 logger.debug(f"Updated template: {db_updated_template.template_type}")
 
                 # Remove the updated template from the mapping
-                del template_seeder_data_mapping[db_template.template_type.value]
+                del template_seeder_data_mapping[db_template.template_type]
 
         # Remaining templates are new and need to be created
         for template_type, template_data in template_seeder_data_mapping.items():

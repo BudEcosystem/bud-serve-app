@@ -16,15 +16,13 @@
 
 """The core package, containing essential business logic, services, and routing configurations for the microservices."""
 
-from datetime import datetime
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import ARRAY, DateTime, Integer, String, Uuid
-from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy import ARRAY, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
-from budapp.commons.constants import ModelTemplateTypeEnum
+# from budapp.commons.constants import ModelTemplateTypeEnum
 from budapp.commons.database import Base, TimestampMixin
 
 
@@ -47,15 +45,16 @@ class ModelTemplate(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=False)
     icon: Mapped[str] = mapped_column(String, nullable=False)
-    template_type: Mapped[str] = mapped_column(
-        PG_ENUM(
-            ModelTemplateTypeEnum,
-            name="template_type_enum",
-            values_callable=lambda x: [e.value for e in x],
-        ),
-        nullable=False,
-        unique=True,
-    )
+    # template_type: Mapped[str] = mapped_column(
+    #     PG_ENUM(
+    #         ModelTemplateTypeEnum,
+    #         name="template_type_enum",
+    #         values_callable=lambda x: [e.value for e in x],
+    #     ),
+    #     nullable=False,
+    #     unique=True,
+    # )
+    template_type: Mapped[str] = mapped_column(String, nullable=False)
     avg_sequence_length: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     avg_context_length: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     per_session_tokens_per_sec: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=True)

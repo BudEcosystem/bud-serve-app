@@ -36,6 +36,9 @@ from ..commons.schemas import ErrorResponse, SuccessResponse
 from ..workflow_ops.schemas import RetrieveWorkflowDataResponse
 from ..workflow_ops.services import WorkflowService
 from .schemas import (
+    AdapterFilter,
+    AdapterPaginatedResponse,
+    AddAdapterRequest,
     AddWorkerRequest,
     DeleteWorkerRequest,
     EndpointFilter,
@@ -44,6 +47,8 @@ from .schemas import (
     WorkerDetailResponse,
     WorkerInfoFilter,
     WorkerInfoResponse,
+    WorkerLogsResponse,
+    WorkerMetricsResponse,
 )
 from .services import EndpointService
 
@@ -195,6 +200,90 @@ async def get_endpoint_workers(
     except Exception as e:
         logger.exception(f"Failed to get endpoint workers: {e}")
         response = ErrorResponse(message="Failed to get endpoint workers", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return response.to_http_response()
+
+
+@endpoint_router.get(
+    "/{endpoint_id}/workers/{worker_id}/logs",
+    responses={
+        status.HTTP_200_OK: {
+            "model": WorkerLogsResponse,
+            "description": "Successfully get endpoint detail",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to get endpoint workers",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Worker not found",
+        },
+    },
+)
+async def get_endpoint_worker_logs(
+    endpoint_id: UUID,
+    worker_id: UUID,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> Union[WorkerLogsResponse, ErrorResponse]:
+    """Get endpoint worker logs."""
+    try:
+        worker_log = await EndpointService(session).get_endpoint_worker_logs(endpoint_id, worker_id)
+        response = WorkerLogsResponse(
+            logs=worker_log,
+            object="endpoint.worker.logs",
+            message="Successfully fetched endpoint worker logs",
+            code=status.HTTP_200_OK,
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to get endpoint worker detail: {e}")
+        response = ErrorResponse(message=e.message, code=e.status_code)
+    except Exception as e:
+        logger.exception(f"Failed to get endpoint worker detail: {e}")
+        response = ErrorResponse(
+            message="Failed to get endpoint worker detail", code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    return response.to_http_response()
+
+
+@endpoint_router.get(
+    "/{endpoint_id}/workers/{worker_id}/metrics",
+    responses={
+        status.HTTP_200_OK: {
+            "model": WorkerMetricsResponse,  # noqa: F821
+            "description": "Successfully get endpoint worker metrics",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Worker not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to get endpoint worker metrics",
+        },
+    },
+)
+async def get_endpoint_worker_metrics(
+    endpoint_id: UUID,
+    worker_id: UUID,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> Union[WorkerMetricsResponse, ErrorResponse]:
+    """Get endpoint worker metrics."""
+    try:
+        worker_metrics = await EndpointService(session).get_worker_metrics_history(endpoint_id, worker_id)
+        response = WorkerMetricsResponse(
+            metrics=worker_metrics,
+            object="endpoint.worker.metrics",
+            message="Successfully fetched endpoint worker metrics",
+            code=status.HTTP_200_OK,
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to get endpoint worker metrics: {e}")
+        response = ErrorResponse(message=e.message, code=e.status_code)
+    except Exception as e:
+        logger.exception(f"Failed to get endpoint worker metrics: {e}")
+        response = ErrorResponse(message="Failed to get endpoint worker metrics", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
     return response.to_http_response()
 
 
@@ -358,3 +447,144 @@ async def add_worker_to_endpoint(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add worker to endpoint"
         ).to_http_response()
 
+@endpoint_router.post(
+    "/add-adapter",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RetrieveWorkflowDataResponse,
+            "description": "Successfully updated Add Adapter workflow",
+        },
+    },
+    description="Add worker to endpoint",
+)
+async def add_adapter_to_endpoint(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: AddAdapterRequest,
+) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
+    """Add worker to endpoint."""
+    try:
+        db_workflow = await EndpointService(session).add_adapter_workflow(
+            current_user_id=current_user.id,
+            request=request,
+        )
+
+        return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
+    except ClientException as e:
+        logger.exception(f"Failed to add adapter to endpoint: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to add adapter to endpoint: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add adapter to endpoint"
+        ).to_http_response()
+
+
+@endpoint_router.get(
+    "/{endpoint_id}/adapters",
+    responses={
+        status.HTTP_200_OK: {
+            "model": AdapterPaginatedResponse,
+            "description": "Successfully get endpoint adapters",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to get endpoint workers",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Endpoint not found",
+        },
+    },
+    description="Get endpoint adapters",
+)
+async def get_endpoint_adapters(
+    endpoint_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[AdapterFilter, Depends()],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = Query(False),
+) -> Union[AdapterPaginatedResponse, ErrorResponse]:
+    """Get endpoint adapters."""
+    offset = (page - 1) * limit
+
+    # Construct filters
+    filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True)
+
+    try:
+        adapters, count = await EndpointService(session).get_adapters_by_endpoint(
+            endpoint_id, filters_dict, offset, limit, order_by, search
+        )
+        response = AdapterPaginatedResponse(
+            adapters=adapters,
+            total_record=count,
+            page=page,
+            limit=limit,
+            object="adapters.list",
+            code=status.HTTP_200_OK,
+            message="Successfully list all adapters",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to get endpoint adapters: {e}")
+        response = ErrorResponse(message=e.message, code=e.status_code)
+    except Exception as e:
+        logger.exception(f"Failed to get endpoint adapters: {e}")
+        response = ErrorResponse(message="Failed to get endpoint adapters", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return response.to_http_response()
+
+
+@endpoint_router.post(
+    "/delete-adapter/{adapter_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RetrieveWorkflowDataResponse,
+            "description": "Successfully updated delete adapter workflow",
+        },
+    },
+    description="Add worker to endpoint",
+)
+async def delete_adapter_from_endpoint(
+    adapter_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
+    """Add worker to endpoint."""
+    try:
+        db_workflow = await EndpointService(session).delete_adapter_workflow(
+            current_user_id=current_user.id,
+            adapter_id=adapter_id,
+        )
+        response = SuccessResponse(
+            message="Adapter deleting initiated successfully",
+            code=status.HTTP_200_OK,
+            object="adapter.delete",
+        )
+        return response.to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to delete adapter from endpoint: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete adapter from endpoint: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete adapter from endpoint"
+        ).to_http_response()

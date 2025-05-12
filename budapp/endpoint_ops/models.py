@@ -27,7 +27,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.cluster_ops.models import Cluster
-from budapp.commons.constants import EndpointStatusEnum
+from budapp.commons.constants import AdapterStatusEnum, EndpointStatusEnum
 from budapp.commons.database import Base, TimestampMixin
 from budapp.model_ops.models import Model
 from budapp.project_ops.models import Project
@@ -63,6 +63,7 @@ class Endpoint(Base, TimestampMixin):
     total_replicas: Mapped[int] = mapped_column(Integer, nullable=False)
     number_of_nodes: Mapped[int] = mapped_column(Integer, nullable=False)
     deployment_config: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    node_list: Mapped[list[str]] = mapped_column(JSONB, nullable=True)
 
     model: Mapped[Model] = relationship("Model", back_populates="endpoints", foreign_keys=[model_id])
     # worker: Mapped[Worker] = relationship(
@@ -74,9 +75,14 @@ class Endpoint(Base, TimestampMixin):
     project: Mapped[Project] = relationship("Project", back_populates="endpoints", foreign_keys=[project_id])
 
     cluster: Mapped[Cluster] = relationship("Cluster", back_populates="endpoints", foreign_keys=[cluster_id])
+    adapters: Mapped[list["Adapter"]] = relationship(back_populates="endpoint")
     created_user: Mapped["User"] = relationship(back_populates="created_endpoints", foreign_keys=[created_by])
     credential: Mapped[Optional["ProprietaryCredential"]] = relationship(
         "ProprietaryCredential", back_populates="endpoints"
+    )
+    routers: Mapped[list["RouterEndpoint"]] = relationship(
+        "RouterEndpoint",
+        back_populates="endpoint",
     )
 
     @hybrid_property
@@ -114,6 +120,61 @@ class Endpoint(Base, TimestampMixin):
             url=data.get("url"),
             namespace=data.get("namespace"),
             replicas=data.get("replicas"),
+            created_at=datetime.fromisoformat(data.get("created_at")),
+            modified_at=datetime.fromisoformat(data.get("modified_at")),
+        )
+
+class Adapter(Base, TimestampMixin):
+    """Adapter model."""
+
+    __tablename__ = "adapter"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    deployment_name: Mapped[str] = mapped_column(String, nullable=False)
+    endpoint_id: Mapped[UUID] = mapped_column(ForeignKey("endpoint.id", ondelete="CASCADE"), nullable=False)
+    model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id", ondelete="CASCADE"), nullable=False)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
+    status: Mapped[str] = mapped_column(Enum(AdapterStatusEnum, name="adapter_status_enum", values_callable=lambda x: [e.value for e in x]), nullable=False)
+    status_sync_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    endpoint: Mapped[Endpoint] = relationship("Endpoint", back_populates="adapters", foreign_keys=[endpoint_id])
+    model: Mapped[Model] = relationship("Model", back_populates="adapters", foreign_keys=[model_id])
+
+    def to_dict(self):
+        """Convert the Adapter instance to a dictionary.
+
+        Returns:
+            dict: A dictionary representation of the Adapter instance.
+        """
+        return {
+            "id": str(self.id),
+            "name": self.name,
+            "endpoint_id": str(self.endpoint_id),
+            "model_id": str(self.model_id),
+            "status": self.status,
+            "status_sync_at": self.status_sync_at.isoformat(),
+            "created_at": self.created_at.isoformat(),
+            "modified_at": self.modified_at.isoformat(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        """Create an Adapter instance from a dictionary.
+
+        Args:
+            data (dict): A dictionary containing the Adapter data.
+
+        Returns:
+            Adapter: An instance of the Adapter class.
+        """
+        return cls(
+            id=data.get("id"),
+            name=data.get("name"),
+            endpoint_id=UUID(data.get("endpoint_id")),
+            model_id=UUID(data.get("model_id")),
+            created_by=UUID(data.get("created_by")),
+            status=data.get("status"),
+            status_sync_at=datetime.fromisoformat(data.get("status_sync_at")),
             created_at=datetime.fromisoformat(data.get("created_at")),
             modified_at=datetime.fromisoformat(data.get("modified_at")),
         )

@@ -44,7 +44,7 @@ from .schemas import (
     PerformanceAnalyticsRequest,
     PerformanceAnalyticsResponse,
 )
-from .services import MetricService
+from .services import BudMetricService, MetricService
 
 
 logger = logging.get_logger(__name__)
@@ -72,12 +72,12 @@ metric_router = APIRouter(prefix="/metrics", tags=["metric"])
 )
 async def get_request_count_analytics(
     current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
+    # session: Annotated[Session, Depends(get_session)],
     metric_request: CountAnalyticsRequest,
 ) -> Union[CountAnalyticsResponse, ErrorResponse]:
     """Get request count analytics."""
     try:
-        return await MetricService(session).get_request_count_analytics(metric_request)
+        return await BudMetricService().get_request_count_analytics(metric_request)
     except ClientException as e:
         logger.exception(f"Failed to get request count analytics: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
@@ -108,12 +108,12 @@ async def get_request_count_analytics(
 )
 async def get_request_performance_analytics(
     current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
+    # session: Annotated[Session, Depends(get_session)],
     metric_request: PerformanceAnalyticsRequest,
 ) -> Union[PerformanceAnalyticsResponse, ErrorResponse]:
     """Get request performance analytics."""
     try:
-        return await MetricService(session).get_request_performance_analytics(metric_request)
+        return await BudMetricService().get_request_performance_analytics(metric_request)
     except ClientException as e:
         logger.exception(f"Failed to get request performance analytics: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
@@ -189,13 +189,13 @@ async def get_dashboard_stats(
 async def get_deployment_cache_metric(
     endpoint_id: UUID,
     _: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
+    # session: Annotated[Session, Depends(get_session)],
     page: int = 1,
     limit: int = 10,
 ) -> Union[CacheMetricsResponse, ErrorResponse]:
     """Get deployment cache metrics."""
     try:
-        response = await MetricService(session).get_deployment_cache_metric(endpoint_id, page=page, limit=limit)
+        response = await BudMetricService().get_deployment_cache_metric(endpoint_id, page=page, limit=limit)
     except ClientException as e:
         logger.exception(f"Failed to get deployment cache metrics: {e}")
         return ErrorResponse(code=e.status_code, message=e.message)
@@ -227,11 +227,11 @@ async def get_deployment_cache_metric(
 async def get_inference_quality_score_analytics(
     endpoint_id: UUID,
     _: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
+    # session: Annotated[Session, Depends(get_session)],
 ) -> Union[InferenceQualityAnalyticsResponse, ErrorResponse]:
     """Get inference quality score analytics."""
     try:
-        response = await MetricService(session).get_inference_quality_analytics(endpoint_id)
+        response = await BudMetricService().get_inference_quality_analytics(endpoint_id)
     except ClientException as e:
         logger.exception(f"Failed to get inference quality score analytics: {e}")
         response = ErrorResponse(code=e.status_code, message=e.message)
@@ -264,7 +264,7 @@ async def get_inference_quality_prompt_analytics(
     endpoint_id: UUID,
     score_type: Literal["hallucination", "harmfulness", "sensitive_info", "prompt_injection"],
     _: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
+    # session: Annotated[Session, Depends(get_session)],
     filters: Annotated[InferenceQualityAnalyticsPromptFilter, Depends()],
     search: bool = False,
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
@@ -274,7 +274,7 @@ async def get_inference_quality_prompt_analytics(
     """Get inference quality prompt analytics."""
     try:
         order_by_str = ",".join(":".join(item) for item in order_by)
-        response = await MetricService(session).get_inference_quality_prompt_analytics(endpoint_id, score_type, page, limit, filters, search, order_by_str if order_by_str else "created_at:desc")
+        response = await BudMetricService().get_inference_quality_prompt_analytics(endpoint_id, score_type, page, limit, filters, search, order_by_str if order_by_str else "created_at:desc")
     except ClientException as e:
         logger.exception(f"Failed to get inference quality prompt analytics: {e}")
         response = ErrorResponse(code=e.status_code, message=e.message)
