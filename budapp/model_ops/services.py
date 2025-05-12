@@ -2245,14 +2245,24 @@ class ModelService(SessionMixin):
 
     async def _get_text_file_content(self, license_file: UploadFile) -> None:
         """Get content from text file."""
-        return license_file.file.read().decode("utf-8")
+        license_content = license_file.file.read().decode("utf-8")
+        
+        # Set the file pointer to the beginning of the file
+        license_file.file.seek(0)
+        
+        return license_content
 
     async def _get_pdf_file_content(self, license_file: UploadFile) -> None:
         """Get content from pdf file."""
         reader = PdfReader(license_file.file)
 
         # Extract text from each page as a new line and join them
-        return "\n".join([page.extract_text() for page in reader.pages])
+        license_content = "\n".join([page.extract_text() for page in reader.pages])
+
+        # Set the file pointer to the beginning of the file
+        license_file.file.seek(0)
+
+        return license_content
 
     async def _update_papers(self, model_id: UUID, paper_urls: list[str]) -> None:
         """Update paper entries for the given model by adding new URLs and removing old ones."""
