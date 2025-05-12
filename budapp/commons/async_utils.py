@@ -17,6 +17,7 @@
 """Provides utility functions for managing asynchronous tasks."""
 
 import asyncio
+import re
 from typing import Any, Awaitable, Callable, List, Tuple, TypeVar, Union
 
 from fastapi import Header, status
@@ -160,3 +161,9 @@ async def get_range_label(
         return "Better" if higher_is_better else "Worse"
     else:
         return "Expected"
+
+
+async def count_words(source_text: str) -> int:
+    """Count words in license file."""
+    text = re.findall(r"\b\w+\b", re.sub(r"[\n\r\t\s]+", " ", source_text.strip()))
+    return len(text)
