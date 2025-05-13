@@ -2166,10 +2166,6 @@ class ModelService(SessionMixin):
         current_user_id: UUID,
     ) -> None:
         """Create or update a license entry in the database."""
-        # Set license source
-        minio_store = ModelStore()
-        license_source = minio_store.get_object_url(app_settings.minio_model_bucket, license_url)
-
         # Check if a license entry with the given model_id exists
         existing_license = await ModelLicensesDataManager(self.session).retrieve_by_fields(
             ModelLicenses, fields={"model_id": model_id}, missing_ok=True
@@ -2191,7 +2187,7 @@ class ModelService(SessionMixin):
             await ModelLicensesDataManager(self.session).update_by_fields(existing_license, update_license_data)
 
             # Execute license faqs workflow
-            await self.fetch_license_faqs(model_id, existing_license.id, current_user_id, license_source)
+            await self.fetch_license_faqs(model_id, existing_license.id, current_user_id, license_url)
         else:
             # Create a new license entry
             license_entry = ModelLicensesCreate(
@@ -2210,7 +2206,7 @@ class ModelService(SessionMixin):
             )
 
             # Execute license faqs workflow
-            await self.fetch_license_faqs(model_id, license_entry.id, current_user_id, license_source)
+            await self.fetch_license_faqs(model_id, license_entry.id, current_user_id, license_url)
 
     async def _validate_license_url(self, license_url: str) -> str:
         """Validate license url."""
@@ -2248,10 +2244,10 @@ class ModelService(SessionMixin):
     async def _get_text_file_content(self, license_file: UploadFile) -> None:
         """Get content from text file."""
         license_content = license_file.file.read().decode("utf-8")
-        
+
         # Set the file pointer to the beginning of the file
         license_file.file.seek(0)
-        
+
         return license_content
 
     async def _get_pdf_file_content(self, license_file: UploadFile) -> None:
