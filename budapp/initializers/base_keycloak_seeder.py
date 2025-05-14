@@ -36,25 +36,33 @@ class BaseKeycloakSeeder(BaseSeeder):
         # Get the default realm name
         default_realm_name = app_settings.default_realm_name
         default_client_id = "default-internal-client"
-        new_client_id = None
-        client_secret = None
 
-        # Check if tenant exists in database first
+        # Check if realm exists in Keycloak
+        keycloak_realm_exists = keycloak_manager.realm_exists(default_realm_name)
+
+        # Check if user exists in DB
+        db_user = await UserDataManager(session).retrieve_by_fields(
+            UserModel,
+            {"email": app_settings.superuser_email, "status": UserStatusEnum.ACTIVE, "is_superuser": True},
+            missing_ok=True,
+        )
+
+        # If both exist, we can skip the entire seeding process
+        if keycloak_realm_exists and db_user:
+            logger.info(f"::KEYCLOAK::Realm {default_realm_name} and user {app_settings.superuser_email} both exist. Skipping seeding.")
+            return
+
+        # Create realm in Keycloak if it doesn't exist
+        if not keycloak_realm_exists:
+            logger.debug(f"::KEYCLOAK::Realm {default_realm_name} does not exist. Creating...")
+            await keycloak_manager.create_realm(default_realm_name)
+
+        # Check if tenant exists in database
         tenant = await UserDataManager(session).retrieve_by_fields(
             Tenant,
             {"realm_name": default_realm_name},
             missing_ok=True,
         )
-
-        # Check if realm exists in Keycloak
-        keycloak_realm_exists = keycloak_manager.realm_exists(default_realm_name)
-
-        if keycloak_realm_exists:
-            logger.info(f"::KEYCLOAK::Realm {default_realm_name} already exists. Skipping...")
-            return
-
-        logger.debug(f"::KEYCLOAK::Realm {default_realm_name} does not exist. Creating...")
-        await keycloak_manager.create_realm(default_realm_name)
 
         if not tenant:
             # Save The Tenant in DB if it doesn't exist
@@ -77,77 +85,81 @@ class BaseKeycloakSeeder(BaseSeeder):
             missing_ok=True,
         )
 
-        # Create client in Keycloak
-        new_client_id, client_secret = await keycloak_manager.create_client(default_client_id, default_realm_name)
+        # Create client in Keycloak if realm was just created
+        if not keycloak_realm_exists:
+            new_client_id, client_secret = await keycloak_manager.create_client(default_client_id, default_realm_name)
 
-        if not tenant_client:
-            # Create new client record in DB
-            tenant_client = TenantClient(
-                tenant_id=tenant.id,
-                client_named_id=default_client_id,
-                client_id=new_client_id,
-                client_secret=client_secret,
-            )
-            await UserDataManager(session).insert_one(tenant_client)
-            logger.info(f"::KEYCLOAK::Client created in DB with ID {tenant_client.id}")
-        else:
-            # Update existing client record with new Keycloak credentials
-            tenant_client.client_id = new_client_id
-            tenant_client.client_secret = client_secret
-            await UserDataManager(session).update_one(tenant_client)
-            logger.info(f"::KEYCLOAK::Client updated in DB with ID {tenant_client.id}")
-
-        # Check if the user exists
-        db_user = await UserDataManager(session).retrieve_by_fields(
-            UserModel,
-            {"email": app_settings.superuser_email, "status": UserStatusEnum.ACTIVE, "is_superuser": True},
-            missing_ok=True,
-        )
-
-        # Create user in Keycloak
-        keycloak_user_id = await keycloak_manager.create_realm_admin(
-            username=app_settings.superuser_email,
-            email=app_settings.superuser_email,
-            password=app_settings.superuser_password,
-            realm_name=default_realm_name,
-            client_id=new_client_id,
-            client_secret=client_secret,
-        )
-
-        if not db_user:
-            # Create new user record in DB
-            db_user = UserModel(
-                name="admin",
-                auth_id=keycloak_user_id,
-                email=app_settings.superuser_email,
-                is_superuser=True,
-                color=UserColorEnum.get_random_color(),
-                is_reset_password=False,
-                first_login=True,
-                status=UserStatusEnum.ACTIVE.value,
-                role=UserRoleEnum.SUPER_ADMIN.value,
-            )
-            db_user = await UserDataManager(session).insert_one(db_user)
-            logger.info(f"::KEYCLOAK::User created in DB with ID {db_user.id}")
-
-            # Add user to tenant mapping
-            tenant_user_mapping = await UserDataManager(session).retrieve_by_fields(
-                TenantUserMapping,
-                {"tenant_id": tenant.id, "user_id": db_user.id},
-                missing_ok=True,
-            )
-
-            if not tenant_user_mapping:
-                tenant_user_mapping = TenantUserMapping(
+            if not tenant_client:
+                # Create new client record in DB
+                tenant_client = TenantClient(
                     tenant_id=tenant.id,
-                    user_id=db_user.id,
+                    client_named_id=default_client_id,
+                    client_id=new_client_id,
+                    client_secret=client_secret,
                 )
-                await UserDataManager(session).insert_one(tenant_user_mapping)
-                logger.info("::KEYCLOAK::User-Tenant mapping created")
+                await UserDataManager(session).insert_one(tenant_client)
+                logger.info(f"::KEYCLOAK::Client created in DB with ID {tenant_client.id}")
+            else:
+                # Update existing client record with new Keycloak credentials
+                tenant_client.client_id = new_client_id
+                tenant_client.client_secret = client_secret
+                await UserDataManager(session).update_one(tenant_client)
+                logger.info(f"::KEYCLOAK::Client updated in DB with ID {tenant_client.id}")
         else:
-            # Update existing user record with new Keycloak ID
-            db_user.auth_id = keycloak_user_id
-            await UserDataManager(session).update_one(db_user)
-            logger.info("::KEYCLOAK::User updated in DB with new auth_id")
+            # If we get here, realm exists but user doesn't, we need to fetch client info
+            if not tenant_client:
+                logger.error("::KEYCLOAK::Inconsistent state: Realm exists but no client record in DB")
+                return
+
+        # If realm was just created or user doesn't exist, create user in Keycloak
+        if not keycloak_realm_exists or not db_user:
+            if keycloak_realm_exists and not db_user:
+                logger.info(f"::KEYCLOAK::Realm exists but user {app_settings.superuser_email} doesn't exist. Creating user...")
+
+            # Create user in Keycloak
+            keycloak_user_id = await keycloak_manager.create_realm_admin(
+                username=app_settings.superuser_email,
+                email=app_settings.superuser_email,
+                password=app_settings.superuser_password,
+                realm_name=default_realm_name,
+                client_id=tenant_client.client_id,
+                client_secret=tenant_client.client_secret,
+            )
+
+            if not db_user:
+                # Create new user record in DB
+                db_user = UserModel(
+                    name="admin",
+                    auth_id=keycloak_user_id,
+                    email=app_settings.superuser_email,
+                    is_superuser=True,
+                    color=UserColorEnum.get_random_color(),
+                    is_reset_password=False,
+                    first_login=True,
+                    status=UserStatusEnum.ACTIVE.value,
+                    role=UserRoleEnum.SUPER_ADMIN.value,
+                )
+                db_user = await UserDataManager(session).insert_one(db_user)
+                logger.info(f"::KEYCLOAK::User created in DB with ID {db_user.id}")
+
+                # Add user to tenant mapping
+                tenant_user_mapping = await UserDataManager(session).retrieve_by_fields(
+                    TenantUserMapping,
+                    {"tenant_id": tenant.id, "user_id": db_user.id},
+                    missing_ok=True,
+                )
+
+                if not tenant_user_mapping:
+                    tenant_user_mapping = TenantUserMapping(
+                        tenant_id=tenant.id,
+                        user_id=db_user.id,
+                    )
+                    await UserDataManager(session).insert_one(tenant_user_mapping)
+                    logger.info("::KEYCLOAK::User-Tenant mapping created")
+            else:
+                # Update existing user record with new Keycloak ID
+                db_user.auth_id = keycloak_user_id
+                await UserDataManager(session).update_one(db_user)
+                logger.info("::KEYCLOAK::User updated in DB with new auth_id")
 
         logger.info("::KEYCLOAK::Seeding completed successfully")
