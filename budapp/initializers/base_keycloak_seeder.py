@@ -103,7 +103,7 @@ class BaseKeycloakSeeder(BaseSeeder):
                 # Update existing client record with new Keycloak credentials
                 tenant_client.client_id = new_client_id
                 tenant_client.client_secret = client_secret
-                await UserDataManager(session).update_one(tenant_client)
+                UserDataManager(session).update_one(tenant_client)
                 logger.info(f"::KEYCLOAK::Client updated in DB with ID {tenant_client.id}")
         else:
             # If we get here, realm exists but user doesn't, we need to fetch client info
@@ -159,7 +159,7 @@ class BaseKeycloakSeeder(BaseSeeder):
             else:
                 # Update existing user record with new Keycloak ID
                 db_user.auth_id = keycloak_user_id
-                await UserDataManager(session).update_one(db_user)
+                UserDataManager(session).update_one(db_user)
                 logger.info("::KEYCLOAK::User updated in DB with new auth_id")
 
         logger.info("::KEYCLOAK::Seeding completed successfully")
