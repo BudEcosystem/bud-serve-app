@@ -45,4 +45,6 @@ from budapp.router_ops.models import Router as Router
 from budapp.router_ops.models import RouterEndpoint as RouterEndpoint
 from ..playground_ops.models import Note as Note
 
+from budapp.eval_ops.models import Evaluation as Evaluation
+
 from .database import Base as Base
