@@ -2097,6 +2097,19 @@ class ModelService(SessionMixin):
             paper_urls = data.pop("paper_urls")
             await self._update_papers(model_id, paper_urls)
 
+        # Remove license if provided
+        if data.get("remove_license"):
+            logger.debug("Removing license for model: %s", model_id)
+            if not db_model.model_licenses:
+                raise ClientException(
+                    message="Unable to find license for model", status_code=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                await self._remove_license(db_model)
+
+        # remove remove_license from data
+        data.pop("remove_license")
+
         # Update model with validated data
         await ModelDataManager(self.session).update_by_fields(db_model, data)
 
@@ -2292,6 +2305,24 @@ class ModelService(SessionMixin):
             await PaperPublishedDataManager(self.session).delete_paper_by_urls(
                 model_id=model_id, paper_urls={"url": urls_to_remove}
             )
+
+    async def _remove_license(self, db_model: Model) -> None:
+        """Remove license from minio and db."""
+        license_object_prefix = f"{MINIO_LICENSE_OBJECT_NAME}/{db_model.id}"
+
+        # Delete license from minio
+        try:
+            minio_store = ModelStore()
+            minio_store.remove_objects(app_settings.minio_model_bucket, license_object_prefix, recursive=True)
+            logger.debug("License removed from minio object: %s", license_object_prefix)
+        except MinioException as e:
+            logger.exception(f"Error removing license from minio: {e}")
+            raise ClientException(
+                message="Unable to remove license from store", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+        # Delete license from db
+        await ModelLicensesDataManager(self.session).delete_by_fields(ModelLicenses, {"model_id": db_model.id})
 
     async def cancel_model_deployment_workflow(self, workflow_id: UUID) -> None:
         """Cancel model deployment workflow."""

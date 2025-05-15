@@ -381,6 +381,7 @@ async def edit_model(
     website_url: str | None = Form(None),
     license_file: UploadFile | None = None,
     license_url: str | None = Form(None),
+    remove_license: bool = Form(False),
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Edit cloud model with file upload"""
     logger.debug(
@@ -416,6 +417,7 @@ async def edit_model(
             website_url=website_url if website_url else None,
             license_url=license_url if license_url else None,
             license_file=license_file if license_file else None,
+            remove_license=remove_license,
         )
 
         # Pass file and edit_model data to your service
