@@ -68,6 +68,7 @@ class ProviderCreate(BaseModel):
     description: str
     type: str
     icon: str
+    is_active: bool = True
 
 
 class Provider(BaseModel):

@@ -78,12 +78,18 @@ class CloudModelSyncScheduler:
             return data
         except Exception as e:
             logger.error("Error getting latest compatible models: %s", e)
-            return []
+            with open("budapp/initializers/data/cloud_model_seeder copy.json", "r") as f:
+                providers = json.load(f)
+            return providers
 
-    async def sync_data():
+    async def sync_data(self):
         """Sync the data from the cloud service."""
-        providers = await CloudModelSyncScheduler.get_latest_compatible_models()
+        providers = await self.get_latest_compatible_models()
         logger.debug("Found %s providers from cloud service", len(providers))
+
+        if not providers:
+            logger.error("No providers found from cloud service")
+            return
 
         # Set is_active to False for previous version of providers
         provider_types = [provider["provider_type"] for provider in providers]
@@ -148,6 +154,10 @@ class CloudModelSyncScheduler:
                         deprecation_date=cloud_model["deprecation_date"],
                     )
                 )
+
+        if not cloud_model_data:
+            logger.error("No cloud model data found from cloud service")
+            return
 
         # Get model ids from model zoo of deprecated cloud models
         deprecated_model_ids = []
