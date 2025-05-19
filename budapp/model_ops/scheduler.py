@@ -78,9 +78,7 @@ class CloudModelSyncScheduler:
             return data
         except Exception as e:
             logger.error("Error getting latest compatible models: %s", e)
-            with open("budapp/initializers/data/cloud_model_seeder copy.json", "r") as f:
-                providers = json.load(f)
-            return providers
+            return []
 
     async def sync_data(self):
         """Sync the data from the cloud service."""
