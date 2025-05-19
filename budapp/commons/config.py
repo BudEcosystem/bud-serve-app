@@ -166,7 +166,7 @@ class AppConfig(BaseAppConfig):
 
     # Bud Connect
     cloud_model_seeder_engine: str = Field(alias="CLOUD_MODEL_SEEDER_ENGINE")
-    bud_connect_base_url: str = Field(alias="BUD_CONNECT_BASE_URL")
+    bud_connect_base_url: AnyHttpUrl = Field(alias="BUD_CONNECT_BASE_URL")
 
     @computed_field
     def static_dir(self) -> str:
