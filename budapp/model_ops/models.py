@@ -217,9 +217,10 @@ class CloudModel(Base, TimestampMixin):
         ),
         nullable=False,
     )
-    uri: Mapped[str] = mapped_column(String, nullable=False)
+    uri: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     provider_id: Mapped[UUID] = mapped_column(ForeignKey("provider.id"), nullable=False)
     is_present_in_model: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    deprecation_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     max_input_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     input_cost: Mapped[dict] = mapped_column(JSONB, nullable=True)
