@@ -164,6 +164,10 @@ class AppConfig(BaseAppConfig):
     grafana_username: str = Field(alias="GRAFANA_USERNAME")
     grafana_password: str = Field(alias="GRAFANA_PASSWORD")
 
+    # Bud Connect
+    cloud_model_seeder_engine: str = Field(alias="CLOUD_MODEL_SEEDER_ENGINE")
+    bud_connect_base_url: str = Field(alias="BUD_CONNECT_BASE_URL")
+
     @computed_field
     def static_dir(self) -> str:
         """Get the static directory."""
