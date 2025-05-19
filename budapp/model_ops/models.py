@@ -30,8 +30,8 @@ from sqlalchemy.sql import false as sa_false
 from budapp.commons.constants import (
     BaseModelRelationEnum,
     CloudModelStatusEnum,
-    CredentialTypeEnum,
     ModalityEnum,
+    ModelEndpointEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelStatusEnum,
@@ -165,16 +165,10 @@ class Provider(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    type: Mapped[str] = mapped_column(
-        Enum(
-            CredentialTypeEnum,
-            name="credential_type_enum",
-            values_callable=lambda x: [e.value for e in x],
-        ),
-        nullable=False,
-    )
+    type: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=True)
     icon: Mapped[Optional[str]] = mapped_column(String, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     models: Mapped[Optional[list["Model"]]] = relationship("Model", back_populates="provider")
     cloud_models: Mapped[list["CloudModel"]] = relationship("CloudModel", back_populates="provider")
@@ -230,6 +224,17 @@ class CloudModel(Base, TimestampMixin):
     max_input_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     input_cost: Mapped[dict] = mapped_column(JSONB, nullable=True)
     output_cost: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    supported_endpoints: Mapped[List[str]] = mapped_column(
+        PG_ARRAY(
+            PG_ENUM(
+                ModelEndpointEnum,
+                name="model_endpoint_enum",
+                values_callable=lambda x: [e.value for e in x],
+                create_type=False,
+            ),
+        ),
+        nullable=False,
+    )
 
     provider: Mapped[Optional["Provider"]] = relationship("Provider", back_populates="cloud_models")
 

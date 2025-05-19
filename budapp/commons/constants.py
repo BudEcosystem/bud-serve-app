@@ -2739,3 +2739,32 @@ COMMON_LICENSE_MINIO_OBJECT_NAME = f"{MINIO_LICENSE_OBJECT_NAME}/common_licenses
 
 # Max license word count
 MAX_LICENSE_WORD_COUNT = 50000
+
+
+class ModelEndpointEnum(Enum):
+    """Enumeration of API endpoints for different model capabilities.
+
+    This enum represents the different API endpoints that can be used to access
+    various AI model functionalities.
+
+    Attributes:
+        CHAT (str): Chat completion endpoint for conversational AI.
+        COMPLETION (str): Text completion endpoint for non-conversational AI.
+        IMAGE_GENERATION (str): Image creation endpoint.
+        AUDIO_TRANSCRIPTION (str): Speech-to-text conversion endpoint.
+        AUDIO_SPEECH (str): Text-to-speech synthesis endpoint.
+        EMBEDDING (str): Vector embedding generation endpoint.
+        BATCH (str): Batch processing endpoint for multiple requests.
+        RESPONSE (str): Response retrieval endpoint for asynchronous operations.
+    """
+
+    CHAT = "/v1/chat/completions"
+    COMPLETION = "/v1/completions"
+    IMAGE_GENERATION = "/v1/images/generations"
+    AUDIO_TRANSCRIPTION = "/v1/audio/transcriptions"
+    AUDIO_SPEECH = "/v1/audio/speech"
+    EMBEDDING = "/v1/embeddings"
+    BATCH = "/v1/batch"
+    RESPONSE = "/v1/responses"
+    RERANK = "/v1/rerank"  # https://docs.litellm.ai/docs/rerank
+    MODERATION = "/v1/moderations"  # https://docs.litellm.ai/docs/moderation
