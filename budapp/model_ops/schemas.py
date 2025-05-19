@@ -60,6 +60,15 @@ class ProviderFilter(BaseModel):
     name: str | None = None
 
 
+class ProviderCreate(BaseModel):
+    """Provider create schema."""
+
+    name: str
+    description: str
+    type: str
+    icon: str
+
+
 class Provider(BaseModel):
     """Provider schema."""
 
@@ -68,7 +77,7 @@ class Provider(BaseModel):
     id: UUID4
     name: str
     description: str
-    type: CredentialTypeEnum
+    type: str
     icon: str
 
 

@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy import and_, desc, func, or_, select, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -79,6 +79,23 @@ class ProviderDataManager(DataManagerUtils):
         result = self.scalars_all(stmt)
 
         return result, count
+
+    async def soft_delete_non_supported_providers(self, provider_types: List[str]) -> None:
+        """Soft delete providers by setting is_active to False.
+
+        Args:
+            provider_types (List[str]): List of provider types to keep active.
+
+        Returns:
+            None
+        """
+        try:
+            stmt = update(ProviderModel).where(~ProviderModel.type.in_(provider_types)).values(is_active=False)
+            self.session.execute(stmt)
+            self.session.commit()
+        except SQLAlchemyError as e:
+            logger.exception(f"Failed to soft delete non-supported providers: {e}")
+            raise DatabaseException("Unable to soft delete non-supported providers") from e
 
 
 class PaperPublishedDataManager(DataManagerUtils):
