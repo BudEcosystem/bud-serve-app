@@ -25,14 +25,16 @@ from sqlalchemy.orm import Session
 
 from ..commons.config import app_settings
 from ..commons.database import engine
-from ..model_ops.crud import ProviderDataManager
+from ..endpoint_ops.crud import EndpointDataManager
+from ..model_ops.crud import CloudModelDataManager, ModelDataManager, ProviderDataManager
 
 
 logger = logging.get_logger(__name__)
 from budapp.initializers.provider_seeder import PROVIDERS_SEEDER_FILE_PATH
 
+from ..model_ops.models import CloudModel as CloudModelModel
 from ..model_ops.models import Provider as ProviderModel
-from ..model_ops.schemas import ProviderCreate
+from ..model_ops.schemas import CloudModelCreate, ProviderCreate
 
 
 class CloudModelSyncScheduler:
@@ -93,6 +95,7 @@ class CloudModelSyncScheduler:
             logger.debug("Soft deleted non-supported providers")
 
         # Upsert new providers
+        provider_type_id_mapper = {}
         with Session(engine) as session:
             for provider in providers:
                 provider_data = ProviderCreate(
@@ -101,8 +104,9 @@ class CloudModelSyncScheduler:
                     type=provider["provider_type"],
                     icon=provider["icon"],
                 ).model_dump()
-                await ProviderDataManager(session).upsert_one(ProviderModel, provider_data, ["type"])
-                logger.debug("Upserted provider: %s", provider["provider_type"])
+                db_provider = await ProviderDataManager(session).upsert_one(ProviderModel, provider_data, ["type"])
+                provider_type_id_mapper[provider["provider_type"]] = str(db_provider.id)
+                logger.debug("Upserted provider: %s", db_provider.id)
 
         # Save to json file by following earlier implementation
         # NOTE: this json is used in proprietary/credentials/provider-info api
@@ -120,12 +124,59 @@ class CloudModelSyncScheduler:
             json.dump(providers_data, f, indent=4)
         logger.debug("Saved providers to %s", PROVIDERS_SEEDER_FILE_PATH)
 
-        # Collect all cloud models uri
-        new_cloud_model_uris = []
+        # Get all cloud model uris
+        cloud_model_uris = []
+        cloud_model_data = []
         for provider in providers:
-            for model in provider["models"]:
-                new_cloud_model_uris.append(model["uri"])
-        logger.debug("New cloud model uris: %s", new_cloud_model_uris)
+            cloud_models = provider["models"]
+            for cloud_model in cloud_models:
+                cloud_model_uris.append(cloud_model["uri"])
+                max_input_tokens = (
+                    cloud_model["tokens"].get("max_input_tokens", None) if cloud_model["tokens"] is not None else None
+                )
+                cloud_model_data.append(
+                    CloudModelCreate(
+                        provider_id=provider_type_id_mapper[provider["provider_type"]],
+                        uri=cloud_model["uri"],
+                        name=cloud_model["uri"],
+                        modality="llm",  # TODO: change to cloud_model["modality"]
+                        source=provider["provider_type"],
+                        max_input_tokens=max_input_tokens,
+                        input_cost=cloud_model["input_cost"],
+                        output_cost=cloud_model["output_cost"],
+                        supported_endpoints=cloud_model["endpoints"],
+                        deprecation_date=cloud_model["deprecation_date"],
+                    )
+                )
+
+        # Get model ids from model zoo of deprecated cloud models
+        deprecated_model_ids = []
+        with Session(engine) as session:
+            deprecated_models = await ModelDataManager(session).get_deprecated_cloud_models(cloud_model_uris)
+            deprecated_model_ids = [db_model.id for db_model in deprecated_models]
+            logger.debug("Found %s deprecated cloud models", deprecated_model_ids)
+
+        # Mark endpoints as deprecated
+        with Session(engine) as session:
+            await EndpointDataManager(session).mark_as_deprecated(deprecated_model_ids)
+            logger.debug("Marked endpoints as deprecated")
+
+        # Soft delete deprecated models
+        with Session(engine) as session:
+            await ModelDataManager(session).soft_delete_deprecated_models(deprecated_model_ids)
+            logger.debug("Soft deleted deprecated models from model zoo")
+
+        # Remove deprecated cloud models
+        with Session(engine) as session:
+            await CloudModelDataManager(session).remove_non_supported_cloud_models(cloud_model_uris)
+            logger.debug("Removed non-supported cloud models")
+
+        # Upsert new cloud models
+        with Session(engine) as session:
+            for cloud_model in cloud_model_data:
+                await CloudModelDataManager(session).upsert_one(CloudModelModel, cloud_model.model_dump(), ["uri"])
+                logger.debug("Upserted cloud model: %s", cloud_model)
+        logger.debug("Upserted %s cloud models", len(cloud_model_data))
 
 
 if __name__ == "__main__":

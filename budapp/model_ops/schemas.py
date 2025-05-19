@@ -39,6 +39,7 @@ from budapp.commons.constants import (
     BaseModelRelationEnum,
     CredentialTypeEnum,
     ModalityEnum,
+    ModelEndpointEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
@@ -87,6 +88,22 @@ class ProviderResponse(PaginatedSuccessResponse):
     model_config = ConfigDict(extra="ignore")
 
     providers: list[Provider] = []
+
+
+class CloudModelCreate(BaseModel):
+    """Cloud model create schema."""
+
+    name: str
+    modality: ModalityEnum
+    provider_id: UUID4
+    uri: str
+    source: str  # provider type
+    provider_type: ModelProviderTypeEnum = Field(default=ModelProviderTypeEnum.CLOUD_MODEL)
+    max_input_tokens: int | None = None
+    input_cost: dict | None = None
+    output_cost: dict | None = None
+    supported_endpoints: list[ModelEndpointEnum]
+    deprecation_date: datetime | None = None
 
 
 class CloudModel(BaseModel):
@@ -976,6 +993,7 @@ class ScalingSpecification(BaseModel):
     scaleUpTolerance: float = Field(ge=0)
     scaleDownTolerance: float = Field(ge=0)
     window: int = Field(ge=1)
+
 
 class ModelDeployStepRequest(BaseModel):
     """Request to deploy a model by step."""
