@@ -694,3 +694,54 @@ async def get_recommended_clusters(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Error retrieving recommended clusters",
         ).to_http_response()
+
+
+@cluster_router.get(
+    "/internal/get-clusters",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ClusterListResponse,
+            "description": "Successfully listed all clusters",
+        },
+    },
+    description="List all clusters (internal service use only)",
+)
+async def list_clusters_internal(
+    session: Annotated[Session, Depends(get_session)],
+    filters: ClusterFilter = Depends(),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[ClusterListResponse, ErrorResponse]:
+    """List all clusters for internal service use."""
+    offset = (page - 1) * limit
+
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    try:
+        db_clusters, count = await ClusterService(session).get_all_active_clusters(
+            offset, limit, filters_dict, order_by, search
+        )
+    except Exception as e:
+        logger.error(f"Error occurred while listing clusters: {str(e)}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list clusters"
+        ).to_http_response()
+
+    return ClusterListResponse(
+        clusters=db_clusters,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="cluster.list",
+        code=status.HTTP_200_OK,
+    ).to_http_response()

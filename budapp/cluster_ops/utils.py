@@ -232,10 +232,8 @@ class ClusterMetricsFetcher:
             
             #[{'metric': {'instance': 'fl4u42'}, 'value': [1739776921.221, '1.0290890332632034']}, {'metric': {'instance': 'fl4u44'}, 'value': [1739776921.221, '1.0421553174477174']}]"
             for node_data in current_results["power"]:
-                
-                 
                 nodename = node_data["metric"]["instance"]
-                instance = nodename_to_instance.get(nodename)
+                instance = nodename_to_instance.get(nodename, nodename)
                 processed_nodes.add(instance)
                 init_node_metrics(instance)
                 total_values = round(float(node_data["value"][1]), 2)

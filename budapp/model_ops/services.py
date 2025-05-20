@@ -2050,6 +2050,8 @@ class ModelService(SessionMixin):
             # Validate license file
             license_content = await self._get_content_from_file(file)
             word_count = await count_words(license_content)
+            logger.debug(f"word_count: {word_count}")
+
             if word_count > MAX_LICENSE_WORD_COUNT:
                 raise ClientException(message="License content is too long")
 
@@ -2094,6 +2096,19 @@ class ModelService(SessionMixin):
         if isinstance(data.get("paper_urls"), list):
             paper_urls = data.pop("paper_urls")
             await self._update_papers(model_id, paper_urls)
+
+        # Remove license if provided
+        if data.get("remove_license"):
+            logger.debug("Removing license for model: %s", model_id)
+            if not db_model.model_licenses:
+                raise ClientException(
+                    message="Unable to find license for model", status_code=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                await self._remove_license(db_model)
+
+        # remove remove_license from data
+        data.pop("remove_license")
 
         # Update model with validated data
         await ModelDataManager(self.session).update_by_fields(db_model, data)
@@ -2164,10 +2179,6 @@ class ModelService(SessionMixin):
         current_user_id: UUID,
     ) -> None:
         """Create or update a license entry in the database."""
-        # Set license source
-        minio_store = ModelStore()
-        license_source = minio_store.get_object_url(app_settings.minio_model_bucket, license_url)
-
         # Check if a license entry with the given model_id exists
         existing_license = await ModelLicensesDataManager(self.session).retrieve_by_fields(
             ModelLicenses, fields={"model_id": model_id}, missing_ok=True
@@ -2189,7 +2200,7 @@ class ModelService(SessionMixin):
             await ModelLicensesDataManager(self.session).update_by_fields(existing_license, update_license_data)
 
             # Execute license faqs workflow
-            await self.fetch_license_faqs(model_id, existing_license.id, current_user_id, license_source)
+            await self.fetch_license_faqs(model_id, existing_license.id, current_user_id, license_url)
         else:
             # Create a new license entry
             license_entry = ModelLicensesCreate(
@@ -2208,7 +2219,7 @@ class ModelService(SessionMixin):
             )
 
             # Execute license faqs workflow
-            await self.fetch_license_faqs(model_id, license_entry.id, current_user_id, license_source)
+            await self.fetch_license_faqs(model_id, license_entry.id, current_user_id, license_url)
 
     async def _validate_license_url(self, license_url: str) -> str:
         """Validate license url."""
@@ -2245,14 +2256,24 @@ class ModelService(SessionMixin):
 
     async def _get_text_file_content(self, license_file: UploadFile) -> None:
         """Get content from text file."""
-        return license_file.file.read().decode("utf-8")
+        license_content = license_file.file.read().decode("utf-8")
+
+        # Set the file pointer to the beginning of the file
+        license_file.file.seek(0)
+
+        return license_content
 
     async def _get_pdf_file_content(self, license_file: UploadFile) -> None:
         """Get content from pdf file."""
         reader = PdfReader(license_file.file)
 
         # Extract text from each page as a new line and join them
-        return "\n".join([page.extract_text() for page in reader.pages])
+        license_content = "\n".join([page.extract_text() for page in reader.pages])
+
+        # Set the file pointer to the beginning of the file
+        license_file.file.seek(0)
+
+        return license_content
 
     async def _update_papers(self, model_id: UUID, paper_urls: list[str]) -> None:
         """Update paper entries for the given model by adding new URLs and removing old ones."""
@@ -2284,6 +2305,24 @@ class ModelService(SessionMixin):
             await PaperPublishedDataManager(self.session).delete_paper_by_urls(
                 model_id=model_id, paper_urls={"url": urls_to_remove}
             )
+
+    async def _remove_license(self, db_model: Model) -> None:
+        """Remove license from minio and db."""
+        license_object_prefix = f"{MINIO_LICENSE_OBJECT_NAME}/{db_model.id}"
+
+        # Delete license from minio
+        try:
+            minio_store = ModelStore()
+            minio_store.remove_objects(app_settings.minio_model_bucket, license_object_prefix, recursive=True)
+            logger.debug("License removed from minio object: %s", license_object_prefix)
+        except MinioException as e:
+            logger.exception(f"Error removing license from minio: {e}")
+            raise ClientException(
+                message="Unable to remove license from store", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+        # Delete license from db
+        await ModelLicensesDataManager(self.session).delete_by_fields(ModelLicenses, {"model_id": db_model.id})
 
     async def cancel_model_deployment_workflow(self, workflow_id: UUID) -> None:
         """Cancel model deployment workflow."""

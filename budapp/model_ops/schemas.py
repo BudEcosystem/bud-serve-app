@@ -470,6 +470,7 @@ class EditModel(BaseModel):
     website_url: HttpUrl | None = None
     license_file: UploadFile | None = None
     license_url: HttpUrl | None = None
+    remove_license: bool = False
 
     @field_validator("name", mode="before")
     def validate_name(cls, value: Optional[str]) -> Optional[str]:
