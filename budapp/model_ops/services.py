@@ -791,7 +791,7 @@ class LocalModelWorkflowService(SessionMixin):
         provider_id = None
         if provider_type == ModelProviderTypeEnum.HUGGING_FACE:
             db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
-                ProviderModel, {"type": CredentialTypeEnum.HUGGINGFACE}
+                ProviderModel, {"type": CredentialTypeEnum.HUGGINGFACE.value}
             )
             provider_id = db_provider.id
 
@@ -1094,6 +1094,9 @@ class LocalModelWorkflowService(SessionMixin):
             if not icon:
                 icon = APP_ICONS["general"]["default_url_model"]
 
+        extracted_modality = model_info["modality"]
+        model_details = await determine_modality_endpoints(extracted_modality)
+
         model_data = ModelCreate(
             name=required_data["name"],
             description=model_description,
@@ -1102,7 +1105,8 @@ class LocalModelWorkflowService(SessionMixin):
             github_url=model_github_url,
             huggingface_url=model_huggingface_url,
             website_url=model_website_url,
-            modality=model_info["modality"],
+            modality=model_details["modality"],
+            supported_endpoints=model_details["endpoints"],
             source=ModelSourceEnum.LOCAL,
             provider_type=required_data["provider_type"],
             uri=required_data["uri"],

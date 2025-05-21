@@ -328,14 +328,25 @@ class ModelDetailResponse(BaseModel):
     kv_cache_size: int | None = None
     architecture_text_config: ModelArchitectureLLMConfig | None = None
     architecture_vision_config: ModelArchitectureVisionConfig | None = None
-    modality: ModalityEnum
+    modality: List[ModalityEnum]
     source: str
     provider_type: ModelProviderTypeEnum
     uri: str
     paper_published: list[PaperPublishedModel] | None = None
     model_licenses: ModelLicensesModel | None = None
     provider: Provider | None = None
+    supported_endpoints: List[ModelEndpointEnum]
     created_at: datetime
+
+    @field_serializer("modality")
+    def serialized_modality(self, modalities: List[ModalityEnum], _info) -> Dict[str, Any]:
+        """Serialize the modality."""
+        return ModalityEnum.serialize_modality(modalities)
+
+    @field_serializer("supported_endpoints")
+    def serialized_endpoints(self, endpoints: List[ModelEndpointEnum], _info) -> Dict[str, Any]:
+        """Serialize the endpoints."""
+        return ModelEndpointEnum.serialize_endpoints(endpoints)
 
 
 class ModelTree(BaseModel):
