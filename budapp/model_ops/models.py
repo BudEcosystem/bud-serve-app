@@ -88,11 +88,14 @@ class Model(Base, TimestampMixin):
         nullable=False,
         default=ModelStatusEnum.ACTIVE,
     )
-    modality: Mapped[str] = mapped_column(
-        Enum(
-            ModalityEnum,
-            name="modality_enum",
-            values_callable=lambda x: [e.value for e in x],
+    modality: Mapped[List[str]] = mapped_column(
+        PG_ARRAY(
+            PG_ENUM(
+                ModalityEnum,
+                name="modality_enum",
+                values_callable=lambda x: [e.value for e in x],
+                create_type=False,
+            ),
         ),
         nullable=False,
     )
@@ -110,6 +113,17 @@ class Model(Base, TimestampMixin):
     provider_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("provider.id"), nullable=True)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
     recommended_cluster_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    supported_endpoints: Mapped[List[str]] = mapped_column(
+        PG_ARRAY(
+            PG_ENUM(
+                ModelEndpointEnum,
+                name="model_endpoint_enum",
+                values_callable=lambda x: [e.value for e in x],
+                create_type=False,
+            ),
+        ),
+        nullable=False,
+    )
 
     endpoints: Mapped[list["Endpoint"]] = relationship(back_populates="model")
     adapters: Mapped[list["Adapter"]] = relationship(back_populates="model")
@@ -198,12 +212,14 @@ class CloudModel(Base, TimestampMixin):
         nullable=False,
         default=CloudModelStatusEnum.ACTIVE,
     )
-    modality: Mapped[str] = mapped_column(
-        PG_ENUM(
-            ModalityEnum,
-            name="modality_enum",
-            values_callable=lambda x: [e.value for e in x],
-            create_type=False,
+    modality: Mapped[List[str]] = mapped_column(
+        PG_ARRAY(
+            PG_ENUM(
+                ModalityEnum,
+                name="modality_enum",
+                values_callable=lambda x: [e.value for e in x],
+                create_type=False,
+            ),
         ),
         nullable=False,
     )
