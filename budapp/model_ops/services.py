@@ -74,7 +74,7 @@ from ..commons.constants import (
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
-from ..commons.helpers import validate_huggingface_repo_format
+from ..commons.helpers import determine_modality_endpoints, validate_huggingface_repo_format
 from ..commons.schemas import BudNotificationMetadata
 from ..commons.security import RSAHandler
 from ..core.crud import ModelTemplateDataManager
@@ -189,7 +189,7 @@ class CloudModelWorkflowService(SessionMixin):
             db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
                 ProviderModel, {"id": provider_id}
             )
-            source = db_provider.type.value
+            source = db_provider.type
 
             # Update icon on workflow
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
@@ -330,7 +330,7 @@ class CloudModelWorkflowService(SessionMixin):
                         required_data[key] = db_workflow_step.data[key]
 
             # Check if all required keys are present
-            required_keys = ["provider_type", "provider_id", "modality", "tags", "name", "source"]
+            required_keys = ["provider_type", "provider_id", "tags", "name", "source"]
             missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
@@ -615,17 +615,20 @@ class CloudModelWorkflowService(SessionMixin):
                 uri=db_cloud_model.uri,
                 created_by=current_user_id,
                 provider_id=provider_id,
+                supported_endpoints=db_cloud_model.supported_endpoints,
             )
         else:
+            model_details = await determine_modality_endpoints(modality)
             model_data = ModelCreate(
                 source=source,
                 name=name,
-                modality=modality,
+                modality=model_details["modality"],
                 uri=uri,
                 tags=tags,
                 provider_type=provider_type,
                 created_by=current_user_id,
                 provider_id=provider_id,
+                supported_endpoints=model_details["endpoints"],
             )
 
         return model_data

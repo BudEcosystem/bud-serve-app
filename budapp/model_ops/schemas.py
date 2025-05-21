@@ -19,7 +19,7 @@
 
 import re
 from datetime import datetime
-from typing import List, Literal, Optional, Tuple, Dict, Any
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from fastapi import UploadFile
 from pydantic import (
@@ -40,6 +40,7 @@ from budapp.commons.constants import (
     CredentialTypeEnum,
     ModalityEnum,
     ModelEndpointEnum,
+    ModelModalityEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
@@ -95,7 +96,7 @@ class CloudModelCreate(BaseModel):
     """Cloud model create schema."""
 
     name: str
-    modality: ModalityEnum
+    modality: List[ModalityEnum]
     provider_id: UUID4
     uri: str
     source: str  # provider type
@@ -115,14 +116,25 @@ class CloudModel(BaseModel):
     id: UUID4
     name: str
     description: str | None = None
-    modality: ModalityEnum
-    source: CredentialTypeEnum
+    modality: List[ModalityEnum]
+    source: str
     provider_type: ModelProviderTypeEnum
     uri: str
     model_size: int | None = None
     tags: list[Tag] | None = None
     tasks: list[Tag] | None = None
     is_present_in_model: bool = False
+    supported_endpoints: list[ModelEndpointEnum]
+
+    @field_serializer("modality")
+    def serialized_modality(self, modalities: List[ModalityEnum], _info) -> Dict[str, Any]:
+        """Serialize the modality."""
+        return ModalityEnum.serialize_modality(modalities)
+
+    @field_serializer("supported_endpoints")
+    def serialized_endpoints(self, endpoints: List[ModelEndpointEnum], _info) -> Dict[str, Any]:
+        """Serialize the endpoints."""
+        return ModelEndpointEnum.serialize_endpoints(endpoints)
 
 
 class PaperPublishedModel(BaseModel):
@@ -207,7 +219,7 @@ class Model(ModelBase):
 
     id: UUID4
     icon: str | None = None
-    modality: ModalityEnum
+    modality: List[ModalityEnum]
     source: ModelSourceEnum
     provider_type: ModelProviderTypeEnum
     uri: str
@@ -217,6 +229,17 @@ class Model(ModelBase):
     created_at: datetime
     modified_at: datetime
     provider: Provider | None = None
+    supported_endpoints: list[ModelEndpointEnum]
+
+    @field_serializer("modality")
+    def serialized_modality(self, modalities: List[ModalityEnum], _info) -> Dict[str, Any]:
+        """Serialize the modality."""
+        return ModalityEnum.serialize_modality(modalities)
+
+    @field_serializer("supported_endpoints")
+    def serialized_endpoints(self, endpoints: List[ModelEndpointEnum], _info) -> Dict[str, Any]:
+        """Serialize the endpoints."""
+        return ModelEndpointEnum.serialize_endpoints(endpoints)
 
 
 class ModelArchitectureLLMConfig(BaseModel):
@@ -245,7 +268,7 @@ class ModelArchitectureVisionConfig(BaseModel):
 class ModelCreate(ModelBase):
     """Schema for creating a new AI Model."""
 
-    modality: ModalityEnum
+    modality: List[ModalityEnum]
     source: str
     provider_type: ModelProviderTypeEnum
     uri: str
@@ -270,6 +293,7 @@ class ModelCreate(ModelBase):
     architecture_vision_config: ModelArchitectureVisionConfig | None = None
     scan_verified: bool | None = None
     icon: str | None = None
+    supported_endpoints: list[ModelEndpointEnum]
 
 
 class ModelDetailResponse(BaseModel):
@@ -381,7 +405,7 @@ class CreateCloudModelWorkflowRequest(BaseModel):
     provider_type: ModelProviderTypeEnum | None = None
     provider_id: UUID4 | None = None
     name: str | None = None
-    modality: ModalityEnum | None = None
+    modality: ModelModalityEnum | None = None
     uri: str | None = None
     tags: list[Tag] | None = None
     cloud_model_id: UUID4 | None = None
@@ -775,7 +799,7 @@ class CreateCloudModelWorkflowSteps(BaseModel):
     provider_type: ModelProviderTypeEnum | None = None
     source: str | None = None
     name: str | None = None
-    modality: ModalityEnum | None = None
+    modality: ModelModalityEnum | None = None
     uri: str | None = None
     tags: list[Tag] | None = None
     icon: str | None = None
