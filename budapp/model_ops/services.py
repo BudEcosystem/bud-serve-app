@@ -145,6 +145,8 @@ class ProviderService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[ProviderModel], int]:
         """Get all providers."""
+        # Fetch active providers
+        filters["is_active"] = True
         return await ProviderDataManager(self.session).get_all_providers(offset, limit, filters, order_by, search)
 
 
