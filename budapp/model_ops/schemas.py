@@ -19,7 +19,7 @@
 
 import re
 from datetime import datetime
-from typing import List, Literal, Optional, Tuple
+from typing import List, Literal, Optional, Tuple, Dict, Any
 
 from fastapi import UploadFile
 from pydantic import (
@@ -598,7 +598,7 @@ class ModelResponse(BaseModel):
     id: UUID4
     name: str
     author: str | None = None
-    modality: ModalityEnum
+    modality: List[ModalityEnum]
     source: str
     uri: str
     created_user: UserInfo | None = None
@@ -613,6 +613,17 @@ class ModelResponse(BaseModel):
     provider: Provider | None = None
     is_present_in_model: bool | None = None
     model_cluster_recommended: ModelClusterRecommended | None = None
+    supported_endpoints: list[ModelEndpointEnum]
+
+    @field_serializer("modality")
+    def serialized_modality(self, modalities: List[ModalityEnum], _info) -> Dict[str, Any]:
+        """Serialize the modality."""
+        return ModalityEnum.serialize_modality(modalities)
+
+    @field_serializer("supported_endpoints")
+    def serialized_endpoints(self, endpoints: List[ModelEndpointEnum], _info) -> Dict[str, Any]:
+        """Serialize the endpoints."""
+        return ModelEndpointEnum.serialize_endpoints(endpoints)
 
 
 class ModelDeploymentResponse(ModelResponse):

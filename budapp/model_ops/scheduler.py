@@ -21,21 +21,18 @@ from typing import Dict, List
 
 import aiohttp
 from budmicroframe.commons import logging
+from budapp.initializers.provider_seeder import PROVIDERS_SEEDER_FILE_PATH
 from sqlalchemy.orm import Session
 
 from ..commons.config import app_settings
 from ..commons.database import engine
 from ..endpoint_ops.crud import EndpointDataManager
 from ..model_ops.crud import CloudModelDataManager, ModelDataManager, ProviderDataManager
-
-
-logger = logging.get_logger(__name__)
-from budapp.initializers.provider_seeder import PROVIDERS_SEEDER_FILE_PATH
-
 from ..model_ops.models import CloudModel as CloudModelModel
 from ..model_ops.models import Provider as ProviderModel
 from ..model_ops.schemas import CloudModelCreate, ProviderCreate
 
+logger = logging.get_logger(__name__)
 
 class CloudModelSyncScheduler:
     """Schedule cloud model db with cloud service."""
@@ -143,7 +140,7 @@ class CloudModelSyncScheduler:
                         provider_id=provider_type_id_mapper[provider["provider_type"]],
                         uri=cloud_model["uri"],
                         name=cloud_model["uri"],
-                        modality="llm",  # TODO: change to cloud_model["modality"]
+                        modality=cloud_model["modality"],
                         source=provider["provider_type"],
                         max_input_tokens=max_input_tokens,
                         input_cost=cloud_model["input_cost"],
@@ -190,6 +187,6 @@ class CloudModelSyncScheduler:
 if __name__ == "__main__":
     import asyncio
 
-    asyncio.run(CloudModelSyncScheduler.sync_data())
+    asyncio.run(CloudModelSyncScheduler().sync_data())
 
     # python -m budapp.model_ops.scheduler
