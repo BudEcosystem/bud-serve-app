@@ -566,7 +566,7 @@ class CloudModelDataManager(DataManagerUtils):
 
         if explicit_filters["author"]:
             # Check any of author present in the field
-            author_condition = CloudModel.modality.in_(explicit_filters["author"])
+            author_condition = CloudModel.author.in_(explicit_filters["author"])
             explicit_conditions.append(author_condition)
 
         if explicit_filters["model_size_min"] is not None or explicit_filters["model_size_max"] is not None:
