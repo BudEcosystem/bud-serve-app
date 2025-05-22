@@ -83,6 +83,7 @@ class EndpointListResponse(BaseModel):
     cluster: ClusterResponse
     created_at: datetime
     modified_at: datetime
+    is_deprecated: bool
 
 
 class EndpointPaginatedResponse(PaginatedSuccessResponse):
