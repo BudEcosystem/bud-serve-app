@@ -26,9 +26,9 @@ def upgrade() -> None:
     op.add_column('cloud_model', sa.Column('deprecation_date', sa.DateTime(timezone=True), nullable=True))
     op.add_column('cloud_model', sa.Column('supported_endpoints', postgresql.ARRAY(postgresql.ENUM('/v1/chat/completions', '/v1/completions', '/v1/images/generations', '/v1/audio/transcriptions', '/v1/audio/speech', '/v1/embeddings', '/v1/batch', '/v1/responses', '/v1/rerank', '/v1/moderations', name='model_endpoint_enum', create_type=False)), nullable=False))
     op.create_unique_constraint("cloud_model_uri_key", 'cloud_model', ['uri'])
-    op.add_column('endpoint', sa.Column('is_deprecated', sa.Boolean(), nullable=False))
+    op.add_column('endpoint', sa.Column('is_deprecated', sa.Boolean(), nullable=False, server_default='false'))
     op.add_column('model', sa.Column('supported_endpoints', postgresql.ARRAY(postgresql.ENUM('/v1/chat/completions', '/v1/completions', '/v1/images/generations', '/v1/audio/transcriptions', '/v1/audio/speech', '/v1/embeddings', '/v1/batch', '/v1/responses', '/v1/rerank', '/v1/moderations', name='model_endpoint_enum', create_type=False)), nullable=False))
-    op.add_column('provider', sa.Column('is_active', sa.Boolean(), nullable=False))
+    op.add_column('provider', sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'))
     op.alter_column('provider', 'type',
                existing_type=postgresql.ENUM('nlp_cloud', 'deepinfra', 'anthropic', 'vertex_ai-vision-models', 'vertex_ai-ai21_models', 'cerebras', 'watsonx', 'predibase', 'volcengine', 'clarifai', 'baseten', 'sambanova', 'github', 'petals', 'replicate', 'vertex_ai-chat-models', 'azure_ai', 'perplexity', 'vertex_ai-code-text-models', 'vertex_ai-text-models', 'cohere_chat', 'vertex_ai-embedding-models', 'text-completion-openai', 'groq', 'openai', 'aleph_alpha', 'sagemaker', 'databricks', 'fireworks_ai', 'vertex_ai-anthropic_models', 'vertex_ai-mistral_models', 'voyage', 'vertex_ai-language-models', 'anyscale', 'deepseek', 'vertex_ai-image-models', 'mistral', 'ollama', 'cohere', 'gemini', 'friendliai', 'vertex_ai-code-chat-models', 'azure', 'codestral', 'vertex_ai-llama_models', 'together_ai', 'cloudflare', 'ai21', 'openrouter', 'bedrock', 'text-completion-codestral', 'huggingface', name='credential_type_enum'),
                type_=sa.String(),
