@@ -306,7 +306,7 @@ class ModelDataManager(DataManagerUtils):
 
         if explicit_filters["modality"]:
             # Check any of modality present in the field
-            modality_condition = Model.modality.in_(explicit_filters["modality"])
+            modality_condition = Model.modality.overlap(explicit_filters["modality"])
             explicit_conditions.append(modality_condition)
 
         if explicit_filters["author"]:
@@ -561,7 +561,7 @@ class CloudModelDataManager(DataManagerUtils):
 
         if explicit_filters["modality"]:
             # Check any of modality present in the field
-            modality_condition = CloudModel.modality.in_(explicit_filters["modality"])
+            modality_condition = CloudModel.modality.overlap(explicit_filters["modality"])
             explicit_conditions.append(modality_condition)
 
         if explicit_filters["author"]:
