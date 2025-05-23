@@ -40,6 +40,7 @@ from .endpoint_ops import endpoint_routes
 from .initializers.seeder import seeders
 from .metric_ops import metric_routes
 from .model_ops import model_routes
+from .model_ops.workflows import CloudModelSyncWorkflows
 from .playground_ops import playground_routes
 from .project_ops import project_routes
 from .router_ops import router_routes
@@ -70,6 +71,9 @@ async def execute_initial_dapr_workflows() -> None:
         else:
             attempts += 1
             logger.info("Waiting for Dapr workflow runtime to start... Attempt: %s", attempts)
+
+    response = await CloudModelSyncWorkflows().__call__()
+    logger.debug("Cloud model sync workflow response: %s", response)
 
     response = await ClusterRecommendedSchedulerWorkflows().__call__()
     logger.debug("Recommended cluster scheduler workflow response: %s", response)

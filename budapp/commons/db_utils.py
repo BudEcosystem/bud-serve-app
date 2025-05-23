@@ -23,6 +23,7 @@ from sqlalchemy import BigInteger as SqlAlchemyBigInteger
 from sqlalchemy import String as SqlAlchemyString
 from sqlalchemy import cast, delete, func, inspect, select
 from sqlalchemy.dialects.postgresql import ARRAY as PostgresArray
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Session
 from sqlalchemy.sql import Executable
@@ -526,3 +527,32 @@ class DataManagerUtils(SQLAlchemyMixin):
             stmt = stmt.filter(*exclude_conditions)
 
         return self.execute_scalar(stmt)
+
+    async def upsert_one(
+        self, model: Type[DeclarativeBase], fields: Dict[str, Any], conflict_target: List[str]
+    ) -> object:
+        """Upsert a model instance into the database.
+
+        This method upserts a model instance into the database based on the provided fields.
+        If the instance already exists, it updates the existing instance with the new values.
+        Otherwise, it inserts a new instance.
+
+        Args:
+            model (Type[DeclarativeBase]): The SQLAlchemy model class to upsert.
+            fields (Dict): A dictionary of field names and their values to upsert.
+            conflict_target (List[str]): A list of field names to use as the conflict target.
+
+        Returns:
+            object: The upserted model instance.
+        """
+        try:
+            stmt = insert(model).values(fields)
+            if conflict_target:
+                stmt = stmt.on_conflict_do_update(index_elements=conflict_target, set_=fields)
+            stmt = stmt.returning(model)
+            result = self.session.execute(stmt).scalar_one()
+            self.session.commit()
+            return result
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            raise DatabaseException("Unable to upsert model") from e

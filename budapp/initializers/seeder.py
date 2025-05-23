@@ -11,8 +11,8 @@ from budapp.initializers.template_seeder import TemplateSeeder
 seeders = {
     "keycloak": BaseKeycloakSeeder,
     # "user": UserSeeder,
-    "provider": ProviderSeeder,
-    "cloud_model": CloudModelSeeder,
+    # "provider": ProviderSeeder,   # Commented out for budconnect sync
+    # "cloud_model": CloudModelSeeder,   # Commented out for budconnect sync
     "icon": IconSeeder,
     "template": TemplateSeeder,
     "cloud_provider": CloudProviderSeeder,

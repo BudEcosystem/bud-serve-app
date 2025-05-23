@@ -18,7 +18,7 @@
 
 import random
 from enum import Enum, StrEnum, auto
-from typing import List
+from typing import Any, Dict, List
 
 from .helpers import create_dynamic_enum
 
@@ -116,6 +116,63 @@ class Environment(str, Enum):
 
 
 class ModalityEnum(Enum):
+    """Enumeration of model modalities.
+
+    This enum represents different types of AI model modalities or capabilities.
+
+    Attributes:
+        TEXT_INPUT (str): Represents text input modality.
+        TEXT_OUTPUT (str): Represents text output modality.
+        IMAGE_INPUT (str): Represents image input modality.
+        IMAGE_OUTPUT (str): Represents image output modality.
+        AUDIO_INPUT (str): Represents audio input modality.
+        AUDIO_OUTPUT (str): Represents audio output modality.
+    """
+
+    TEXT_INPUT = "text_input"
+    TEXT_OUTPUT = "text_output"
+    IMAGE_INPUT = "image_input"
+    IMAGE_OUTPUT = "image_output"
+    AUDIO_INPUT = "audio_input"
+    AUDIO_OUTPUT = "audio_output"
+
+    @classmethod
+    def serialize_modality(cls, selected_modalities: List["ModalityEnum"]) -> Dict[str, Any]:
+        """Serialize a list of selected modality enums into a nested dictionary by modality type.
+
+        The returned dictionary organizes modalities by their type (text, image, audio) with
+        nested 'input' and 'output' boolean flags.
+
+        Args:
+            selected_modalities (List[ModalityEnum]): A list of selected modality enum values.
+
+        Returns:
+            Dict[str, Dict[str, bool]]: A nested dictionary with modality types and their input/output status.
+        """
+        # Initialize result dictionary
+        result = {}
+
+        # Define labels for each modality type
+        modality_labels = {"text": "Text", "image": "Image", "audio": "Audio"}
+
+        # Get all selected modality values
+        selected_values = [m.value for m in selected_modalities]
+
+        # Process each modality type (text, image, audio)
+        for modality_type in modality_labels:
+            input_key = f"{modality_type}_input"
+            output_key = f"{modality_type}_output"
+
+            result[modality_type] = {
+                "input": input_key in selected_values,
+                "output": output_key in selected_values,
+                "label": modality_labels[modality_type],
+            }
+
+        return result
+
+
+class ModelModalityEnum(Enum):
     """Enumeration of model modalities.
 
     This enum represents different types of AI model modalities or capabilities.
@@ -2739,3 +2796,75 @@ COMMON_LICENSE_MINIO_OBJECT_NAME = f"{MINIO_LICENSE_OBJECT_NAME}/common_licenses
 
 # Max license word count
 MAX_LICENSE_WORD_COUNT = 50000
+
+
+class ModelEndpointEnum(Enum):
+    """Enumeration of API endpoints for different model capabilities.
+
+    This enum represents the different API endpoints that can be used to access
+    various AI model functionalities.
+
+    Attributes:
+        CHAT (str): Chat completion endpoint for conversational AI.
+        COMPLETION (str): Text completion endpoint for non-conversational AI.
+        IMAGE_GENERATION (str): Image creation endpoint.
+        AUDIO_TRANSCRIPTION (str): Speech-to-text conversion endpoint.
+        AUDIO_SPEECH (str): Text-to-speech synthesis endpoint.
+        EMBEDDING (str): Vector embedding generation endpoint.
+        BATCH (str): Batch processing endpoint for multiple requests.
+        RESPONSE (str): Response retrieval endpoint for asynchronous operations.
+    """
+
+    CHAT = "/v1/chat/completions"
+    COMPLETION = "/v1/completions"
+    IMAGE_GENERATION = "/v1/images/generations"
+    AUDIO_TRANSCRIPTION = "/v1/audio/transcriptions"
+    AUDIO_SPEECH = "/v1/audio/speech"
+    EMBEDDING = "/v1/embeddings"
+    BATCH = "/v1/batch"
+    RESPONSE = "/v1/responses"
+    RERANK = "/v1/rerank"  # https://docs.litellm.ai/docs/rerank
+    MODERATION = "/v1/moderations"  # https://docs.litellm.ai/docs/moderation
+
+    @classmethod
+    def serialize_endpoints(cls, selected_endpoints: List["ModelEndpointEnum"]) -> Dict[str, Any]:
+        """Serialize a list of selected endpoint enums into a structured dictionary with details.
+
+        The returned dictionary organizes endpoints with their path, enabled status, and a human-readable label.
+        The keys are lowercase versions of the enum names.
+
+        Args:
+            selected_endpoints (List[ModelEndpointEnum]): A list of selected endpoint enum values.
+
+        Returns:
+            Dict[str, Dict[str, Any]]: A structured dictionary with endpoint details.
+        """
+        # Define endpoint labels
+        endpoint_labels = {
+            cls.CHAT: "Chat Completions",
+            cls.COMPLETION: "Completions",
+            cls.IMAGE_GENERATION: "Image Generation",
+            cls.AUDIO_TRANSCRIPTION: "Transcription",
+            cls.AUDIO_SPEECH: "Speech generation",
+            cls.EMBEDDING: "Embeddings",
+            cls.BATCH: "Batch",
+            cls.RESPONSE: "Responses",
+            cls.RERANK: "Reranking",
+            cls.MODERATION: "Moderation",
+        }
+
+        # Create result dictionary
+        result = {}
+
+        for endpoint in cls:
+            # Use lowercase enum name as key
+            key_name = endpoint.name.lower()
+
+            # Add endpoint details
+            result[key_name] = {
+                "path": endpoint.value.lstrip("/"),  # Remove leading slash for path
+                "enabled": endpoint in selected_endpoints,
+                "label": endpoint_labels.get(endpoint, key_name.replace("_", " ").title()),
+            }
+
+        return result

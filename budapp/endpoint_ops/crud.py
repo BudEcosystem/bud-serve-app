@@ -19,7 +19,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, asc, case, cast, desc, distinct, func, literal, or_, select
+from sqlalchemy import and_, asc, case, cast, desc, distinct, func, literal, or_, select, update
 from sqlalchemy.dialects.postgresql import JSONB
 
 from budapp.cluster_ops.models import Cluster as ClusterModel
@@ -29,11 +29,11 @@ from budapp.commons.db_utils import DataManagerUtils
 from budapp.model_ops.models import CloudModel
 from budapp.model_ops.models import Model as Model
 
-from ..commons.helpers import get_param_range
 from ..commons.constants import AdapterStatusEnum, ModelProviderTypeEnum
-
+from ..commons.helpers import get_param_range
 from ..project_ops.models import Project as ProjectModel
-from .models import Adapter as AdapterModel, Endpoint as EndpointModel
+from .models import Adapter as AdapterModel
+from .models import Endpoint as EndpointModel
 
 
 logger = logging.get_logger(__name__)
@@ -417,6 +417,16 @@ class EndpointDataManager(DataManagerUtils):
         result = self.execute_all(stmt)
 
         return result, count
+
+    async def mark_as_deprecated(self, model_ids: List[UUID]) -> None:
+        """Mark models as deprecated.
+
+        Args:
+            model_ids (List[UUID]): List of model ids to mark as deprecated.
+        """
+        stmt = update(EndpointModel).where(EndpointModel.model_id.in_(model_ids)).values(is_deprecated=True)
+        self.session.execute(stmt)
+        self.session.commit()
 
 
 class AdapterDataManager(DataManagerUtils):
