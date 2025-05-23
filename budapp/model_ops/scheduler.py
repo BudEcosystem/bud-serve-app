@@ -21,8 +21,9 @@ from typing import Dict, List
 
 import aiohttp
 from budmicroframe.commons import logging
-from budapp.initializers.provider_seeder import PROVIDERS_SEEDER_FILE_PATH
 from sqlalchemy.orm import Session
+
+from budapp.initializers.provider_seeder import PROVIDERS_SEEDER_FILE_PATH
 
 from ..commons.config import app_settings
 from ..commons.database import engine
@@ -32,7 +33,9 @@ from ..model_ops.models import CloudModel as CloudModelModel
 from ..model_ops.models import Provider as ProviderModel
 from ..model_ops.schemas import CloudModelCreate, ProviderCreate
 
+
 logger = logging.get_logger(__name__)
+
 
 class CloudModelSyncScheduler:
     """Schedule cloud model db with cloud service."""
@@ -72,7 +75,15 @@ class CloudModelSyncScheduler:
                         logger.debug("Found %s providers on page %s", len(cloud_providers), page)
                         data.extend(cloud_providers)
 
-            return data
+            # Make sure models are not None, Checking OpenApi in budconnect gives non null models
+            final_data = []
+            for provider in data:
+                for model in provider["models"]:
+                    if model is None:
+                        provider["models"].remove(model)
+                final_data.append(provider)
+
+            return final_data
         except Exception as e:
             logger.error("Error getting latest compatible models: %s", e)
             return []
