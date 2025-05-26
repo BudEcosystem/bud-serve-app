@@ -40,7 +40,6 @@ from budapp.commons.constants import (
     CredentialTypeEnum,
     ModalityEnum,
     ModelEndpointEnum,
-    ModelModalityEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
@@ -416,7 +415,7 @@ class CreateCloudModelWorkflowRequest(BaseModel):
     provider_type: ModelProviderTypeEnum | None = None
     provider_id: UUID4 | None = None
     name: str | None = None
-    modality: ModelModalityEnum | None = None
+    modality: List[ModalityEnum] | None = None
     uri: str | None = None
     tags: list[Tag] | None = None
     cloud_model_id: UUID4 | None = None
@@ -810,7 +809,7 @@ class CreateCloudModelWorkflowSteps(BaseModel):
     provider_type: ModelProviderTypeEnum | None = None
     source: str | None = None
     name: str | None = None
-    modality: ModelModalityEnum | None = None
+    modality: list[ModalityEnum] | None = None
     uri: str | None = None
     tags: list[Tag] | None = None
     icon: str | None = None

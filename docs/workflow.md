@@ -41,7 +41,6 @@
   "step_number": 4,
   "name": "abc",
   "tags": [{"name": "Tag1", "color": "#000000"}, {"name": "Tag2", "color": "#000000"}],
-  "modality": "llm",
   "trigger_workflow": true
 }
 ```
@@ -77,7 +76,7 @@
   "step_number": 4,
   "name": "abc",
   "tags": [{"name": "Tag1", "color": "#000000"}, {"name": "Tag2", "color": "#000000"}],
-  "modality": "llm",
+  "modality": ["text_input", "text_output"],
   "uri": "openai/gpt4",
   "trigger_workflow": true
 }

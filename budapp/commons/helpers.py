@@ -454,3 +454,47 @@ async def determine_modality_endpoints(
         raise ValueError(f"Invalid modality: {input_modality}")
 
     return result
+
+
+async def determine_supported_endpoints(
+    selected_modalities: List["ModalityEnum"],
+) -> List["ModelEndpointEnum"]:
+    """Determine API endpoints supported by the given modalities.
+
+    Args:
+        selected_modalities: The modalities to determine the endpoints for.
+
+    Returns:
+        The endpoints supported by the given modalities.
+    """
+    from ..commons.constants import ModalityEnum, ModelEndpointEnum
+
+    modality_set = set(selected_modalities)
+    endpoints: set[ModelEndpointEnum] = set()
+
+    if {
+        ModalityEnum.TEXT_INPUT.value,
+        ModalityEnum.TEXT_OUTPUT.value,
+    }.issubset(modality_set):
+        endpoints.update({ModelEndpointEnum.CHAT, ModelEndpointEnum.COMPLETION})
+    elif ModalityEnum.TEXT_INPUT.value in modality_set:
+        endpoints.add(ModelEndpointEnum.COMPLETION)
+
+    if ModalityEnum.IMAGE_OUTPUT.value in modality_set:
+        endpoints.add(ModelEndpointEnum.IMAGE_GENERATION)
+
+    if ModalityEnum.AUDIO_OUTPUT.value in modality_set:
+        endpoints.add(ModelEndpointEnum.AUDIO_SPEECH)
+
+    if {
+        ModalityEnum.AUDIO_INPUT.value,
+        ModalityEnum.TEXT_OUTPUT.value,
+    }.issubset(modality_set):
+        endpoints.add(ModelEndpointEnum.AUDIO_TRANSCRIPTION)
+
+    if not endpoints:
+        # Add default endpoint
+        logger.warning("No endpoints found, adding default endpoint")
+        endpoints.add(ModelEndpointEnum.CHAT)
+
+    return list(endpoints)
