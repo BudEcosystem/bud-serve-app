@@ -1,4 +1,4 @@
-# Model Onboarding
+# Model Onboarding (BudApp)
 
 This document provides comprehensive guidance on onboarding new models using the Bud Serve App's workflow APIs. Two main POST endpoints are exposed by the backend to facilitate adding a model in incremental steps.
 
@@ -157,3 +157,222 @@ If the user reloads the page or leaves the form, they can resume by calling the 
 ## Conclusion
 
 The Bud Serve App exposes two powerful workflow endpoints to manage the complex process of adding cloud and local models. By splitting the process into discrete steps with clear validations, the UI can guide the user, resume progress and display live updates. The local workflow integrates with budmodel to extract rich metadata and manage long-running downloads, while the cloud workflow offers a quick way to register cloud-hosted models.
+
+# Model Extraction (BudModel)
+
+This document provides a comprehensive overview of the Model Extraction feature in the budmodel microservice. It outlines the API contract, internal workflows using Dapr orchestration, ETA calculations, and state and pubsub mechanisms. This document is primarily aimed at developers and system designers integrating or maintaining this functionality.
+
+## Overview
+
+The **BudModel** microservice is built to support automated model extraction tasks. When a user provides information about a model—such as its name, location, and provider—the service validates and retrieves the model, extracts relevant metadata, and stores everything in a centralized registry. This microservice operates as part of the larger Bud ecosystem, relying on **Dapr** for workflow orchestration, state management, and pub/sub messaging.
+
+Key goals of the service include:
+
+- Provide a consistent API for submitting model extraction requests.
+- Handle various provider types including cloud-based models, Hugging Face repositories,
+  external URLs, and local disk paths.
+- Calculate and update processing time estimates so clients can track progress.
+- Use Dapr workflows to orchestrate tasks reliably and scalably.
+- Store interim state data and publish updates to interested subscribers.
+
+```mermaid
+flowchart TD
+    A[Client] -->|POST /model-info/extract| B[BudModel Service]
+    B --> C[Dapr Workflow]
+    C --> D[validate_model_uri]
+    C --> E[download_model]
+    C --> F[extract_model_info]
+    C --> G[save_model_to_registry]
+    G --> H[(MinIO Storage)]
+    C --> I[(State Store)]
+    C --> J((Pub/Sub))
+```
+
+### Activity Flow
+
+```mermaid
+flowchart LR
+    V[validate_model_uri] --> D[download_model]
+    D --> X[extract_model_info]
+    X --> S[save_model_to_registry]
+    S --> R[Result Publication]
+```
+
+## API Endpoint
+
+The primary API endpoint for triggering a model extraction is `POST /model-info/extract`.
+
+### Request Schema
+
+```json
+{
+  "model_name": "string",
+  "model_uri": "string",
+  "provider_type": "cloud_model | hugging_face | url | disk",
+  "hf_token": "string | null"
+}
+```
+
+- `model_name`: A friendly name for the model.
+- `model_uri`: The location of the model. This varies based on the provider type.
+- `provider_type`: Indicates the source of the model. Allowed values are:
+  - `cloud_model`
+  - `hugging_face`
+  - `url`
+  - `disk`
+- `hf_token`: Optional Hugging Face token when accessing private repositories.
+
+### Response Schema
+
+```json
+{
+  "message": "Extraction workflow started",
+  "workflow_id": "UUID",
+  "eta_seconds": 123
+}
+```
+
+The response returns an initial estimate of the time required to complete the extraction along with a
+workflow identifier. Clients can use this identifier to track progress.
+
+## Workflow Architecture
+
+The extraction is orchestrated using **Dapr Workflows**. When a new request arrives, the service
+initiates a workflow containing several activities. These activities run in sequence, each updating
+the estimated time of arrival (ETA) for the entire process. If any activity fails, the workflow logs
+an error and surfaces it to the client.
+
+The main activities are as follows:
+
+1. `validate_model_uri`
+2. `download_model`
+3. `extract_model_info`
+4. `save_model_to_registry`
+
+The following sections describe each activity in more detail.
+
+## Step Details
+
+### validate_model_uri
+
+The first step ensures that the model URI is accessible and valid. Depending on the provider type,
+different validation logic applies.
+
+- **Hugging Face**: The service checks the repository ID using the Hugging Face API and verifies
+  that the provided token grants access.
+- **URL**: The service validates that the URL is well-formed and reachable.
+- **Disk**: The service confirms that the specified directory or file exists.
+
+Based on the provider type, a baseline validation time is added to the ETA. Historically, network-based validations (Hugging Face or URL) take slightly longer than disk checks. The step writes to the state store with `current_step='validate_model_uri'` and the remaining ETA
+
+### download_model
+
+After validation, the service downloads the model to a designated directory on the client side. The
+download approach depends on the provider type.
+
+- **Hugging Face**:
+  - The service retrieves the list of files from the Hugging Face API.
+  - It then downloads the repository using the `huggingface_hub` snapshot utilities.
+  - The download rate is measured to predict the remaining time.
+  - ETA updates use the formula `remaining_bytes / speed`. If the speed fluctuates, the ETA is recalculated accordingly.
+- **URL**:
+  - The service uses the `aria2p` package for HTTP/FTP downloads.
+  - `aria2p` handles the download. The package exposes an ETA value directly, which we read at
+     intervals.
+  - Upon completion, if the file is a ZIP archive, we use Python’s `zipfile` module to extract it and monitor extraction speed. The time taken is added to the remaining ETA.
+- **Disk**:
+  - The service copies or moves the model from a local path to the download directory.
+  - The ETA is calculated based on the observed transfer speed.
+  - The service copies files using `shutil.copytree` or `shutil.copy2`.
+  - If the file is zipped, `zipfile` extraction is used just like in the URL case. Transfer speed is monitored to adjust the ETA.
+
+The step writes progress information to the state store, including the number of bytes transferred and estimated remaining time.
+
+### extract_model_info
+
+Once the model files are available locally, the service extracts metadata. This can include license
+information, model configuration, weights, and other details. The process differs for cloud-based or
+Hugging Face models and local models.
+
+For Hugging Face models, extraction steps include:
+
+- Gathering descriptions, use cases, advantages, and disadvantages from the README via a language
+  model prompt.
+- Fetching tags, tasks, papers, website URLs, and license details using Hugging Face APIs.
+- Determining modality and architecture from the `config.json` file.
+- Estimating model weight sizes from metadata and git repository information.
+- Using a static prompt, the service runs a small language model to generate frequently asked questions about the license. This text is included in the final output.
+
+Local models follow a similar pattern if required files (README, license, `config.json`) are found in
+predefined directories. A missing `config.json` or weight file results in an error.
+
+Metadata is stored in the state store. The ETA is updated, typically decreasing by a large portion at this stage.
+
+### save_model_to_registry
+
+- The service uploads all files to MinIO or an equivalent object store. Upload speed is monitored, and large files (>1 GB) are removed locally after upload.
+- The `.cache` directory is deleted to free space.
+- Temporary files are removed.
+- Once upload completes, the service constructs the final response, which includes the object name in storage and all extracted metadata.
+- The workflow state is marked as completed, and the remaining ETA reaches zero.
+
+# ETA
+
+## Initial ETA Calculation
+
+The initial ETA is calculated when the workflow starts. Each activity contributes an estimated time
+based on average durations from previous runs. Here is a simplified approach used to compute the
+ETA:
+
+1. **Base Estimations**: For each activity, the service keeps a history of durations. If historical
+   data exists, it uses the median or average time. Otherwise, default values are applied.
+2. **Dynamic Adjustments**: During runtime, actual metrics (like download speed) can adjust future
+   estimates. For example, if the download speed is slower than average, the system recalculates the
+   remaining time.
+3. **Accumulation**: The initial ETA is the sum of each activity’s estimated duration. This value is
+   returned in the response and stored in the state store for reference.
+
+## Dynamic ETA Updates
+
+As each activity progresses, the service updates the remaining ETA in the state store. This allows external systems to query the latest ETA at any time.
+
+The state entries are typically stored under a key pattern like `model-extraction:{workflow_id}`. Each entry may include fields such as:
+- `current_step`
+- `remaining_eta`
+- `total_eta`
+- `progress_percent`
+- `last_update`
+
+To keep clients informed of progress, the service publishes ETA updates to a pub/sub topic at a
+constant interval. The typical setup involves:
+
+1. **Interval**: A background job runs every few seconds (for example, every 15 seconds). The exact
+   interval is configurable based on system load and responsiveness requirements.
+2. **Data**: Each published message contains the workflow ID, the current step, the remaining ETA in
+   seconds, and a timestamp.
+3. **Pub/Sub Component**: Dapr’s pub/sub building block handles delivery. Subscribers can listen on
+   the topic to receive real-time updates.
+
+This ensures that any interested component—whether a user interface or another service—can react to progress changes promptly.
+
+### State Update Cycle
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Service
+    participant StateStore
+    participant PubSub
+
+    Client->>Service: Start Workflow
+    Service->>StateStore: Save initial ETA
+    loop Every 15 seconds
+        Service->>StateStore: Update remaining ETA
+        Service->>PubSub: Publish ETA update
+    end
+    Service-->>Client: Final Result
+```
+
+The combination of Dapr workflows, state management, and pub/sub messaging ensures reliable and
+observable model extraction. The ETA calculation helps clients gauge progress, while state-store
+persistence allows the service to recover gracefully from unexpected interruptions.
