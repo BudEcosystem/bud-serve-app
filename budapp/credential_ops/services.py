@@ -361,7 +361,7 @@ class CredentialService(SessionMixin):
                 "metadata": {
                     "name": db_model.name,
                     "provider": db_model.provider.name,
-                    "modality": db_model.modality.value,
+                    "modality": [modality.value for modality in db_model.modality],
                     "endpoint_id": db_endpoint.id,
                     "cloud": db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
                     "deploy_model_uri": deploy_model_uri,
@@ -422,7 +422,7 @@ class CredentialService(SessionMixin):
                 "metadata": {
                     "name": db_model.name,
                     "provider": db_model.provider.name,
-                    "modality": db_model.modality.value,
+                    "modality": [modality.value for modality in db_model.modality],
                     "endpoint_id": db_endpoint.id,
                     "adapter_id": db_adapter.id,
                     "cloud": db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
@@ -486,7 +486,7 @@ class CredentialService(SessionMixin):
                         "metadata": {
                             "name": db_model.name,
                             "provider": db_model.provider.name,
-                            "modality": db_model.modality.value,
+                            "modality": [modality.value for modality in db_model.modality],
                             "endpoint_id": db_endpoint.id,
                             "cloud": db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
                             "deploy_model_uri": deploy_model_uri,
