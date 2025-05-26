@@ -74,7 +74,11 @@ from ..commons.constants import (
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
-from ..commons.helpers import determine_modality_endpoints, validate_huggingface_repo_format
+from ..commons.helpers import (
+    determine_modality_endpoints,
+    determine_supported_endpoints,
+    validate_huggingface_repo_format,
+)
 from ..commons.schemas import BudNotificationMetadata
 from ..commons.security import RSAHandler
 from ..core.crud import ModelTemplateDataManager
@@ -618,17 +622,17 @@ class CloudModelWorkflowService(SessionMixin):
                 supported_endpoints=db_cloud_model.supported_endpoints,
             )
         else:
-            model_details = await determine_modality_endpoints(modality)
+            supported_endpoints = await determine_supported_endpoints(modality)
             model_data = ModelCreate(
                 source=source,
                 name=name,
-                modality=model_details["modality"],
+                modality=modality,
                 uri=uri,
                 tags=tags,
                 provider_type=provider_type,
                 created_by=current_user_id,
                 provider_id=provider_id,
-                supported_endpoints=model_details["endpoints"],
+                supported_endpoints=supported_endpoints,
             )
 
         return model_data
