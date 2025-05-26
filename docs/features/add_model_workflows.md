@@ -145,7 +145,6 @@ graph LR
     BudModel -->|events| BudApp
     BudApp -->|create Model| DB
     BudApp -->|notifications| UI
-}
 ```
 ---
 
