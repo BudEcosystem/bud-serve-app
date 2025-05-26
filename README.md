@@ -1,12 +1,5 @@
-# bud-serve-app
-
-
-## Project Architecture
-
-The project consists of several containers:
-
-- **Redis**: Used for pub/sub and state store.
-- **Dapr Containers**: Various services of the Dapr platform.
+# Bud Serve App
+This is the application service for the Bud Runtime which handles user management, project management, cluster management etc
 
 ### Prerequisites
 
