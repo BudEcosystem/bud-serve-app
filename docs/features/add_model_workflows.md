@@ -103,3 +103,59 @@ flowchart TD
     HH -- yes --> II[Model created]
     HH -- no --> JJ[Workflow failed]
 ```
+
+### Live Notifications
+
+While the budmodel microservice performs the extraction workflow, it emits events on every activity completion. Budapp listens to these events, finalizes the model creation once the extraction result is available. The frontend receives these updates via server-sent events and displays progress with an estimated time remaining.
+
+A typical sequence of events is:
+
+1. `validate_uri_completed`
+2. `download_completed`
+3. `extract_info_completed`
+4. `model_saved`
+
+If any step fails, an error event is emitted and the workflow status becomes `failed`.
+
+---
+
+## Extracted Model Metadata
+
+Budmodel extracts rich metadata about the model and sends it back to Bud Serve in the final event payload. The metadata includes but is not limited to:
+
+- **Description** – a short summary of the model.
+- **Strengths / Limitations** – bullet points describing what the model excels at and where it may perform poorly.
+- **Suitable Use Cases** – example scenarios where the model has been used successfully.
+- **License details** – including license name, description, URL and a list of frequently asked questions.
+- **Languages** – list of languages supported by the model.
+- **Technical Specifications** – parsed from the model's `config.json` such as number of parameters, hidden size, context length, and other architecture fields.
+- **Modality** – classification of the model as `llm`, `mllm`, vision, audio, etc. This informs the API which endpoints the model can serve.
+- **Model Tree Information** – identifies the base model and indicates whether the uploaded model is an adapter, a fine-tuned version, quantised weights, a merged checkpoint or a true base model.
+- **Supported Endpoints** – list of endpoints supported by the model.
+
+## Architecture Diagram
+
+The following diagram shows the overall architecture when adding a local model.
+
+```mermaid
+digraph G {
+    rankdir=LR;
+    UI -> BudApp [label="POST local-model-workflow"];
+    BudApp -> DB [label="save steps"];
+    BudApp -> BudModel [label="start workflow"];
+    BudModel -> BudApp [label="events"];
+    BudApp -> DB [label="create Model"];
+    BudApp -> UI [label="notifications"];
+}
+```
+---
+
+## Resuming Workflows
+
+If the user reloads the page or leaves the form, they can resume by calling the same endpoint with the `workflow_id` returned earlier and the correct `step_number`. The stored steps are merged with the new data. Once completed, the workflow record is kept for audit purposes but further calls with the same id will be rejected.
+
+---
+
+## Conclusion
+
+The Bud Serve App exposes two powerful workflow endpoints to manage the complex process of adding cloud and local models. By splitting the process into discrete steps with clear validations, the UI can guide the user, resume progress and display live updates. The local workflow integrates with budmodel to extract rich metadata and manage long-running downloads, while the cloud workflow offers a quick way to register cloud-hosted models.
