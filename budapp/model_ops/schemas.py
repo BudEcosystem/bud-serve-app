@@ -37,7 +37,6 @@ from pydantic import (
 from budapp.commons.constants import (
     AddModelModalityEnum,
     BaseModelRelationEnum,
-    CredentialTypeEnum,
     ModalityEnum,
     ModelEndpointEnum,
     ModelProviderTypeEnum,
@@ -687,7 +686,7 @@ class ModelFilter(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     name: str | None = None
-    source: CredentialTypeEnum | None = None
+    source: str | None = None
     model_size_min: int | None = Field(None, ge=0, le=500)
     model_size_max: int | None = Field(None, ge=0, le=500)
     provider_type: ModelProviderTypeEnum | None = None
@@ -695,11 +694,11 @@ class ModelFilter(BaseModel):
     base_model: str | None = None
     base_model_relation: BaseModelRelationEnum | None = None
 
-    @field_validator("source")
-    @classmethod
-    def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
-        """Convert the source enum value to a string."""
-        return v.value if v else None
+    # @field_validator("source")
+    # @classmethod
+    # def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
+    #     """Convert the source enum value to a string."""
+    #     return v.value if v else None
 
     @field_validator("model_size_min", "model_size_max")
     @classmethod
@@ -850,15 +849,15 @@ class CloudModelFilter(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    source: CredentialTypeEnum | None = None
+    source: str | None = None
     modality: ModalityEnum | None = None
     model_size: int | None = None
     name: str | None = None
 
-    @field_validator("source")
-    def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
-        """Change the source to a string."""
-        return v.value if v else None
+    # @field_validator("source")
+    # def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
+    #     """Change the source to a string."""
+    #     return v.value if v else None
 
 
 class CloudModelResponse(PaginatedSuccessResponse):
