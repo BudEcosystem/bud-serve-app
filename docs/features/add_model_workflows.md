@@ -138,14 +138,13 @@ Budmodel extracts rich metadata about the model and sends it back to Bud Serve i
 The following diagram shows the overall architecture when adding a local model.
 
 ```mermaid
-digraph G {
-    rankdir=LR;
-    UI -> BudApp [label="POST local-model-workflow"];
-    BudApp -> DB [label="save steps"];
-    BudApp -> BudModel [label="start workflow"];
-    BudModel -> BudApp [label="events"];
-    BudApp -> DB [label="create Model"];
-    BudApp -> UI [label="notifications"];
+graph LR
+    UI -->|POST local-model-workflow| BudApp
+    BudApp -->|save steps| DB
+    BudApp -->|start workflow| BudModel
+    BudModel -->|events| BudApp
+    BudApp -->|create Model| DB
+    BudApp -->|notifications| UI
 }
 ```
 ---
