@@ -255,6 +255,8 @@ class ExperimentService:
                     estimated_input_tokens=dataset.estimated_input_tokens,
                     estimated_output_tokens=dataset.estimated_output_tokens,
                     modalities=dataset.modalities,
+                    sample_questions_answers=dataset.sample_questions_answers,
+                    advantages_disadvantages=dataset.advantages_disadvantages,
                 )
                 for dataset in datasets_query
             ]
@@ -394,6 +396,8 @@ class ExperimentService:
                         estimated_input_tokens=dataset.estimated_input_tokens,
                         estimated_output_tokens=dataset.estimated_output_tokens,
                         modalities=dataset.modalities,
+                        sample_questions_answers=dataset.sample_questions_answers,
+                        advantages_disadvantages=dataset.advantages_disadvantages,
                     )],  # This trait is associated with the current dataset
                 )
                 for trait in traits_query
@@ -414,6 +418,8 @@ class ExperimentService:
                 humans_vs_llm_qualifications=dataset.humans_vs_llm_qualifications,
                 task_type=dataset.task_type,
                 modalities=dataset.modalities,
+                sample_questions_answers=dataset.sample_questions_answers,
+                advantages_disadvantages=dataset.advantages_disadvantages,
                 traits=traits,
             )
 
@@ -499,6 +505,8 @@ class ExperimentService:
                             estimated_input_tokens=dataset.estimated_input_tokens,
                             estimated_output_tokens=dataset.estimated_output_tokens,
                             modalities=dataset.modalities,
+                            sample_questions_answers=dataset.sample_questions_answers,
+                            advantages_disadvantages=dataset.advantages_disadvantages,
                         )],  # This trait is associated with the current dataset
                     )
                     for trait in traits_query
@@ -518,6 +526,8 @@ class ExperimentService:
                     humans_vs_llm_qualifications=dataset.humans_vs_llm_qualifications,
                     task_type=dataset.task_type,
                     modalities=dataset.modalities,
+                    sample_questions_answers=dataset.sample_questions_answers,
+                    advantages_disadvantages=dataset.advantages_disadvantages,
                     traits=traits,
                 )
                 result.append(dataset_schema)
@@ -557,6 +567,8 @@ class ExperimentService:
                 humans_vs_llm_qualifications=req.humans_vs_llm_qualifications,
                 task_type=req.task_type,
                 modalities=req.modalities,
+                sample_questions_answers=req.sample_questions_answers,
+                advantages_disadvantages=req.advantages_disadvantages,
             )
 
             self.session.add(dataset)
@@ -585,6 +597,8 @@ class ExperimentService:
                                 estimated_input_tokens=dataset.estimated_input_tokens,
                                 estimated_output_tokens=dataset.estimated_output_tokens,
                                 modalities=dataset.modalities,
+                                sample_questions_answers=dataset.sample_questions_answers,
+                                advantages_disadvantages=dataset.advantages_disadvantages,
                             )],  # This trait is associated with the current dataset
                         ))
 
@@ -606,6 +620,8 @@ class ExperimentService:
                 humans_vs_llm_qualifications=dataset.humans_vs_llm_qualifications,
                 task_type=dataset.task_type,
                 modalities=dataset.modalities,
+                sample_questions_answers=dataset.sample_questions_answers,
+                advantages_disadvantages=dataset.advantages_disadvantages,
                 traits=traits,
             )
 
@@ -663,6 +679,10 @@ class ExperimentService:
                 dataset.task_type = req.task_type
             if req.modalities is not None:
                 dataset.modalities = req.modalities
+            if req.sample_questions_answers is not None:
+                dataset.sample_questions_answers = req.sample_questions_answers
+            if req.advantages_disadvantages is not None:
+                dataset.advantages_disadvantages = req.advantages_disadvantages
 
             # Update trait associations if provided
             if req.trait_ids is not None:
@@ -721,6 +741,8 @@ class ExperimentService:
                 humans_vs_llm_qualifications=dataset.humans_vs_llm_qualifications,
                 task_type=dataset.task_type,
                 modalities=dataset.modalities,
+                sample_questions_answers=dataset.sample_questions_answers,
+                advantages_disadvantages=dataset.advantages_disadvantages,
                 traits=traits,
             )
 

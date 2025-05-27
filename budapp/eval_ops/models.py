@@ -34,6 +34,8 @@ class ModalityEnum(PyEnum):
     TEXT = "text"        # Textual data, e.g., documents, sentences
     IMAGE = "image"      # Image data, e.g., photographs, diagrams
     VIDEO = "video"      # Video data, e.g., video clips, animations
+    ACTIONS = "actions"    # Action data, e.g., button clicks, mouse movements
+    EMBEDDING = "embedding" # Embedding data, e.g., vector representations of text, images, or audio
 
 
 # ------------------------ Core Tables ------------------------
@@ -136,6 +138,9 @@ class ExpDataset(Base, TimestampMixin):
     task_type: Mapped[list] = mapped_column(JSONB, nullable=True)
 
     modalities: Mapped[list] = mapped_column(JSONB, nullable=True)  # List of modalities, e.g., ["text", "image"]
+
+    sample_questions_answers: Mapped[dict] = mapped_column(JSONB, nullable=True)  # Sample Q&A data in JSON format
+    advantages_disadvantages: Mapped[dict] = mapped_column(JSONB, nullable=True)  # {"advantages": ["str1"], "disadvantages": ["str2"]}
 
     versions = relationship("ExpDatasetVersion", back_populates="dataset",  cascade="all, delete-orphan")
 

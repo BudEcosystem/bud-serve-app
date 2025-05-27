@@ -60,6 +60,8 @@ class DatasetBasic(BaseModel):
     estimated_input_tokens: Optional[int] = Field(None, description="Estimated input tokens.")
     estimated_output_tokens: Optional[int] = Field(None, description="Estimated output tokens.")
     modalities: Optional[List[str]] = Field(None, description="List of modalities.")
+    sample_questions_answers: Optional[dict] = Field(None, description="Sample questions and answers in JSON format.")
+    advantages_disadvantages: Optional[dict] = Field(None, description="Advantages and disadvantages with structure {'advantages': ['str1'], 'disadvantages': ['str2']}.")
 
     class Config:  # noqa: D106
         from_attributes = True
@@ -105,6 +107,8 @@ class ExpDataset(BaseModel):
         None,
         description="List of modalities. Allowed values: 'text' (Textual data), 'image' (Image data), 'video' (Video data)"
     )
+    sample_questions_answers: Optional[dict] = Field(None, description="Sample questions and answers in JSON format.")
+    advantages_disadvantages: Optional[dict] = Field(None, description="Advantages and disadvantages with structure {'advantages': ['str1'], 'disadvantages': ['str2']}.")
     traits: List[Trait] = Field([], description="Traits associated with this dataset.")
 
     class Config:  # noqa: D106
@@ -149,6 +153,8 @@ class CreateDatasetRequest(BaseModel):
         None,
         description="List of modalities. Allowed values: 'text' (Textual data), 'image' (Image data), 'video' (Video data)"
     )
+    sample_questions_answers: Optional[dict] = Field(None, description="Sample questions and answers in JSON format.")
+    advantages_disadvantages: Optional[dict] = Field(None, description="Advantages and disadvantages with structure {'advantages': ['str1'], 'disadvantages': ['str2']}.")
     trait_ids: Optional[List[UUID4]] = Field([], description="List of trait IDs to associate with the dataset.")
 
 
@@ -169,6 +175,8 @@ class UpdateDatasetRequest(BaseModel):
         None,
         description="List of modalities. Allowed values: 'text' (Textual data), 'image' (Image data), 'video' (Video data)"
     )
+    sample_questions_answers: Optional[dict] = Field(None, description="Sample questions and answers in JSON format.")
+    advantages_disadvantages: Optional[dict] = Field(None, description="Advantages and disadvantages with structure {'advantages': ['str1'], 'disadvantages': ['str2']}.")
     trait_ids: Optional[List[UUID4]] = Field(None, description="List of trait IDs to associate with the dataset.")
 
 

@@ -10,6 +10,42 @@
         "humans_vs_llm_qualifications": ["Expert", "Novice"],
         "task_type": ["Multiple Choice", "Knowledge Assessment"],
         "modalities": ["text"],
+        "sample_questions_answers": {
+            "examples": [
+                {
+                    "question": "What is the maximum draft allowed for a vessel entering the Suez Canal?",
+                    "options": ["A) 20.1 meters", "B) 22.5 meters", "C) 24.0 meters", "D) 26.8 meters"],
+                    "correct_answer": "C) 24.0 meters",
+                    "explanation": "The Suez Canal Authority sets the maximum draft at 24.0 meters for vessels transiting the canal."
+                },
+                {
+                    "question": "According to MARPOL Annex VI, what is the global sulfur limit for marine fuel oil?",
+                    "options": ["A) 0.1%", "B) 0.5%", "C) 1.0%", "D) 3.5%"],
+                    "correct_answer": "B) 0.5%",
+                    "explanation": "Since January 1, 2020, the global sulfur limit for marine fuel oil is 0.5% m/m as per MARPOL Annex VI."
+                }
+            ],
+            "total_questions": 1888,
+            "question_format": "Multiple choice questions with 4 options each",
+            "difficulty_levels": ["Beginner", "Intermediate", "Advanced", "Expert"]
+        },
+        "advantages_disadvantages": {
+            "advantages": [
+                "Comprehensive coverage of maritime industry knowledge",
+                "Based on authoritative industry standards and regulations",
+                "Large dataset with 1,888 high-quality questions",
+                "Bilingual support (English and Chinese)",
+                "Covers both theoretical knowledge and practical applications",
+                "Regular updates to reflect current maritime regulations"
+            ],
+            "disadvantages": [
+                "Limited to multiple-choice format only",
+                "Requires domain expertise for proper evaluation",
+                "May not cover emerging maritime technologies",
+                "Cultural bias towards certain maritime regions",
+                "No practical simulation or hands-on assessment"
+            ]
+        },
         "emoji": "",
         "dimensions": [
             {

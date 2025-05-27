@@ -89,6 +89,8 @@ class EvalDatasetSeeder(BaseSeeder):
                 "humans_vs_llm_qualifications": dataset.get("humans_vs_llm_qualifications"),
                 "task_type": dataset.get("task_type"),
                 "modalities": dataset.get("modalities"),
+                "sample_questions_answers": dataset.get("sample_questions_answers"),
+                "advantages_disadvantages": dataset.get("advantages_disadvantages"),
             }
 
             # Add config_validation_schema if needed
