@@ -41,7 +41,6 @@ from budapp.commons.constants import (
     ModelEndpointEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
-    ModelSourceEnum,
     WorkflowStatusEnum,
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
@@ -218,7 +217,7 @@ class Model(ModelBase):
     id: UUID4
     icon: str | None = None
     modality: List[ModalityEnum]
-    source: ModelSourceEnum
+    source: str
     provider_type: ModelProviderTypeEnum
     uri: str
     model_size: Optional[int] = None
