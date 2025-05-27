@@ -1,0 +1,77 @@
+[
+    {
+        "name": "Strong Reasoning",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    },
+    {
+        "name": "Multimodal",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    },
+    {
+        "name": "Examination",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    },
+    {
+        "name": "Reasoning",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    },
+    {
+        "name": "Knowledge",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    },
+    {
+        "name": "Code",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    },
+    {
+        "name": "Language",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    },
+    {
+        "name": "Math",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    },
+    {
+        "name": "Understanding",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    },
+    {
+        "name": "Safety",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    },
+    {
+        "name": "Long-Context",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    },
+    {
+        "name": "Agent",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    },
+    {
+        "name": "Creation",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    },
+    {
+        "name": "Instruct",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    },
+    {
+        "name": "Other",
+        "description": "A dataset is a collection of data that is used to train a model.",
+        "icon": "icons/traits/dataset.png"
+    }
+]

@@ -45,6 +45,7 @@ from .project_ops import project_routes
 from .router_ops import router_routes
 from .user_ops import user_routes
 from .workflow_ops import workflow_routes
+from .eval_ops import eval_routes
 
 
 logger = logging.get_logger(__name__)
@@ -151,14 +152,14 @@ app = configure_app(
 app.mount("/static", StaticFiles(directory=app_settings.static_dir), name="static")
 
 # Set all CORS enabled origins
-if app_settings.cors_origins:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[str(origin).strip("/") for origin in app_settings.cors_origins],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# if app_settings.cors_origins:
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:9081", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 internal_router = APIRouter()
 internal_router.include_router(auth_routes.auth_router)
@@ -178,6 +179,7 @@ internal_router.include_router(workflow_routes.workflow_router)
 internal_router.include_router(playground_routes.playground_router)
 internal_router.include_router(project_routes.project_router)
 internal_router.include_router(router_routes.router_router)
+internal_router.include_router(eval_routes.router)
 
 app.include_router(internal_router)
 

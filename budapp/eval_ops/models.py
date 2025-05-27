@@ -3,7 +3,7 @@
 from enum import Enum as PyEnum
 from uuid import uuid4
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, String, Text, UniqueConstraint, Integer
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import JSONB, NUMERIC
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -14,7 +14,7 @@ from budapp.commons.database import Base, TimestampMixin
 
 # ------------------------ Enums ------------------------
 
-class EvaluationStatusEnum(PyEnum):
+class ExperimentStatusEnum(PyEnum):
     ACTIVE = "active"
     DELETED = "deleted"
 
@@ -30,25 +30,31 @@ class EvaluationRunStatusEnum(PyEnum):
     SUMMARIZING = "summarizing"
 
 
+class ModalityEnum(PyEnum):
+    TEXT = "text"        # Textual data, e.g., documents, sentences
+    IMAGE = "image"      # Image data, e.g., photographs, diagrams
+    VIDEO = "video"      # Video data, e.g., video clips, animations
+
+
 # ------------------------ Core Tables ------------------------
 
-class Evaluation(Base, TimestampMixin):
-    __tablename__ = "evaluation"
+class Experiment(Base, TimestampMixin):
+    __tablename__ = "experiment"
 
     id:           Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     name:         Mapped[str]   = mapped_column(String, nullable=False)
     description:  Mapped[str]   = mapped_column(String, nullable=True)
     status:       Mapped[str]   = mapped_column(
-        PG_ENUM(*[e.value for e in EvaluationStatusEnum], name="evaluation_status_enum"),
+        PG_ENUM(*[e.value for e in ExperimentStatusEnum], name="experiment_status_enum"),
         nullable=False,
     )
     created_by:   Mapped[uuid4] = mapped_column(ForeignKey("user.id"), nullable=False)
     project_id:   Mapped[uuid4] = mapped_column(ForeignKey("project.id"), nullable=False)
 
-    runs = relationship("Run", back_populates="evaluation", cascade="all, delete-orphan")
+    runs = relationship("Run", back_populates="experiment", cascade="all, delete-orphan")
     run_dataset_configs = relationship(
-        "EvaluationRunDatasetConfig",
-        back_populates="evaluation",
+        "ExperimentRunDatasetConfig",
+        back_populates="experiment",
         cascade="all, delete-orphan"
     )
 
@@ -57,122 +63,141 @@ class Run(Base, TimestampMixin):
     __tablename__ = "evaluation_runs"
 
     id:            Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    evaluation_id: Mapped[uuid4] = mapped_column(ForeignKey("evaluation.id"), nullable=False)
-    name:          Mapped[str]   = mapped_column(String, nullable=False)
-    description:   Mapped[str]   = mapped_column(String, nullable=True)
+    experiment_id: Mapped[uuid4] = mapped_column(ForeignKey("experiment.id"), nullable=False)
     status:        Mapped[str]   = mapped_column(
         PG_ENUM(*[e.value for e in EvaluationRunStatusEnum], name="evaluation_run_status_enum"),
         nullable=False,
     )
 
-    evaluation = relationship("Evaluation", back_populates="runs")
+    experiment = relationship("Experiment", back_populates="runs")
     dataset_configs = relationship(
-        "EvaluationRunDatasetConfig",
+        "ExperimentRunDatasetConfig",
         back_populates="run",
         cascade="all, delete-orphan"
     )
-    metrics     = relationship("EvalMetric",     back_populates="run",      cascade="all, delete-orphan")
-    raw_results = relationship("EvalRawResult",  back_populates="run",      cascade="all, delete-orphan")
+    metrics     = relationship("ExpMetric",     back_populates="run",      cascade="all, delete-orphan")
+    raw_results = relationship("ExpRawResult",  back_populates="run",      cascade="all, delete-orphan")
 
 
-class EvaluationRunDatasetConfig(Base, TimestampMixin):
-    __tablename__ = "evaluation_run_dataset_config"
+class ExperimentRunDatasetConfig(Base, TimestampMixin):
+    __tablename__ = "experiment_run_dataset_config"
 
     id:            Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     run_id:        Mapped[uuid4] = mapped_column(ForeignKey("evaluation_runs.id"), nullable=False)
-    evaluation_id: Mapped[uuid4] = mapped_column(ForeignKey("evaluation.id"),      nullable=False)
+    experiment_id: Mapped[uuid4] = mapped_column(ForeignKey("experiment.id"),      nullable=False)
 
     run        = relationship("Run",        back_populates="dataset_configs")
-    evaluation = relationship("Evaluation", back_populates="run_dataset_configs")
+    experiment = relationship("Experiment", back_populates="run_dataset_configs")
 
 
 # ------------------------ Lookup Tables ------------------------
 
-class Model(Base, TimestampMixin):
-    __tablename__ = "eval_models"
+class ExpModel(Base, TimestampMixin):
+    __tablename__ = "exp_models"
 
     id:          Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     name:        Mapped[str]   = mapped_column(String, unique=True, nullable=False)
     description: Mapped[str]   = mapped_column(String, nullable=True)
+    model_in_db: Mapped[str]   = mapped_column(String, nullable=False) # Should be valid_endpoint_id
 
-    metrics     = relationship("EvalMetric",    back_populates="model",      cascade="all, delete-orphan")
-    raw_results = relationship("EvalRawResult", back_populates="model",      cascade="all, delete-orphan")
+    metrics     = relationship("ExpMetric",    back_populates="model",      cascade="all, delete-orphan")
+    raw_results = relationship("ExpRawResult", back_populates="model",      cascade="all, delete-orphan")
 
 
-class Trait(Base, TimestampMixin):
-    __tablename__ = "eval_traits"
+class ExpTrait(Base, TimestampMixin):
+    __tablename__ = "exp_traits"
 
     id:          Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     name:        Mapped[str]   = mapped_column(String, unique=True, nullable=False)
     description: Mapped[str]   = mapped_column(String, nullable=True)
+    icon:        Mapped[str]   = mapped_column(String, nullable=True)
 
-    datasets = relationship("Dataset", back_populates="trait", cascade="all, delete-orphan")
 
 
-class Dataset(Base, TimestampMixin):
-    __tablename__ = "eval_datasets"
-    __table_args__ = (UniqueConstraint('trait_id', 'name', name='uq_dataset_trait_name'),)
+class ExpDataset(Base, TimestampMixin):
+    __tablename__ = "exp_datasets"
+    __table_args__ = (UniqueConstraint('name', name='uq_expdataset_trait_name'),)
 
     id:          Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    trait_id:    Mapped[uuid4] = mapped_column(ForeignKey("eval_traits.id"),  nullable=False)
     name:        Mapped[str]   = mapped_column(String, nullable=False)
     description: Mapped[str]   = mapped_column(String, nullable=True)
 
-    trait    = relationship("Trait",           back_populates="datasets")
-    versions = relationship("DatasetVersion",  back_populates="dataset",  cascade="all, delete-orphan")
+    meta_links:   Mapped[dict]   = mapped_column(JSONB, nullable=True) # Storing Github, Paper, etc. links
+
+    config_validation_schema: Mapped[dict]  = mapped_column(JSONB, nullable=True) # Required to validate the config shared
+
+    estimated_input_tokens: Mapped[int] = mapped_column(Integer, nullable=True)
+    estimated_output_tokens: Mapped[int] = mapped_column(Integer, nullable=True)
+
+    language: Mapped[list] = mapped_column(JSONB, nullable=True)
+    domains: Mapped[list] = mapped_column(JSONB, nullable=True)
+    concepts: Mapped[list] = mapped_column(JSONB, nullable=True)
+    humans_vs_llm_qualifications: Mapped[list] = mapped_column(JSONB, nullable=True)
+    task_type: Mapped[list] = mapped_column(JSONB, nullable=True)
+
+    modalities: Mapped[list] = mapped_column(JSONB, nullable=True)  # List of modalities, e.g., ["text", "image"]
+
+    versions = relationship("ExpDatasetVersion", back_populates="dataset",  cascade="all, delete-orphan")
+
+class ExpTraitsDatasetPivot(Base, TimestampMixin):
+    __tablename__ = "exp_traits_dataset_pivot"
+
+    id:          Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    trait_id:    Mapped[uuid4] = mapped_column(ForeignKey("exp_traits.id"),  nullable=False)
+    dataset_id:  Mapped[uuid4] = mapped_column(ForeignKey("exp_datasets.id"), nullable=False)
 
 
-class DatasetVersion(Base, TimestampMixin):
-    __tablename__ = "eval_dataset_versions"
-    __table_args__ = (UniqueConstraint('dataset_id', 'version', name='uq_datasetversion_dataset_version'),)
+class ExpDatasetVersion(Base, TimestampMixin):
+    __tablename__ = "exp_dataset_versions"
+    __table_args__ = (UniqueConstraint('dataset_id', 'version', name='uq_expdatasetversion_dataset_version'),)
 
     id:             Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    dataset_id:     Mapped[uuid4] = mapped_column(ForeignKey("eval_datasets.id"),          nullable=False)
+    dataset_id:     Mapped[uuid4] = mapped_column(ForeignKey("exp_datasets.id"),          nullable=False)
     version:        Mapped[str]   = mapped_column(String, nullable=False)
     meta:           Mapped[dict]  = mapped_column(JSONB, nullable=True)
 
-    dataset      = relationship("Dataset",        back_populates="versions")
-    metrics      = relationship("EvalMetric",     back_populates="dataset_version", cascade="all, delete-orphan")
-    raw_results  = relationship("EvalRawResult",  back_populates="dataset_version", cascade="all, delete-orphan")
+    dataset      = relationship("ExpDataset",      back_populates="versions")
+    metrics      = relationship("ExpMetric",       back_populates="dataset_version", cascade="all, delete-orphan")
+    raw_results  = relationship("ExpRawResult",    back_populates="dataset_version", cascade="all, delete-orphan")
 
 
 # ------------------------ Evaluation Results ------------------------
 
-class EvalMetric(Base):
-    __tablename__ = "eval_metrics"
+class ExpMetric(Base):
+    __tablename__ = "exp_metrics"
     __table_args__ = (
         UniqueConstraint(
             'run_id', 'dataset_version_id', 'model_id', 'metric_name', 'mode',
-            name='uq_evalmetrics_combination'
+            name='uq_expmetrics_combination'
         ),
     )
 
     id:                 Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     run_id:             Mapped[uuid4] = mapped_column(ForeignKey("evaluation_runs.id"),         nullable=False)
-    dataset_version_id: Mapped[uuid4] = mapped_column(ForeignKey("eval_dataset_versions.id"),  nullable=False)
-    model_id:           Mapped[uuid4] = mapped_column(ForeignKey("eval_models.id"),            nullable=False)
+    dataset_version_id: Mapped[uuid4] = mapped_column(ForeignKey("exp_dataset_versions.id"),  nullable=False)
+    model_id:           Mapped[uuid4] = mapped_column(ForeignKey("exp_models.id"),            nullable=False)
     metric_name:        Mapped[str]   = mapped_column(String, nullable=False)
     mode:               Mapped[str]   = mapped_column(String, nullable=False)
     metric_value:       Mapped[float] = mapped_column(NUMERIC(6, 2), nullable=False)
 
-    run             = relationship("Run",            back_populates="metrics")
-    dataset_version = relationship("DatasetVersion", back_populates="metrics")
-    model           = relationship("Model",          back_populates="metrics")
+    run             = relationship("Run",               back_populates="metrics")
+    dataset_version = relationship("ExpDatasetVersion", back_populates="metrics")
+    model           = relationship("ExpModel",          back_populates="metrics")
 
 
-class EvalRawResult(Base, TimestampMixin):
-    __tablename__ = "eval_raw_results"
+class ExpRawResult(Base, TimestampMixin):
+    __tablename__ = "exp_raw_results"
     __table_args__ = (
-        UniqueConstraint('run_id', 'dataset_version_id', 'model_id', name='uq_evalrawresults_run_dv_model'),
+        UniqueConstraint('run_id', 'dataset_version_id', 'model_id', name='uq_exprawresults_run_dv_model'),
     )
 
     id:                  Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     run_id:              Mapped[uuid4] = mapped_column(ForeignKey("evaluation_runs.id"),         nullable=False)
-    dataset_version_id:  Mapped[uuid4] = mapped_column(ForeignKey("eval_dataset_versions.id"),  nullable=False)
-    model_id:            Mapped[uuid4] = mapped_column(ForeignKey("eval_models.id"),            nullable=False)
+    dataset_version_id:  Mapped[uuid4] = mapped_column(ForeignKey("exp_dataset_versions.id"),  nullable=False)
+    model_id:            Mapped[uuid4] = mapped_column(ForeignKey("exp_models.id"),            nullable=False)
     preview_results:     Mapped[dict]  = mapped_column(JSONB, nullable=False)
     full_results_uri:    Mapped[str]   = mapped_column(Text, nullable=True)
 
-    run             = relationship("Run",            back_populates="raw_results")
-    dataset_version = relationship("DatasetVersion", back_populates="raw_results")
-    model           = relationship("Model",          back_populates="raw_results")
+    run             = relationship("Run",               back_populates="raw_results")
+    dataset_version = relationship("ExpDatasetVersion", back_populates="raw_results")
+    model           = relationship("ExpModel",          back_populates="raw_results")
