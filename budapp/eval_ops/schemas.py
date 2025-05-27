@@ -52,6 +52,19 @@ class DeleteExperimentResponse(SuccessResponse):
     pass
 
 
+class DatasetBasic(BaseModel):
+    """Basic dataset information for trait responses."""
+    id: UUID4 = Field(..., description="The UUID of the dataset.")
+    name: str = Field(..., description="The name of the dataset.")
+    description: Optional[str] = Field(None, description="The description of the dataset.")
+    estimated_input_tokens: Optional[int] = Field(None, description="Estimated input tokens.")
+    estimated_output_tokens: Optional[int] = Field(None, description="Estimated output tokens.")
+    modalities: Optional[List[str]] = Field(None, description="List of modalities.")
+
+    class Config:  # noqa: D106
+        from_attributes = True
+
+
 class Trait(BaseModel):
     """A trait that experiments can be grouped by."""
     id: UUID4 = Field(..., description="The UUID of the trait.")
@@ -60,6 +73,7 @@ class Trait(BaseModel):
     # if you still need these for your UI you can keep them:
     category: Optional[str] = Field(None, description="Optional category metadata.")
     exps_ids: List[UUID4] = Field([], description="Optional list of experiment UUIDs.")
+    datasets: List[DatasetBasic] = Field([], description="List of datasets associated with this trait.")
 
     class Config:  # noqa: D106
         from_attributes = True

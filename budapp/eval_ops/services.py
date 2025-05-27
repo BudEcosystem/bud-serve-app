@@ -234,16 +234,40 @@ class ExperimentService:
                 detail="Failed to list traits"
             ) from e
 
-        result = [
-            TraitSchema(
-                unique_id=str(t.id),
+        # Get datasets for each trait
+        result = []
+        for t in traits:
+            # Get associated datasets through pivot table
+            datasets_query = (
+                self.session.query(DatasetModel)
+                .join(PivotModel, DatasetModel.id == PivotModel.dataset_id)
+                .filter(PivotModel.trait_id == t.id)
+                .all()
+            )
+            
+            # Convert to DatasetBasic schema
+            from budapp.eval_ops.schemas import DatasetBasic
+            datasets = [
+                DatasetBasic(
+                    id=dataset.id,
+                    name=dataset.name,
+                    description=dataset.description,
+                    estimated_input_tokens=dataset.estimated_input_tokens,
+                    estimated_output_tokens=dataset.estimated_output_tokens,
+                    modalities=dataset.modalities,
+                )
+                for dataset in datasets_query
+            ]
+            
+            result.append(TraitSchema(
+                id=t.id,
                 name=t.name,
                 description=t.description or "",
                 category="",
                 exps_ids=[],
-            )
-            for t in traits
-        ]
+                datasets=datasets,
+            ))
+        
         return result, total
 
     def create_run(self, experiment_id: uuid.UUID, req: CreateRunRequest, user_id: uuid.UUID) -> RunSchema:
@@ -355,6 +379,7 @@ class ExperimentService:
             )
 
             # Convert traits to schema
+            from budapp.eval_ops.schemas import DatasetBasic
             traits = [
                 TraitSchema(
                     id=trait.id,
@@ -362,6 +387,14 @@ class ExperimentService:
                     description=trait.description or "",
                     category="",
                     exps_ids=[],
+                    datasets=[DatasetBasic(
+                        id=dataset.id,
+                        name=dataset.name,
+                        description=dataset.description,
+                        estimated_input_tokens=dataset.estimated_input_tokens,
+                        estimated_output_tokens=dataset.estimated_output_tokens,
+                        modalities=dataset.modalities,
+                    )],  # This trait is associated with the current dataset
                 )
                 for trait in traits_query
             ]
@@ -451,6 +484,7 @@ class ExperimentService:
                     .all()
                 )
 
+                from budapp.eval_ops.schemas import DatasetBasic
                 traits = [
                     TraitSchema(
                         id=trait.id,
@@ -458,6 +492,14 @@ class ExperimentService:
                         description=trait.description or "",
                         category="",
                         exps_ids=[],
+                        datasets=[DatasetBasic(
+                            id=dataset.id,
+                            name=dataset.name,
+                            description=dataset.description,
+                            estimated_input_tokens=dataset.estimated_input_tokens,
+                            estimated_output_tokens=dataset.estimated_output_tokens,
+                            modalities=dataset.modalities,
+                        )],  # This trait is associated with the current dataset
                     )
                     for trait in traits_query
                 ]
@@ -529,12 +571,21 @@ class ExperimentService:
                     if trait:
                         pivot = PivotModel(trait_id=trait_id, dataset_id=dataset.id)
                         self.session.add(pivot)
+                        from budapp.eval_ops.schemas import DatasetBasic
                         traits.append(TraitSchema(
                             id=trait.id,
                             name=trait.name,
                             description=trait.description or "",
                             category="",
                             exps_ids=[],
+                            datasets=[DatasetBasic(
+                                id=dataset.id,
+                                name=dataset.name,
+                                description=dataset.description,
+                                estimated_input_tokens=dataset.estimated_input_tokens,
+                                estimated_output_tokens=dataset.estimated_output_tokens,
+                                modalities=dataset.modalities,
+                            )],  # This trait is associated with the current dataset
                         ))
 
             self.session.commit()
@@ -636,6 +687,7 @@ class ExperimentService:
                 .all()
             )
 
+            from budapp.eval_ops.schemas import DatasetBasic
             traits = [
                 TraitSchema(
                     id=trait.id,
@@ -643,6 +695,14 @@ class ExperimentService:
                     description=trait.description or "",
                     category="",
                     exps_ids=[],
+                    datasets=[DatasetBasic(
+                        id=dataset.id,
+                        name=dataset.name,
+                        description=dataset.description,
+                        estimated_input_tokens=dataset.estimated_input_tokens,
+                        estimated_output_tokens=dataset.estimated_output_tokens,
+                        modalities=dataset.modalities,
+                    )],  # This trait is associated with the current dataset
                 )
                 for trait in traits_query
             ]
