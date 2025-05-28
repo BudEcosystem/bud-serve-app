@@ -170,9 +170,9 @@ async def logout_user(
             "model": ErrorResponse,
             "description": "Service is unavailable due to server error",
         },
-        status.HTTP_400_BAD_REQUEST: {
+        status.HTTP_401_UNAUTHORIZED: {
             "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
+            "description": "Token Expired or Invalid",
         },
         status.HTTP_200_OK: {
             "model": RefreshTokenResponse,
@@ -190,9 +190,9 @@ async def refresh_token(
         return auth_token_response.to_http_response()
     except ClientException as e:
         logger.error(f"ClientException: {e}")
-        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+        return ErrorResponse(code=status.HTTP_401_UNAUTHORIZED, message="Token Expired or Invalid").to_http_response()
     except Exception as e:
         logger.exception(f"Exception: {e}")
         return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Something went wrong"
+            code=status.HTTP_401_UNAUTHORIZED, message="Token Expired or Invalid"
         ).to_http_response()
