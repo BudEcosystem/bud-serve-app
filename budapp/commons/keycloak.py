@@ -136,8 +136,8 @@ class KeycloakManager:
             "editUsernameAllowed": False,
             "bruteForceProtected": True,
             "refreshTokenMaxReuse": 0,  # Allow unlimited reuse of refresh tokens
-            "ssoSessionIdleTimeout": 2592000,  # 30 days in seconds
-            "ssoSessionMaxLifespan": 2592000,  # 30 days in seconds
+            "ssoSessionIdleTimeout": 3600,    # 1 hour in seconds
+            "ssoSessionMaxLifespan": 3600,    # 1 hour in seconds
             "offlineSessionIdleTimeout": 2592000,  # 30 days in seconds
             "offlineSessionMaxLifespan": 2592000,  # 30 days in seconds
         }
