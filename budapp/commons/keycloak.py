@@ -349,11 +349,12 @@ class KeycloakManager:
             user_permission_map = {}
             if user.permissions:
                 for permission in user.permissions:
-                    key = permission.name.split(":")[0]
-                    scope_name = permission.name.split(":")[1]
-                    if key not in user_permission_map:
-                        user_permission_map[key] = []
-                    user_permission_map[key].append(scope_name)
+                    if permission.has_permission:
+                        key = permission.name.split(":")[0]
+                        scope_name = permission.name.split(":")[1]
+                        if key not in user_permission_map:
+                            user_permission_map[key] = []
+                        user_permission_map[key].append(scope_name)
 
             # User Policy Name
             policy_name = f"urn:bud:policy:{user_id}"
