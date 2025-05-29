@@ -671,15 +671,16 @@ class EndpointService(SessionMixin):
         """Get model cluster detail."""
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})
         model_id = db_endpoint.model_id
-        model_detail_json_response = await ModelService(self.session).retrieve_model(model_id)
-        model_detail = json.loads(model_detail_json_response.body.decode("utf-8"))
+        # Commented out since it is same as a db retrieve
+        # model_detail_json_response = await ModelService(self.session).retrieve_model(model_id)
+        # model_detail = json.loads(model_detail_json_response.body.decode("utf-8"))
         cluster_id = db_endpoint.cluster_id
         cluster_detail = await ClusterService(self.session).get_cluster_details(cluster_id)
         return ModelClusterDetail(
             id=db_endpoint.id,
             name=db_endpoint.name,
             status=db_endpoint.status,
-            model=model_detail["model"],
+            model=db_endpoint.model,
             cluster=cluster_detail,
             deployment_config=db_endpoint.deployment_config,
         )

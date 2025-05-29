@@ -19,7 +19,7 @@
 
 import re
 from datetime import datetime
-from typing import List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from fastapi import UploadFile
 from pydantic import (
@@ -37,11 +37,10 @@ from pydantic import (
 from budapp.commons.constants import (
     AddModelModalityEnum,
     BaseModelRelationEnum,
-    CredentialTypeEnum,
     ModalityEnum,
+    ModelEndpointEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
-    ModelSourceEnum,
     WorkflowStatusEnum,
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
@@ -60,6 +59,16 @@ class ProviderFilter(BaseModel):
     name: str | None = None
 
 
+class ProviderCreate(BaseModel):
+    """Provider create schema."""
+
+    name: str
+    description: str
+    type: str
+    icon: str
+    is_active: bool = True
+
+
 class Provider(BaseModel):
     """Provider schema."""
 
@@ -68,7 +77,7 @@ class Provider(BaseModel):
     id: UUID4
     name: str
     description: str
-    type: CredentialTypeEnum
+    type: str
     icon: str
 
 
@@ -80,6 +89,22 @@ class ProviderResponse(PaginatedSuccessResponse):
     providers: list[Provider] = []
 
 
+class CloudModelCreate(BaseModel):
+    """Cloud model create schema."""
+
+    name: str
+    modality: List[ModalityEnum]
+    provider_id: UUID4
+    uri: str
+    source: str  # provider type
+    provider_type: ModelProviderTypeEnum = Field(default=ModelProviderTypeEnum.CLOUD_MODEL)
+    max_input_tokens: int | None = None
+    input_cost: dict | None = None
+    output_cost: dict | None = None
+    supported_endpoints: list[ModelEndpointEnum]
+    deprecation_date: datetime | None = None
+
+
 class CloudModel(BaseModel):
     """Cloud model schema."""
 
@@ -88,14 +113,25 @@ class CloudModel(BaseModel):
     id: UUID4
     name: str
     description: str | None = None
-    modality: ModalityEnum
-    source: CredentialTypeEnum
+    modality: List[ModalityEnum]
+    source: str
     provider_type: ModelProviderTypeEnum
     uri: str
     model_size: int | None = None
     tags: list[Tag] | None = None
     tasks: list[Tag] | None = None
     is_present_in_model: bool = False
+    supported_endpoints: list[ModelEndpointEnum]
+
+    @field_serializer("modality")
+    def serialized_modality(self, modalities: List[ModalityEnum], _info) -> Dict[str, Any]:
+        """Serialize the modality."""
+        return ModalityEnum.serialize_modality(modalities)
+
+    @field_serializer("supported_endpoints")
+    def serialized_endpoints(self, endpoints: List[ModelEndpointEnum], _info) -> Dict[str, Any]:
+        """Serialize the endpoints."""
+        return ModelEndpointEnum.serialize_endpoints(endpoints)
 
 
 class PaperPublishedModel(BaseModel):
@@ -180,8 +216,8 @@ class Model(ModelBase):
 
     id: UUID4
     icon: str | None = None
-    modality: ModalityEnum
-    source: ModelSourceEnum
+    modality: List[ModalityEnum]
+    source: str
     provider_type: ModelProviderTypeEnum
     uri: str
     model_size: Optional[int] = None
@@ -190,6 +226,17 @@ class Model(ModelBase):
     created_at: datetime
     modified_at: datetime
     provider: Provider | None = None
+    supported_endpoints: list[ModelEndpointEnum]
+
+    @field_serializer("modality")
+    def serialized_modality(self, modalities: List[ModalityEnum], _info) -> Dict[str, Any]:
+        """Serialize the modality."""
+        return ModalityEnum.serialize_modality(modalities)
+
+    @field_serializer("supported_endpoints")
+    def serialized_endpoints(self, endpoints: List[ModelEndpointEnum], _info) -> Dict[str, Any]:
+        """Serialize the endpoints."""
+        return ModelEndpointEnum.serialize_endpoints(endpoints)
 
 
 class ModelArchitectureLLMConfig(BaseModel):
@@ -218,7 +265,7 @@ class ModelArchitectureVisionConfig(BaseModel):
 class ModelCreate(ModelBase):
     """Schema for creating a new AI Model."""
 
-    modality: ModalityEnum
+    modality: List[ModalityEnum]
     source: str
     provider_type: ModelProviderTypeEnum
     uri: str
@@ -243,6 +290,7 @@ class ModelCreate(ModelBase):
     architecture_vision_config: ModelArchitectureVisionConfig | None = None
     scan_verified: bool | None = None
     icon: str | None = None
+    supported_endpoints: list[ModelEndpointEnum]
 
 
 class ModelDetailResponse(BaseModel):
@@ -277,14 +325,25 @@ class ModelDetailResponse(BaseModel):
     kv_cache_size: int | None = None
     architecture_text_config: ModelArchitectureLLMConfig | None = None
     architecture_vision_config: ModelArchitectureVisionConfig | None = None
-    modality: ModalityEnum
+    modality: List[ModalityEnum]
     source: str
     provider_type: ModelProviderTypeEnum
     uri: str
     paper_published: list[PaperPublishedModel] | None = None
     model_licenses: ModelLicensesModel | None = None
     provider: Provider | None = None
+    supported_endpoints: List[ModelEndpointEnum]
     created_at: datetime
+
+    @field_serializer("modality")
+    def serialized_modality(self, modalities: List[ModalityEnum], _info) -> Dict[str, Any]:
+        """Serialize the modality."""
+        return ModalityEnum.serialize_modality(modalities)
+
+    @field_serializer("supported_endpoints")
+    def serialized_endpoints(self, endpoints: List[ModelEndpointEnum], _info) -> Dict[str, Any]:
+        """Serialize the endpoints."""
+        return ModelEndpointEnum.serialize_endpoints(endpoints)
 
 
 class ModelTree(BaseModel):
@@ -354,7 +413,7 @@ class CreateCloudModelWorkflowRequest(BaseModel):
     provider_type: ModelProviderTypeEnum | None = None
     provider_id: UUID4 | None = None
     name: str | None = None
-    modality: ModalityEnum | None = None
+    modality: List[ModalityEnum] | None = None
     uri: str | None = None
     tags: list[Tag] | None = None
     cloud_model_id: UUID4 | None = None
@@ -571,7 +630,7 @@ class ModelResponse(BaseModel):
     id: UUID4
     name: str
     author: str | None = None
-    modality: ModalityEnum
+    modality: List[ModalityEnum]
     source: str
     uri: str
     created_user: UserInfo | None = None
@@ -586,6 +645,17 @@ class ModelResponse(BaseModel):
     provider: Provider | None = None
     is_present_in_model: bool | None = None
     model_cluster_recommended: ModelClusterRecommended | None = None
+    supported_endpoints: list[ModelEndpointEnum]
+
+    @field_serializer("modality")
+    def serialized_modality(self, modalities: List[ModalityEnum], _info) -> Dict[str, Any]:
+        """Serialize the modality."""
+        return ModalityEnum.serialize_modality(modalities)
+
+    @field_serializer("supported_endpoints")
+    def serialized_endpoints(self, endpoints: List[ModelEndpointEnum], _info) -> Dict[str, Any]:
+        """Serialize the endpoints."""
+        return ModelEndpointEnum.serialize_endpoints(endpoints)
 
 
 class ModelDeploymentResponse(ModelResponse):
@@ -615,7 +685,7 @@ class ModelFilter(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     name: str | None = None
-    source: CredentialTypeEnum | None = None
+    source: str | None = None
     model_size_min: int | None = Field(None, ge=0, le=500)
     model_size_max: int | None = Field(None, ge=0, le=500)
     provider_type: ModelProviderTypeEnum | None = None
@@ -623,11 +693,11 @@ class ModelFilter(BaseModel):
     base_model: str | None = None
     base_model_relation: BaseModelRelationEnum | None = None
 
-    @field_validator("source")
-    @classmethod
-    def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
-        """Convert the source enum value to a string."""
-        return v.value if v else None
+    # @field_validator("source")
+    # @classmethod
+    # def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
+    #     """Convert the source enum value to a string."""
+    #     return v.value if v else None
 
     @field_validator("model_size_min", "model_size_max")
     @classmethod
@@ -737,7 +807,7 @@ class CreateCloudModelWorkflowSteps(BaseModel):
     provider_type: ModelProviderTypeEnum | None = None
     source: str | None = None
     name: str | None = None
-    modality: ModalityEnum | None = None
+    modality: list[ModalityEnum] | None = None
     uri: str | None = None
     tags: list[Tag] | None = None
     icon: str | None = None
@@ -778,15 +848,15 @@ class CloudModelFilter(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    source: CredentialTypeEnum | None = None
+    source: str | None = None
     modality: ModalityEnum | None = None
     model_size: int | None = None
     name: str | None = None
 
-    @field_validator("source")
-    def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
-        """Change the source to a string."""
-        return v.value if v else None
+    # @field_validator("source")
+    # def change_to_string(cls, v: CredentialTypeEnum | None) -> str | None:
+    #     """Change the source to a string."""
+    #     return v.value if v else None
 
 
 class CloudModelResponse(PaginatedSuccessResponse):
@@ -967,6 +1037,7 @@ class ScalingSpecification(BaseModel):
     scaleUpTolerance: float = Field(ge=0)
     scaleDownTolerance: float = Field(ge=0)
     window: int = Field(ge=1)
+
 
 class ModelDeployStepRequest(BaseModel):
     """Request to deploy a model by step."""

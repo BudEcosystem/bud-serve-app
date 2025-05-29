@@ -20,12 +20,12 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy import and_, delete, desc, func, or_, select, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
 
 from budapp.commons import logging
-from budapp.commons.constants import CloudModelStatusEnum, EndpointStatusEnum, ModelStatusEnum
+from budapp.commons.constants import CloudModelStatusEnum, EndpointStatusEnum, ModelProviderTypeEnum, ModelStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.commons.exceptions import DatabaseException
 from budapp.endpoint_ops.models import Endpoint
@@ -79,6 +79,23 @@ class ProviderDataManager(DataManagerUtils):
         result = self.scalars_all(stmt)
 
         return result, count
+
+    async def soft_delete_non_supported_providers(self, provider_types: List[str]) -> None:
+        """Soft delete providers by setting is_active to False.
+
+        Args:
+            provider_types (List[str]): List of provider types to keep active.
+
+        Returns:
+            None
+        """
+        try:
+            stmt = update(ProviderModel).where(~ProviderModel.type.in_(provider_types)).values(is_active=False)
+            self.session.execute(stmt)
+            self.session.commit()
+        except SQLAlchemyError as e:
+            logger.exception(f"Failed to soft delete non-supported providers: {e}")
+            raise DatabaseException("Unable to soft delete non-supported providers") from e
 
 
 class PaperPublishedDataManager(DataManagerUtils):
@@ -289,7 +306,7 @@ class ModelDataManager(DataManagerUtils):
 
         if explicit_filters["modality"]:
             # Check any of modality present in the field
-            modality_condition = Model.modality.in_(explicit_filters["modality"])
+            modality_condition = Model.modality.overlap(explicit_filters["modality"])
             explicit_conditions.append(modality_condition)
 
         if explicit_filters["author"]:
@@ -474,6 +491,28 @@ class ModelDataManager(DataManagerUtils):
         result = self.session.execute(query)
         return result.scalar_one_or_none()
 
+    async def get_deprecated_cloud_models(self, uris: List[str]) -> List[Model]:
+        """Get deprecated cloud models."""
+        stmt = select(Model).where(~Model.uri.in_(uris), Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL)
+        return self.scalars_all(stmt)
+
+    async def soft_delete_deprecated_models(self, ids: List[str]) -> None:
+        """Soft delete deprecated models by setting is_active to False.
+
+        Args:
+            ids (List[str]): List of ids to soft delete.
+
+        Returns:
+            None
+        """
+        try:
+            stmt = update(Model).where(Model.id.in_(ids)).values(status=ModelStatusEnum.DELETED)
+            self.session.execute(stmt)
+            self.session.commit()
+        except SQLAlchemyError as e:
+            logger.exception(f"Failed to soft delete deprecated models: {e}")
+            raise DatabaseException("Unable to soft delete deprecated models") from e
+
 
 class CloudModelDataManager(DataManagerUtils):
     """Data manager for the CloudModel model."""
@@ -522,12 +561,12 @@ class CloudModelDataManager(DataManagerUtils):
 
         if explicit_filters["modality"]:
             # Check any of modality present in the field
-            modality_condition = CloudModel.modality.in_(explicit_filters["modality"])
+            modality_condition = CloudModel.modality.overlap(explicit_filters["modality"])
             explicit_conditions.append(modality_condition)
 
         if explicit_filters["author"]:
             # Check any of author present in the field
-            author_condition = CloudModel.modality.in_(explicit_filters["author"])
+            author_condition = CloudModel.author.in_(explicit_filters["author"])
             explicit_conditions.append(author_condition)
 
         if explicit_filters["model_size_min"] is not None or explicit_filters["model_size_max"] is not None:
@@ -629,6 +668,23 @@ class CloudModelDataManager(DataManagerUtils):
         result = self.execute_all(stmt)
 
         return result, count
+
+    async def remove_non_supported_cloud_models(self, uris: List[str]) -> None:
+        """Remove cloud models by setting is_active to False.
+
+        Args:
+            uris (List[str]): List of uris to keep active.
+
+        Returns:
+            None
+        """
+        try:
+            stmt = delete(CloudModel).where(~CloudModel.uri.in_(uris))
+            self.session.execute(stmt)
+            self.session.commit()
+        except SQLAlchemyError as e:
+            logger.exception(f"Failed to remove non-supported cloud models: {e}")
+            raise DatabaseException("Unable to remove non-supported cloud models") from e
 
 
 class ModelLicensesDataManager(DataManagerUtils):

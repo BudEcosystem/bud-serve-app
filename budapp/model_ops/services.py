@@ -74,7 +74,11 @@ from ..commons.constants import (
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
-from ..commons.helpers import validate_huggingface_repo_format
+from ..commons.helpers import (
+    determine_modality_endpoints,
+    determine_supported_endpoints,
+    validate_huggingface_repo_format,
+)
 from ..commons.schemas import BudNotificationMetadata
 from ..commons.security import RSAHandler
 from ..core.crud import ModelTemplateDataManager
@@ -145,6 +149,8 @@ class ProviderService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[ProviderModel], int]:
         """Get all providers."""
+        # Fetch active providers
+        filters["is_active"] = True
         return await ProviderDataManager(self.session).get_all_providers(offset, limit, filters, order_by, search)
 
 
@@ -187,7 +193,7 @@ class CloudModelWorkflowService(SessionMixin):
             db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
                 ProviderModel, {"id": provider_id}
             )
-            source = db_provider.type.value
+            source = db_provider.type
 
             # Update icon on workflow
             db_workflow = await WorkflowDataManager(self.session).update_by_fields(
@@ -328,7 +334,7 @@ class CloudModelWorkflowService(SessionMixin):
                         required_data[key] = db_workflow_step.data[key]
 
             # Check if all required keys are present
-            required_keys = ["provider_type", "provider_id", "modality", "tags", "name", "source"]
+            required_keys = ["provider_type", "provider_id", "tags", "name", "source"]
             missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
@@ -613,8 +619,10 @@ class CloudModelWorkflowService(SessionMixin):
                 uri=db_cloud_model.uri,
                 created_by=current_user_id,
                 provider_id=provider_id,
+                supported_endpoints=db_cloud_model.supported_endpoints,
             )
         else:
+            supported_endpoints = await determine_supported_endpoints(modality)
             model_data = ModelCreate(
                 source=source,
                 name=name,
@@ -624,6 +632,7 @@ class CloudModelWorkflowService(SessionMixin):
                 provider_type=provider_type,
                 created_by=current_user_id,
                 provider_id=provider_id,
+                supported_endpoints=supported_endpoints,
             )
 
         return model_data
@@ -786,7 +795,7 @@ class LocalModelWorkflowService(SessionMixin):
         provider_id = None
         if provider_type == ModelProviderTypeEnum.HUGGING_FACE:
             db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
-                ProviderModel, {"type": CredentialTypeEnum.HUGGINGFACE}
+                ProviderModel, {"type": CredentialTypeEnum.HUGGINGFACE.value}
             )
             provider_id = db_provider.id
 
@@ -1089,6 +1098,9 @@ class LocalModelWorkflowService(SessionMixin):
             if not icon:
                 icon = APP_ICONS["general"]["default_url_model"]
 
+        extracted_modality = model_info["modality"]
+        model_details = await determine_modality_endpoints(extracted_modality)
+
         model_data = ModelCreate(
             name=required_data["name"],
             description=model_description,
@@ -1097,7 +1109,8 @@ class LocalModelWorkflowService(SessionMixin):
             github_url=model_github_url,
             huggingface_url=model_huggingface_url,
             website_url=model_website_url,
-            modality=model_info["modality"],
+            modality=model_details["modality"],
+            supported_endpoints=model_details["endpoints"],
             source=ModelSourceEnum.LOCAL,
             provider_type=required_data["provider_type"],
             uri=required_data["uri"],

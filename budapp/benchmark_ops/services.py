@@ -514,9 +514,12 @@ class BenchmarkService(SessionMixin):
             benchmark_list = []
             for db_benchmark in db_benchmarks:
                 benchmark_dict = {**db_benchmark.__dict__}
-                benchmark_dict["model"] = ModelResponse.model_validate(db_benchmark.model).model_dump(
-                    mode="json"
-                )  # Ensure relationships are included
+                benchmark_dict["model"] = ModelResponse.model_validate(
+                    db_benchmark.model
+                )  # Ensure relationships are included # Removed json conversion to avoid error in modality and supported endpoints
+                # benchmark_dict["model"] = ModelResponse.model_validate(db_benchmark.model).model_dump(
+                #     mode="json"
+                # )  # Ensure relationships are included
                 benchmark_dict["cluster"] = {**db_benchmark.cluster.__dict__}
                 benchmark_dict["tpot"] = (
                     round(benchmark_dict["result"].get("mean_tpot_ms", 0.0), 2) if benchmark_dict["result"] else 0.0

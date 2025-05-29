@@ -408,3 +408,93 @@ def replicate_dir(source: str, destination: str, is_override: bool = False):
                     logger.debug(f"Skipped (identical): {dst_file}")
             else:
                 logger.debug(f"Skipped (exists): {dst_file}")
+
+
+async def determine_modality_endpoints(
+    input_modality: Literal[
+        "llm", "mllm", "image", "embedding", "text_to_speech", "speech_to_text", "llm_embedding", "mllm_embedding"
+    ],
+) -> List[Dict[str, str]]:
+    """Determine the endpoints for the given modality.
+
+    Args:
+        modality: The modality to determine the endpoints for.
+
+    Returns:
+        The endpoints for the given modality.
+    """
+    from ..commons.constants import ModalityEnum, ModelEndpointEnum
+
+    result = {"modality": None, "endpoints": None}
+    if input_modality == "llm":
+        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT]
+        result["endpoints"] = [ModelEndpointEnum.CHAT, ModelEndpointEnum.COMPLETION]
+    elif input_modality == "mllm":
+        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.TEXT_OUTPUT]
+        result["endpoints"] = [ModelEndpointEnum.CHAT]
+    elif input_modality == "image":
+        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_OUTPUT]
+        result["endpoints"] = [ModelEndpointEnum.IMAGE_GENERATION]
+    elif input_modality == "embedding":
+        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT]
+        result["endpoints"] = [ModelEndpointEnum.EMBEDDING]
+    elif input_modality == "text_to_speech":
+        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.AUDIO_OUTPUT]
+        result["endpoints"] = [ModelEndpointEnum.AUDIO_SPEECH]
+    elif input_modality == "speech_to_text":
+        result["modality"] = [ModalityEnum.AUDIO_INPUT, ModalityEnum.TEXT_OUTPUT]
+        result["endpoints"] = [ModelEndpointEnum.AUDIO_TRANSCRIPTION]
+    elif input_modality == "llm_embedding":
+        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT]
+        result["endpoints"] = [ModelEndpointEnum.EMBEDDING]
+    elif input_modality == "mllm_embedding":
+        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.TEXT_OUTPUT]
+        result["endpoints"] = [ModelEndpointEnum.EMBEDDING]
+    else:
+        raise ValueError(f"Invalid modality: {input_modality}")
+
+    return result
+
+
+async def determine_supported_endpoints(
+    selected_modalities: List["ModalityEnum"],
+) -> List["ModelEndpointEnum"]:
+    """Determine API endpoints supported by the given modalities.
+
+    Args:
+        selected_modalities: The modalities to determine the endpoints for.
+
+    Returns:
+        The endpoints supported by the given modalities.
+    """
+    from ..commons.constants import ModalityEnum, ModelEndpointEnum
+
+    modality_set = set(selected_modalities)
+    endpoints: set[ModelEndpointEnum] = set()
+
+    if {
+        ModalityEnum.TEXT_INPUT.value,
+        ModalityEnum.TEXT_OUTPUT.value,
+    }.issubset(modality_set):
+        endpoints.update({ModelEndpointEnum.CHAT, ModelEndpointEnum.COMPLETION})
+    elif ModalityEnum.TEXT_INPUT.value in modality_set:
+        endpoints.add(ModelEndpointEnum.COMPLETION)
+
+    if ModalityEnum.IMAGE_OUTPUT.value in modality_set:
+        endpoints.add(ModelEndpointEnum.IMAGE_GENERATION)
+
+    if ModalityEnum.AUDIO_OUTPUT.value in modality_set:
+        endpoints.add(ModelEndpointEnum.AUDIO_SPEECH)
+
+    if {
+        ModalityEnum.AUDIO_INPUT.value,
+        ModalityEnum.TEXT_OUTPUT.value,
+    }.issubset(modality_set):
+        endpoints.add(ModelEndpointEnum.AUDIO_TRANSCRIPTION)
+
+    if not endpoints:
+        # Add default endpoint
+        logger.warning("No endpoints found, adding default endpoint")
+        endpoints.add(ModelEndpointEnum.CHAT)
+
+    return list(endpoints)
