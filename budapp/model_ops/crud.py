@@ -25,10 +25,16 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
 
 from budapp.commons import logging
-from budapp.commons.constants import CloudModelStatusEnum, EndpointStatusEnum, ModelProviderTypeEnum, ModelStatusEnum
+from budapp.commons.constants import (
+    CloudModelStatusEnum,
+    EndpointStatusEnum,
+    ModelProviderTypeEnum,
+    ModelStatusEnum,
+    AdapterStatusEnum,
+)
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.commons.exceptions import DatabaseException
-from budapp.endpoint_ops.models import Endpoint
+from budapp.endpoint_ops.models import Adapter, Endpoint
 from budapp.model_ops.models import CloudModel, Model, PaperPublished
 from budapp.model_ops.models import Provider as ProviderModel
 from budapp.model_ops.models import QuantizationMethod as QuantizationMethodModel
@@ -329,21 +335,56 @@ class ModelDataManager(DataManagerUtils):
             size_condition = and_(*size_conditions)
             explicit_conditions.append(size_condition)
 
+        endpoint_count_subquery = (
+            select(
+                Endpoint.model_id,
+                func.count(func.distinct(Endpoint.id)).label("endpoint_count"),
+            )
+            .where(Endpoint.status != EndpointStatusEnum.DELETED)
+            .group_by(Endpoint.model_id)
+            .alias("endpoint_count_subquery")
+        )
+
+        adapter_endpoint_count_subquery = (
+            select(
+                Adapter.model_id,
+                func.count(func.distinct(Adapter.endpoint_id)).label("endpoint_count"),
+            )
+            .join(Endpoint, Endpoint.id == Adapter.endpoint_id)
+            .where(
+                Adapter.status != AdapterStatusEnum.DELETED,
+                Endpoint.status != EndpointStatusEnum.DELETED,
+            )
+            .group_by(Adapter.model_id)
+            .alias("adapter_endpoint_count_subquery")
+        )
+
+        endpoints_count_expr = (
+            func.coalesce(endpoint_count_subquery.c.endpoint_count, 0)
+            + func.coalesce(adapter_endpoint_count_subquery.c.endpoint_count, 0)
+        ).label("endpoints_count")
+
         # Generate statements according to search or filters
         if search:
             search_conditions = await self.generate_search_stmt(Model, filters)
             stmt = (
                 select(
                     Model,
-                    func.count(Endpoint.id)
-                    .filter(Endpoint.status != EndpointStatusEnum.DELETED)
-                    .label("endpoints_count"),
+                    endpoints_count_expr,
                 )
                 .select_from(Model)
                 .filter(or_(*search_conditions, *explicit_conditions))
                 .filter(Model.status == ModelStatusEnum.ACTIVE)
-                .outerjoin(Endpoint, Endpoint.model_id == Model.id)
-                .group_by(Model.id)
+                .join(
+                    endpoint_count_subquery,
+                    Model.id == endpoint_count_subquery.c.model_id,
+                    isouter=True,
+                )
+                .join(
+                    adapter_endpoint_count_subquery,
+                    Model.id == adapter_endpoint_count_subquery.c.model_id,
+                    isouter=True,
+                )
             )
             count_stmt = (
                 select(func.count())
@@ -355,16 +396,22 @@ class ModelDataManager(DataManagerUtils):
             stmt = (
                 select(
                     Model,
-                    func.count(Endpoint.id)
-                    .filter(Endpoint.status != EndpointStatusEnum.DELETED)
-                    .label("endpoints_count"),
+                    endpoints_count_expr,
                 )
                 .select_from(Model)
                 .filter_by(**filters)
                 .where(and_(*explicit_conditions))
                 .filter(Model.status == ModelStatusEnum.ACTIVE)
-                .outerjoin(Endpoint, Endpoint.model_id == Model.id)
-                .group_by(Model.id)
+                .join(
+                    endpoint_count_subquery,
+                    Model.id == endpoint_count_subquery.c.model_id,
+                    isouter=True,
+                )
+                .join(
+                    adapter_endpoint_count_subquery,
+                    Model.id == adapter_endpoint_count_subquery.c.model_id,
+                    isouter=True,
+                )
             )
             count_stmt = (
                 select(func.count())
@@ -456,6 +503,30 @@ class ModelDataManager(DataManagerUtils):
         )
 
         return self.execute_all(stmt)
+
+    async def get_model_endpoints_count(self, model_id: UUID) -> int:
+        """Get total endpoints count for a model including adapters."""
+        direct_stmt = (
+            select(Endpoint.id)
+            .where(
+                Endpoint.model_id == model_id,
+                Endpoint.status != EndpointStatusEnum.DELETED,
+            )
+        )
+
+        adapter_stmt = (
+            select(Adapter.endpoint_id)
+            .join(Endpoint, Endpoint.id == Adapter.endpoint_id)
+            .where(
+                Adapter.model_id == model_id,
+                Adapter.status != AdapterStatusEnum.DELETED,
+                Endpoint.status != EndpointStatusEnum.DELETED,
+            )
+        )
+
+        union_subq = direct_stmt.union(adapter_stmt).subquery()
+        count_stmt = select(func.count()).select_from(union_subq)
+        return self.execute_scalar(count_stmt)
 
     async def get_models_by_uris(self, uris: List[str]) -> List[Model]:
         """Get models by uris."""
