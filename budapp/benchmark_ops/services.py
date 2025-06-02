@@ -1,5 +1,5 @@
 import json
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
 import aiohttp
@@ -529,6 +529,28 @@ class BenchmarkService(SessionMixin):
                 )
                 benchmark_list.append(benchmark_dict)
             return benchmark_list, total_count
+
+    async def get_benchmark_filters(
+        self, offset: int, limit: int, filters: Dict, order_by: List, search: bool
+    ) -> Tuple[List[BenchmarkSchema], int]:
+        """Get benchmark filters.
+        This function is used to get all the unique values for the filters.
+        It is used to populate the dropdowns for the filters.
+
+        Args:
+            offset: The offset to start the fetch from.
+            limit: The limit to fetch.
+            filters: The filters to apply.
+            order_by: The order by to apply.
+            search: Whether to apply search.
+
+        Returns:
+            Tuple[List[BenchmarkSchema], int]: A tuple containing the list of benchmark filters and the total count.
+        """
+        with BenchmarkCRUD() as crud:
+            db_benchmarks, total_count = await crud.get_all_benchmark_filters(offset, limit, filters, order_by, search)
+
+            return db_benchmarks, total_count
 
     async def _perform_get_benchmark_result_request(self, benchmark_id: UUID) -> dict:
         """Perform run benchmark request to budcluster service."""

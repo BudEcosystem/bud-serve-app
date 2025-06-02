@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
 
 from budmicroframe.shared.psql_service import CRUDMixin, PSQLBase, TimestampMixin
@@ -207,6 +207,28 @@ class BenchmarkCRUD(CRUDMixin[BenchmarkSchema, None, None]):
         result = self.scalars_all(stmt)
 
         return result, count
+
+    async def get_all_benchmark_filters(
+        self, offset: int, limit: int, filters: Dict, order_by: List, search: bool
+    ) -> Tuple[List[str], List[str]]:
+        """Get all benchmark filters.
+
+        This function is used to get all the unique values for the filters.
+        It is used to populate the dropdowns for the filters.
+
+        Args:
+            offset: The offset to start the fetch from.
+            limit: The limit to fetch.
+            filters: The filters to apply.
+            order_by: The order by to apply.
+            search: Whether to apply search.
+        """
+        if search:
+            pass
+        else:
+            pass
+
+        return [], 0
 
 
 class BenchmarkRequestMetricsSchema(PSQLBase, TimestampMixin):
