@@ -38,15 +38,7 @@ from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
-from ..commons.constants import BenchmarkFilterResourceEnum
-from .schemas import (
-    AddRequestMetricsRequest,
-    BenchmarkFilter,
-    BenchmarkFilterFields,
-    BenchmarkFilterValueResponse,
-    BenchmarkPaginatedResponse,
-    RunBenchmarkWorkflowRequest,
-)
+from .schemas import AddRequestMetricsRequest, BenchmarkFilter, BenchmarkPaginatedResponse, RunBenchmarkWorkflowRequest
 from .services import BenchmarkRequestMetricsService, BenchmarkService
 
 
@@ -151,55 +143,6 @@ async def list_all_benchmarks(
         object="benchmarks.list",
         code=status.HTTP_200_OK,
         message="Successfully list all benchmarks",
-    ).to_http_response()
-
-
-@benchmark_router.get(
-    "/filters",
-    responses={
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
-        status.HTTP_200_OK: {
-            "model": BenchmarkFilterValueResponse,
-            "description": "Successfully list all benchmark filters",
-        },
-    },
-    description="List unique benchmark filter values",
-)
-async def list_all_benchmark_filters(
-    _: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
-    filters: Annotated[BenchmarkFilterFields, Depends()],
-    page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=0),
-    search: bool = False,
-) -> Union[BenchmarkFilterValueResponse, ErrorResponse]:
-    """List unique benchmark filter values."""
-    offset = (page - 1) * limit
-
-    # Get the name to filter by
-    if filters.resource == BenchmarkFilterResourceEnum.MODEL:
-        name = filters.model_name or None
-    else:
-        name = filters.cluster_name or None
-
-    result, count = await BenchmarkService(session).list_benchmark_filter_values(
-        filters.resource, name, search, offset, limit
-    )
-
-    return BenchmarkFilterValueResponse(
-        result=result,
-        total_record=count,
-        page=page,
-        limit=limit,
-        object="benchmarks.filters.list",
-        code=status.HTTP_200_OK,
     ).to_http_response()
 
 

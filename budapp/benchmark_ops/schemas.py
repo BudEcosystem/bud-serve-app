@@ -2,9 +2,9 @@ from datetime import datetime
 from typing import Any, Literal, Optional
 from uuid import UUID
 
-from pydantic import UUID4, BaseModel, ConfigDict, Field, computed_field, model_validator
+from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator, computed_field
 
-from budapp.commons.constants import BenchmarkFilterResourceEnum, BenchmarkStatusEnum
+from budapp.commons.constants import BenchmarkStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse
 
 from ..cluster_ops.schemas import ClusterResponse
@@ -205,20 +205,3 @@ class BenchmarkRequestMetrics(BaseModel):
 
 class AddRequestMetricsRequest(BaseModel):
     metrics: list[BenchmarkRequestMetrics]
-
-
-# Benchmark Filter Listing API
-
-
-class BenchmarkFilterFields(BaseModel):
-    """Benchmark filter fields schema."""
-
-    model_name: str | None = None
-    cluster_name: str | None = None
-    resource: BenchmarkFilterResourceEnum = Field(default=BenchmarkFilterResourceEnum.MODEL)
-
-
-class BenchmarkFilterValueResponse(PaginatedSuccessResponse):
-    """Benchmark filter values response schema."""
-
-    result: list[str]

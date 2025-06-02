@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 from budmicroframe.shared.psql_service import CRUDMixin, PSQLBase, TimestampMixin
@@ -16,10 +16,10 @@ from sqlalchemy import (
     select,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..cluster_ops.models import Cluster as ClusterModel
-from ..commons.constants import BenchmarkFilterResourceEnum, BenchmarkStatusEnum
+from ..commons.constants import BenchmarkStatusEnum
 from ..model_ops.models import Model
 
 
@@ -205,60 +205,6 @@ class BenchmarkCRUD(CRUDMixin[BenchmarkSchema, None, None]):
         print(stmt)
 
         result = self.scalars_all(stmt)
-
-        return result, count
-
-    async def list_unique_model_cluster_names(
-        self,
-        resource: BenchmarkFilterResourceEnum,
-        value: str,
-        search: bool,
-        offset: int,
-        limit: int,
-        session: Session,
-    ) -> Tuple[List[str], int]:
-        """List distinct model or cluster names used in benchmarks.
-
-        Args:
-            resource: The resource to filter by.
-            value: The value to filter by.
-            search: Whether to search for the value.
-            offset: The offset to start the fetch from.
-            limit: The limit to fetch.
-
-        Returns:
-            Tuple[List[str], int]: A tuple containing the list of unique model or cluster names and the total count.
-        """
-        if resource == BenchmarkFilterResourceEnum.MODEL:
-            col_name = Model.name
-            join_model = Model
-            join_condition = self.model.model_id == Model.id
-        else:
-            col_name = ClusterModel.name
-            join_model = ClusterModel
-            join_condition = self.model.cluster_id == ClusterModel.id
-
-        # Create query and count query
-        stmt = select(func.distinct(col_name).label("name")).select_from(self.model).join(join_model, join_condition)
-        count_stmt = (
-            select(func.count(func.distinct(col_name))).select_from(self.model).join(join_model, join_condition)
-        )
-
-        # Generate search or filter query
-        if value:
-            if search:
-                stmt = stmt.where(col_name.ilike(f"%{value}%"))
-                count_stmt = count_stmt.where(col_name.ilike(f"%{value}%"))
-            else:
-                stmt = stmt.where(col_name == value)
-                count_stmt = count_stmt.where(col_name == value)
-
-        # Apply limit and offset
-        stmt = stmt.order_by(col_name).offset(offset).limit(limit)
-
-        # Execute query
-        result = session.execute(stmt).scalars().all()
-        count = self.execute_scalar(count_stmt)
 
         return result, count
 
