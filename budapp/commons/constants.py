@@ -2868,3 +2868,10 @@ class ModelEndpointEnum(Enum):
             }
 
         return result
+
+
+class BenchmarkFilterResourceEnum(Enum):
+    """Benchmark filter resource types."""
+
+    MODEL = "model"
+    CLUSTER = "cluster"
