@@ -38,11 +38,12 @@ from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
+from ..commons.constants import BenchmarkFilterResourceEnum
 from .schemas import (
     AddRequestMetricsRequest,
     BenchmarkFilter,
     BenchmarkFilterFields,
-    BenchmarkFilterPaginatedResponse,
+    BenchmarkFilterValueResponse,
     BenchmarkPaginatedResponse,
     RunBenchmarkWorkflowRequest,
 )
@@ -165,11 +166,11 @@ async def list_all_benchmarks(
             "description": "Service is unavailable due to client error",
         },
         status.HTTP_200_OK: {
-            "model": BenchmarkFilterPaginatedResponse,
-            "description": "Successfully list all benchmarks",
+            "model": BenchmarkFilterValueResponse,
+            "description": "Successfully list all benchmark filters",
         },
     },
-    description="List all benchmark filters",
+    description="List unique benchmark filter values",
 )
 async def list_all_benchmark_filters(
     _: Annotated[User, Depends(get_current_active_user)],
@@ -177,23 +178,23 @@ async def list_all_benchmark_filters(
     filters: Annotated[BenchmarkFilterFields, Depends()],
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=0),
-    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
     search: bool = False,
-) -> Union[BenchmarkFilterPaginatedResponse, ErrorResponse]:
-    """List all benchmark filters."""
-    # Calculate offset
+) -> Union[BenchmarkFilterValueResponse, ErrorResponse]:
+    """List unique benchmark filter values."""
     offset = (page - 1) * limit
 
-    # Convert UserFilter to dictionary
-    filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True)
-    logger.debug("Filters dictionary: %s", filters_dict)
+    # Get the name to filter by
+    if filters.resource == BenchmarkFilterResourceEnum.MODEL:
+        name = filters.model_name or None
+    else:
+        name = filters.cluster_name or None
 
-    db_benchmarks, count = await BenchmarkService(session).get_benchmark_filters(
-        offset, limit, filters_dict, order_by, search
+    result, count = await BenchmarkService(session).list_benchmark_filter_values(
+        filters.resource, name, search, offset, limit
     )
 
-    return BenchmarkFilterPaginatedResponse(
-        benchmarks=db_benchmarks,
+    return BenchmarkFilterValueResponse(
+        result=result,
         total_record=count,
         page=page,
         limit=limit,

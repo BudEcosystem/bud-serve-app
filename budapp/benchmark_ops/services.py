@@ -16,6 +16,7 @@ from ..commons.config import app_settings
 from ..commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
+    BenchmarkFilterResourceEnum,
     BenchmarkStatusEnum,
     BudServeWorkflowStepEventName,
     ClusterStatusEnum,
@@ -530,29 +531,32 @@ class BenchmarkService(SessionMixin):
                 benchmark_list.append(benchmark_dict)
             return benchmark_list, total_count
 
-    async def get_benchmark_filters(
-        self, offset: int, limit: int, filters: Dict, order_by: List, search: bool
-    ) -> Tuple[List[BenchmarkSchema], int]:
-        """Get benchmark filters.
-        This function is used to get all the unique values for the filters.
-        It is used to populate the dropdowns for the filters.
+    async def list_benchmark_filter_values(
+        self,
+        resource: BenchmarkFilterResourceEnum,
+        name: str,
+        search: bool,
+        offset: int = 0,
+        limit: int = 10,
+    ) -> Tuple[List[str], int]:
+        """List distinct benchmark filter values by type.
 
         Args:
-            offset: The offset to start the fetch from.
-            limit: The limit to fetch.
-            filters: The filters to apply.
-            order_by: The order by to apply.
-            search: Whether to apply search.
+            resource: BenchmarkFilterResourceEnum
+            name: str
+            search: bool
+            offset: int
+            limit: int
 
         Returns:
-            Tuple[List[BenchmarkSchema], int]: A tuple containing the list of benchmark filters and the total count.
+            Tuple[List[str], int]: A tuple containing a list of distinct filter values and the total count of values.
         """
         with BenchmarkCRUD() as crud:
-            db_benchmarks, total_count = await crud.get_all_benchmark_filters(
-                offset, limit, filters, order_by, search, self.session
+            result, count = await crud.list_unique_model_cluster_names(
+                resource, name, search, offset, limit, self.session
             )
 
-            return db_benchmarks, total_count
+        return result, count
 
     async def _perform_get_benchmark_result_request(self, benchmark_id: UUID) -> dict:
         """Perform run benchmark request to budcluster service."""

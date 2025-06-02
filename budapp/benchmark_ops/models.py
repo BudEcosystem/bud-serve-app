@@ -19,7 +19,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from ..cluster_ops.models import Cluster as ClusterModel
-from ..commons.constants import BenchmarkStatusEnum
+from ..commons.constants import BenchmarkFilterResourceEnum, BenchmarkStatusEnum
 from ..model_ops.models import Model
 
 
@@ -208,97 +208,57 @@ class BenchmarkCRUD(CRUDMixin[BenchmarkSchema, None, None]):
 
         return result, count
 
-    async def get_all_benchmark_filters(
-        self, offset: int, limit: int, filters: Dict, order_by: List, search: bool, session: Session = None
-    ) -> Tuple[List[str], List[str]]:
-        """Get all benchmark filters.
-
-        This function is used to get all the unique values for the filters.
-        It is used to populate the dropdowns for the filters.
+    async def list_unique_model_cluster_names(
+        self,
+        resource: BenchmarkFilterResourceEnum,
+        value: str,
+        search: bool,
+        offset: int,
+        limit: int,
+        session: Session,
+    ) -> Tuple[List[str], int]:
+        """List distinct model or cluster names used in benchmarks.
 
         Args:
+            resource: The resource to filter by.
+            value: The value to filter by.
+            search: Whether to search for the value.
             offset: The offset to start the fetch from.
             limit: The limit to fetch.
-            filters: The filters to apply.
-            order_by: The order by to apply.
-            search: Whether to apply search.
+
+        Returns:
+            Tuple[List[str], int]: A tuple containing the list of unique model or cluster names and the total count.
         """
-        # filters, order_by of default model fields and structure
-        filters = filters or {}
-        order_by = order_by or []
-
-        translated_filters = filters.copy()
-        translated_order_by = order_by.copy()
-
-        # Remove non-model fields from filters dictionary for validation
-        for field in translated_filters:
-            if field in ["model_name", "cluster_name"]:
-                filters.pop(field)
-
-        await self.validate_fields(self.model, filters)
-
-        # explicit conditions for sorting by related model fields
-        explicit_conditions = []
-        for field in translated_order_by:
-            if field[0] == "model_name":
-                sorting_stmt = await self.generate_sorting_stmt(
-                    Model,
-                    [("name", field[1])],
-                )
-                explicit_conditions.extend(sorting_stmt)
-                order_by.remove(field)
-            elif field[0] == "cluster_name":
-                sorting_stmt = await self.generate_sorting_stmt(
-                    ClusterModel,
-                    [("name", field[1])],
-                )
-                explicit_conditions.extend(sorting_stmt)
-                order_by.remove(field)
-
-        if search:
-            search_conditions = []
-            for field, value in translated_filters.items():
-                if field == "model_name":
-                    search_conditions.extend(await self.generate_search_stmt(Model, {"name": value}))
-                elif field == "cluster_name":
-                    search_conditions.extend(await self.generate_search_stmt(ClusterModel, {"name": value}))
-            search_conditions.extend(await self.generate_search_stmt(self.model, filters))
-
-            stmt = select(self.model).join(Model).join(ClusterModel).filter(and_(*search_conditions))
-            count_stmt = (
-                select(func.count())
-                .select_from(self.model)
-                .join(Model)
-                .join(ClusterModel)
-                .filter(and_(*search_conditions))
-            )
+        if resource == BenchmarkFilterResourceEnum.MODEL:
+            col_name = Model.name
+            join_model = Model
+            join_condition = self.model.model_id == Model.id
         else:
-            stmt = select(self.model).join(Model).join(ClusterModel)
-            count_stmt = select(func.count()).select_from(self.model).join(Model).join(ClusterModel)
-            for key, value in translated_filters.items():
-                if key == "model_name":
-                    stmt = stmt.filter(Model.name == value)
-                    count_stmt = count_stmt.filter(Model.name == value)
-                elif key == "cluster_name":
-                    stmt = stmt.filter(ClusterModel.name == value)
-                    count_stmt = count_stmt.filter(ClusterModel.name == value)
-            for key, value in filters.items():
-                stmt = stmt.filter(getattr(self.model, key) == value)
-                count_stmt = count_stmt.filter(getattr(self.model, key) == value)
+            col_name = ClusterModel.name
+            join_model = ClusterModel
+            join_condition = self.model.cluster_id == ClusterModel.id
 
-        # Calculate count before applying limit and offset
-        count = self.execute_scalar(count_stmt)
+        # Create query and count query
+        stmt = select(func.distinct(col_name).label("name")).select_from(self.model).join(join_model, join_condition)
+        count_stmt = (
+            select(func.count(func.distinct(col_name))).select_from(self.model).join(join_model, join_condition)
+        )
+
+        # Generate search or filter query
+        if value:
+            if search:
+                stmt = stmt.where(col_name.ilike(f"%{value}%"))
+                count_stmt = count_stmt.where(col_name.ilike(f"%{value}%"))
+            else:
+                stmt = stmt.where(col_name == value)
+                count_stmt = count_stmt.where(col_name == value)
 
         # Apply limit and offset
-        stmt = stmt.limit(limit).offset(offset)
+        stmt = stmt.order_by(col_name).offset(offset).limit(limit)
 
-        # Apply sorting
-        if translated_order_by:
-            sort_conditions = await self.generate_sorting_stmt(self.model, order_by)
-            sort_conditions.extend(explicit_conditions)
-            stmt = stmt.order_by(*sort_conditions)
-
+        # Execute query
         result = session.execute(stmt).scalars().all()
+        count = self.execute_scalar(count_stmt)
 
         return result, count
 
