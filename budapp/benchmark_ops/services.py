@@ -548,7 +548,9 @@ class BenchmarkService(SessionMixin):
             Tuple[List[BenchmarkSchema], int]: A tuple containing the list of benchmark filters and the total count.
         """
         with BenchmarkCRUD() as crud:
-            db_benchmarks, total_count = await crud.get_all_benchmark_filters(offset, limit, filters, order_by, search)
+            db_benchmarks, total_count = await crud.get_all_benchmark_filters(
+                offset, limit, filters, order_by, search, self.session
+            )
 
             return db_benchmarks, total_count
 
