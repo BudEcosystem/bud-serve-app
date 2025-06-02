@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Literal, Optional
 from uuid import UUID
 
-from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator, computed_field
+from pydantic import UUID4, BaseModel, ConfigDict, Field, computed_field, model_validator
 
 from budapp.commons.constants import BenchmarkStatusEnum
 from budapp.commons.schemas import PaginatedSuccessResponse
@@ -205,3 +205,47 @@ class BenchmarkRequestMetrics(BaseModel):
 
 class AddRequestMetricsRequest(BaseModel):
     metrics: list[BenchmarkRequestMetrics]
+
+
+# Benchmark Filter Listing API
+
+
+class ModelFilter(BaseModel):
+    """Model filter schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: UUID
+    name: str
+
+
+class ClusterFilter(BaseModel):
+    """Cluster filter schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: UUID
+    name: str
+
+
+class BenchmarkFilterResponse(BaseModel):
+    """Benchmark filter response schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    model: ModelFilter
+    cluster: ClusterFilter
+    id: UUID4
+
+
+class BenchmarkFilterFields(BaseModel):
+    """Benchmark filter fields schema."""
+
+    model_name: str | None = None
+    cluster_name: str | None = None
+
+
+class BenchmarkFilterPaginatedResponse(PaginatedSuccessResponse):
+    """Benchmark filter paginated response schema."""
+
+    benchmarks: list[BenchmarkFilterResponse]

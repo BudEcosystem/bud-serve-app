@@ -38,7 +38,14 @@ from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
-from .schemas import AddRequestMetricsRequest, BenchmarkFilter, BenchmarkPaginatedResponse, RunBenchmarkWorkflowRequest
+from .schemas import (
+    AddRequestMetricsRequest,
+    BenchmarkFilter,
+    BenchmarkFilterFields,
+    BenchmarkFilterPaginatedResponse,
+    BenchmarkPaginatedResponse,
+    RunBenchmarkWorkflowRequest,
+)
 from .services import BenchmarkRequestMetricsService, BenchmarkService
 
 
@@ -143,6 +150,55 @@ async def list_all_benchmarks(
         object="benchmarks.list",
         code=status.HTTP_200_OK,
         message="Successfully list all benchmarks",
+    ).to_http_response()
+
+
+@benchmark_router.get(
+    "/filters",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": BenchmarkFilterPaginatedResponse,
+            "description": "Successfully list all benchmarks",
+        },
+    },
+    description="List all benchmark filters",
+)
+async def list_all_benchmark_filters(
+    _: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[BenchmarkFilterFields, Depends()],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[BenchmarkFilterPaginatedResponse, ErrorResponse]:
+    """List all benchmark filters."""
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Convert UserFilter to dictionary
+    filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True)
+    logger.debug("Filters dictionary: %s", filters_dict)
+
+    db_benchmarks, count = await BenchmarkService(session).get_benchmark_filters(
+        offset, limit, filters_dict, order_by, search
+    )
+
+    return BenchmarkFilterPaginatedResponse(
+        benchmarks=db_benchmarks,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="benchmarks.filters.list",
+        code=status.HTTP_200_OK,
     ).to_http_response()
 
 
