@@ -21,6 +21,7 @@ import re
 import tempfile
 from typing import Any, Dict, List, Literal, Optional, Tuple
 from urllib.parse import unquote, urlparse
+from urllib.request import ProxyHandler, Request, build_opener
 from uuid import UUID, uuid4
 
 import aiohttp
@@ -64,6 +65,7 @@ from ..commons.constants import (
     ClusterStatusEnum,
     CredentialTypeEnum,
     EndpointStatusEnum,
+    ModelLicenseObjectTypeEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
@@ -2072,7 +2074,9 @@ class ModelService(SessionMixin):
             license_object_name = await self._save_license_file_to_minio(file, model_id)
 
             # Create or update license entry
-            await self._create_or_update_license_entry(model_id, file.filename, license_object_name, current_user_id)
+            await self._create_or_update_license_entry(
+                model_id, file.filename, license_object_name, current_user_id, ModelLicenseObjectTypeEnum.MINIO
+            )
 
         elif data.get("license_url"):
             # If a license URL is provided, store the URL in the DB instead of the file path
@@ -2093,16 +2097,25 @@ class ModelService(SessionMixin):
 
             # Validate license url
             license_content = await self._validate_license_url(license_url)
+            logger.debug(f"license_content: {license_content}")
+
             word_count = await count_words(license_content)
             logger.debug(f"word_count: {word_count}")
+
+            if not license_content:
+                raise ClientException(message="Unable to get license text from given url")
+
             if word_count > MAX_LICENSE_WORD_COUNT:
                 raise ClientException(message="License content is too long")
 
-            # Save to minio
-            license_object_name = await self._save_license_url_to_minio(license_url, filename, model_id)
+            # NOTE: https://github.com/BudEcosystem/bud-serve/issues/2585
+            # For external license url, we are not saving the license file to minio, user need to navigate to the url to view the license
+
+            # Save to minio (commented out as per the issue)
+            # license_object_name = await self._save_license_url_to_minio(license_url, filename, model_id)
 
             await self._create_or_update_license_entry(
-                model_id, filename, license_object_name, current_user_id
+                model_id, filename, license_url, current_user_id, ModelLicenseObjectTypeEnum.URL
             )  # TODO: modify filename arg when license service implemented
 
         # Add papers if provided
@@ -2190,6 +2203,7 @@ class ModelService(SessionMixin):
         filename: str,
         license_url: str,
         current_user_id: UUID,
+        data_type: ModelLicenseObjectTypeEnum,
     ) -> None:
         """Create or update a license entry in the database."""
         # Check if a license entry with the given model_id exists
@@ -2207,6 +2221,7 @@ class ModelService(SessionMixin):
                 "description": None,
                 "suitability": None,
                 "license_type": None,
+                "data_type": data_type,
             }
 
             # Update database
@@ -2224,6 +2239,7 @@ class ModelService(SessionMixin):
                 description=None,
                 suitability=None,
                 license_type=None,
+                data_type=data_type,
             )
 
             # Update database
@@ -2234,19 +2250,22 @@ class ModelService(SessionMixin):
             # Execute license faqs workflow
             await self.fetch_license_faqs(model_id, license_entry.id, current_user_id, license_url)
 
-    async def _validate_license_url(self, license_url: str) -> str:
+    @staticmethod
+    async def _validate_license_url(license_url: str) -> str:
         """Validate license url."""
         try:
-            response = requests.get(license_url, timeout=10)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.content, "html.parser")
+            req = Request(url=license_url, headers={"User-Agent": "Mozilla/5.0"})
+            opener = build_opener(ProxyHandler({}))
+            with opener.open(req, timeout=10) as response:
+                content = response.read()
+
+            soup = BeautifulSoup(content, "html.parser")
             license_content = str(soup.text).strip()
             if license_content:
                 return license_content
-            else:
-                logger.error(f"Unable to get license text from given url: {license_url}")
-                raise ClientException(message="Unable to get license text from given url")
-        except (Exception, requests.exceptions.RequestException) as e:
+            logger.error(f"Unable to get license text from given url: {license_url}")
+            raise ClientException(message="Unable to get license text from given url")
+        except Exception as e:
             logger.exception(f"Error validating license url: {e}")
             raise ClientException(message="Unable to get license text from given url") from e
 
@@ -2638,9 +2657,9 @@ class ModelService(SessionMixin):
                     }
                 )
 
-        license_name = normalize_value(license_details.get("name", "license"))
+        license_name = normalize_value(license_details.get("name", "LICENSE"))
         license_data = {
-            "name": license_name if license_name else "license",
+            "name": license_name if license_name else "LICENSE",
             "license_type": normalize_value(license_details.get("type")),
             "description": normalize_value(license_details.get("type_description")),
             "suitability": normalize_value(license_details.get("type_suitability")),

@@ -47,7 +47,7 @@ from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Ta
 from budapp.user_ops.schemas import UserInfo
 
 from ..commons.config import app_settings
-from ..commons.constants import ScalingMetricEnum, ScalingTypeEnum
+from ..commons.constants import ModelLicenseObjectTypeEnum, ScalingMetricEnum, ScalingTypeEnum
 from ..commons.helpers import validate_icon
 from ..commons.schemas import BudNotificationMetadata
 from ..shared.minio_store import ModelStore
@@ -168,6 +168,7 @@ class ModelLicensesModel(BaseModel):
     description: str | None = None
     suitability: str | None = None
     model_id: UUID4
+    data_type: ModelLicenseObjectTypeEnum = ModelLicenseObjectTypeEnum.URL
 
     class Config:
         orm_mode = True
@@ -175,7 +176,7 @@ class ModelLicensesModel(BaseModel):
 
     @model_validator(mode="after")
     def validate_fields(self) -> "ModelLicensesModel":
-        if self.url:
+        if self.data_type == ModelLicenseObjectTypeEnum.MINIO:
             minio_store = ModelStore()
             is_minio_object_exists = minio_store.check_file_exists(app_settings.minio_model_bucket, self.url)
             if is_minio_object_exists:
@@ -943,6 +944,7 @@ class ModelLicensesCreate(BaseModel):
     description: str | None = None
     suitability: str | None = None
     model_id: UUID4
+    data_type: ModelLicenseObjectTypeEnum = ModelLicenseObjectTypeEnum.URL
 
 
 # Local model related schemas

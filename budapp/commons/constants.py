@@ -2875,3 +2875,10 @@ class BenchmarkFilterResourceEnum(Enum):
 
     MODEL = "model"
     CLUSTER = "cluster"
+
+
+class ModelLicenseObjectTypeEnum(StrEnum):
+    """Model license object type."""
+
+    URL = "url"
+    MINIO = "minio"
