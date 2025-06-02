@@ -2868,3 +2868,10 @@ class ModelEndpointEnum(Enum):
             }
 
         return result
+
+
+class ModelLicenseObjectTypeEnum(StrEnum):
+    """Model license object type."""
+
+    URL = "url"
+    MINIO = "minio"

@@ -64,6 +64,7 @@ from ..commons.constants import (
     ClusterStatusEnum,
     CredentialTypeEnum,
     EndpointStatusEnum,
+    ModelLicenseObjectTypeEnum,
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelSourceEnum,
@@ -2072,7 +2073,9 @@ class ModelService(SessionMixin):
             license_object_name = await self._save_license_file_to_minio(file, model_id)
 
             # Create or update license entry
-            await self._create_or_update_license_entry(model_id, file.filename, license_object_name, current_user_id)
+            await self._create_or_update_license_entry(
+                model_id, file.filename, license_object_name, current_user_id, ModelLicenseObjectTypeEnum.MINIO
+            )
 
         elif data.get("license_url"):
             # If a license URL is provided, store the URL in the DB instead of the file path
@@ -2109,7 +2112,7 @@ class ModelService(SessionMixin):
             # license_object_name = await self._save_license_url_to_minio(license_url, filename, model_id)
 
             await self._create_or_update_license_entry(
-                model_id, filename, license_url, current_user_id
+                model_id, filename, license_url, current_user_id, ModelLicenseObjectTypeEnum.URL
             )  # TODO: modify filename arg when license service implemented
 
         # Add papers if provided
@@ -2197,6 +2200,7 @@ class ModelService(SessionMixin):
         filename: str,
         license_url: str,
         current_user_id: UUID,
+        data_type: ModelLicenseObjectTypeEnum,
     ) -> None:
         """Create or update a license entry in the database."""
         # Check if a license entry with the given model_id exists
@@ -2214,6 +2218,7 @@ class ModelService(SessionMixin):
                 "description": None,
                 "suitability": None,
                 "license_type": None,
+                "data_type": data_type,
             }
 
             # Update database
@@ -2231,6 +2236,7 @@ class ModelService(SessionMixin):
                 description=None,
                 suitability=None,
                 license_type=None,
+                data_type=data_type,
             )
 
             # Update database
@@ -2241,7 +2247,8 @@ class ModelService(SessionMixin):
             # Execute license faqs workflow
             await self.fetch_license_faqs(model_id, license_entry.id, current_user_id, license_url)
 
-    async def _validate_license_url(self, license_url: str) -> str:
+    @staticmethod
+    async def _validate_license_url(license_url: str) -> str:
         """Validate license url."""
         try:
             headers = {
