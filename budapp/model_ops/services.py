@@ -21,6 +21,7 @@ import re
 import tempfile
 from typing import Any, Dict, List, Literal, Optional, Tuple
 from urllib.parse import unquote, urlparse
+from urllib.request import ProxyHandler, Request, build_opener
 from uuid import UUID, uuid4
 
 import aiohttp
@@ -2096,6 +2097,8 @@ class ModelService(SessionMixin):
 
             # Validate license url
             license_content = await self._validate_license_url(license_url)
+            logger.debug(f"license_content: {license_content}")
+
             word_count = await count_words(license_content)
             logger.debug(f"word_count: {word_count}")
 
@@ -2251,21 +2254,18 @@ class ModelService(SessionMixin):
     async def _validate_license_url(license_url: str) -> str:
         """Validate license url."""
         try:
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/114.0.0.0 Safari/537.36"
-            }
-            response = requests.get(license_url, timeout=10, headers=headers)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.content, "html.parser")
+            req = Request(url=license_url, headers={"User-Agent": "Mozilla/5.0"})
+            opener = build_opener(ProxyHandler({}))
+            with opener.open(req, timeout=10) as response:
+                content = response.read()
+
+            soup = BeautifulSoup(content, "html.parser")
             license_content = str(soup.text).strip()
             if license_content:
                 return license_content
-            else:
-                logger.error(f"Unable to get license text from given url: {license_url}")
-                raise ClientException(message="Unable to get license text from given url")
-        except (Exception, requests.exceptions.RequestException) as e:
+            logger.error(f"Unable to get license text from given url: {license_url}")
+            raise ClientException(message="Unable to get license text from given url")
+        except Exception as e:
             logger.exception(f"Error validating license url: {e}")
             raise ClientException(message="Unable to get license text from given url") from e
 
