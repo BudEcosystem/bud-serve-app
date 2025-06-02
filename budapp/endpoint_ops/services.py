@@ -256,11 +256,33 @@ class EndpointService(SessionMixin):
         )
         logger.debug(f"Endpoint retrieved successfully: {db_endpoint.id}")
 
+        # Get all adapters of this endpoint BEFORE marking them as deleted
+        db_adapters, _ = await AdapterDataManager(self.session).get_all_active_adapters(
+            db_endpoint.id, limit=1000  # Get all adapters
+        )
+
         # Mark endpoint as deleted
         db_endpoint = await EndpointDataManager(self.session).update_by_fields(
             db_endpoint, {"status": EndpointStatusEnum.DELETED}
         )
         logger.debug(f"Endpoint {db_endpoint.id} marked as deleted")
+
+        # Mark all adapters of this endpoint as deleted
+        deleted_adapters_count = await AdapterDataManager(self.session).mark_endpoint_adapters_as_deleted(
+            db_endpoint.id
+        )
+        logger.debug(f"Marked {deleted_adapters_count} adapters as deleted for endpoint {db_endpoint.id}")
+
+        # Delete adapter Redis keys
+        try:
+            redis_service = RedisService()
+            for adapter in db_adapters:
+                adapter_redis_keys = await redis_service.keys(f"router_config:*:{adapter.deployment_name}")
+                if adapter_redis_keys:
+                    adapter_redis_keys_count = await redis_service.delete(*adapter_redis_keys)
+                    logger.debug(f"Deleted {adapter_redis_keys_count} Redis keys for adapter {adapter.name}")
+        except (RedisException, Exception) as e:
+            logger.error(f"Failed to delete adapter details from redis: {e}")
 
         # Delete endpoint details with pattern “router_config:*:<endpoint_name>“,
         try:
@@ -1440,13 +1462,12 @@ class EndpointService(SessionMixin):
                 raise ClientException("Adapter is already added in the endpoint")
 
         if adapter_name:
-            db_adapters = await AdapterDataManager(self.session).retrieve_by_fields(
-                AdapterModel, {"name": adapter_name, "endpoint_id": endpoint_id},
-                missing_ok=True,
-                exclude_fields={"status": AdapterStatusEnum.DELETED}
+            # Check if adapter name already exists in the project
+            adapter_exists = await AdapterDataManager(self.session).check_adapter_name_exists_in_project(
+                adapter_name, project_id
             )
-            if db_adapters:
-                raise ClientException("Adapter name is already taken in the endpoint")
+            if adapter_exists:
+                raise ClientException("Adapter name is already taken in the project")
 
             db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
                 EndpointModel, {"name": adapter_name, "project_id": project_id},
@@ -1721,15 +1742,17 @@ class EndpointService(SessionMixin):
                 if key in db_workflow_step.data:
                     required_data[key] = db_workflow_step.data[key]
 
-        # Check for adapter with duplicate name
-        db_adapter = await AdapterDataManager(self.session).retrieve_by_fields(
-            AdapterModel,
-            {"name": required_data["adapter_name"], "endpoint_id": required_data["endpoint_id"], "status": AdapterStatusEnum.RUNNING},
-            missing_ok=True,
-            case_sensitive=False
+        # Get the endpoint to retrieve project_id
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel, {"id": required_data["endpoint_id"]}
         )
-        if db_adapter:
-            logger.error(f"Unable to create adapter with name {required_data['adapter_name']} as it already exists")
+
+        # Check for adapter with duplicate name at project level
+        adapter_exists = await AdapterDataManager(self.session).check_adapter_name_exists_in_project(
+            required_data["adapter_name"], db_endpoint.project_id
+        )
+        if adapter_exists:
+            logger.error(f"Unable to create adapter with name {required_data['adapter_name']} as it already exists in the project")
             required_data["adapter_name"] = f"{required_data['adapter_name']}_adapter"
 
         # Create a new adapter instance with the adapter data

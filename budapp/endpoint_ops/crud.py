@@ -503,19 +503,66 @@ class AdapterDataManager(DataManagerUtils):
             stmt = stmt.order_by(*sort_conditions)
 
         result = self.scalars_all(stmt)
-        logger.info("all adapters result: %s", result)
         return result, count
 
     async def get_all_adapters_in_project(self, project_id: UUID) -> Tuple[List[AdapterModel], int]:
         """Get all adapters in a project."""
-        stmt = select(AdapterModel).join(EndpointModel).filter(EndpointModel.project_id == project_id)
+        stmt = (
+            select(AdapterModel)
+            .join(EndpointModel)
+            .filter(EndpointModel.project_id == project_id)
+            .filter(AdapterModel.status == AdapterStatusEnum.RUNNING)
+        )
         count_stmt = (
             select(func.count())
             .select_from(AdapterModel)
             .join(EndpointModel)
             .filter(EndpointModel.project_id == project_id)
+            .filter(AdapterModel.status == AdapterStatusEnum.RUNNING)
         )
         count = self.execute_scalar(count_stmt)
         result = self.scalars_all(stmt)
-        logger.info("all adapters result: %s", result)
         return result, count
+
+    async def check_adapter_name_exists_in_project(self, adapter_name: str, project_id: UUID) -> bool:
+        """Check if an adapter name already exists in the project.
+        
+        Args:
+            adapter_name: The adapter name to check
+            project_id: The project ID to check within
+            
+        Returns:
+            bool: True if adapter name exists, False otherwise
+        """
+        stmt = (
+            select(AdapterModel)
+            .join(EndpointModel)
+            .filter(EndpointModel.project_id == project_id)
+            .filter(func.lower(AdapterModel.name) == func.lower(adapter_name))
+            .filter(AdapterModel.status != AdapterStatusEnum.DELETED)
+        )
+        result = self.session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+    
+    async def mark_endpoint_adapters_as_deleted(self, endpoint_id: UUID) -> int:
+        """Mark all adapters of an endpoint as deleted.
+        
+        Args:
+            endpoint_id: The endpoint ID whose adapters should be marked as deleted
+            
+        Returns:
+            int: Number of adapters marked as deleted
+        """
+        stmt = (
+            update(AdapterModel)
+            .where(
+                and_(
+                    AdapterModel.endpoint_id == endpoint_id,
+                    AdapterModel.status != AdapterStatusEnum.DELETED
+                )
+            )
+            .values(status=AdapterStatusEnum.DELETED)
+        )
+        result = self.session.execute(stmt)
+        self.session.commit()
+        return result.rowcount
