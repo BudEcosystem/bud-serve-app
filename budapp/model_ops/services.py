@@ -1961,9 +1961,7 @@ class ModelService(SessionMixin):
             quantizations_count=base_model_relation_count.get(BaseModelRelationEnum.QUANTIZED.value, 0),
         )
 
-        db_endpoint_count = await ModelDataManager(self.session).get_count_by_fields(
-            EndpointModel, fields={"model_id": model_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
-        )
+        db_endpoint_count = await ModelDataManager(self.session).get_model_endpoints_count(model_id)
 
         return ModelDetailSuccessResponse(
             model=db_model,
