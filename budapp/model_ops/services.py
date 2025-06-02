@@ -2095,14 +2095,21 @@ class ModelService(SessionMixin):
             license_content = await self._validate_license_url(license_url)
             word_count = await count_words(license_content)
             logger.debug(f"word_count: {word_count}")
+
+            if not license_content:
+                raise ClientException(message="Unable to get license text from given url")
+
             if word_count > MAX_LICENSE_WORD_COUNT:
                 raise ClientException(message="License content is too long")
 
-            # Save to minio
-            license_object_name = await self._save_license_url_to_minio(license_url, filename, model_id)
+            # NOTE: https://github.com/BudEcosystem/bud-serve/issues/2585
+            # For external license url, we are not saving the license file to minio, user need to navigate to the url to view the license
+
+            # Save to minio (commented out as per the issue)
+            # license_object_name = await self._save_license_url_to_minio(license_url, filename, model_id)
 
             await self._create_or_update_license_entry(
-                model_id, filename, license_object_name, current_user_id
+                model_id, filename, license_url, current_user_id
             )  # TODO: modify filename arg when license service implemented
 
         # Add papers if provided
