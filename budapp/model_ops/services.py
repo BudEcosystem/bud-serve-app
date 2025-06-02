@@ -2638,9 +2638,9 @@ class ModelService(SessionMixin):
                     }
                 )
 
-        license_name = normalize_value(license_details.get("name", "license"))
+        license_name = normalize_value(license_details.get("name", "LICENSE"))
         license_data = {
-            "name": license_name if license_name else "license",
+            "name": license_name if license_name else "LICENSE",
             "license_type": normalize_value(license_details.get("type")),
             "description": normalize_value(license_details.get("type_description")),
             "suitability": normalize_value(license_details.get("type_suitability")),
