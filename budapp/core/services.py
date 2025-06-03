@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from budapp.cluster_ops.services import ClusterService
 from budapp.commons import logging
 from budapp.commons.constants import (
+    PAYLOAD_TO_WORKFLOW_STEP_EVENT,
     BudServeWorkflowStepEventName,
     NotificationCategory,
     PayloadType,
@@ -331,6 +332,56 @@ class NotificationService(SessionMixin):
         # Delete adapter from database
         if payload.event == "results":
             await EndpointService(self.session).delete_adapter_from_notification_event(payload)
+
+    async def update_eta_events(self, payload: NotificationPayload) -> None:
+        """Update ETA value for workflow progress and step."""
+        if not payload.workflow_id:
+            logger.error("No workflow_id provided in ETA payload")
+            return
+
+        try:
+            eta = int(payload.content.message)
+        except (TypeError, ValueError):
+            logger.error(
+                "Invalid ETA value received for workflow %s: %s", payload.workflow_id, payload.content.message
+            )
+            return
+
+        event_name = PAYLOAD_TO_WORKFLOW_STEP_EVENT.get(PayloadType(payload.type))
+        if not event_name:
+            logger.error("No workflow step mapping found for payload type %s", payload.type)
+            return
+
+        # Update workflow progress ETA
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+            WorkflowModel, {"id": payload.workflow_id}
+        )
+        if db_workflow and isinstance(db_workflow.progress, dict):
+            progress = db_workflow.progress
+            progress["eta"] = eta
+            self.session.refresh(db_workflow)
+            await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"progress": progress})
+
+        # Update workflow step ETA
+        db_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps_by_data(
+            data_key=event_name.value, workflow_id=payload.workflow_id
+        )
+        if db_steps:
+            # Get and validate latest step
+            latest_step = db_steps[-1]
+
+            # Update step data with ETA
+            data = latest_step.data
+            event_data = data.get(event_name.value, {})
+            event_data["eta"] = eta
+            data[event_name.value] = event_data
+
+            # Refresh step and update data in db
+            self.session.refresh(latest_step)
+            await WorkflowStepDataManager(self.session).update_by_fields(latest_step, {"data": data})
+        else:
+            logger.error("Error updating ETA for workflow %s: No workflow step found", payload.workflow_id)
+
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
         """Update the workflow step events for a workflow step.
 
@@ -476,6 +527,13 @@ class SubscriberHandler:
             return NotificationResponse(
                 object="notification",
                 message="Pubsub notification received",
+            ).to_http_response()
+
+        if payload.event == "eta":
+            await NotificationService(self.session).update_eta_events(payload)
+            return NotificationResponse(
+                object="notification",
+                message="Updated workflow ETA",
             ).to_http_response()
 
         handlers = {
