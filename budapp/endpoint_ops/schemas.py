@@ -22,7 +22,7 @@ from uuid import UUID
 from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator
 
 from budapp.cluster_ops.schemas import ClusterResponse
-from budapp.commons.constants import AdapterStatusEnum, EndpointStatusEnum
+from budapp.commons.constants import AdapterStatusEnum, EndpointStatusEnum, ProxyProviderEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from budapp.model_ops.schemas import ModelDetailResponse, ModelResponse
 
@@ -279,3 +279,17 @@ class AdapterPaginatedResponse(PaginatedSuccessResponse):
     """Adapter paginated response."""
 
     adapters: list[AdapterResponse] = []
+
+
+class VLLMConfig(BaseModel):
+    """VLLM config."""
+
+    type: str
+    model_name: str
+    api_base: str
+
+class ProxyModelConfig(BaseModel):
+    """Proxy model config."""
+
+    routing: list[ProxyProviderEnum]
+    providers: dict[ProxyProviderEnum, VLLMConfig]
