@@ -224,11 +224,8 @@ class SecretsConfig(BaseSecretsConfig):
 
     password_salt: str = Field("bud_password_salt", alias="PASSWORD_SALT")
     jwt_secret_key: str = Field(alias="JWT_SECRET_KEY")
-    redis_password: Optional[str] = Field(
-        None, alias="REDIS_PASSWORD", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
-    )
     redis_uri: Optional[str] = Field(
-        None, alias="REDIS_URI", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
+        None, alias="TENSORZERO_REDIS_URL", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
     )
     hf_token: Optional[str] = Field(
         None, alias="HF_TOKEN", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
@@ -256,7 +253,7 @@ class SecretsConfig(BaseSecretsConfig):
     @computed_field
     def redis_url(self) -> str:
         """Construct and returns a Redis connection URL."""
-        return f"redis://:{self.redis_password}@{self.redis_uri}"
+        return self.redis_uri
 
     @property
     def public_key(self) -> PublicKeyTypes:

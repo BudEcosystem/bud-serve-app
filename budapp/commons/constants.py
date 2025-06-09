@@ -684,6 +684,12 @@ class ScalingMetricEnum(StrEnum):
     TIME_PER_OUTPUT_TOKEN_SECONDS = "bud:time_per_output_token_seconds_average"
 
 
+class ProxyProviderEnum(StrEnum):
+    """Proxy provider types."""
+
+    VLLM = "vllm"
+    OPENAI = "openai"
+
 # class ModelTemplateTypeEnum(StrEnum):
 #     """Model template types."""
 
