@@ -140,12 +140,12 @@ class CredentialService(SessionMixin):
                 filters={"project_id": project_id}
             )
             for credential in db_credentials:
-                keys_to_update.append({"api_key": credential.key, "expiry": expiry})
+                keys_to_update.append({"api_key": credential.key, "expiry": credential.expiry})
         else:
             keys_to_update.append({"api_key": api_key, "expiry": expiry})
 
         models = {}
-        endpoints, _ = await EndpointDataManager(self.session).get_all_running_endpoints(project_id)
+        endpoints = await EndpointDataManager(self.session).get_all_running_endpoints(project_id)
         for endpoint in endpoints:
             models[endpoint.name] = str(endpoint.id)
 
@@ -160,6 +160,8 @@ class CredentialService(SessionMixin):
             if key["expiry"]:
                 ttl = int((key["expiry"] - datetime.now()).total_seconds())
             await redis_service.set(f"api_key:{key['api_key']}", json.dumps({key['api_key']: models}), ex=ttl)
+
+        logger.info("Updated api keys in proxy cache")
 
     async def get_credentials(
         self,

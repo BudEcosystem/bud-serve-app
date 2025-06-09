@@ -287,6 +287,7 @@ class VLLMConfig(BaseModel):
     type: str
     model_name: str
     api_base: str
+    api_key_location: str
 
 class ProxyModelConfig(BaseModel):
     """Proxy model config."""

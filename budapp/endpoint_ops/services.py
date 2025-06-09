@@ -1970,13 +1970,14 @@ class EndpointService(SessionMixin):
                 ProxyProviderEnum.VLLM.value: VLLMConfig(
                     type=model_type,
                     model_name=model_name,
-                    api_base=api_base
+                    api_base=api_base + "/v1",
+                    api_key_location="none"
                 )
             }
         )
 
         redis_service = RedisService()
-        await redis_service.set(f"model_table:{endpoint_id}", json.dumps({endpoint_id: model_config.model_dump()}))
+        await redis_service.set(f"model_table:{endpoint_id}", json.dumps({str(endpoint_id): model_config.model_dump()}))
 
     async def delete_model_from_proxy_cache(self, endpoint_id: UUID) -> None:
         """Delete model from proxy cache for a project."""
