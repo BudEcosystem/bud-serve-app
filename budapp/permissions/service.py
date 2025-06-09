@@ -47,6 +47,10 @@ class PermissionService(SessionMixin):
             logger.error(f"Error creating resource permission: {e}")
             raise
 
+    async def delete_permission_for_resource_by_users(
+        self, users: list[UserModel], resource: DeletePermissionRequest
+    ) -> None:
+        pass
 
     async def delete_permission_for_resource(self, resource: DeletePermissionRequest) -> None:
         """Delete a resource permission for a user."""
