@@ -2056,6 +2056,16 @@ class ModelService(SessionMixin):
         ]:
             data.pop("icon")
 
+        # Remove license first if requested
+        if data.get("remove_license"):
+            logger.debug("Removing license for model: %s", model_id)
+            if not db_model.model_licenses:
+                raise ClientException(
+                    message="Unable to find license for model", status_code=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                await self._remove_license(db_model)
+
         # Handle file upload if provided
         # TODO: consider dapr local storage
         if data.get("license_file"):
@@ -2123,18 +2133,8 @@ class ModelService(SessionMixin):
             paper_urls = data.pop("paper_urls")
             await self._update_papers(model_id, paper_urls)
 
-        # Remove license if provided
-        if data.get("remove_license"):
-            logger.debug("Removing license for model: %s", model_id)
-            if not db_model.model_licenses:
-                raise ClientException(
-                    message="Unable to find license for model", status_code=status.HTTP_400_BAD_REQUEST
-                )
-            else:
-                await self._remove_license(db_model)
-
-        # remove remove_license from data
-        data.pop("remove_license")
+        # remove remove_license from data if it exists
+        data.pop("remove_license", None)
 
         # Update model with validated data
         await ModelDataManager(self.session).update_by_fields(db_model, data)
@@ -2243,12 +2243,12 @@ class ModelService(SessionMixin):
             )
 
             # Update database
-            await ModelLicensesDataManager(self.session).insert_one(
+            db_license = await ModelLicensesDataManager(self.session).insert_one(
                 ModelLicenses(**license_entry.model_dump(exclude_unset=True))
             )
 
             # Execute license faqs workflow
-            await self.fetch_license_faqs(model_id, license_entry.id, current_user_id, license_url)
+            await self.fetch_license_faqs(model_id, db_license.id, current_user_id, license_url)
 
     @staticmethod
     async def _validate_license_url(license_url: str) -> str:
