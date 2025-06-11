@@ -3,7 +3,7 @@
 import base64
 import json
 import sys
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import requests
 from jose import ExpiredSignatureError, JWTError
@@ -1374,6 +1374,156 @@ class KeycloakManager:
 
         except Exception as e:
             logger.error(f"Failed to retrieve permissions for user {user_id}: {str(e)}", exc_info=True)
+            raise
+
+    async def update_user_global_permissions(
+        self,
+        user_auth_id: str,
+        permissions: List[Dict[str, Union[str, bool]]],
+        realm_name: str,
+        client_id: str,
+    ) -> None:
+        """Update global permissions for a user in Keycloak.
+
+        Args:
+            user_auth_id: The Keycloak user auth ID
+            permissions: List of permissions dicts with 'name' (str) and 'has_permission' (bool) fields
+            realm_name: The realm name
+            client_id: The client ID
+        """
+        try:
+            realm_admin = self.get_realm_admin(realm_name)
+
+            # Get or create user policy
+            policy_name = f"urn:bud:policy:{user_auth_id}"
+            existing_policies = realm_admin.get_client_authz_policies(client_id)
+            user_policy = next((p for p in existing_policies if p["name"] == policy_name), None)
+
+            if not user_policy:
+                # Create user policy
+                user_policy_data = {
+                    "name": policy_name,
+                    "description": f"User policy for {user_auth_id}",
+                    "logic": "POSITIVE",
+                    "users": [str(user_auth_id)],
+                }
+
+                policy_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/user"
+
+                data_raw = realm_admin.connection.raw_post(
+                    policy_url,
+                    data=json.dumps(user_policy_data),
+                    max=-1,
+                    permission=False,
+                )
+
+                user_policy_id = data_raw.json()["id"]
+            else:
+                user_policy_id = user_policy["id"]
+
+            # Process each permission update
+            for permission in permissions:
+                # Parse permission name (e.g., "cluster:view" -> module="cluster", scope="view")
+                parts = permission["name"].split(":")
+                if len(parts) != 2:
+                    logger.warning(f"Invalid permission format: {permission['name']}")
+                    continue
+
+                module_name, scope_name = parts
+
+                # Get the permission URL
+                permission_search_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/permission?name=urn%3Abud%3Apermission%3A{module_name}%3Amodule%3A{scope_name}&scope={scope_name}&type=scope"
+
+                try:
+                    data_raw = realm_admin.connection.raw_get(
+                        permission_search_url,
+                        max=-1,
+                        permission=False,
+                    )
+
+                    if not data_raw.json():
+                        logger.warning(f"Permission not found: {permission['name']}")
+                        continue
+
+                    permission_id = data_raw.json()[0]["id"]
+
+                    # Get current permission details
+                    permission_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/permission/scope/{permission_id}"
+                    permission_data_raw = realm_admin.connection.raw_get(
+                        permission_url,
+                        max=-1,
+                        permission=False,
+                    )
+
+                    # Get associated resources
+                    permission_resources_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/{permission_id}/resources"
+                    permission_resources_data_raw = realm_admin.connection.raw_get(
+                        permission_resources_url,
+                        max=-1,
+                        permission=False,
+                    )
+
+                    # Get scopes
+                    permission_scopes_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/{permission_id}/scopes"
+                    permission_scopes_data_raw = realm_admin.connection.raw_get(
+                        permission_scopes_url,
+                        max=-1,
+                        permission=False,
+                    )
+
+                    # Get associated policies
+                    permission_policies_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/{permission_id}/associatedPolicies"
+                    permission_policies_data_raw = realm_admin.connection.raw_get(
+                        permission_policies_url,
+                        max=-1,
+                        permission=False,
+                    )
+
+                    # Update policy list based on has_permission
+                    update_policies = []
+                    for policy in permission_policies_data_raw.json():
+                        if policy["name"] != policy_name:
+                            update_policies.append(policy["id"])
+
+                    if permission["has_permission"]:
+                        # Add user policy if not already present
+                        if user_policy_id not in update_policies:
+                            update_policies.append(user_policy_id)
+                    else:
+                        # Remove user policy if present
+                        if user_policy_id in update_policies:
+                            update_policies.remove(user_policy_id)
+
+                    # Update the permission
+                    permission_update_payload = {
+                        "id": permission_data_raw.json()["id"],
+                        "name": permission_data_raw.json()["name"],
+                        "description": permission_data_raw.json()["description"],
+                        "type": permission_data_raw.json()["type"],
+                        "logic": permission_data_raw.json()["logic"],
+                        "decisionStrategy": permission_data_raw.json()["decisionStrategy"],
+                        "resources": [r["_id"] for r in permission_resources_data_raw.json()],
+                        "policies": update_policies,
+                        "scopes": [s["id"] for s in permission_scopes_data_raw.json()],
+                    }
+                    
+                    # Update the permission
+                    permission_update_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/permission/scope/{permission_id}"
+                    realm_admin.connection.raw_put(
+                        permission_update_url,
+                        data=json.dumps(permission_update_payload),
+                        max=-1,
+                        permission=False,
+                    )
+                    
+                    logger.info(f"Updated permission {permission['name']} for user {user_auth_id}")
+                    
+                except Exception as e:
+                    logger.error(f"Error updating permission {permission['name']}: {str(e)}")
+                    continue
+                    
+        except Exception as e:
+            logger.error(f"Error updating global permissions for user {user_auth_id}: {str(e)}", exc_info=True)
             raise
 
     async def validate_token(self, token: str, realm_name: str, credentials: TenantClientSchema) -> dict:
