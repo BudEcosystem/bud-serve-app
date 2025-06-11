@@ -1506,7 +1506,7 @@ class KeycloakManager:
                         "policies": update_policies,
                         "scopes": [s["id"] for s in permission_scopes_data_raw.json()],
                     }
-                    
+
                     # Update the permission
                     permission_update_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/permission/scope/{permission_id}"
                     realm_admin.connection.raw_put(
@@ -1515,13 +1515,13 @@ class KeycloakManager:
                         max=-1,
                         permission=False,
                     )
-                    
-                    logger.info(f"Updated permission {permission['name']} for user {user_auth_id}")
-                    
+
+                    logger.debug(f"Updated permission {permission['name']} for user {user_auth_id}")
+
                 except Exception as e:
                     logger.error(f"Error updating permission {permission['name']}: {str(e)}")
                     continue
-                    
+
         except Exception as e:
             logger.error(f"Error updating global permissions for user {user_auth_id}: {str(e)}", exc_info=True)
             raise

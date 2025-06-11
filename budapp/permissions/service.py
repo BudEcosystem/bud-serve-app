@@ -188,11 +188,27 @@ class PermissionService(SessionMixin):
                         f"Invalid permission: {permission.name}.", status_code=status.HTTP_400_BAD_REQUEST
                     )
 
+            # Process permissions to add implicit view permissions for manage permissions
+            permission_dict = {p.name: p for p in permissions}
+            manage_to_view_mapping = PermissionEnum.get_manage_to_view_mapping()
+
+            # Add implicit view permissions for manage permissions
+            for permission in permissions:
+                if permission.has_permission and permission.name in manage_to_view_mapping:
+                    view_permission_name = manage_to_view_mapping[permission.name]
+                    # Explicitly upsert the view permission
+                    permission_dict[view_permission_name] = PermissionList(
+                        name=view_permission_name, has_permission=True
+                    )
+                    logger.debug("Upsert %s for %s", view_permission_name, permission.name)
+
+            processed_permissions = list(permission_dict.values())
+
             # Use KeycloakManager to update permissions
             kc_manager = KeycloakManager()
             await kc_manager.update_user_global_permissions(
                 user_auth_id=db_user.auth_id,
-                permissions=[p.model_dump() for p in permissions],
+                permissions=[p.model_dump() for p in processed_permissions],
                 realm_name=app_settings.default_realm_name,
                 client_id=str(tenant_client.client_id),
             )
@@ -200,7 +216,7 @@ class PermissionService(SessionMixin):
             logger.info(f"Updated global permissions for user {user_id}")
 
             # Return the updated permissions
-            return permissions
+            return processed_permissions
 
         except ClientException:
             raise
