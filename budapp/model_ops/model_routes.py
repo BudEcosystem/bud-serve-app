@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
-from budapp.commons.constants import ModalityEnum
+from budapp.commons.constants import ModalityEnum, PermissionEnum
 from budapp.commons.dependencies import (
     get_current_active_user,
     get_session,
@@ -40,6 +40,7 @@ from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
+from ..commons.permission_handler import require_permissions
 from .quantization_services import QuantizationService
 from .schemas import (
     CancelDeploymentWorkflowRequest,
@@ -98,6 +99,7 @@ model_router = APIRouter(prefix="/models", tags=["model"])
     },
     description="List all models",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
 async def list_all_models(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -284,6 +286,7 @@ async def list_providers(
     },
     description="Add cloud model workflow",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
 async def add_cloud_model_workflow(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -325,6 +328,7 @@ async def add_cloud_model_workflow(
     },
     description="Add local model workflow",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
 async def add_local_model_workflow(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -366,6 +370,7 @@ async def add_local_model_workflow(
     },
     description="Edit cloud model",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
 async def edit_model(
     model_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -560,6 +565,7 @@ async def edit_model(
     },
     description="List all cloud model recommended tags",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
 async def list_cloud_model_recommended_tags(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -606,6 +612,7 @@ async def list_cloud_model_recommended_tags(
     },
     description="Search model tags by name with pagination",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
 async def list_model_tags(
     session: Annotated[Session, Depends(get_session)],
     name: Optional[str] = Query(default=None),
@@ -649,6 +656,7 @@ async def list_model_tags(
     },
     description="Search model tags by name with pagination",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
 async def list_model_tasks(
     session: Annotated[Session, Depends(get_session)],
     name: Optional[str] = Query(default=None),
@@ -692,6 +700,7 @@ async def list_model_tasks(
     },
     description="Search model author by name with pagination",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
 async def list_all_model_authors(
     session: Annotated[Session, Depends(get_session)],
     filters: Annotated[ModelAuthorFilter, Depends()],
@@ -732,6 +741,7 @@ async def list_all_model_authors(
     },
     description="List quantization methods",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
 async def list_quantization_methods(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -787,6 +797,7 @@ async def list_quantization_methods(
     },
     description="Retrieve details of a model by ID",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
 async def retrieve_model(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -824,6 +835,7 @@ async def retrieve_model(
     },
     description="Scan local model",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
 async def scan_local_model_workflow(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -906,6 +918,7 @@ async def cancel_model_deployment(
     },
     description="Delete an active model from the database",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
 async def delete_model(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -936,6 +949,7 @@ async def delete_model(
     },
     description="List leaderboards of specific model by uri",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
 async def list_leaderboards(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -981,6 +995,7 @@ async def list_leaderboards(
     },
     description="Quantize model workflow",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
 async def quantize_model_workflow(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -1021,6 +1036,7 @@ async def quantize_model_workflow(
     },
     description="Cancel model quantization",
 )
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
 async def cancel_model_quantization(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],

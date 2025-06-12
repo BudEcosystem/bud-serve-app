@@ -1,10 +1,16 @@
+import json
+from typing import List
+
+from fastapi import status
+
 from budapp.auth.schemas import DeletePermissionRequest, ResourceCreate
 from budapp.commons import logging
 from budapp.commons.config import app_settings
+from budapp.commons.constants import PermissionEnum, UserStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.keycloak import KeycloakManager
-from budapp.permissions.schemas import CheckUserResourceScope
+from budapp.permissions.schemas import CheckUserResourceScope, PermissionList
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient
 from budapp.user_ops.models import User as UserModel
@@ -135,3 +141,87 @@ class PermissionService(SessionMixin):
         except Exception as e:
             logger.error(f"Error checking resource permission: {e}")
             raise
+
+    async def update_global_permissions(self, user_id: str, permissions: List[PermissionList]) -> List[PermissionList]:
+        """Update global permissions for a specific user.
+
+        Args:
+            user_id: The ID of the user to update permissions for
+            permissions: List of permissions to update
+
+        Returns:
+            List[PermissionList]: Updated list of permissions
+        """
+        # Get the default tenant
+        tenant = await UserDataManager(self.session).retrieve_by_fields(
+            Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+        )
+
+        if not tenant:
+            raise ClientException("Default tenant not found")
+
+        # Get the default tenant client
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+        )
+
+        if not tenant_client:
+            raise ClientException("Tenant client not found")
+
+        try:
+            # Get the user - only retrieve active users
+            db_user = await UserDataManager(self.session).retrieve_by_fields(
+                UserModel, {"id": user_id, "status": UserStatusEnum.ACTIVE}
+            )
+
+            # Restrict update permission on super user
+            if db_user.is_superuser:
+                raise ClientException(
+                    "Cannot update permissions for super user", status_code=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validate permissions against PermissionEnum
+            valid_permissions = PermissionEnum.get_global_permissions()
+            for permission in permissions:
+                if permission.name not in valid_permissions:
+                    raise ClientException(
+                        f"Invalid permission: {permission.name}.", status_code=status.HTTP_400_BAD_REQUEST
+                    )
+
+            # Process permissions to add implicit view permissions for manage permissions
+            permission_dict = {p.name: p for p in permissions}
+            manage_to_view_mapping = PermissionEnum.get_manage_to_view_mapping()
+
+            # Add implicit view permissions for manage permissions
+            for permission in permissions:
+                if permission.has_permission and permission.name in manage_to_view_mapping:
+                    view_permission_name = manage_to_view_mapping[permission.name]
+                    # Explicitly upsert the view permission
+                    permission_dict[view_permission_name] = PermissionList(
+                        name=view_permission_name, has_permission=True
+                    )
+                    logger.debug("Upsert %s for %s", view_permission_name, permission.name)
+
+            processed_permissions = list(permission_dict.values())
+
+            # Use KeycloakManager to update permissions
+            kc_manager = KeycloakManager()
+            await kc_manager.update_user_global_permissions(
+                user_auth_id=db_user.auth_id,
+                permissions=[p.model_dump() for p in processed_permissions],
+                realm_name=app_settings.default_realm_name,
+                client_id=str(tenant_client.client_id),
+            )
+
+            logger.info(f"Updated global permissions for user {user_id}")
+
+            # Return the updated permissions
+            return processed_permissions
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.error(f"Error updating global permissions: {str(e)}")
+            raise ClientException(
+                "Failed to update global permissions", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

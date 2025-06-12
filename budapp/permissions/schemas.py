@@ -3,7 +3,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, field_validator
-
+from ..commons.schemas import SuccessResponse
 
 class CheckUserResourceScope(BaseModel):
     """Check user resource scope."""
@@ -86,4 +86,10 @@ class ProjectPermissionUpdate(BaseModel):
 
     user_id: UUID
     project_id: UUID
+    permissions: List[PermissionList]
+
+
+class GlobalPermissionUpdateResponse(SuccessResponse):
+    """Response for global permission update."""
+
     permissions: List[PermissionList]
