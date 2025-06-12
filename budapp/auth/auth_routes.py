@@ -166,10 +166,6 @@ async def logout_user(
 @auth_router.post(
     "/refresh-token",
     responses={
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
         status.HTTP_401_UNAUTHORIZED: {
             "model": ErrorResponse,
             "description": "Token Expired or Invalid",
