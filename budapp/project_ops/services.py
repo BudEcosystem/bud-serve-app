@@ -237,8 +237,9 @@ class ProjectService(SessionMixin):
             if user.email is not None and user.email in email_user_id_mapping:
                 project_permission_mapping[email_user_id_mapping[user.email]] = user.scopes
 
+        # NOTE: Commented out since Keycloak handles permissions
         # Store project permissions to be added in database
-        project_permissions = []
+        # project_permissions = []
 
         # Store email notification payloads
         email_notification_payloads = []
@@ -268,13 +269,14 @@ class ProjectService(SessionMixin):
                 # Add user to project instance
                 db_project.users.append(db_user)
 
-                project_permission_data = ProjectPermissionCreate(
-                    project_id=db_project.id,
-                    user_id=db_user.id,
-                    auth_id=db_user.auth_id,
-                    scopes=project_permission_mapping[db_user.id],
-                )
-                project_permissions.append(ProjectPermission(**project_permission_data.model_dump()))
+                # NOTE: Commented out since Keycloak handles permissions
+                # project_permission_data = ProjectPermissionCreate(
+                #     project_id=db_project.id,
+                #     user_id=db_user.id,
+                #     auth_id=db_user.auth_id,
+                #     scopes=project_permission_mapping[db_user.id],
+                # )
+                # project_permissions.append(ProjectPermission(**project_permission_data.model_dump()))
 
                 # Store email notification payload
                 email_notification_payloads.append(
@@ -304,13 +306,14 @@ class ProjectService(SessionMixin):
                 # Add user to project
                 db_project.users.append(db_user)
 
-                project_permission_data = ProjectPermissionCreate(
-                    project_id=db_project.id,
-                    user_id=db_user.id,
-                    auth_id=db_user.auth_id,
-                    scopes=project_permission_mapping[db_user.email],
-                )
-                project_permissions.append(ProjectPermission(**project_permission_data.model_dump()))
+                # NOTE: Commented out since Keycloak handles permissions
+                # project_permission_data = ProjectPermissionCreate(
+                #     project_id=db_project.id,
+                #     user_id=db_user.id,
+                #     auth_id=db_user.auth_id,
+                #     scopes=project_permission_mapping[db_user.email],
+                # )
+                # project_permissions.append(ProjectPermission(**project_permission_data.model_dump()))
 
                 new_user_ids.append(db_user.id)
 
@@ -332,9 +335,10 @@ class ProjectService(SessionMixin):
         logger.info(f"{len(user_ids)} BudServe users added to project")
         logger.info(f"{len(emails)} Non BudServe users added to project")
 
+        # NOTE: Commented out since Keycloak handles permissions
         # Add project level permissions
-        _ = ProjectPermissionDataManager(self.session).add_all(project_permissions)
-        logger.info(f"Added project level permissions to {len(project_permissions)} users")
+        # _ = ProjectPermissionDataManager(self.session).add_all(project_permissions)
+        # logger.info(f"Added project level permissions to {len(project_permissions)} users")
 
         # Send app notification for budserve users
         if user_ids:
