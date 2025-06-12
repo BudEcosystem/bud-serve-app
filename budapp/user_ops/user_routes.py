@@ -219,10 +219,6 @@ async def update_current_user(
             "model": MyPermissions,
             "description": "Successfully get user permissions",
         },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
         status.HTTP_401_UNAUTHORIZED: {
             "model": ErrorResponse,
             "description": "Authentication failed or token expired",
@@ -248,12 +244,12 @@ async def get_user_roles(
     except ClientException as e:
         logger.error(f"Client error getting user permissions: {e.message}")
         return ErrorResponse(
-            code=e.status_code or status.HTTP_400_BAD_REQUEST, message=e.message
+            code=e.status_code or status.HTTP_401_UNAUTHORIZED, message=e.message
         ).to_http_response()
     except Exception as e:
         logger.exception(f"Unexpected error getting user permissions: {e}")
         return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="An unexpected error occurred while retrieving user permissions"
+            code=status.HTTP_401_UNAUTHORIZED, message="Authentication failed or token expired"
         ).to_http_response()
 
 
