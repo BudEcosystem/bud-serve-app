@@ -22,8 +22,10 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from ..commons import logging
+from ..commons.constants import PermissionEnum
 from ..commons.dependencies import get_current_active_user, get_session
 from ..commons.exceptions import ClientException
+from ..commons.permission_handler import require_permissions
 from ..commons.schemas import ErrorResponse
 from ..user_ops.schemas import User
 from .schemas import GlobalPermissionUpdateResponse, PermissionList
@@ -53,6 +55,7 @@ permission_router = APIRouter(prefix="/permissions", tags=["permission"])
     },
     description="Update global permissions for a specific user",
 )
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def update_global_permissions(
     user_id: str,
     permissions: List[PermissionList],
