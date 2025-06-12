@@ -35,7 +35,17 @@ from budapp.commons.dependencies import (
 from budapp.commons.exceptions import ClientException
 from budapp.commons.permission_handler import require_permissions
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
-from budapp.user_ops.schemas import User, ResetPasswordResponse, ResetPasswordRequest
+from budapp.user_ops.schemas import (
+    MyPermissions,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
+    User,
+    UserListFilter,
+    UserListResponse,
+    UserPermissions,
+    UserResponse,
+    UserUpdate,
+)
 from budapp.user_ops.services import UserService
 
 from ..permissions.schemas import CheckUserResourceScope
