@@ -260,6 +260,7 @@ class KeycloakManager:
                 "model",
                 "project",
                 "user",
+                "benchmark",
             ]
             for module in modules:
                 await self._create_module_resource(realm_admin, new_client_id, module, realm_name)
@@ -538,6 +539,7 @@ class KeycloakManager:
                 "model",
                 "project",
                 "user",
+                "benchmark",
             ]
             for module in modules:
                 resource_name = f"module_{module}"
@@ -1207,6 +1209,7 @@ class KeycloakManager:
         model_scopes = []
         cluster_scopes = []
         endpoint_scopes = []
+        benchmark_scopes = []
 
         for resource in resources:
             resource_name = resource["name"]
@@ -1239,6 +1242,10 @@ class KeycloakManager:
                     endpoint_uuid = resource_name.split("::")[-1]
                     perm_name = f"endpoint:{scope_name}"
                     urn = f"urn:bud:permission:endpoint:{endpoint_uuid}:{scope_name}"
+                elif resource_name.startswith("URN::benchmark::"):
+                    benchmark_uuid = resource_name.split("::")[-1]
+                    perm_name = f"benchmark:{scope_name}"
+                    urn = f"urn:bud:permission:benchmark:{benchmark_uuid}:{scope_name}"
                 elif resource_name.startswith("module_"):
                     module_name = resource_name.replace("module_", "")
                     perm_name = f"{module_name}:{scope_name}"
@@ -1291,6 +1298,13 @@ class KeycloakManager:
                     "name": display_name,
                     "permissions": scoped_permissions
                 })
+            elif resource_name.startswith("URN::benchmark::"):
+                benchmark_scopes.append({
+                    "id": benchmark_uuid,
+                    "rs_id": resource_id,
+                    "name": display_name,
+                    "permissions": scoped_permissions
+                })
 
         return {
             "result": {
@@ -1299,7 +1313,8 @@ class KeycloakManager:
                 "user_scopes": user_scopes,
                 "model_scopes": model_scopes,
                 "cluster_scopes": cluster_scopes,
-                "endpoint_scopes": endpoint_scopes
+                "endpoint_scopes": endpoint_scopes,
+                "benchmark_scopes": benchmark_scopes
             }
         }
 
