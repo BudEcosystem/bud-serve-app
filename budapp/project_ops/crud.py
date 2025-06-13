@@ -482,6 +482,116 @@ class ProjectDataManager(DataManagerUtils):
         db_project, endpoint_count = row
         return db_project, endpoint_count
 
+    async def get_all_project_users_without_permissions(
+        self,
+        project_id: UUID,
+        offset: int,
+        limit: int,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[Tuple[User, str]], int]:
+        """Get all users in a project without permission tables."""
+        await self.validate_fields(User, filters)
+
+        # define project_role
+        project_role = case(
+            (Project.created_by == User.id, "owner"),
+            else_="participant",
+        ).label("project_role")
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(User, filters)
+            stmt = (
+                select(
+                    User,
+                    project_role,
+                )
+                .filter(User.status.in_([UserStatusEnum.INVITED, UserStatusEnum.ACTIVE]))
+                .filter(and_(*search_conditions))
+                .join(
+                    project_user_association,
+                    User.id == project_user_association.c.user_id,
+                )
+                .join(
+                    Project,
+                    project_user_association.c.project_id == Project.id,
+                )
+                .where(project_user_association.c.project_id == project_id)
+            )
+
+            count_stmt = (
+                select(func.count())
+                .select_from(User)
+                .filter(User.status.in_([UserStatusEnum.INVITED, UserStatusEnum.ACTIVE]))
+                .filter(and_(*search_conditions))
+                .join(
+                    project_user_association,
+                    User.id == project_user_association.c.user_id,
+                )
+                .where(project_user_association.c.project_id == project_id)
+            )
+        else:
+            stmt = (
+                select(
+                    User,
+                    project_role,
+                )
+                .filter(User.status.in_([UserStatusEnum.INVITED, UserStatusEnum.ACTIVE]))
+                .filter_by(**filters)
+                .join(
+                    project_user_association,
+                    User.id == project_user_association.c.user_id,
+                )
+                .join(
+                    Project,
+                    project_user_association.c.project_id == Project.id,
+                )
+                .where(project_user_association.c.project_id == project_id)
+            )
+
+            count_stmt = (
+                select(func.count())
+                .select_from(User)
+                .filter(User.status.in_([UserStatusEnum.INVITED, UserStatusEnum.ACTIVE]))
+                .filter_by(**filters)
+                .join(
+                    project_user_association,
+                    User.id == project_user_association.c.user_id,
+                )
+                .where(project_user_association.c.project_id == project_id)
+            )
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = []
+            # Handle project_role custom field
+            for order_tuple in order_by[:]:  # Create a copy to iterate over
+                order_field = order_tuple[0]
+                direction = order_tuple[1]
+                if order_field == "project_role":
+                    if direction == "asc":
+                        sort_conditions.append(project_role.asc())
+                    else:
+                        sort_conditions.append(project_role.desc())
+                    order_by.remove(order_tuple)
+                    break
+
+            # Add remaining sort conditions for User model fields
+            sort_conditions.extend(await self.generate_sorting_stmt(User, order_by))
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.execute_all(stmt)
+
+        return result, count
+
     async def get_all_users(
         self,
         project_id: UUID,

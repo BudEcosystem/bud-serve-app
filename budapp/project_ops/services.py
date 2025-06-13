@@ -41,6 +41,7 @@ from ..commons.constants import (
 )
 from ..commons.exceptions import BudNotifyException
 from ..commons.helpers import generate_valid_password, get_hardware_types
+from ..commons.keycloak import KeycloakManager
 from ..core.schemas import NotificationResult
 from ..credential_ops.crud import CredentialDataManager
 from ..credential_ops.models import Credential as CredentialModel
@@ -53,6 +54,7 @@ from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..user_ops.crud import UserDataManager
 from ..user_ops.models import User as UserModel
 from ..user_ops.schemas import User, UserCreate
+from ..user_ops.models import Tenant, TenantClient
 from .crud import ProjectDataManager
 from .models import Project as ProjectModel
 from .schemas import (
@@ -635,12 +637,120 @@ class ProjectService(SessionMixin):
     ) -> Tuple[List[ProjectUserList], int]:
         filters_dict = filters
 
-        db_results, count = await ProjectDataManager(self.session).get_all_users(
+        # Get users from database (without permission tables)
+        db_users, count = await ProjectDataManager(self.session).get_all_project_users_without_permissions(
             project_id, offset, limit, filters_dict, order_by, search
         )
 
-        return await self._get_parsed_project_user_permissions(db_results), count
+        # Get permissions from Keycloak for each user
+        return await self._get_parsed_project_user_permissions_from_keycloak(db_users, project_id), count
 
+    async def _get_parsed_project_user_permissions_from_keycloak(
+        self,
+        results: List[Tuple[UserModel, str]],  # User and project_role
+        project_id: UUID,
+    ) -> List[ProjectUserList]:
+        """Get parsed project user list response with permissions from Keycloak"""
+        data = []
+        project_level_permissions = PermissionEnum.get_project_level_scopes()
+        global_project_permissions = [
+            PermissionEnum.PROJECT_MANAGE.value,
+            PermissionEnum.PROJECT_VIEW.value,
+        ]
+
+        # Get tenant and client info once
+        tenant = await UserDataManager(self.session).retrieve_by_fields(
+            Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+        )
+        if not tenant:
+            raise ClientException("Default tenant not found")
+
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+        )
+        if not tenant_client:
+            raise ClientException("Tenant client not found")
+
+        # Initialize Keycloak manager
+        kc_manager = KeycloakManager()
+
+        for user, project_role in results:
+            permissions = []
+
+            # Get user's permissions for this project from Keycloak
+            try:
+                user_permissions = await kc_manager.get_user_permissions_for_resource(
+                    realm_name=app_settings.default_realm_name,
+                    client_id=str(tenant_client.client_id),
+                    user_auth_id=str(user.auth_id),
+                    resource_type="project",
+                    resource_id=str(project_id),
+                )
+
+            except Exception as e:
+                logger.debug(f"Failed to get permissions for user {user.id} from Keycloak: {e}")
+                user_permissions = []
+
+            # Check project-level permissions
+            for permission in project_level_permissions:
+                # Extract scope from permission (e.g., "endpoint:view" -> "view")
+                scope = permission.split(":")[-1] if ":" in permission else permission
+
+                # Check if user has this scope
+                has_permission = scope in user_permissions
+
+                permissions.append(
+                    PermissionList(
+                        name=permission,
+                        has_permission=has_permission,
+                    )
+                )
+
+            # Check global project permissions
+            try:
+                # Get user's global permissions
+                global_permissions = await kc_manager.get_user_permissions_for_resource(
+                    realm_name=app_settings.default_realm_name,
+                    client_id=str(tenant_client.client_id),
+                    user_auth_id=str(user.auth_id),
+                    resource_type="project",
+                    resource_id=None,  # Global permissions
+                )
+
+            except Exception as e:
+                logger.debug(f"Failed to get global permissions for user {user.id} from Keycloak: {e}")
+                global_permissions = []
+
+            for permission in global_project_permissions:
+                # Extract scope from permission
+                scope = permission.split(":")[-1] if ":" in permission else permission
+
+                # Check if user has this global scope
+                has_permission = scope in global_permissions
+
+                permissions.append(
+                    PermissionList(
+                        name=permission,
+                        has_permission=has_permission,
+                    )
+                )
+
+            data.append(
+                ProjectUserList(
+                    name=user.name,
+                    email=user.email,
+                    id=user.id,
+                    color=user.color,
+                    role=user.role,
+                    status=user.status,
+                    permissions=permissions,
+                    project_role=project_role,
+                )
+            )
+
+        return data
+
+    # Keep the old method for backward compatibility if needed
     async def _get_parsed_project_user_permissions(
         self,
         results: List[Tuple[UserModel, str, ProjectPermission, Permission]],
