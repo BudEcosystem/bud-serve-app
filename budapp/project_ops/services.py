@@ -90,11 +90,6 @@ class ProjectService(SessionMixin):
         project_model = ProjectModel(**project_data)
         db_project = await ProjectDataManager(self.session).insert_one(project_model)
 
-        # Add current user to project
-        default_project_level_scopes = PermissionEnum.get_project_default_permissions()
-        add_users_data = ProjectUserAdd(user_id=current_user_id, scopes=default_project_level_scopes)
-        db_project = await self.add_users_to_project(db_project.id, [add_users_data])
-
         # Get user with id
         db_user = await UserDataManager(self.session).retrieve_by_fields(UserModel, {"id": current_user_id}, missing_ok=True)
 
@@ -107,11 +102,16 @@ class ProjectService(SessionMixin):
                 scopes=["view", "manage"],
             )
             await permission_service.create_resource_permission_by_user(db_user, payload)
-            return db_project
+        
+            # Add current user to project
+            default_project_level_scopes = PermissionEnum.get_project_level_scopes()
+            add_users_data = ProjectUserAdd(user_id=current_user_id, scopes=default_project_level_scopes)
+            db_project = await self.add_users_to_project(db_project.id, [add_users_data])
         except Exception as e:
             logger.error(f"Failed to update permission in Keycloak: {e}")
             raise ClientException("Failed to update permission in Keycloak")
 
+        return db_project
 
 
     async def edit_project(self, project_id: UUID, data: Dict[str, Any]) -> ProjectResponse:
