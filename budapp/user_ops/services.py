@@ -151,7 +151,7 @@ class UserService(SessionMixin):
             auth_id = user.auth_id
             if not auth_id:
                 logger.error("User auth_id is missing")
-                raise ClientException("User authentication ID not found")
+                raise ClientException("User authentication ID not found", status_code=401)
 
             # Realm Name
             realm_name = app_settings.default_realm_name
@@ -162,19 +162,19 @@ class UserService(SessionMixin):
             )
             if not tenant:
                 logger.error(f"Tenant not found for realm: {realm_name}")
-                raise ClientException("Tenant configuration not found")
+                raise ClientException("Tenant configuration not found", status_code=401)
 
             tenant_client = await UserDataManager(self.session).retrieve_by_fields(
                 TenantClient, {"tenant_id": tenant.id}, missing_ok=True
             )
             if not tenant_client:
                 logger.error(f"Tenant client not found for tenant: {tenant.id}")
-                raise ClientException("Tenant client configuration not found")
+                raise ClientException("Tenant client configuration not found", status_code=401)
 
             # Validate token exists
             if not user.raw_token:
                 logger.error("User token is missing")
-                raise ClientException("User authentication token not found")
+                raise ClientException("User authentication token not found", status_code=401)
 
             # Credentials
             credentials = TenantClientSchema(
@@ -201,7 +201,7 @@ class UserService(SessionMixin):
             raise
         except Exception as e:
             logger.error(f"Unexpected error getting user roles and permissions: {str(e)}", exc_info=True)
-            raise ClientException(f"Failed to retrieve user permissions: {str(e)}")
+            raise ClientException(f"Failed to retrieve user permissions: {str(e)}", status_code=401)
 
     async def get_user_permissions_by_id(
         self,
