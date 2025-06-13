@@ -569,6 +569,9 @@ class ProjectService(SessionMixin):
         if len(existing_user_ids) == len(user_ids):
             raise ClientException(detail="Cannot remove all users from project")
 
+        # Initialize permission service
+        permission_service = PermissionService(self.session)
+
         # Fetch active invited users by ids
         db_users = await UserDataManager(self.session).get_active_invited_users_by_ids(user_ids)
 
@@ -598,14 +601,26 @@ class ProjectService(SessionMixin):
 
             # Remove user from project
             db_project.users.remove(db_user)
+            
+            # Remove user permissions from Keycloak
+            try:
+                await permission_service.remove_user_from_project_permissions(
+                    user=db_user,
+                    project_id=str(project_id),
+                )
+                logger.debug(f"Removed user {db_user.id} from project permissions in Keycloak")
+            except Exception as e:
+                logger.error(f"Failed to remove user {db_user.id} from project permissions in Keycloak: {e}")
+                raise ClientException("Failed to remove user from project permissions")
 
         # update project
         db_project = ProjectDataManager(self.session).update_one(db_project)
         logger.info(f"{len(user_ids)} users removed from project")
 
+        # NOTE: Commented out since Keycloak handles permissions
         # delete project permissions
-        await ProjectPermissionDataManager(self.session).delete_project_permissions_by_user_ids(user_ids, project_id)
-        logger.info(f"Deleted project permissions of {len(user_ids)} users")
+        # await ProjectPermissionDataManager(self.session).delete_project_permissions_by_user_ids(user_ids, project_id)
+        # logger.info(f"Deleted project permissions of {len(user_ids)} users")
 
         return db_project
 

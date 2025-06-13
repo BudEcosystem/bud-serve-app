@@ -142,6 +142,47 @@ class PermissionService(SessionMixin):
             logger.error(f"Error checking resource permission: {e}")
             raise
 
+    async def remove_user_from_project_permissions(self, user: UserModel, project_id: str) -> None:
+        """Remove a user from a project's permissions in Keycloak.
+
+        This method removes the user's access to a specific project by removing
+        their policy from all project permissions.
+
+        Args:
+            user: The user model to remove from the project
+            project_id: The project UUID
+        """
+        # Get the default tenant
+        tenant = await UserDataManager(self.session).retrieve_by_fields(
+            Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+        )
+
+        if not tenant:
+            raise ClientException("Default tenant not found")
+
+        # Get the default tenant client
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+        )
+
+        if not tenant_client:
+            raise ClientException("Tenant client not found")
+
+        try:
+            # Use KeycloakManager to remove user policy from project permissions
+            kc_manager = KeycloakManager()
+            await kc_manager.remove_user_policy_from_resource_permissions(
+                realm_name=app_settings.default_realm_name,
+                client_id=str(tenant_client.client_id),
+                resource_type="project",
+                resource_id=str(project_id),
+                user_auth_id=str(user.auth_id),
+            )
+            logger.debug(f"Removed user {user.auth_id} from project {project_id} permissions")
+        except Exception as e:
+            logger.error(f"Error removing user from project permissions: {e}")
+            raise ClientException("Failed to remove user from project permissions")
+
     async def add_user_to_project_permissions(
         self, user: UserModel, project_id: str, scopes: List[str] = None
     ) -> None:
