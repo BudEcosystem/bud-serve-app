@@ -249,6 +249,9 @@ class ProjectService(SessionMixin):
             "url": f"{app_settings.frontend_url}/projects/{db_project.id}",
         }
 
+        # Initialize permission service
+        permission_service = PermissionService(self.session)
+
         # Handle existing budserve users
         if user_ids:
             # Fetch all related user ids
@@ -268,6 +271,17 @@ class ProjectService(SessionMixin):
             for db_user in db_users:
                 # Add user to project instance
                 db_project.users.append(db_user)
+
+                # Add user to project permissions in Keycloak
+                try:
+                    await permission_service.add_user_to_project_permissions(
+                        user=db_user,
+                        project_id=str(db_project.id),
+                        scopes=project_permission_mapping[db_user.id],
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to add user {db_user.id} to project permissions: {e}")
+                    raise ClientException("Failed to add user to project permissions")
 
                 # NOTE: Commented out since Keycloak handles permissions
                 # project_permission_data = ProjectPermissionCreate(
@@ -297,6 +311,9 @@ class ProjectService(SessionMixin):
             user_role = UserRoleEnum.DEVELOPER
 
             for new_email in emails:
+                # User name will be get from email
+                user_name = new_email.split("@")[0]
+
                 password = generate_valid_password()
 
                 # NOTE: New user created with help of auth service, it will handle different scenarios like notification, permission, etc.
@@ -305,6 +322,17 @@ class ProjectService(SessionMixin):
 
                 # Add user to project
                 db_project.users.append(db_user)
+
+                # Add user to project permissions in Keycloak
+                try:
+                    await permission_service.add_user_to_project_permissions(
+                        user=db_user,
+                        project_id=str(db_project.id),
+                        scopes=project_permission_mapping[db_user.email],
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to add new user {db_user.id} to project permissions: {e}")
+                    raise ClientException("Failed to add new user to project permissions")
 
                 # NOTE: Commented out since Keycloak handles permissions
                 # project_permission_data = ProjectPermissionCreate(

@@ -142,6 +142,79 @@ class PermissionService(SessionMixin):
             logger.error(f"Error checking resource permission: {e}")
             raise
 
+    async def add_user_to_project_permissions(
+        self, user: UserModel, project_id: str, scopes: List[str] = None
+    ) -> None:
+        """Add a user to an existing project's permissions in Keycloak.
+
+        This method is used when adding users to an existing project. The project
+        resource and permissions already exist in Keycloak, so we only need to
+        associate the user's policy with them.
+
+        Args:
+            user: The user model to add to the project
+            project_id: The project UUID
+            scopes: List of scopes to grant (defaults to ["view", "manage"])
+        """
+        # Get the default tenant
+        tenant = await UserDataManager(self.session).retrieve_by_fields(
+            Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+        )
+
+        if not tenant:
+            raise ClientException("Default tenant not found")
+
+        # Get the default tenant client
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+        )
+
+        if not tenant_client:
+            raise ClientException("Tenant client not found")
+
+        try:
+            # Extract actual scopes from format like "endpoint:view" -> "view"
+            if scopes:
+                extracted_scopes = []
+                for scope in scopes:
+                    if ":" in scope:
+                        # Split by ':' and take the last part (view/manage)
+                        extracted_scopes.append(scope.split(":")[-1])
+                    else:
+                        # If no ':', use as is
+                        extracted_scopes.append(scope)
+
+                # Remove duplicates and filter to valid scopes
+                valid_scopes = {"view", "manage"}
+                keycloak_scopes = list(set(extracted_scopes) & valid_scopes)
+
+                if not keycloak_scopes:
+                    logger.warning(f"No valid scopes found in {scopes}, using defaults")
+                    keycloak_scopes = ["view", "manage"]
+
+                # If user has manage permission, ensure they also have view permission
+                if "manage" in keycloak_scopes and "view" not in keycloak_scopes:
+                    keycloak_scopes.append("view")
+            else:
+                keycloak_scopes = ["view", "manage"]
+
+            # Use KeycloakManager to add user policy to existing project permissions
+            kc_manager = KeycloakManager()
+            await kc_manager.add_user_policy_to_resource_permissions(
+                realm_name=app_settings.default_realm_name,
+                client_id=str(tenant_client.client_id),
+                resource_type="project",
+                resource_id=str(project_id),
+                user_auth_id=str(user.auth_id),
+                scopes=keycloak_scopes,
+            )
+            logger.debug(
+                f"Added user {user.auth_id} to project {project_id} permissions with scopes {keycloak_scopes}"
+            )
+        except Exception as e:
+            logger.error(f"Error adding user to project permissions: {e}")
+            raise ClientException("Failed to add user to project permissions")
+
     async def update_global_permissions(self, user_id: str, permissions: List[PermissionList]) -> List[PermissionList]:
         """Update global permissions for a specific user.
 
