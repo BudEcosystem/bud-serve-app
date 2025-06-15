@@ -21,7 +21,7 @@ from json.decoder import JSONDecodeError
 from typing import List, Literal, Optional, Union
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, Query, UploadFile, status
+from fastapi import APIRouter, Depends, Form, Header, Query, UploadFile, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -877,10 +877,13 @@ async def scan_local_model_workflow(
     },
     description="Cancel model deployment",
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def cancel_model_deployment(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     cancel_request: CancelDeploymentWorkflowRequest,
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Cancel model deployment."""
     try:
@@ -1078,10 +1081,13 @@ async def cancel_model_quantization(
     },
     description="Deploy a model in server for a specified project by step",
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def deploy_model_by_step(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     deploy_request: ModelDeployStepRequest,
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Deploy a model in server for a specified project by step."""
     try:
