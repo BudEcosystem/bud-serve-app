@@ -742,3 +742,34 @@ class ProjectDataManager(DataManagerUtils):
         count = self.execute_scalar(count_stmt)
 
         return result, count
+
+    async def get_active_projects_by_ids(self, project_ids: List[UUID]) -> List[Project]:
+        """Get active projects by ids.
+
+        Args:
+            project_ids: List of project ids
+
+        Returns:
+            List of active projects
+        """
+        stmt = select(Project).filter(Project.id.in_(project_ids)).filter_by(status=ProjectStatusEnum.ACTIVE)
+
+        return self.scalars_all(stmt)
+
+    async def is_user_in_project(self, user_id: UUID, project_id: UUID) -> bool:
+        """Check if a user is a member of a project.
+
+        Args:
+            user_id: The user ID
+            project_id: The project ID
+
+        Returns:
+            True if user is a member, False otherwise
+        """
+        stmt = (
+            select(func.count())
+            .select_from(project_user_association)
+            .where(project_user_association.c.user_id == user_id, project_user_association.c.project_id == project_id)
+        )
+        count = self.scalar_one_or_none(stmt)
+        return count > 0 if count is not None else False

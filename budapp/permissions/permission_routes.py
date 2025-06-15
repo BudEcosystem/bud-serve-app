@@ -18,6 +18,7 @@
 
 from typing import Annotated, List, Union
 
+from budmicroframe.commons.schemas import ErrorResponse, SuccessResponse
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -26,15 +27,64 @@ from ..commons.constants import PermissionEnum
 from ..commons.dependencies import get_current_active_user, get_session
 from ..commons.exceptions import ClientException
 from ..commons.permission_handler import require_permissions
-from ..commons.schemas import ErrorResponse
 from ..user_ops.schemas import User
-from .schemas import GlobalPermissionUpdateResponse, PermissionList
+from .schemas import GlobalPermissionUpdateResponse, PermissionList, ProjectPermissionUpdate
 from .service import PermissionService
 
 
 logger = logging.get_logger(__name__)
 
 permission_router = APIRouter(prefix="/permissions", tags=["permission"])
+
+
+@permission_router.patch(
+    "/project",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully updated project permissions",
+        },
+    },
+    description="Update project permissions for a specific user",
+)
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
+async def update_project_permissions(
+    permissions: List[ProjectPermissionUpdate],
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Update project permissions for a specific user.
+
+    Args:
+        permissions: List of permissions to update
+        db: Database session
+        current_user: The authenticated user making the request
+
+    Returns:
+        SuccessResponse: Success response with project permissions updated
+    """
+    try:
+        _ = await PermissionService(session).update_project_permissions(permissions)
+        return SuccessResponse(
+            code=status.HTTP_200_OK,
+            message="Project permissions updated successfully",
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Unable to update project permissions: {e.message}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Unable to update project permissions: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update permissions"
+        ).to_http_response()
 
 
 @permission_router.put(
