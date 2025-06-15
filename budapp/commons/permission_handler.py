@@ -2,6 +2,7 @@ from functools import wraps
 from typing import Callable, List, Union
 
 from fastapi import Depends, HTTPException, status
+from keycloak.exceptions import KeycloakAuthenticationError
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
@@ -92,6 +93,14 @@ def require_permissions(
 
                     # If we get here without an exception, the user has the required permissions
                     logger.debug(f"::PERMISSION:: User {current_user.id} has the required permissions")
+
+                except KeycloakAuthenticationError as e:
+                    logger.warning(f"::PERMISSION:: User {current_user.id} found invalid bearer token: {str(e)}")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid authentication credentials",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
 
                 except Exception as e:
                     logger.warning(f"::PERMISSION:: User {current_user.id} lacks required permissions: {str(e)}")
