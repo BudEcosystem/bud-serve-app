@@ -6,7 +6,7 @@ from fastapi import status
 from budapp.auth.schemas import DeletePermissionRequest, ResourceCreate
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import PermissionEnum, UserStatusEnum
+from budapp.commons.constants import PermissionEnum, ProjectStatusEnum, UserStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.keycloak import KeycloakManager
@@ -17,7 +17,7 @@ from budapp.user_ops.models import User as UserModel
 from budapp.user_ops.schemas import TenantClientSchema
 
 from ..project_ops.crud import ProjectDataManager
-from .schemas import ProjectPermissionUpdate
+from .schemas import PermissionList, ProjectPermissionUpdate, UserProjectPermission
 
 
 logger = logging.get_logger(__name__)
@@ -550,3 +550,130 @@ class PermissionService(SessionMixin):
         except Exception as e:
             logger.error(f"Error updating user project permissions in Keycloak: {e}")
             raise
+
+    async def get_user_project_permissions(
+        self,
+        user_id: str,
+        offset: int = 0,
+        limit: int = 10,
+        filters: dict = None,
+        order_by: list = None,
+        search: bool = False,
+    ) -> tuple[list, int]:
+        """Get all project permissions for a specific user.
+
+        Args:
+            user_id: The ID of the user to get permissions for
+            offset: Pagination offset
+            limit: Pagination limit
+            filters: Additional filters
+            order_by: Order by fields
+            search: Whether to use search
+
+        Returns:
+            Tuple of (projects with permissions, total count)
+        """
+        # Handle None defaults
+        if filters is None:
+            filters = {}
+        if order_by is None:
+            order_by = []
+
+        # Get the user we're checking permissions for
+        db_user = await UserDataManager(self.session).retrieve_by_fields(
+            UserModel, {"id": user_id, "status": UserStatusEnum.ACTIVE}
+        )
+
+        # Set up filters for active projects
+        filters_dict = filters.copy()
+        filters_dict["status"] = ProjectStatusEnum.ACTIVE
+        filters_dict["benchmark"] = False
+
+        # Get all active projects
+        db_projects, count = await ProjectDataManager(self.session).get_all_projects(
+            offset, limit, filters_dict, order_by, search
+        )
+
+        # Get tenant and client info
+        tenant = await UserDataManager(self.session).retrieve_by_fields(
+            Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+        )
+        if not tenant:
+            raise ClientException("Default tenant not found")
+
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+        )
+        if not tenant_client:
+            raise ClientException("Tenant client not found")
+
+        # Initialize Keycloak manager
+        kc_manager = KeycloakManager()
+
+        # Check if the target user has global project:manage permission
+        try:
+            target_user_global_permissions = await kc_manager.get_user_permissions_for_resource(
+                realm_name=app_settings.default_realm_name,
+                client_id=str(tenant_client.client_id),
+                user_auth_id=str(db_user.auth_id),
+                resource_type="project",
+                resource_id=None,  # None for global permissions
+            )
+            target_user_has_global_manage = "manage" in target_user_global_permissions
+            logger.debug(f"User {db_user.id} has global project:manage permission: {target_user_has_global_manage}")
+        except Exception as e:
+            logger.debug(f"Failed to get global permissions for user {db_user.id}: {e}")
+            target_user_has_global_manage = False
+
+        # Process each project
+        result = []
+        for db_project in db_projects:
+            permissions = []
+
+            # If target user has global project:manage, they have all permissions
+            if target_user_has_global_manage:
+                permissions = [
+                    PermissionList(name=PermissionEnum.ENDPOINT_VIEW.value, has_permission=True),
+                    PermissionList(name=PermissionEnum.ENDPOINT_MANAGE.value, has_permission=True),
+                ]
+            else:
+                # Get user's permissions for this specific project from Keycloak
+                try:
+                    user_permissions = await kc_manager.get_user_permissions_for_resource(
+                        realm_name=app_settings.default_realm_name,
+                        client_id=str(tenant_client.client_id),
+                        user_auth_id=str(db_user.auth_id),
+                        resource_type="project",
+                        resource_id=str(db_project.id),
+                    )
+
+                    # If user_permissions is empty list, user is not participating in the project
+                    if not user_permissions:
+                        permissions = []
+                    else:
+                        # Check endpoint permissions based on project permissions
+                        has_view = "view" in user_permissions
+                        has_manage = "manage" in user_permissions
+
+                        permissions = [
+                            PermissionList(name=PermissionEnum.ENDPOINT_VIEW.value, has_permission=has_view),
+                            PermissionList(name=PermissionEnum.ENDPOINT_MANAGE.value, has_permission=has_manage),
+                        ]
+                except Exception as e:
+                    logger.debug(f"Failed to get permissions for user {db_user.id} on project {db_project.id}: {e}")
+                    # Default to no permissions if error
+                    permissions = [
+                        PermissionList(name=PermissionEnum.ENDPOINT_VIEW.value, has_permission=False),
+                        PermissionList(name=PermissionEnum.ENDPOINT_MANAGE.value, has_permission=False),
+                    ]
+
+            result.append(
+                UserProjectPermission(
+                    id=db_project.id,
+                    name=db_project.name,
+                    status=db_project.status,
+                    permissions=permissions,
+                )
+            )
+
+        return result, count

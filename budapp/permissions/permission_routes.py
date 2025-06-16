@@ -16,19 +16,25 @@
 
 """The permissions module, containing essential business logic, services, and routing configurations for the permissions."""
 
-from typing import Annotated, List, Union
+from typing import Annotated, List, Optional, Union
 
 from budmicroframe.commons.schemas import ErrorResponse, SuccessResponse
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from ..commons import logging
 from ..commons.constants import PermissionEnum
-from ..commons.dependencies import get_current_active_user, get_session
+from ..commons.dependencies import get_current_active_user, get_session, parse_ordering_fields
 from ..commons.exceptions import ClientException
 from ..commons.permission_handler import require_permissions
+from ..project_ops.schemas import ProjectFilter
 from ..user_ops.schemas import User
-from .schemas import GlobalPermissionUpdateResponse, PermissionList, ProjectPermissionUpdate
+from .schemas import (
+    GlobalPermissionUpdateResponse,
+    PaginatedUserProjectPermissionsResponse,
+    PermissionList,
+    ProjectPermissionUpdate,
+)
 from .service import PermissionService
 
 
@@ -138,4 +144,75 @@ async def update_global_permissions(
         logger.exception(f"Unable to update global permissions: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update permissions"
+        ).to_http_response()
+
+
+@permission_router.get(
+    "/{user_id}/projects",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": PaginatedUserProjectPermissionsResponse,
+            "description": "Successfully listed user project permissions",
+        },
+    },
+    description="Get all project permissions for a specific user",
+)
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
+async def get_user_project_permissions(
+    user_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    filters: Annotated[ProjectFilter, Depends()],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[PaginatedUserProjectPermissionsResponse, ErrorResponse]:
+    """Get all project permissions for a specific user.
+
+    Args:
+        user_id: The ID of the user to get permissions for
+        session: Database session
+        current_user: The authenticated user making the request
+        filters: Project filters
+        page: Page number
+        limit: Number of items per page
+        order_by: Order by fields
+        search: Whether to use search
+
+    Returns:
+        PaginatedUserProjectPermissionsResponse: List of projects with permissions
+    """
+    offset = (page - 1) * limit
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    try:
+        projects, count = await PermissionService(session).get_user_project_permissions(
+            user_id, offset, limit, filters_dict, order_by, search
+        )
+
+        return PaginatedUserProjectPermissionsResponse(
+            message="User project permissions listed successfully",
+            projects=projects,
+            object="permission.user.projects",
+            code=status.HTTP_200_OK,
+            total_record=count,
+            page=page,
+            limit=limit,
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Unable to get user project permissions: {e.message}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Unable to get user project permissions: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get user project permissions"
         ).to_http_response()

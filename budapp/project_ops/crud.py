@@ -773,3 +773,38 @@ class ProjectDataManager(DataManagerUtils):
         )
         count = self.scalar_one_or_none(stmt)
         return count > 0 if count is not None else False
+
+    async def get_all_projects(
+        self,
+        offset: int,
+        limit: int,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[Project], int]:
+        """List all projects in the database."""
+        await self.validate_fields(Project, filters)
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(Project, filters)
+            stmt = select(Project).filter(or_(*search_conditions))
+            count_stmt = select(func.count()).select_from(Project).filter(and_(*search_conditions))
+        else:
+            stmt = select(Project).filter_by(**filters)
+            count_stmt = select(func.count()).select_from(Project).filter_by(**filters)
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(Project, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.scalars_all(stmt)
+
+        return result, count
