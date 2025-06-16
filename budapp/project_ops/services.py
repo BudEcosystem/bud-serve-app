@@ -453,33 +453,22 @@ class ProjectService(SessionMixin):
 
         permission_manager = PermissionService(self.session)
 
-        permission_payload = CheckUserResourceScope(
-            resource_type="project",
-            scope="manage"
-        )
+        permission_payload = CheckUserResourceScope(resource_type="project", scope="manage")
 
-        is_allowed = await permission_manager.check_resource_permission_by_user(current_user,permission_payload)
-        logger.debug(f"is_allowed: {is_allowed}")
+        is_allowed = await permission_manager.check_resource_permission_by_user(current_user, permission_payload)
+        logger.debug(f"User {current_user.id} has project:manage permission: {is_allowed}")
 
-        # commenting out TODO: add new permission logic
-        # Get current user scopes
-        # db_permissions = await PermissionDataManager(self.session).retrieve_by_fields(Permission, {"user_id": user_id})
-        # user_scopes = db_permissions.scopes_list
+        # Only users with project:manage permission can list all projects
+        # Otherwise, list only participated projects
+        if is_allowed:
+            result, count = await ProjectDataManager(self.session).get_all_active_projects(
+                offset, limit, filters_dict, order_by, search
+            )
+        else:
+            result, count = await ProjectDataManager(self.session).get_all_participated_projects(
+                current_user.id, offset, limit, filters_dict, order_by, search
+            )
 
-        # NOTE: Only project manager can list all projects, otherwise only participated projects will be listed
-        # if PermissionEnum.PROJECT_MANAGE.value in user_scopes:
-        #     result, count = await ProjectDataManager(self.session).get_all_active_projects(
-        #         offset, limit, filters_dict, order_by, search
-        #     )
-        # else:
-        #     result, count = await ProjectDataManager(self.session).get_all_participated_projects(
-        #         user_id, offset, limit, filters_dict, order_by, search
-        #     )
-
-        # temporary fix
-        result, count = await ProjectDataManager(self.session).get_all_active_projects(
-            offset, limit, filters_dict, order_by, search
-        )
         return await self.parse_project_list_results(result), count
 
     async def parse_project_list_results(self, db_results: List) -> List[ProjectListResponse]:
