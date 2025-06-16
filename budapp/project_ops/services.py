@@ -21,7 +21,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
-from budapp.auth.schemas import ResourceCreate
+from budapp.auth.schemas import DeletePermissionRequest, ResourceCreate
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
@@ -535,6 +535,21 @@ class ProjectService(SessionMixin):
                 ProjectPermission, {"project_id": project_id}
             )
             logger.info("Deleted all project level permissions")
+
+        # Delete the project resource from Keycloak
+        try:
+            permission_service = PermissionService(self.session)
+            await permission_service.delete_permission_for_resource(
+                DeletePermissionRequest(
+                    resource_type="project",
+                    resource_id=str(project_id),
+                    delete_resource=True,  # Delete the resource itself
+                )
+            )
+            logger.info(f"Deleted project resource from Keycloak for project {project_id}")
+        except Exception as e:
+            logger.error(f"Failed to delete project resource from Keycloak: {e}")
+            # Continue with project deletion even if Keycloak deletion fails
 
         if db_project.benchmark:
             return await ProjectDataManager(self.session).delete_one(db_project)
