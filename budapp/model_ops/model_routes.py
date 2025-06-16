@@ -432,22 +432,22 @@ async def edit_model(
             data=edit_model.model_dump(exclude_none=True, exclude_unset=True),
         )
 
-        return SuccessResponse(message="Cloud model edited successfully", code=status.HTTP_200_OK).to_http_response()
+        return SuccessResponse(message="Model edited successfully", code=status.HTTP_200_OK).to_http_response()
     except ClientException as e:
-        logger.exception(f"Failed to edit cloud model: {e}")
+        logger.exception(f"Failed to edit Model: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except ValidationError as e:
         logger.exception(f"ValidationErrors: {str(e)}")
         raise RequestValidationError(e.errors())
     except JSONDecodeError as e:
-        logger.exception(f"Failed to edit cloud model: {e}")
+        logger.exception(f"Failed to edit model: {e}")
         return ErrorResponse(
-            code=status.HTTP_422_UNPROCESSABLE_ENTITY, message="Failed to edit cloud model. Invalid input format."
+            code=status.HTTP_422_UNPROCESSABLE_ENTITY, message="Failed to edit model. Invalid input format."
         ).to_http_response()
     except Exception as e:
-        logger.exception(f"Failed to edit cloud model: {e}")
+        logger.exception(f"Failed to edit model: {e}")
         return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit cloud model"
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit model"
         ).to_http_response()
 
 

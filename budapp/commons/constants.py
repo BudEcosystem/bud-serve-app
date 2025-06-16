@@ -608,6 +608,28 @@ class BudServeWorkflowStepEventName(str, Enum):
     ADAPTER_DELETE_EVENTS = "adapter_delete_events"
 
 
+# Mapping between payload types and workflow step event names.
+# This mapping is used when processing asynchronous notifications to
+# determine which workflow step should be updated based on the incoming
+# payload type.
+PAYLOAD_TO_WORKFLOW_STEP_EVENT: dict[PayloadType, BudServeWorkflowStepEventName] = {
+    PayloadType.DEPLOYMENT_RECOMMENDATION: BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS,
+    PayloadType.DEPLOY_MODEL: BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS,
+    PayloadType.REGISTER_CLUSTER: BudServeWorkflowStepEventName.CREATE_CLUSTER_EVENTS,
+    PayloadType.PERFORM_MODEL_EXTRACTION: BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS,
+    PayloadType.PERFORM_MODEL_SECURITY_SCAN: BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS,
+    PayloadType.DELETE_CLUSTER: BudServeWorkflowStepEventName.DELETE_CLUSTER_EVENTS,
+    PayloadType.DELETE_DEPLOYMENT: BudServeWorkflowStepEventName.DELETE_ENDPOINT_EVENTS,
+    PayloadType.DELETE_WORKER: BudServeWorkflowStepEventName.DELETE_WORKER_EVENTS,
+    PayloadType.ADD_WORKER: BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS,
+    PayloadType.FETCH_LICENSE_FAQS: BudServeWorkflowStepEventName.LICENSE_FAQ_EVENTS,
+    PayloadType.DEPLOY_QUANTIZATION: BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS,
+    PayloadType.RUN_BENCHMARK: BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS,
+    PayloadType.ADD_ADAPTER: BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS,
+    PayloadType.DELETE_ADAPTER: BudServeWorkflowStepEventName.ADAPTER_DELETE_EVENTS,
+}
+
+
 class ClusterStatusEnum(StrEnum):
     """Cluster status types.
 
@@ -683,6 +705,12 @@ class ScalingMetricEnum(StrEnum):
     GPU_CACHE_USAGE_PERC = "bud:gpu_cache_usage_perc_average"
     TIME_PER_OUTPUT_TOKEN_SECONDS = "bud:time_per_output_token_seconds_average"
 
+
+class ProxyProviderEnum(StrEnum):
+    """Proxy provider types."""
+
+    VLLM = "vllm"
+    OPENAI = "openai"
 
 # class ModelTemplateTypeEnum(StrEnum):
 #     """Model template types."""
@@ -2897,3 +2925,10 @@ class BenchmarkFilterResourceEnum(Enum):
 
     MODEL = "model"
     CLUSTER = "cluster"
+
+
+class ModelLicenseObjectTypeEnum(StrEnum):
+    """Model license object type."""
+
+    URL = "url"
+    MINIO = "minio"

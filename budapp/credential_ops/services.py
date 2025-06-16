@@ -83,6 +83,8 @@ class CredentialService(SessionMixin):
         # Add or generate credential
         db_credential = await self.add_or_generate_credential(credential, current_user_id)
 
+        await self.update_proxy_cache(db_credential.project_id, db_credential.key, db_credential.expiry)
+
         credential_response = CredentialResponse(
             name=db_credential.name,
             project_id=db_credential.project_id,
@@ -117,6 +119,49 @@ class CredentialService(SessionMixin):
         logger.info(f"Credential inserted to database: {db_credential.id}")
 
         return db_credential
+
+    async def update_proxy_cache(self, project_id: UUID, api_key: Optional[str] = None, expiry: Optional[datetime] = None):
+        """Update the proxy cache in Redis with the latest endpoints and adapters for a given project.
+
+        This method collects all active endpoints and adapters associated with the specified project,
+        maps their names to their IDs, and updates the Redis cache with this information. It also sends
+        a message to the "bud_proxy_stream" to notify about the creation or update of the API key mapping.
+
+        Args:
+            api_key (str): The API key to associate with the project and its models.
+            project_id (UUID): The unique identifier of the project whose endpoints and adapters are to be cached.
+
+        Returns:
+            None
+        """
+        keys_to_update = []
+        if api_key is None:
+            db_credentials, count = await CredentialDataManager(self.session).get_all_credentials(
+                filters={"project_id": project_id}
+            )
+            for credential in db_credentials:
+                keys_to_update.append({"api_key": credential.key, "expiry": credential.expiry})
+        else:
+            keys_to_update.append({"api_key": api_key, "expiry": expiry})
+
+        models = {}
+        endpoints = await EndpointDataManager(self.session).get_all_running_endpoints(project_id)
+        for endpoint in endpoints:
+            models[endpoint.name] = str(endpoint.id)
+
+        adapters, _ = await AdapterDataManager(self.session).get_all_adapters_in_project(project_id)
+        for adapter in adapters:
+            models[adapter.name] = str(adapter.id)
+
+        redis_service = RedisService()
+
+        for key in keys_to_update:
+            ttl = None
+            if key["expiry"]:
+                ttl = int((key["expiry"] - datetime.now()).total_seconds())
+            await redis_service.set(f"api_key:{key['api_key']}", json.dumps({key['api_key']: models}), ex=ttl)
+
+        logger.info("Updated api keys in proxy cache")
 
     async def get_credentials(
         self,
@@ -189,10 +234,10 @@ class CredentialService(SessionMixin):
         #     # Check user has access to project
         #     await ProjectService(self.session).check_project_membership(project_id, user_id)
 
-        # delete router-config cache related to this credential
+        # delete proxy cache related to this credential
         api_key = db_credential.key
         redis_service = RedisService()
-        await redis_service.delete_keys_by_pattern(f"router_config:{api_key}:*")
+        await redis_service.delete_keys_by_pattern(f"api_key:{api_key}*")
         # Delete the credential from the database
         await CredentialDataManager(self.session).delete_credential(db_credential)
 

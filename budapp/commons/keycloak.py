@@ -135,6 +135,11 @@ class KeycloakManager:
             "resetPasswordAllowed": True,
             "editUsernameAllowed": False,
             "bruteForceProtected": True,
+            "refreshTokenMaxReuse": 0,  # Allow unlimited reuse of refresh tokens
+            "ssoSessionIdleTimeout": 3600,    # 1 hour in seconds
+            "ssoSessionMaxLifespan": 3600,    # 1 hour in seconds
+            "offlineSessionIdleTimeout": 2592000,  # 30 days in seconds
+            "offlineSessionMaxLifespan": 2592000,  # 30 days in seconds
         }
 
         try:
@@ -234,7 +239,7 @@ class KeycloakManager:
         Returns:
             Tuple[str, str]: Tuple containing (client_id, client_secret)
         """
-        base_url = self._get_base_url()
+        self._get_base_url()
         client_representation = {
             "clientId": client_id,
             "enabled": True,
@@ -345,11 +350,12 @@ class KeycloakManager:
             user_permission_map = {}
             if user.permissions:
                 for permission in user.permissions:
-                    key = permission.name.split(":")[0]
-                    scope_name = permission.name.split(":")[1]
-                    if key not in user_permission_map:
-                        user_permission_map[key] = []
-                    user_permission_map[key].append(scope_name)
+                    if permission.has_permission:
+                        key = permission.name.split(":")[0]
+                        scope_name = permission.name.split(":")[1]
+                        if key not in user_permission_map:
+                            user_permission_map[key] = []
+                        user_permission_map[key].append(scope_name)
 
             # User Policy Name
             policy_name = f"urn:bud:policy:{user_id}"
@@ -550,7 +556,7 @@ class KeycloakManager:
                     logger.warning(f"Resource {resource_name} not found for client {client_id}")
                     continue
 
-                resource_id = module_resource["_id"]
+                module_resource["_id"]
                 policy_name = f"urn:bud:policy:{user_id}"
                 existing_policies = realm_admin.get_client_authz_policies(client_id)
                 logger.debug(f"Existing policies: {existing_policies}")
@@ -1047,13 +1053,18 @@ class KeycloakManager:
             keycloak_openid = self.get_keycloak_openid_client(realm_name, credentials)
 
             # Validate the endpoint is correct
-            oidc_config = keycloak_openid.well_known()
-            token_endpoint = oidc_config.get("token_endpoint")
-            if not token_endpoint:
-                raise Exception("Could not retrieve token_endpoint from OIDC well-known configuration.")
+            try:
+                oidc_config = keycloak_openid.well_known()
+                token_endpoint = oidc_config.get("token_endpoint")
+                if not token_endpoint:
+                    raise ValueError("Could not retrieve token_endpoint from OIDC well-known configuration.")
+            except Exception as e:
+                logger.error(f"Failed to get OIDC configuration: {str(e)}")
+                raise ValueError(f"Failed to connect to Keycloak: {str(e)}")
 
             # access token = token
             if not token:
+                logger.error("Access token not provided")
                 raise KeycloakAuthenticationError("Access token not found.")
 
             # Request the RPT
@@ -1066,22 +1077,46 @@ class KeycloakManager:
                 "audience": credentials.client_named_id,
             }
 
-            response = requests.post(token_endpoint, headers=headers, data=payload)
-            response.raise_for_status()
+            try:
+                response = requests.post(token_endpoint, headers=headers, data=payload, timeout=30)
+                response.raise_for_status()
+            except requests.exceptions.Timeout:
+                logger.error("Timeout while requesting RPT from Keycloak")
+                raise ValueError("Request to Keycloak timed out")
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 401:
+                    logger.error("Token expired or invalid")
+                    raise KeycloakAuthenticationError("Token expired or invalid")
+                elif e.response.status_code == 403:
+                    logger.error("Insufficient permissions to access resources")
+                    raise KeycloakAuthenticationError("Insufficient permissions")
+                else:
+                    logger.error(f"HTTP error from Keycloak: {e.response.status_code} - {e.response.text}")
+                    raise ValueError(f"Keycloak error: {e.response.status_code}")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Network error communicating with Keycloak: {str(e)}")
+                raise ValueError(f"Failed to communicate with Keycloak: {str(e)}")
 
             # RPT Response
-            rpt_response_data = response.json()
+            try:
+                rpt_response_data = response.json()
+            except json.JSONDecodeError:
+                logger.error("Invalid JSON response from Keycloak")
+                raise ValueError("Invalid response format from Keycloak")
+
             requesting_party_token = rpt_response_data.get("access_token")
 
             if not requesting_party_token:
+                logger.error(f"RPT not found in response: {json.dumps(rpt_response_data)}")
                 raise ValueError(
-                    f"'access_token' (RPT) not found in UMA response. Full response: {json.dumps(rpt_response_data)}"
+                    "Failed to obtain permission token from Keycloak"
                 )
 
             # Decode RPT Payload
             rpt_payload = self._decode_jwt_payload(requesting_party_token)
             if not rpt_payload:
-                raise ValueError("Failed to decode the obtained RPT.")
+                logger.error("Failed to decode RPT")
+                raise ValueError("Failed to decode permission token")
 
             # Extract and format permissions
             raw_permissions = rpt_payload.get("authorization", {}).get("permissions", [])
@@ -1101,9 +1136,15 @@ class KeycloakManager:
 
             return final_output
 
-        except Exception as e:
-            logger.error(f"Error getting user roles and permissions: {str(e)}")
+        except KeycloakAuthenticationError:
+            # Re-raise authentication errors as-is
             raise
+        except ValueError:
+            # Re-raise value errors as-is
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error getting user roles and permissions: {str(e)}", exc_info=True)
+            raise ValueError(f"Failed to retrieve user permissions: {str(e)}")
 
     def _decode_jwt_payload(self, token: str) -> dict:
         """Safely decodes the payload of a JWT using base64."""
@@ -1138,7 +1179,7 @@ class KeycloakManager:
                 logger.info(f"Resource {resource.resource_type} does not have any scopes — skipping.")
                 return
 
-            realm_admin = self.get_realm_admin(realm_name)
+            self.get_realm_admin(realm_name)
 
             # for scope in resource.scopes:
             # logger.info(f"Removing resource {resource.resource_type} with scope {scope} — skipping.")
@@ -1720,7 +1761,7 @@ class KeycloakManager:
         for resource in resources:
             scopes = resource.get("scopes", [])
             resource_name = resource.get("name")
-            resource_type = resource.get("type")
+            resource.get("type")
 
             # Skip if resource doesn't have scopes
             if not scopes:

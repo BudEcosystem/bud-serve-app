@@ -45,6 +45,7 @@ from ..commons.constants import (
     ModelProviderTypeEnum,
     ModelStatusEnum,
     NotificationTypeEnum,
+    ProxyProviderEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
@@ -61,6 +62,7 @@ from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
+from ..credential_ops.services import CredentialService
 from .crud import AdapterDataManager, EndpointDataManager
 from .models import Adapter as AdapterModel
 from .models import Endpoint as EndpointModel
@@ -71,6 +73,8 @@ from .schemas import (
     AddWorkerWorkflowStepData,
     EndpointCreate,
     ModelClusterDetail,
+    ProxyModelConfig,
+    VLLMConfig,
     WorkerInfoFilter,
 )
 
@@ -176,6 +180,14 @@ class EndpointService(SessionMixin):
         # Update endpoint status to deleting
         await EndpointDataManager(self.session).update_by_fields(db_endpoint, {"status": EndpointStatusEnum.DELETING})
         logger.debug(f"Endpoint {db_endpoint.id} status updated to {EndpointStatusEnum.DELETING.value}")
+
+        # Delete endpoint details with pattern “router_config:*:<endpoint_name>“,
+        try:
+            await self.delete_model_from_proxy_cache(db_endpoint.id)
+            await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+            logger.debug(f"Updated proxy cache for project {db_endpoint.project_id}")
+        except (RedisException, Exception) as e:
+            logger.error(f"Failed to delete endpoint details from redis: {e}")
 
         return db_workflow
 
@@ -393,6 +405,11 @@ class EndpointService(SessionMixin):
             EndpointModel(**endpoint_data.model_dump(exclude_unset=True, exclude_none=True))
         )
         logger.debug(f"Endpoint created successfully: {db_endpoint.id}")
+
+        # Update proxy cache for project
+        await self.add_model_to_proxy_cache(db_endpoint.id, db_endpoint.namespace, "vllm", db_endpoint.url)
+        await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+        logger.debug(f"Updated proxy cache for project {db_endpoint.project_id}")
 
         # Update endpoint details as next step
         # Update current step number
@@ -676,6 +693,16 @@ class EndpointService(SessionMixin):
         # model_detail = json.loads(model_detail_json_response.body.decode("utf-8"))
         cluster_id = db_endpoint.cluster_id
         cluster_detail = await ClusterService(self.session).get_cluster_details(cluster_id)
+
+        # Get running and crashed worker count
+        running_worker_count, crashed_worker_count = await self.get_endpoint_worker_count(
+            db_endpoint.namespace, str(db_endpoint.bud_cluster_id)
+        )
+
+        # An endpoint always have at least one worker
+        if running_worker_count == 0 and crashed_worker_count == 0:
+            running_worker_count, crashed_worker_count = None, None
+
         return ModelClusterDetail(
             id=db_endpoint.id,
             name=db_endpoint.name,
@@ -683,7 +710,61 @@ class EndpointService(SessionMixin):
             model=db_endpoint.model,
             cluster=cluster_detail,
             deployment_config=db_endpoint.deployment_config,
+            running_worker_count=running_worker_count,
+            crashed_worker_count=crashed_worker_count,
         )
+
+    @staticmethod
+    async def get_endpoint_worker_count(namespace: str, cluster_id: str) -> Tuple[int, int]:
+        """Get endpoint worker count."""
+        get_workers_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/worker-info"
+        )
+        page = 1
+        PAGE_LIMIT = 20
+
+        # Initialize worker counts
+        running_worker_count = 0
+        crashed_worker_count = 0
+
+        # Fetch workers in batches
+        while True:
+            try:
+                payload = {"namespace": namespace, "cluster_id": cluster_id, "page": page, "limit": PAGE_LIMIT}
+                async with aiohttp.ClientSession() as session, session.get(
+                    get_workers_endpoint, params=payload
+                ) as response:
+                    bud_cluster_response = await response.json()
+                    logger.debug("bud_cluster_response: %s", bud_cluster_response)
+
+                    if response.status != 200 or bud_cluster_response.get("object") == "error":
+                        error_message = bud_cluster_response.get("message", "Failed to get endpoint workers")
+                        logger.error(f"Failed to get endpoint workers: {error_message}")
+                        break
+
+                    logger.debug("Successfully retrieved %s workers for page %s", PAGE_LIMIT, page)
+                    workers_data = bud_cluster_response.get("workers", [])
+            except Exception as e:
+                logger.exception(
+                    "Failed to fetch workers for namespace %s and cluster_id %s: %s", namespace, cluster_id, e
+                )
+                break
+
+            # Count running and crashed workers
+            for worker in workers_data:
+                status = worker.get("status")
+                if status == "Running":
+                    running_worker_count += 1
+                else:
+                    crashed_worker_count += 1
+
+            # Check if there are more pages
+            total_pages = bud_cluster_response.get("total_pages", 1)
+            if page >= total_pages:
+                break
+            page += 1
+
+        return running_worker_count, crashed_worker_count
 
     async def delete_worker_from_notification_event(self, payload: NotificationPayload) -> None:
         """Delete a worker in database.
@@ -1943,3 +2024,26 @@ class EndpointService(SessionMixin):
             .build()
         )
         await BudNotifyService().send_notification(notification_request)
+
+    async def add_model_to_proxy_cache(self, endpoint_id: UUID, model_name: str, model_type: str, api_base: str) -> None:
+        """Add model to proxy cache for a project."""
+        
+        model_config = ProxyModelConfig(
+            routing=[ProxyProviderEnum.VLLM.value],
+            providers={
+                ProxyProviderEnum.VLLM.value: VLLMConfig(
+                    type=model_type,
+                    model_name=model_name,
+                    api_base=api_base + "/v1",
+                    api_key_location="none"
+                )
+            }
+        )
+
+        redis_service = RedisService()
+        await redis_service.set(f"model_table:{endpoint_id}", json.dumps({str(endpoint_id): model_config.model_dump()}))
+
+    async def delete_model_from_proxy_cache(self, endpoint_id: UUID) -> None:
+        """Delete model from proxy cache for a project."""
+        redis_service = RedisService()
+        await redis_service.delete_keys_by_pattern(f"model_table:{endpoint_id}*")
