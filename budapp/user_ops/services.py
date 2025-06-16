@@ -31,14 +31,14 @@ from budapp.shared.notification_service import BudNotifyHandler
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
-from budapp.user_ops.schemas import TenantClientSchema, ResetPasswordRequest
+from budapp.user_ops.schemas import ResetPasswordRequest, TenantClientSchema
 
-from ..commons.constants import EndpointStatusEnum, UserStatusEnum, NotificationCategory, BUD_RESET_PASSWORD_WORKFLOW
+from ..commons.constants import BUD_RESET_PASSWORD_WORKFLOW, EndpointStatusEnum, NotificationCategory, UserStatusEnum
+from ..commons.helpers import generate_valid_password, validate_password_string
 from ..credential_ops.crud import CredentialDataManager
 from ..credential_ops.models import Credential as CredentialModel
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
-from ..commons.helpers import generate_valid_password, validate_password_string
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 
 
@@ -128,7 +128,7 @@ class UserService(SessionMixin):
                     email=db_user.email,
                     first_name=fields.get("name"),
                 )
-                response = await BudNotifyHandler().update_subscriber(
+                await BudNotifyHandler().update_subscriber(
                     str(user_id), subscriber_data
                 )
                 logger.info("Updated Budserve user in BudNotify subscriber")
@@ -147,40 +147,61 @@ class UserService(SessionMixin):
         user: UserModel,
     ) -> UserModel:
         """Get user roles and permissions."""
-        auth_id = user.auth_id
+        try:
+            auth_id = user.auth_id
+            if not auth_id:
+                logger.error("User auth_id is missing")
+                raise ClientException("User authentication ID not found", status_code=401)
 
-        # Relan Name
-        realm_name = app_settings.default_realm_name
+            # Realm Name
+            realm_name = app_settings.default_realm_name
 
-        # Default Client Details
-        tenant = await UserDataManager(self.session).retrieve_by_fields(
-            Tenant, {"realm_name": realm_name}, missing_ok=True
-        )
-        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
-            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
-        )
+            # Default Client Details
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"realm_name": realm_name}, missing_ok=True
+            )
+            if not tenant:
+                logger.error(f"Tenant not found for realm: {realm_name}")
+                raise ClientException("Tenant configuration not found", status_code=401)
 
-        # Credentials
-        credentials = TenantClientSchema(
-            id=tenant_client.id,
-            client_named_id=tenant_client.client_named_id,
-            client_id=tenant_client.client_id,
-            client_secret=tenant_client.client_secret,
-        )
+            tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+                TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+            )
+            if not tenant_client:
+                logger.error(f"Tenant client not found for tenant: {tenant.id}")
+                raise ClientException("Tenant client configuration not found", status_code=401)
 
-        # Keycloak Manager
-        keycloak_manager = KeycloakManager()
-        result = await keycloak_manager.get_user_roles_and_permissions(
-            auth_id,
-            realm_name,
-            tenant_client.client_id,
-            credentials,
-            user.raw_token,
-        )
+            # Validate token exists
+            if not user.raw_token:
+                logger.error("User token is missing")
+                raise ClientException("User authentication token not found", status_code=401)
 
-        logger.debug(f"::KEYCLOAK::User {auth_id} roles and permissions: {result}")
+            # Credentials
+            credentials = TenantClientSchema(
+                id=tenant_client.id,
+                client_named_id=tenant_client.client_named_id,
+                client_id=tenant_client.client_id,
+                client_secret=tenant_client.client_secret,
+            )
 
-        return result
+            # Keycloak Manager
+            keycloak_manager = KeycloakManager()
+            result = await keycloak_manager.get_user_roles_and_permissions(
+                auth_id,
+                realm_name,
+                tenant_client.client_id,
+                credentials,
+                user.raw_token,
+            )
+
+            logger.debug(f"::KEYCLOAK::User {auth_id} roles and permissions: {result}")
+
+            return result
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error getting user roles and permissions: {str(e)}", exc_info=True)
+            raise ClientException(f"Failed to retrieve user permissions: {str(e)}", status_code=401)
 
     async def get_user_permissions_by_id(
         self,
@@ -227,11 +248,11 @@ class UserService(SessionMixin):
         order_by: List = [],
         search: bool = False,
     ) -> Tuple[List[UserModel], int]:
-        """Get all users from the database"""
+        """Get all users from the database."""
         return await UserDataManager(self.session).get_all_users(offset, limit, filters, order_by, search)
 
     async def complete_user_onboarding(self, db_user: UserModel) -> UserModel:
-        """Complete user onboarding"""
+        """Complete user onboarding."""
         if db_user.status == UserStatusEnum.DELETED or db_user.status == UserStatusEnum.INVITED:
             raise ClientException(
                 "Only active users can complete onboarding",
@@ -284,7 +305,7 @@ class UserService(SessionMixin):
 
         # Add user to budnotify subscribers
         try:
-            response = await BudNotifyHandler().delete_subscriber(str(db_user.id))
+            await BudNotifyHandler().delete_subscriber(str(db_user.id))
             logger.info("Deleted Budserve user from BudNotify subscriber")
 
             # In order to prevent this user sync in periodic task, set is_subscriber to True
@@ -295,7 +316,7 @@ class UserService(SessionMixin):
         return await UserDataManager(self.session).update_by_fields(db_user, data)
 
     async def reactivate_user(self, user_id: UUID) -> UserModel:
-        """Reactivate a user"""
+        """Reactivate a user."""
         db_user = await UserDataManager(self.session).retrieve_by_fields(
             UserModel, {"id": user_id, "status": UserStatusEnum.DELETED}, missing_ok=True
         )
@@ -313,7 +334,7 @@ class UserService(SessionMixin):
                 email=db_user.email,
                 first_name=db_user.name,
             )
-            response = await BudNotifyHandler().create_subscriber(subscriber_data)
+            await BudNotifyHandler().create_subscriber(subscriber_data)
             logger.info("Reactivated Budserve user in BudNotify subscriber")
 
             # In order to prevent this user sync in periodic task, set is_subscriber to True
@@ -325,8 +346,7 @@ class UserService(SessionMixin):
         return await UserDataManager(self.session).update_by_fields(db_user, data)
 
     async def reset_password_email(self, request: ResetPasswordRequest):
-        """Trigger a reset password email notification"""
-        
+        """Trigger a reset password email notification."""
         # Check if user exists
         db_user = await UserDataManager(self.session).retrieve_by_fields(
             UserModel, {"email": request.email}, missing_ok=True

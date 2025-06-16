@@ -142,6 +142,17 @@ class EndpointDataManager(DataManagerUtils):
         result = self.scalars_all(stmt)
 
         return result, count
+    
+    async def get_all_running_endpoints(self, project_id: UUID) -> List[EndpointModel]:
+        """Get all running endpoints for a given project."""
+        stmt = select(EndpointModel).filter(
+            and_(
+                EndpointModel.status != EndpointStatusEnum.DELETED,
+                EndpointModel.status != EndpointStatusEnum.DELETING,
+                EndpointModel.project_id == project_id,
+            )
+        )
+        return self.scalars_all(stmt)
 
     async def get_all_endpoints_in_cluster(
         self, cluster_id: UUID, offset: int, limit: int, filters: Dict[str, Any], order_by: List[str], search: bool

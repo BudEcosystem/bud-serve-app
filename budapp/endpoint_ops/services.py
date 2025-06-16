@@ -45,6 +45,7 @@ from ..commons.constants import (
     ModelProviderTypeEnum,
     ModelStatusEnum,
     NotificationTypeEnum,
+    ProxyProviderEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
@@ -61,6 +62,7 @@ from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
+from ..credential_ops.services import CredentialService
 from .crud import AdapterDataManager, EndpointDataManager
 from .models import Adapter as AdapterModel
 from .models import Endpoint as EndpointModel
@@ -71,6 +73,8 @@ from .schemas import (
     AddWorkerWorkflowStepData,
     EndpointCreate,
     ModelClusterDetail,
+    ProxyModelConfig,
+    VLLMConfig,
     WorkerInfoFilter,
 )
 
@@ -176,6 +180,14 @@ class EndpointService(SessionMixin):
         # Update endpoint status to deleting
         await EndpointDataManager(self.session).update_by_fields(db_endpoint, {"status": EndpointStatusEnum.DELETING})
         logger.debug(f"Endpoint {db_endpoint.id} status updated to {EndpointStatusEnum.DELETING.value}")
+
+        # Delete endpoint details with pattern “router_config:*:<endpoint_name>“,
+        try:
+            await self.delete_model_from_proxy_cache(db_endpoint.id)
+            await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+            logger.debug(f"Updated proxy cache for project {db_endpoint.project_id}")
+        except (RedisException, Exception) as e:
+            logger.error(f"Failed to delete endpoint details from redis: {e}")
 
         return db_workflow
 
@@ -393,6 +405,11 @@ class EndpointService(SessionMixin):
             EndpointModel(**endpoint_data.model_dump(exclude_unset=True, exclude_none=True))
         )
         logger.debug(f"Endpoint created successfully: {db_endpoint.id}")
+
+        # Update proxy cache for project
+        await self.add_model_to_proxy_cache(db_endpoint.id, db_endpoint.namespace, "vllm", db_endpoint.url)
+        await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+        logger.debug(f"Updated proxy cache for project {db_endpoint.project_id}")
 
         # Update endpoint details as next step
         # Update current step number
@@ -2007,3 +2024,26 @@ class EndpointService(SessionMixin):
             .build()
         )
         await BudNotifyService().send_notification(notification_request)
+
+    async def add_model_to_proxy_cache(self, endpoint_id: UUID, model_name: str, model_type: str, api_base: str) -> None:
+        """Add model to proxy cache for a project."""
+        
+        model_config = ProxyModelConfig(
+            routing=[ProxyProviderEnum.VLLM.value],
+            providers={
+                ProxyProviderEnum.VLLM.value: VLLMConfig(
+                    type=model_type,
+                    model_name=model_name,
+                    api_base=api_base + "/v1",
+                    api_key_location="none"
+                )
+            }
+        )
+
+        redis_service = RedisService()
+        await redis_service.set(f"model_table:{endpoint_id}", json.dumps({str(endpoint_id): model_config.model_dump()}))
+
+    async def delete_model_from_proxy_cache(self, endpoint_id: UUID) -> None:
+        """Delete model from proxy cache for a project."""
+        redis_service = RedisService()
+        await redis_service.delete_keys_by_pattern(f"model_table:{endpoint_id}*")

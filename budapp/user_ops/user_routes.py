@@ -33,7 +33,7 @@ from budapp.commons.dependencies import (
 )
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
-from budapp.user_ops.schemas import User, ResetPasswordResponse, ResetPasswordRequest
+from budapp.user_ops.schemas import ResetPasswordRequest, ResetPasswordResponse, User
 from budapp.user_ops.services import UserService
 
 from .schemas import MyPermissions, UserListFilter, UserListResponse, UserPermissions, UserResponse, UserUpdate
@@ -102,7 +102,7 @@ async def complete_user_onboarding(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Session = Depends(get_session),
 ) -> Union[UserResponse, ErrorResponse]:
-    """Complete user onboarding"""
+    """Complete user onboarding."""
     try:
         db_user = await UserService(session).complete_user_onboarding(current_user)
         logger.info(f"User onboarding completed: {current_user.id}")
@@ -142,14 +142,14 @@ async def complete_user_onboarding(
     description="Trigger a reset password email notification",
 )
 async def reset_password(
-    request: ResetPasswordRequest, 
+    request: ResetPasswordRequest,
     session: Session = Depends(get_session),
 ) -> Union[ResetPasswordResponse, ErrorResponse]:
-    """Trigger a reset password email notification"""
+    """Trigger a reset password email notification."""
     try:
         response = await UserService(session).reset_password_email(request)
         logger.debug("Email notification triggered for reset password. %s", response)
-        
+
         return ResetPasswordResponse(
             object="user.reset-password",
             code=status.HTTP_200_OK,
@@ -219,32 +219,37 @@ async def update_current_user(
             "model": MyPermissions,
             "description": "Successfully get user permissions",
         },
-        status.HTTP_400_BAD_REQUEST: {
+        status.HTTP_401_UNAUTHORIZED: {
             "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
+            "description": "Authentication failed or token expired",
         },
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
             "description": "Service is unavailable due to server error",
         },
     },
-    description="Get user roles",
+    description="Get user roles and permissions",
 )
 async def get_user_roles(
     current_user: Annotated[User, Depends(get_current_active_invite_user)],
     session: Annotated[Session, Depends(get_session)],
 ) -> Union[MyPermissions, ErrorResponse]:
-    """Get user roles."""
+    """Get user roles and permissions."""
     try:
         kc_user = await UserService(session).get_user_roles_and_permissions(current_user)
         permissions_list = kc_user.get("permissions", [])
         return MyPermissions(
             object="user.permissions", code=status.HTTP_200_OK, message="Successfully get user permissions", permissions=permissions_list
         ).to_http_response()
-    except Exception as e:
-        logger.exception(f"Failed to get user permissions: {e}")
+    except ClientException as e:
+        logger.error(f"Client error getting user permissions: {e.message}")
         return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get user roles"
+            code=e.status_code or status.HTTP_401_UNAUTHORIZED, message=e.message
+        ).to_http_response()
+    except Exception as e:
+        logger.exception(f"Unexpected error getting user permissions: {e}")
+        return ErrorResponse(
+            code=status.HTTP_401_UNAUTHORIZED, message="Authentication failed or token expired"
         ).to_http_response()
 
 
@@ -275,7 +280,7 @@ async def get_all_users(
     search: bool = False,
     session: Session = Depends(get_session),
 ) -> Union[MyPermissions, ErrorResponse]:
-    """Get all active users from the database"""
+    """Get all active users from the database."""
     # Calculate offset
     offset = (page - 1) * limit
 
@@ -326,7 +331,7 @@ async def retrieve_user(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Session = Depends(get_session),
 ) -> Union[UserResponse, ErrorResponse]:
-    """Get a single active user from the database"""
+    """Get a single active user from the database."""
     try:
         db_user = await UserService(session).retrieve_active_user(user_id)
         return UserResponse(
@@ -402,7 +407,7 @@ async def delete_user(
     remove_credential: bool = True,
     session: Session = Depends(get_session),
 ) -> Union[SuccessResponse, ErrorResponse]:
-    """Delete an active user from the database"""
+    """Delete an active user from the database."""
     try:
         _ = await UserService(session).delete_active_user(user_id, remove_credential)
         logger.debug(f"User deleted: {user_id}")
@@ -440,7 +445,7 @@ async def reactivate_user(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Session = Depends(get_session),
 ) -> Union[SuccessResponse, ErrorResponse]:
-    """Reactivate an inactive user from the database"""
+    """Reactivate an inactive user from the database."""
     try:
         db_user = await UserService(session).reactivate_user(user_id)
         logger.debug(f"User reactivated: {user_id}")
