@@ -19,11 +19,12 @@
 from typing import Union
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated, List, Optional
 
 from budapp.commons import logging
+from budapp.commons.constants import PermissionEnum
 from budapp.commons.dependencies import (
     get_current_active_invite_user,
     get_current_active_user,
@@ -32,11 +33,23 @@ from budapp.commons.dependencies import (
     parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
+from budapp.commons.permission_handler import require_permissions
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
-from budapp.user_ops.schemas import ResetPasswordRequest, ResetPasswordResponse, User
+from budapp.user_ops.schemas import (
+    MyPermissions,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
+    User,
+    UserListFilter,
+    UserListResponse,
+    UserPermissions,
+    UserResponse,
+    UserUpdate,
+)
 from budapp.user_ops.services import UserService
 
-from .schemas import MyPermissions, UserListFilter, UserListResponse, UserPermissions, UserResponse, UserUpdate
+from ..permissions.schemas import CheckUserResourceScope
+from ..permissions.service import PermissionService
 
 
 logger = logging.get_logger(__name__)
@@ -190,7 +203,6 @@ async def reset_password(
     },
     description="Update current user",
 )
-# @require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def update_current_user(
     user_id: UUID,
     user: UserUpdate,
@@ -200,12 +212,39 @@ async def update_current_user(
 ) -> Union[UserResponse, ErrorResponse]:
     """Update current user."""
     try:
+        # Check if user is updating another user's profile
+        if str(user_id) != str(current_user.id):
+            try:
+                # Check if current user has USER_MANAGE permission
+                has_permission = await PermissionService(session).check_resource_permission_by_user(
+                    current_user,
+                    CheckUserResourceScope(
+                        resource_type="user",
+                        scope="manage",
+                        entity_id=None,  # Global permission check
+                    ),
+                )
+
+                if not has_permission:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for this operation"
+                    )
+            except HTTPException as e:
+                raise e
+            except Exception as e:
+                logger.exception(f"Failed to check user permission: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for this operation"
+                )
+
         db_user = await UserService(session).update_active_user(
             user_id, user.model_dump(exclude_unset=True, exclude_none=True), current_user, realm_name
         )
         return UserResponse(
             object="user.me", code=status.HTTP_200_OK, message="Successfully update current user", user=db_user
         ).to_http_response()
+    except HTTPException as e:
+        raise e
     except Exception as e:
         logger.exception(f"Failed to update current user: {e}")
         return ErrorResponse(
@@ -271,6 +310,7 @@ async def get_user_roles(
     },
     description="Get all active users from the database",
 )
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def get_all_users(
     current_user: Annotated[User, Depends(get_current_active_user)],
     page: int = Query(1, ge=1),
@@ -326,6 +366,7 @@ async def get_all_users(
     },
     description="Get a single active user from the database",
 )
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def retrieve_user(
     user_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -364,6 +405,7 @@ async def retrieve_user(
     },
     description="Get user roles",
 )
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def get_user_permissions_by_id(
     user_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_invite_user)],
@@ -401,6 +443,7 @@ async def get_user_permissions_by_id(
     },
     description="Delete an active user from the database",
 )
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def delete_user(
     user_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -440,6 +483,7 @@ async def delete_user(
     },
     description="Reactivate an inactive user from the database",
 )
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
 async def reactivate_user(
     user_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
