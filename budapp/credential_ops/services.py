@@ -124,8 +124,8 @@ class CredentialService(SessionMixin):
         """Update the proxy cache in Redis with the latest endpoints and adapters for a given project.
 
         This method collects all active endpoints and adapters associated with the specified project,
-        maps their names to their IDs, and updates the Redis cache with this information. It also sends
-        a message to the "bud_proxy_stream" to notify about the creation or update of the API key mapping.
+        maps their names to their IDs with additional metadata (model_id, project_id), and updates 
+        the Redis cache with this information.
 
         Args:
             api_key (str): The API key to associate with the project and its models.
@@ -145,13 +145,25 @@ class CredentialService(SessionMixin):
             keys_to_update.append({"api_key": api_key, "expiry": expiry})
 
         models = {}
+        
+        # Get endpoints with their model_id and project_id
         endpoints = await EndpointDataManager(self.session).get_all_running_endpoints(project_id)
         for endpoint in endpoints:
-            models[endpoint.name] = str(endpoint.id)
+            models[endpoint.name] = {
+                "endpoint_id": str(endpoint.id),
+                "model_id": str(endpoint.model_id),
+                "project_id": str(endpoint.project_id)
+            }
 
+        # Get adapters with their model_id and project_id
         adapters, _ = await AdapterDataManager(self.session).get_all_adapters_in_project(project_id)
         for adapter in adapters:
-            models[adapter.name] = str(adapter.id)
+            # For adapters, endpoint_id refers to the adapter id itself
+            models[adapter.name] = {
+                "endpoint_id": str(adapter.id),
+                "model_id": str(adapter.model_id),
+                "project_id": str(project_id)  # Adapters don't have direct project_id, use the passed project_id
+            }
 
         redis_service = RedisService()
 
