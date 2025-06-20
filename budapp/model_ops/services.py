@@ -1404,6 +1404,7 @@ class LocalModelWorkflowService(SessionMixin):
             license_type=license_type,
             description=license_description,
             suitability=license_suitability,
+            data_type=ModelLicenseObjectTypeEnum.MINIO,
         )
         return await ModelLicensesDataManager(self.session).insert_one(
             ModelLicenses(**license_data.model_dump(exclude_none=True))
