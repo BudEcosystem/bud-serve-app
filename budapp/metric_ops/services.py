@@ -48,12 +48,11 @@ from .schemas import DashboardStatsResponse
 logger = logging.get_logger(__name__)
 
 
-class BudMetricService:
+class BudMetricService(SessionMixin):
     """Bud Metric service."""
 
-    @staticmethod
-    async def proxy_analytics_request(request_body: Dict) -> Dict:
-        """Proxy analytics request to the observability endpoint without processing."""
+    async def proxy_analytics_request(self, request_body: Dict) -> Dict:
+        """Proxy analytics request to the observability endpoint and enrich with names."""
         analytics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/analytics"
         
         logger.debug(f"Proxying analytics request to bud_metrics: {request_body}")
@@ -74,6 +73,9 @@ class BudMetricService:
                             status_code=response.status
                         )
                     
+                    # Enrich response with names
+                    await self._enrich_response_with_names(response_data)
+                    
                     return response_data
         except ClientException:
             raise
@@ -83,6 +85,63 @@ class BudMetricService:
                 "Failed to proxy analytics request",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
+    
+    async def _enrich_response_with_names(self, response_data: Dict) -> None:
+        """Enrich the response data with names for project, model, and endpoint IDs."""
+        from sqlalchemy import select
+        
+        # Collect all unique IDs from the response
+        project_ids = set()
+        model_ids = set()
+        endpoint_ids = set()
+        
+        # Extract IDs from the response structure
+        if "items" in response_data:
+            for time_bucket in response_data["items"]:
+                for item in time_bucket.get("items", []):
+                    if "project_id" in item and item["project_id"]:
+                        project_ids.add(item["project_id"])
+                    if "model_id" in item and item["model_id"]:
+                        model_ids.add(item["model_id"])
+                    if "endpoint_id" in item and item["endpoint_id"]:
+                        endpoint_ids.add(item["endpoint_id"])
+        
+        # Fetch names for all IDs
+        project_names = {}
+        model_names = {}
+        endpoint_names = {}
+        
+        if project_ids:
+            # Query projects
+            stmt = select(ProjectModel).where(ProjectModel.id.in_(list(project_ids)))
+            result = self.session.execute(stmt)
+            projects = result.scalars().all()
+            project_names = {str(p.id): p.name for p in projects}
+        
+        if model_ids:
+            # Query models
+            stmt = select(Model).where(Model.id.in_(list(model_ids)))
+            result = self.session.execute(stmt)
+            models = result.scalars().all()
+            model_names = {str(m.id): m.name for m in models}
+        
+        if endpoint_ids:
+            # Query endpoints
+            stmt = select(EndpointModel).where(EndpointModel.id.in_(list(endpoint_ids)))
+            result = self.session.execute(stmt)
+            endpoints = result.scalars().all()
+            endpoint_names = {str(e.id): e.name for e in endpoints}
+        
+        # Add names to the response items
+        if "items" in response_data:
+            for time_bucket in response_data["items"]:
+                for item in time_bucket.get("items", []):
+                    if "project_id" in item and item["project_id"]:
+                        item["project_name"] = project_names.get(str(item["project_id"]), "Unknown")
+                    if "model_id" in item and item["model_id"]:
+                        item["model_name"] = model_names.get(str(item["model_id"]), "Unknown")
+                    if "endpoint_id" in item and item["endpoint_id"]:
+                        item["endpoint_name"] = endpoint_names.get(str(item["endpoint_id"]), "Unknown")
 
 
 class MetricService(SessionMixin):

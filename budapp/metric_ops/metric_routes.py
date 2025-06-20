@@ -57,16 +57,17 @@ metric_router = APIRouter(prefix="/metrics", tags=["metric"])
 )
 async def analytics_proxy(
     current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
     request_body: Dict[str, Any],
 ):
     """
     Proxy analytics requests to the observability/analytics endpoint.
     
-    This endpoint forwards the request body as-is to the metrics service
-    without any processing or transformation.
+    This endpoint forwards the request body to the metrics service
+    and enriches the response with names for project, model, and endpoint IDs.
     """
     try:
-        response_data = await BudMetricService.proxy_analytics_request(request_body)
+        response_data = await BudMetricService(session).proxy_analytics_request(request_body)
         return JSONResponse(content=response_data, status_code=status.HTTP_200_OK)
     except ClientException as e:
         logger.exception(f"Failed to proxy analytics request: {e}")
