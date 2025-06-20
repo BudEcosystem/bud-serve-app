@@ -29,8 +29,10 @@ from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
 from budapp.user_ops.schemas import TenantClientSchema, User, UserCreate
 
+from ..commons.constants import PermissionEnum
 from ..commons.exceptions import BudNotifyException
 from ..core.schemas import SubscriberCreate
+from ..permissions.schemas import PermissionList
 from ..shared.notification_service import BudNotifyHandler
 from .schemas import LogoutRequest, RefreshTokenRequest, RefreshTokenResponse, UserLogin, UserLoginData
 
@@ -278,6 +280,24 @@ class AuthService(SessionMixin):
             )
             if not tenant_client:
                 raise ClientException("Default tenant client not found")
+
+            # Process permissions to add implicit view permissions for manage permissions
+            if user.permissions:
+                permission_dict = {p.name: p for p in user.permissions}
+                manage_to_view_mapping = PermissionEnum.get_manage_to_view_mapping()
+
+                # Add implicit view permissions for manage permissions
+                for permission in user.permissions:
+                    if permission.has_permission and permission.name in manage_to_view_mapping:
+                        view_permission_name = manage_to_view_mapping[permission.name]
+                        # Explicitly upsert the view permission
+                        permission_dict[view_permission_name] = PermissionList(
+                            name=view_permission_name, has_permission=True
+                        )
+                        logger.debug("Upsert %s for %s", view_permission_name, permission.name)
+
+                # Update user object with processed permissions
+                user.permissions = list(permission_dict.values())
 
             user_auth_id = await keycloak_manager.create_user_with_permissions(
                 user, app_settings.default_realm_name, tenant_client.client_id

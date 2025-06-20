@@ -1,7 +1,7 @@
 from typing import Annotated, List, Optional, Union
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
@@ -10,6 +10,8 @@ from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse, SingleResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 
+from ..commons.constants import PermissionEnum
+from ..commons.permission_handler import require_permissions
 from .schemas import PaginatedRouterResponse, RouterFilter, RouterRequest, RouterResponse
 from .services import RouterService
 
@@ -21,16 +23,20 @@ router_router = APIRouter(prefix="/routers", tags=["router"])
 
 
 @router_router.post("/", status_code=status.HTTP_201_CREATED, response_model=SingleResponse[RouterResponse])
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def create_router(
     router: RouterRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ):
     router_response = await RouterService(session).create_router(current_user.id, router)
     return SingleResponse(message="Router created successfully", result=router_response)
 
 
 @router_router.get("/", response_model=PaginatedRouterResponse)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def get_routers(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -40,6 +46,8 @@ async def get_routers(
     limit: int = Query(10, ge=0),
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),  # noqa: B008
     search: bool = False,
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ):
     # Calculate offset
     offset = (page - 1) * limit
@@ -77,11 +85,14 @@ async def get_routers(
     response_model_exclude_none=True,
     description="Update saved router.",
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def update_router(
     router_id: UUID,
     router_data: RouterRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ):
     router_response = await RouterService(session).update_router(router_id, router_data, current_user.id)
     logger.info(f"Router updated: {router_response.id}")
@@ -94,10 +105,13 @@ async def update_router(
     response_model=SuccessResponse,
     description="Delete saved router",
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def delete_router(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     router_id: UUID,
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Delete a router by its ID."""
     try:

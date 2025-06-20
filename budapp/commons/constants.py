@@ -375,7 +375,7 @@ class PermissionEnum(Enum):
     """Enumeration of system permissions.
 
     This enum defines various permission levels for different aspects of the system,
-    including models, projects, endpoints, clusters, and user management.
+    including models, projects, endpoints, clusters, user management, and benchmarks.
 
     Attributes:
         MODEL_VIEW (str): Permission to view models.
@@ -387,7 +387,10 @@ class PermissionEnum(Enum):
         ENDPOINT_MANAGE (str): Permission to manage endpoints.
         CLUSTER_VIEW (str): Permission to view clusters.
         CLUSTER_MANAGE (str): Permission to manage clusters.
+        USER_VIEW (str): Permission to view users.
         USER_MANAGE (str): Permission to manage users.
+        BENCHMARK_VIEW (str): Permission to view benchmarks.
+        BENCHMARK_MANAGE (str): Permission to manage benchmarks.
     """
 
     MODEL_VIEW = "model:view"
@@ -403,7 +406,11 @@ class PermissionEnum(Enum):
     CLUSTER_VIEW = "cluster:view"
     CLUSTER_MANAGE = "cluster:manage"
 
+    USER_VIEW = "user:view"
     USER_MANAGE = "user:manage"
+
+    BENCHMARK_VIEW = "benchmark:view"
+    BENCHMARK_MANAGE = "benchmark:manage"
 
     @classmethod
     def get_global_permissions(cls) -> List[str]:
@@ -416,8 +423,23 @@ class PermissionEnum(Enum):
             cls.PROJECT_MANAGE.value,
             cls.CLUSTER_VIEW.value,
             cls.CLUSTER_MANAGE.value,
+            cls.USER_VIEW.value,
             cls.USER_MANAGE.value,
+            cls.BENCHMARK_VIEW.value,
+            cls.BENCHMARK_MANAGE.value,
         ]
+
+    @classmethod
+    def get_manage_to_view_mapping(cls) -> Dict[str, str]:
+        """Return mapping of manage permissions to their corresponding view permissions."""
+        return {
+            cls.MODEL_MANAGE.value: cls.MODEL_VIEW.value,
+            cls.PROJECT_MANAGE.value: cls.PROJECT_VIEW.value,
+            cls.CLUSTER_MANAGE.value: cls.CLUSTER_VIEW.value,
+            cls.USER_MANAGE.value: cls.USER_VIEW.value,
+            cls.ENDPOINT_MANAGE.value: cls.ENDPOINT_VIEW.value,
+            cls.BENCHMARK_MANAGE.value: cls.BENCHMARK_VIEW.value,
+        }
 
     @classmethod
     def get_default_permissions(cls) -> List[str]:

@@ -19,7 +19,7 @@
 from typing import List, Optional, Union
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -32,6 +32,8 @@ from budapp.commons.dependencies import (
 from budapp.commons.exceptions import ClientException
 from budapp.user_ops.schemas import User
 
+from ..commons.constants import PermissionEnum
+from ..commons.permission_handler import require_permissions
 from ..commons.schemas import ErrorResponse, SuccessResponse
 from ..workflow_ops.schemas import RetrieveWorkflowDataResponse
 from ..workflow_ops.services import WorkflowService
@@ -76,6 +78,7 @@ endpoint_router = APIRouter(prefix="/endpoints", tags=["endpoint"])
     },
     description="List all endpoints. \n\n order_by fields are: name, status, created_at, modified_at, cluster_name, model_name, modality",
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
 async def list_all_endpoints(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -85,6 +88,8 @@ async def list_all_endpoints(
     limit: int = Query(10, ge=0),
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
     search: bool = False,
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[EndpointPaginatedResponse, ErrorResponse]:
     """List all endpoints."""
     # Calculate offset
@@ -135,10 +140,13 @@ async def list_all_endpoints(
     },
     description="Delete an endpoint by ID",
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def delete_endpoint(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     endpoint_id: UUID,
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Delete a endpoint by its ID."""
     try:
@@ -177,6 +185,7 @@ async def delete_endpoint(
         },
     },
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
 async def get_endpoint_workers(
     endpoint_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -187,6 +196,8 @@ async def get_endpoint_workers(
     limit: int = Query(10, ge=0),  # noqa: B008
     order_by: Optional[List[str]] = Query(None),  # noqa: B008
     search: bool = Query(False),  # noqa: B008
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[WorkerInfoResponse, ErrorResponse]:
     """Get endpoint workers."""
     try:
@@ -220,11 +231,14 @@ async def get_endpoint_workers(
         },
     },
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
 async def get_endpoint_worker_logs(
     endpoint_id: UUID,
     worker_id: UUID,
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[WorkerLogsResponse, ErrorResponse]:
     """Get endpoint worker logs."""
     try:
@@ -263,11 +277,14 @@ async def get_endpoint_worker_logs(
         },
     },
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
 async def get_endpoint_worker_metrics(
     endpoint_id: UUID,
     worker_id: UUID,
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[WorkerMetricsResponse, ErrorResponse]:
     """Get endpoint worker metrics."""
     try:
@@ -304,12 +321,15 @@ async def get_endpoint_worker_metrics(
         },
     },
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
 async def get_endpoint_worker_detail(
     endpoint_id: UUID,
     worker_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     reload: bool = Query(False),  # noqa: B008
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[WorkerDetailResponse, ErrorResponse]:
     """Get endpoint workers."""
     try:
@@ -343,10 +363,13 @@ async def get_endpoint_worker_detail(
         },
     },
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
 async def get_model_cluster_detail(
     endpoint_id: UUID,
-    _: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[ModelClusterDetailResponse, ErrorResponse]:
     """Get model cluster detail."""
     try:
@@ -384,10 +407,13 @@ async def get_model_cluster_detail(
         },
     },
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def delete_endpoint_worker(
     request: DeleteWorkerRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Delete a endpoint worker by its ID."""
     try:
@@ -425,10 +451,13 @@ async def delete_endpoint_worker(
     },
     description="Add worker to endpoint",
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def add_worker_to_endpoint(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     request: AddWorkerRequest,
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Add worker to endpoint."""
     try:
@@ -465,10 +494,13 @@ async def add_worker_to_endpoint(
     },
     description="Add worker to endpoint",
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def add_adapter_to_endpoint(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     request: AddAdapterRequest,
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Add worker to endpoint."""
     try:
@@ -506,6 +538,7 @@ async def add_adapter_to_endpoint(
     },
     description="Get endpoint adapters",
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
 async def get_endpoint_adapters(
     endpoint_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -515,6 +548,8 @@ async def get_endpoint_adapters(
     limit: int = Query(10, ge=0),
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
     search: bool = Query(False),
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[AdapterPaginatedResponse, ErrorResponse]:
     """Get endpoint adapters."""
     offset = (page - 1) * limit
@@ -563,10 +598,13 @@ async def get_endpoint_adapters(
     },
     description="Add worker to endpoint",
 )
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def delete_adapter_from_endpoint(
     adapter_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Add worker to endpoint."""
     try:

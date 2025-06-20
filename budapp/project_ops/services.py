@@ -21,7 +21,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
-from budapp.auth.schemas import ResourceCreate
+from budapp.auth.schemas import DeletePermissionRequest, ResourceCreate
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
@@ -41,6 +41,7 @@ from ..commons.constants import (
 )
 from ..commons.exceptions import BudNotifyException
 from ..commons.helpers import generate_valid_password, get_hardware_types
+from ..commons.keycloak import KeycloakManager
 from ..core.schemas import NotificationResult
 from ..credential_ops.crud import CredentialDataManager
 from ..credential_ops.models import Credential as CredentialModel
@@ -53,6 +54,7 @@ from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..user_ops.crud import UserDataManager
 from ..user_ops.models import User as UserModel
 from ..user_ops.schemas import User, UserCreate
+from ..user_ops.models import Tenant, TenantClient
 from .crud import ProjectDataManager
 from .models import Project as ProjectModel
 from .schemas import (
@@ -90,11 +92,6 @@ class ProjectService(SessionMixin):
         project_model = ProjectModel(**project_data)
         db_project = await ProjectDataManager(self.session).insert_one(project_model)
 
-        # Add current user to project
-        default_project_level_scopes = PermissionEnum.get_project_default_permissions()
-        add_users_data = ProjectUserAdd(user_id=current_user_id, scopes=default_project_level_scopes)
-        db_project = await self.add_users_to_project(db_project.id, [add_users_data])
-
         # Get user with id
         db_user = await UserDataManager(self.session).retrieve_by_fields(UserModel, {"id": current_user_id}, missing_ok=True)
 
@@ -107,11 +104,16 @@ class ProjectService(SessionMixin):
                 scopes=["view", "manage"],
             )
             await permission_service.create_resource_permission_by_user(db_user, payload)
-            return db_project
+        
+            # Add current user to project
+            default_project_level_scopes = PermissionEnum.get_project_level_scopes()
+            add_users_data = ProjectUserAdd(user_id=current_user_id, scopes=default_project_level_scopes)
+            db_project = await self.add_users_to_project(db_project.id, [add_users_data])
         except Exception as e:
             logger.error(f"Failed to update permission in Keycloak: {e}")
             raise ClientException("Failed to update permission in Keycloak")
 
+        return db_project
 
 
     async def edit_project(self, project_id: UUID, data: Dict[str, Any]) -> ProjectResponse:
@@ -237,8 +239,9 @@ class ProjectService(SessionMixin):
             if user.email is not None and user.email in email_user_id_mapping:
                 project_permission_mapping[email_user_id_mapping[user.email]] = user.scopes
 
+        # NOTE: Commented out since Keycloak handles permissions
         # Store project permissions to be added in database
-        project_permissions = []
+        # project_permissions = []
 
         # Store email notification payloads
         email_notification_payloads = []
@@ -247,6 +250,9 @@ class ProjectService(SessionMixin):
             "description": db_project.description,
             "url": f"{app_settings.frontend_url}/projects/{db_project.id}",
         }
+
+        # Initialize permission service
+        permission_service = PermissionService(self.session)
 
         # Handle existing budserve users
         if user_ids:
@@ -268,13 +274,25 @@ class ProjectService(SessionMixin):
                 # Add user to project instance
                 db_project.users.append(db_user)
 
-                project_permission_data = ProjectPermissionCreate(
-                    project_id=db_project.id,
-                    user_id=db_user.id,
-                    auth_id=db_user.auth_id,
-                    scopes=project_permission_mapping[db_user.id],
-                )
-                project_permissions.append(ProjectPermission(**project_permission_data.model_dump()))
+                # Add user to project permissions in Keycloak
+                try:
+                    await permission_service.add_user_to_project_permissions(
+                        user=db_user,
+                        project_id=str(db_project.id),
+                        scopes=project_permission_mapping[db_user.id],
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to add user {db_user.id} to project permissions: {e}")
+                    raise ClientException("Failed to add user to project permissions")
+
+                # NOTE: Commented out since Keycloak handles permissions
+                # project_permission_data = ProjectPermissionCreate(
+                #     project_id=db_project.id,
+                #     user_id=db_user.id,
+                #     auth_id=db_user.auth_id,
+                #     scopes=project_permission_mapping[db_user.id],
+                # )
+                # project_permissions.append(ProjectPermission(**project_permission_data.model_dump()))
 
                 # Store email notification payload
                 email_notification_payloads.append(
@@ -295,6 +313,9 @@ class ProjectService(SessionMixin):
             user_role = UserRoleEnum.DEVELOPER
 
             for new_email in emails:
+                # User name will be get from email
+                user_name = new_email.split("@")[0]
+
                 password = generate_valid_password()
 
                 # NOTE: New user created with help of auth service, it will handle different scenarios like notification, permission, etc.
@@ -304,13 +325,25 @@ class ProjectService(SessionMixin):
                 # Add user to project
                 db_project.users.append(db_user)
 
-                project_permission_data = ProjectPermissionCreate(
-                    project_id=db_project.id,
-                    user_id=db_user.id,
-                    auth_id=db_user.auth_id,
-                    scopes=project_permission_mapping[db_user.email],
-                )
-                project_permissions.append(ProjectPermission(**project_permission_data.model_dump()))
+                # Add user to project permissions in Keycloak
+                try:
+                    await permission_service.add_user_to_project_permissions(
+                        user=db_user,
+                        project_id=str(db_project.id),
+                        scopes=project_permission_mapping[db_user.email],
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to add new user {db_user.id} to project permissions: {e}")
+                    raise ClientException("Failed to add new user to project permissions")
+
+                # NOTE: Commented out since Keycloak handles permissions
+                # project_permission_data = ProjectPermissionCreate(
+                #     project_id=db_project.id,
+                #     user_id=db_user.id,
+                #     auth_id=db_user.auth_id,
+                #     scopes=project_permission_mapping[db_user.email],
+                # )
+                # project_permissions.append(ProjectPermission(**project_permission_data.model_dump()))
 
                 new_user_ids.append(db_user.id)
 
@@ -332,9 +365,10 @@ class ProjectService(SessionMixin):
         logger.info(f"{len(user_ids)} BudServe users added to project")
         logger.info(f"{len(emails)} Non BudServe users added to project")
 
+        # NOTE: Commented out since Keycloak handles permissions
         # Add project level permissions
-        _ = ProjectPermissionDataManager(self.session).add_all(project_permissions)
-        logger.info(f"Added project level permissions to {len(project_permissions)} users")
+        # _ = ProjectPermissionDataManager(self.session).add_all(project_permissions)
+        # logger.info(f"Added project level permissions to {len(project_permissions)} users")
 
         # Send app notification for budserve users
         if user_ids:
@@ -419,33 +453,22 @@ class ProjectService(SessionMixin):
 
         permission_manager = PermissionService(self.session)
 
-        permission_payload = CheckUserResourceScope(
-            resource_type="project",
-            scope="manage"
-        )
+        permission_payload = CheckUserResourceScope(resource_type="project", scope="manage")
 
-        is_allowed = await permission_manager.check_resource_permission_by_user(current_user,permission_payload)
-        logger.debug(f"is_allowed: {is_allowed}")
+        is_allowed = await permission_manager.check_resource_permission_by_user(current_user, permission_payload)
+        logger.debug(f"User {current_user.id} has project:manage permission: {is_allowed}")
 
-        # commenting out TODO: add new permission logic
-        # Get current user scopes
-        # db_permissions = await PermissionDataManager(self.session).retrieve_by_fields(Permission, {"user_id": user_id})
-        # user_scopes = db_permissions.scopes_list
+        # Only users with project:manage permission can list all projects
+        # Otherwise, list only participated projects
+        if is_allowed:
+            result, count = await ProjectDataManager(self.session).get_all_active_projects(
+                offset, limit, filters_dict, order_by, search
+            )
+        else:
+            result, count = await ProjectDataManager(self.session).get_all_participated_projects(
+                current_user.id, offset, limit, filters_dict, order_by, search
+            )
 
-        # NOTE: Only project manager can list all projects, otherwise only participated projects will be listed
-        # if PermissionEnum.PROJECT_MANAGE.value in user_scopes:
-        #     result, count = await ProjectDataManager(self.session).get_all_active_projects(
-        #         offset, limit, filters_dict, order_by, search
-        #     )
-        # else:
-        #     result, count = await ProjectDataManager(self.session).get_all_participated_projects(
-        #         user_id, offset, limit, filters_dict, order_by, search
-        #     )
-
-        # temporary fix
-        result, count = await ProjectDataManager(self.session).get_all_active_projects(
-            offset, limit, filters_dict, order_by, search
-        )
         return await self.parse_project_list_results(result), count
 
     async def parse_project_list_results(self, db_results: List) -> List[ProjectListResponse]:
@@ -513,6 +536,21 @@ class ProjectService(SessionMixin):
             )
             logger.info("Deleted all project level permissions")
 
+        # Delete the project resource from Keycloak
+        try:
+            permission_service = PermissionService(self.session)
+            await permission_service.delete_permission_for_resource(
+                DeletePermissionRequest(
+                    resource_type="project",
+                    resource_id=str(project_id),
+                    delete_resource=True,  # Delete the resource itself
+                )
+            )
+            logger.info(f"Deleted project resource from Keycloak for project {project_id}")
+        except Exception as e:
+            logger.error(f"Failed to delete project resource from Keycloak: {e}")
+            # Continue with project deletion even if Keycloak deletion fails
+
         if db_project.benchmark:
             return await ProjectDataManager(self.session).delete_one(db_project)
 
@@ -536,6 +574,9 @@ class ProjectService(SessionMixin):
         # Cannot remove all users from project
         if len(existing_user_ids) == len(user_ids):
             raise ClientException(detail="Cannot remove all users from project")
+
+        # Initialize permission service
+        permission_service = PermissionService(self.session)
 
         # Fetch active invited users by ids
         db_users = await UserDataManager(self.session).get_active_invited_users_by_ids(user_ids)
@@ -566,14 +607,26 @@ class ProjectService(SessionMixin):
 
             # Remove user from project
             db_project.users.remove(db_user)
+            
+            # Remove user permissions from Keycloak
+            try:
+                await permission_service.remove_user_from_project_permissions(
+                    user=db_user,
+                    project_id=str(project_id),
+                )
+                logger.debug(f"Removed user {db_user.id} from project permissions in Keycloak")
+            except Exception as e:
+                logger.error(f"Failed to remove user {db_user.id} from project permissions in Keycloak: {e}")
+                raise ClientException("Failed to remove user from project permissions")
 
         # update project
         db_project = ProjectDataManager(self.session).update_one(db_project)
         logger.info(f"{len(user_ids)} users removed from project")
 
+        # NOTE: Commented out since Keycloak handles permissions
         # delete project permissions
-        await ProjectPermissionDataManager(self.session).delete_project_permissions_by_user_ids(user_ids, project_id)
-        logger.info(f"Deleted project permissions of {len(user_ids)} users")
+        # await ProjectPermissionDataManager(self.session).delete_project_permissions_by_user_ids(user_ids, project_id)
+        # logger.info(f"Deleted project permissions of {len(user_ids)} users")
 
         return db_project
 
@@ -588,12 +641,131 @@ class ProjectService(SessionMixin):
     ) -> Tuple[List[ProjectUserList], int]:
         filters_dict = filters
 
-        db_results, count = await ProjectDataManager(self.session).get_all_users(
+        # Get users from database (without permission tables)
+        db_users, count = await ProjectDataManager(self.session).get_all_project_users_without_permissions(
             project_id, offset, limit, filters_dict, order_by, search
         )
 
-        return await self._get_parsed_project_user_permissions(db_results), count
+        # Get permissions from Keycloak for each user
+        return await self._get_parsed_project_user_permissions_from_keycloak(db_users, project_id), count
 
+    async def _get_parsed_project_user_permissions_from_keycloak(
+        self,
+        results: List[Tuple[UserModel, str]],  # User and project_role
+        project_id: UUID,
+    ) -> List[ProjectUserList]:
+        """Get parsed project user list response with permissions from Keycloak"""
+        data = []
+        project_level_permissions = PermissionEnum.get_project_level_scopes()
+        global_project_permissions = [
+            PermissionEnum.PROJECT_MANAGE.value,
+            PermissionEnum.PROJECT_VIEW.value,
+        ]
+
+        # Get tenant and client info once
+        tenant = await UserDataManager(self.session).retrieve_by_fields(
+            Tenant, {"realm_name": app_settings.default_realm_name}, missing_ok=True
+        )
+        if not tenant:
+            raise ClientException("Default tenant not found")
+
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+        )
+        if not tenant_client:
+            raise ClientException("Tenant client not found")
+
+        # Initialize Keycloak manager
+        kc_manager = KeycloakManager()
+
+        for user, project_role in results:
+            permissions = []
+
+            # Get user's permissions for this project from Keycloak
+            try:
+                user_permissions = await kc_manager.get_user_permissions_for_resource(
+                    realm_name=app_settings.default_realm_name,
+                    client_id=str(tenant_client.client_id),
+                    user_auth_id=str(user.auth_id),
+                    resource_type="project",
+                    resource_id=str(project_id),
+                )
+
+            except Exception as e:
+                logger.debug(f"Failed to get permissions for user {user.id} from Keycloak: {e}")
+                user_permissions = []
+
+            # Check global project permissions first to determine if user has project:manage
+            try:
+                # Get user's global permissions
+                global_permissions = await kc_manager.get_user_permissions_for_resource(
+                    realm_name=app_settings.default_realm_name,
+                    client_id=str(tenant_client.client_id),
+                    user_auth_id=str(user.auth_id),
+                    resource_type="project",
+                    resource_id=None,  # Global permissions
+                )
+
+            except Exception as e:
+                logger.debug(f"Failed to get global permissions for user {user.id} from Keycloak: {e}")
+                global_permissions = []
+
+            # Check if user has global project:manage permission
+            has_global_project_manage = "manage" in global_permissions
+
+            # Check project-level permissions
+            for permission in project_level_permissions:
+                # Extract scope from permission (e.g., "endpoint:view" -> "view")
+                scope = permission.split(":")[-1] if ":" in permission else permission
+
+                # Check if user has this scope
+                has_permission = scope in user_permissions
+
+                # If user has global project:manage, they automatically get endpoint:manage and endpoint:view
+                if has_global_project_manage and permission in [
+                    PermissionEnum.ENDPOINT_MANAGE.value,
+                    PermissionEnum.ENDPOINT_VIEW.value,
+                ]:
+                    has_permission = True
+
+                permissions.append(
+                    PermissionList(
+                        name=permission,
+                        has_permission=has_permission,
+                    )
+                )
+
+            # Add global project permissions
+            for permission in global_project_permissions:
+                # Extract scope from permission
+                scope = permission.split(":")[-1] if ":" in permission else permission
+
+                # Check if user has this global scope
+                has_permission = scope in global_permissions
+
+                permissions.append(
+                    PermissionList(
+                        name=permission,
+                        has_permission=has_permission,
+                    )
+                )
+
+            data.append(
+                ProjectUserList(
+                    name=user.name,
+                    email=user.email,
+                    id=user.id,
+                    color=user.color,
+                    role=user.role,
+                    status=user.status,
+                    permissions=permissions,
+                    project_role=project_role,
+                )
+            )
+
+        return data
+
+    # Keep the old method for backward compatibility if needed
     async def _get_parsed_project_user_permissions(
         self,
         results: List[Tuple[UserModel, str, ProjectPermission, Permission]],

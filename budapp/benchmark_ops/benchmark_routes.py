@@ -26,12 +26,14 @@ from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
+from budapp.commons.constants import PermissionEnum
 from budapp.commons.dependencies import (
     get_current_active_user,
     get_session,
     parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
+from budapp.commons.permission_handler import require_permissions
 from budapp.commons.schemas import ErrorResponse
 from budapp.endpoint_ops.schemas import ModelClusterDetailResponse
 from budapp.user_ops.schemas import User
@@ -73,6 +75,7 @@ benchmark_router = APIRouter(prefix="/benchmark", tags=["benchmark"])
     },
     description="Run benchmark workflow",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_MANAGE])
 async def run_benchmark_workflow(
     request: RunBenchmarkWorkflowRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -114,8 +117,9 @@ async def run_benchmark_workflow(
     },
     description="List all benchmarks. \n\n order_by fields are: name, status, created_at, cluster_name, model_name",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def list_all_benchmarks(
-    _: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],  # noqa: B008
     session: Annotated[Session, Depends(get_session)],
     filters: Annotated[BenchmarkFilter, Depends()],
     page: int = Query(1, ge=1),
@@ -172,8 +176,9 @@ async def list_all_benchmarks(
     },
     description="List unique benchmark filter values",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def list_all_benchmark_filters(
-    _: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],  # noqa: B008
     session: Annotated[Session, Depends(get_session)],
     filters: Annotated[BenchmarkFilterFields, Depends()],
     page: int = Query(1, ge=1),
@@ -221,9 +226,10 @@ async def list_all_benchmark_filters(
     },
     description="Fetch benchmark result",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def get_benchmark_result(
     benchmark_id: UUID,
-    _: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],  # noqa: B008
     session: Annotated[Session, Depends(get_session)],
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Fetch benchmark result."""
@@ -267,9 +273,10 @@ async def get_benchmark_result(
     },
     description="Fetch benchmark's model and cluster details",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def get_benchmark_model_cluster_detail(
     benchmark_id: UUID,
-    _: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],  # noqa: B008
     session: Annotated[Session, Depends(get_session)],
 ) -> Union[ModelClusterDetailResponse, ErrorResponse]:
     """Fetch benchmark result."""
@@ -313,8 +320,9 @@ async def get_benchmark_model_cluster_detail(
     },
     description="Fetchetched analysis data",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def get_field1_vs_field2_data(
-    _: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],  # noqa: B008
     session: Annotated[Session, Depends(get_session)],
     field1: str,
     field2: str,
@@ -355,8 +363,9 @@ async def get_field1_vs_field2_data(
     },
     description="Fetchetched analysis data",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def get_field1_vs_field2_benchmark_data(
-    _: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],  # noqa: B008
     session: Annotated[Session, Depends(get_session)],
     benchmark_id: UUID,
     field1: str,
@@ -440,9 +449,10 @@ async def add_request_metrics(
     },
     description="Get dataset vs input-distribution",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def get_dataset_input_distribution(
     dataset_ids: List[UUID],
-    _: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],  # noqa: B008
     session: Annotated[Session, Depends(get_session)],
     benchmark_id: Optional[UUID]=None,
     num_bins: int=10,
@@ -489,9 +499,10 @@ async def get_dataset_input_distribution(
     },
     description="Get dataset vs output-distribution",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def get_dataset_output_distribution(
     dataset_ids: List[UUID],
-    _: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],  # noqa: B008
     session: Annotated[Session, Depends(get_session)],
     benchmark_id: Optional[UUID]=None,
     num_bins: int=10,
@@ -538,9 +549,10 @@ async def get_dataset_output_distribution(
     },
     description="Get benchmark request metrics",
 )
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_VIEW])
 async def get_request_metrics(
     benchmark_id: UUID,
-    _: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],  # noqa: B008
     session: Annotated[Session, Depends(get_session)],
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=0),
