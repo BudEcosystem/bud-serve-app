@@ -91,25 +91,37 @@ class BudMetricService(SessionMixin):
         try:
             from sqlalchemy import select
             
+            # Validate response_data is a dictionary
+            if not isinstance(response_data, dict):
+                logger.warning(f"Response data is not a dictionary: {type(response_data)}")
+                return
+            
             # Collect all unique IDs from the response
             project_ids = set()
             model_ids = set()
             endpoint_ids = set()
             
             # Extract IDs from the response structure
-            if "items" in response_data and response_data["items"]:
-                for time_bucket in response_data["items"]:
-                    if time_bucket and isinstance(time_bucket, dict):
-                        items = time_bucket.get("items", [])
-                        if items:
-                            for item in items:
-                                if item and isinstance(item, dict):
-                                    if "project_id" in item and item["project_id"]:
-                                        project_ids.add(item["project_id"])
-                                    if "model_id" in item and item["model_id"]:
-                                        model_ids.add(item["model_id"])
-                                    if "endpoint_id" in item and item["endpoint_id"]:
-                                        endpoint_ids.add(item["endpoint_id"])
+            items_list = response_data.get("items", [])
+            if not items_list:
+                return
+                
+            for time_bucket in items_list:
+                if not isinstance(time_bucket, dict):
+                    continue
+                    
+                bucket_items = time_bucket.get("items", [])
+                for item in bucket_items:
+                    if not isinstance(item, dict):
+                        continue
+                        
+                    # Extract IDs if they exist
+                    if project_id := item.get("project_id"):
+                        project_ids.add(project_id)
+                    if model_id := item.get("model_id"):
+                        model_ids.add(model_id)
+                    if endpoint_id := item.get("endpoint_id"):
+                        endpoint_ids.add(endpoint_id)
             
             # Fetch names for all IDs
             project_names = {}
@@ -138,21 +150,25 @@ class BudMetricService(SessionMixin):
                 endpoint_names = {str(e.id): e.name for e in endpoints}
             
             # Add names to the response items
-            if "items" in response_data and response_data["items"]:
-                for time_bucket in response_data["items"]:
-                    if time_bucket and isinstance(time_bucket, dict):
-                        items = time_bucket.get("items", [])
-                        if items:
-                            for item in items:
-                                if item and isinstance(item, dict):
-                                    if "project_id" in item and item["project_id"]:
-                                        item["project_name"] = project_names.get(str(item["project_id"]), "Unknown")
-                                    if "model_id" in item and item["model_id"]:
-                                        item["model_name"] = model_names.get(str(item["model_id"]), "Unknown")
-                                    if "endpoint_id" in item and item["endpoint_id"]:
-                                        item["endpoint_name"] = endpoint_names.get(str(item["endpoint_id"]), "Unknown")
+            for time_bucket in items_list:
+                if not isinstance(time_bucket, dict):
+                    continue
+                    
+                bucket_items = time_bucket.get("items", [])
+                for item in bucket_items:
+                    if not isinstance(item, dict):
+                        continue
+                        
+                    # Add names for each ID type
+                    if project_id := item.get("project_id"):
+                        item["project_name"] = project_names.get(str(project_id), "Unknown")
+                    if model_id := item.get("model_id"):
+                        item["model_name"] = model_names.get(str(model_id), "Unknown")
+                    if endpoint_id := item.get("endpoint_id"):
+                        item["endpoint_name"] = endpoint_names.get(str(endpoint_id), "Unknown")
+                        
         except Exception as e:
-            logger.warning(f"Failed to enrich response with names: {e}. Response structure: {type(response_data)}")
+            logger.warning(f"Failed to enrich response with names: {e}")
             # Don't fail the entire request if enrichment fails
 
 
