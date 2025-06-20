@@ -1991,16 +1991,16 @@ class EndpointService(SessionMixin):
         )
         logger.debug(f"Adapter {db_adapter.id} marked as deleted")
 
-        #TODO: Check if this is the correct way to delete adapter details from redis
-        # Delete adapter details with pattern “router_config:*:<_name>“,
-        # try:
-        #     redis_service = RedisService()
-        #     endpoint_redis_keys = await redis_service.keys(f"router_config:*:{db_adapter.name}")
-        #     logger.debug(f"Endpoint redis keys: {endpoint_redis_keys}")
-        #     endpoint_redis_keys_count = await redis_service.delete(*endpoint_redis_keys)
-        #     logger.debug(f"Deleted endpoint data from redis: {endpoint_redis_keys_count} keys")
-        # except (RedisException, Exception) as e:
-        #     logger.error(f"Failed to delete endpoint details from redis: {e}")
+        # Update proxy cache to remove the deleted adapter
+        try:
+            # Get the endpoint to find the project_id
+            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel, {"id": db_adapter.endpoint_id}
+            )
+            await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+            logger.debug(f"Updated proxy cache for project {db_endpoint.project_id} after adapter deletion")
+        except (RedisException, Exception) as e:
+            logger.error(f"Failed to update proxy cache after adapter deletion: {e}")
 
         # Mark workflow as completed
         await WorkflowDataManager(self.session).update_by_fields(

@@ -42,274 +42,134 @@ from ..model_ops.crud import ModelDataManager
 from ..model_ops.models import Model
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
-from .schemas import (
-    CacheMetricsResponse,
-    CountAnalyticsRequest,
-    CountAnalyticsResponse,
-    DashboardStatsResponse,
-    InferenceQualityAnalyticsPromptFilter,
-    InferenceQualityAnalyticsPromptResponse,
-    InferenceQualityAnalyticsResponse,
-    PerformanceAnalyticsRequest,
-    PerformanceAnalyticsResponse,
-)
+from .schemas import DashboardStatsResponse
 
 
 logger = logging.get_logger(__name__)
 
 
-class BudMetricService:
+class BudMetricService(SessionMixin):
     """Bud Metric service."""
 
-    async def get_request_count_analytics(
-        self,
-        request: CountAnalyticsRequest,
-    ) -> CountAnalyticsResponse:
-        """Get request count analytics."""
-        bud_metric_response = await self._perform_request_count_analytics(request)
-
-        return CountAnalyticsResponse(
-            code=status.HTTP_200_OK,
-            object="request.count.analytics",
-            message="Successfully fetched request count analytics",
-            overall_metrics=bud_metric_response["overall_metrics"],
-            concurrency_metrics=bud_metric_response["concurrency_metrics"],
-            queuing_time_metrics=bud_metric_response["queuing_time_metrics"],
-            global_metrics=bud_metric_response["global_metrics"],
-            input_output_tokens_metrics=bud_metric_response["input_output_tokens_metrics"],
-        )
-
-    async def get_request_performance_analytics(
-        self,
-        request: PerformanceAnalyticsRequest,
-    ) -> PerformanceAnalyticsResponse:
-        """Get request performance analytics."""
-        bud_metric_response = await self._perform_request_performance_analytics(request)
-
-        return PerformanceAnalyticsResponse(
-            code=status.HTTP_200_OK,
-            object="request.performance.analytics",
-            message="Successfully fetched request performance analytics",
-            ttft_metrics=bud_metric_response["ttft_metrics"],
-            latency_metrics=bud_metric_response["latency_metrics"],
-            throughput_metrics=bud_metric_response["throughput_metrics"],
-        )
-
-    @staticmethod
-    async def _perform_request_count_analytics(
-        metric_request: CountAnalyticsRequest,
-    ) -> Dict:
-        """Get request count analytics."""
-        request_count_analytics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/analytics/request-counts"
-
-        logger.debug(
-            f"Performing request count analytics request to bud_metric {metric_request.model_dump(exclude_none=True, exclude_unset=True, mode='json')}"
-        )
+    async def proxy_analytics_request(self, request_body: Dict) -> Dict:
+        """Proxy analytics request to the observability endpoint and enrich with names."""
+        analytics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/analytics"
+        
+        logger.debug(f"Proxying analytics request to bud_metrics: {request_body}")
+        
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    request_count_analytics_endpoint,
-                    json=metric_request.model_dump(exclude_none=True, exclude_unset=True, mode="json"),
+                    analytics_endpoint,
+                    json=request_body,
                 ) as response:
                     response_data = await response.json()
+                    
+                    # Return the response as-is, including the status code
                     if response.status != status.HTTP_200_OK:
-                        logger.error(f"Failed to get request count analytics: {response.status} {response_data}")
+                        logger.error(f"Analytics request failed: {response.status} {response_data}")
                         raise ClientException(
-                            "Failed to get request count analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                            response_data.get("message", "Analytics request failed"),
+                            status_code=response.status
                         )
-
-                    logger.debug("Successfully get request count analytics from budmetric")
+                    
+                    # Enrich response with names
+                    await self._enrich_response_with_names(response_data)
+                    
                     return response_data
+        except ClientException:
+            raise
         except Exception as e:
-            logger.exception(f"Failed to send request count analytics request: {e}")
+            logger.exception(f"Failed to proxy analytics request: {e}")
             raise ClientException(
-                "Failed to get request count analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                "Failed to proxy analytics request",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
-
-    @staticmethod
-    async def _perform_request_performance_analytics(
-        metric_request: PerformanceAnalyticsRequest,
-    ) -> Dict:
-        """Get request performance analytics."""
-        request_performance_analytics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/analytics/request-performance"
-
-        logger.debug(
-            f"Performing request performance analytics request to bud_metric {metric_request.model_dump(exclude_none=True, exclude_unset=True, mode='json')}"
-        )
+    
+    async def _enrich_response_with_names(self, response_data: Dict) -> None:
+        """Enrich the response data with names for project, model, and endpoint IDs."""
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    request_performance_analytics_endpoint,
-                    json=metric_request.model_dump(exclude_none=True, exclude_unset=True, mode="json"),
-                ) as response:
-                    response_data = await response.json()
-                    if response.status != status.HTTP_200_OK:
-                        logger.error(f"Failed to get request performance analytics: {response.status} {response_data}")
-                        raise ClientException(
-                            "Failed to get request performance analytics",
-                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        )
-
-                    logger.debug("Successfully get request performance analytics from budmetric")
-                    return response_data
+            from sqlalchemy import select
+            
+            # Validate response_data is a dictionary
+            if not isinstance(response_data, dict):
+                logger.warning(f"Response data is not a dictionary: {type(response_data)}")
+                return
+            
+            # Collect all unique IDs from the response
+            project_ids = set()
+            model_ids = set()
+            endpoint_ids = set()
+            
+            # Extract IDs from the response structure
+            items_list = response_data.get("items", [])
+            if not items_list:
+                return
+                
+            for time_bucket in items_list:
+                if not isinstance(time_bucket, dict):
+                    continue
+                    
+                bucket_items = time_bucket.get("items", [])
+                for item in bucket_items:
+                    if not isinstance(item, dict):
+                        continue
+                        
+                    # Extract IDs if they exist
+                    if project_id := item.get("project_id"):
+                        project_ids.add(project_id)
+                    if model_id := item.get("model_id"):
+                        model_ids.add(model_id)
+                    if endpoint_id := item.get("endpoint_id"):
+                        endpoint_ids.add(endpoint_id)
+            
+            # Fetch names for all IDs
+            project_names = {}
+            model_names = {}
+            endpoint_names = {}
+            
+            if project_ids:
+                # Query projects
+                stmt = select(ProjectModel).where(ProjectModel.id.in_(list(project_ids)))
+                result = self.session.execute(stmt)
+                projects = result.scalars().all()
+                project_names = {str(p.id): p.name for p in projects}
+            
+            if model_ids:
+                # Query models
+                stmt = select(Model).where(Model.id.in_(list(model_ids)))
+                result = self.session.execute(stmt)
+                models = result.scalars().all()
+                model_names = {str(m.id): m.name for m in models}
+            
+            if endpoint_ids:
+                # Query endpoints
+                stmt = select(EndpointModel).where(EndpointModel.id.in_(list(endpoint_ids)))
+                result = self.session.execute(stmt)
+                endpoints = result.scalars().all()
+                endpoint_names = {str(e.id): e.name for e in endpoints}
+            
+            # Add names to the response items
+            for time_bucket in items_list:
+                if not isinstance(time_bucket, dict):
+                    continue
+                    
+                bucket_items = time_bucket.get("items", [])
+                for item in bucket_items:
+                    if not isinstance(item, dict):
+                        continue
+                        
+                    # Add names for each ID type
+                    if project_id := item.get("project_id"):
+                        item["project_name"] = project_names.get(str(project_id), "Unknown")
+                    if model_id := item.get("model_id"):
+                        item["model_name"] = model_names.get(str(model_id), "Unknown")
+                    if endpoint_id := item.get("endpoint_id"):
+                        item["endpoint_name"] = endpoint_names.get(str(endpoint_id), "Unknown")
+                        
         except Exception as e:
-            logger.exception(f"Failed to send request performance analytics request: {e}")
-            raise ClientException(
-                "Failed to get request performance analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-            ) from e
-
-    @staticmethod
-    async def _perform_deployment_cache_metric(endpoint_id: UUID, page: int = 1, limit: int = 10) -> Dict:
-        """Get deployment cache metrics."""
-        deployment_cache_metric_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/analytics/cache-metrics/{endpoint_id}"
-
-        logger.debug(
-            f"Performing request deployment cache-metrics request to bud_metric for endpoint id : {endpoint_id}"
-        )
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    deployment_cache_metric_endpoint,
-                    params = {"page": page, "limit": limit}
-                ) as response:
-                    response_data = await response.json()
-                    if response.status != status.HTTP_200_OK:
-                        if response.status == status.HTTP_404_NOT_FOUND:
-                            response_data = {
-                                "latency": None,
-                                "hit_ratio": None,
-                                "most_reused_prompts": [],
-                                "total_unique_prompts": 0,
-                            }
-                        else:
-                            logger.error(f"Failed to get deployment cache metrics: {response.status} {response_data}")
-                            raise ClientException(
-                                "Failed to get deployment cache metrics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-                            )
-
-                    logger.debug("Successfully get deployment cache metrics from budmetric")
-                    return response_data
-        except Exception as e:
-            logger.exception(f"Failed to send deployment cache metrics request: {e}")
-            raise ClientException(
-                "Failed to get deployment cache metrics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-            ) from e
-
-
-    async def get_deployment_cache_metric(self, endpoint_id: UUID, page: int = 1, limit: int = 10) -> CacheMetricsResponse:
-        """Get deployment cache metrics."""
-        bud_metric_response = await self._perform_deployment_cache_metric(endpoint_id, page, limit)
-
-        return CacheMetricsResponse(
-            code=status.HTTP_200_OK,
-            object="deployment.cache.metrics",
-            message="Successfully fetched deployment cache metrics",
-            latency=bud_metric_response["latency"],
-            hit_ratio=bud_metric_response["hit_ratio"],
-            most_reused_prompts=bud_metric_response["most_reused_prompts"],
-            page=page,
-            limit=limit,
-            total_unique_prompts=bud_metric_response["total_unique_prompts"],
-        )
-
-    @staticmethod
-    async def _perform_inference_quality_analytics(endpoint_id: UUID) -> Dict:
-        """Get inference quality analytics."""
-        inference_quality_analytics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/analytics/inference-quality/{endpoint_id}"
-
-        logger.debug(
-            f"Performing request inference quality analytics request to bud_metric for endpoint id : {endpoint_id}"
-        )
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(inference_quality_analytics_endpoint) as response:
-                    response_data = await response.json()
-                    if response.status != status.HTTP_200_OK:
-                        logger.error(f"Failed to get inference quality analytics: {response.status} {response_data}")
-                        raise ClientException(
-                            "Failed to get inference quality analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-                        )
-
-                    logger.debug("Successfully get inference quality analytics from budmetric")
-                    return response_data
-        except Exception as e:
-            logger.exception(f"Failed to send inference quality analytics request: {e}")
-            raise ClientException(
-                "Failed to get inference quality analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-            ) from e
-
-    @staticmethod
-    async def _perform_inference_quality_prompt_analytics(endpoint_id: UUID, score_type: str, page: int = 1, limit: int = 10, filters: InferenceQualityAnalyticsPromptFilter = None, search: bool = False, order_by: str = "created_at:desc") -> Dict:
-        """Get inference quality prompt analytics."""
-        inference_quality_prompt_analytics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/metrics/analytics/inference-quality/{score_type}/{endpoint_id}"
-
-        logger.debug(
-            f"Performing request inference quality prompt analytics request to bud_metric for endpoint id : {endpoint_id}"
-        )
-        try:
-            async with aiohttp.ClientSession() as session:
-                params={
-                        "page": page,
-                        "limit": limit,
-                        "order_by": order_by,
-                        "search": str(search).lower(),
-                    }
-                # Convert filters to JSON string if present
-                if filters:
-                    filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True, mode="json")
-                    if filters_dict:
-                        params.update(filters_dict)
-                async with session.post(
-                    inference_quality_prompt_analytics_endpoint,
-                    params=params,
-                ) as response:
-                    response_data = await response.json()
-                    if response.status != status.HTTP_200_OK:
-                        if response.status == status.HTTP_404_NOT_FOUND:
-                            response_data = {
-                                "score_type": score_type,
-                                "items": [],
-                                "total_items": 0,
-                                "page": page,
-                                "limit": limit,
-                            }
-                        else:
-                            logger.error(f"Failed to get inference quality prompt analytics: {response.status} {response_data}")
-                            raise ClientException(
-                                "Failed to get inference quality prompt analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-                            )
-
-                    logger.debug("Successfully get inference quality prompt analytics from budmetric")
-                    return response_data
-        except Exception as e:
-            logger.exception(f"Failed to send inference quality prompt analytics request: {e}")
-            raise ClientException(
-                "Failed to get inference quality prompt analytics", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-            ) from e
-
-    async def get_inference_quality_analytics(self, endpoint_id: UUID) -> InferenceQualityAnalyticsResponse:
-        """Get inference quality analytics."""
-        bud_metric_response = await self._perform_inference_quality_analytics(endpoint_id)
-
-        return InferenceQualityAnalyticsResponse(
-            code=status.HTTP_200_OK,
-            object="inference.quality.analytics",
-            message="Successfully fetched inference quality analytics",
-            hallucination_score=bud_metric_response["hallucination_score"],
-            harmfulness_score=bud_metric_response["harmfulness_score"],
-            sensitive_info_score=bud_metric_response["sensitive_info_score"],
-            prompt_injection_score=bud_metric_response["prompt_injection_score"],
-        )
-
-    async def get_inference_quality_prompt_analytics(self, endpoint_id: UUID, score_type: str, page: int = 1, limit: int = 10, filters: InferenceQualityAnalyticsPromptFilter = None, search: bool = False, order_by: str = "created_at:desc") -> InferenceQualityAnalyticsPromptResponse:
-        """Get inference quality prompt analytics."""
-        bud_metric_response = await self._perform_inference_quality_prompt_analytics(endpoint_id, score_type, page, limit, filters, search, order_by)
-
-        return InferenceQualityAnalyticsPromptResponse(
-            code=status.HTTP_200_OK,
-            message="Successfully fetched inference quality prompt analytics",
-            **bud_metric_response,
-        )
+            logger.warning(f"Failed to enrich response with names: {e}")
+            # Don't fail the entire request if enrichment fails
 
 
 class MetricService(SessionMixin):

@@ -16,36 +16,21 @@
 
 """The metric ops package, containing essential business logic, services, and routing configurations for the metric ops."""
 
-from typing import List, Literal, Optional, Union
-from uuid import UUID
+from typing import Any, Dict, Union
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
-from budapp.commons.dependencies import (
-    get_current_active_user,
-    get_session,
-    parse_ordering_fields,
-)
+from budapp.commons.dependencies import get_current_active_user, get_session
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
 
-from .schemas import (
-    CacheMetricsResponse,
-    CountAnalyticsRequest,
-    CountAnalyticsResponse,
-    DashboardStatsResponse,
-    InferenceQualityAnalyticsPromptFilter,
-    InferenceQualityAnalyticsPromptResponse,
-    InferenceQualityAnalyticsResponse,
-    PerformanceAnalyticsRequest,
-    PerformanceAnalyticsResponse,
-)
+from .schemas import DashboardStatsResponse
 from .services import BudMetricService, MetricService
-
 
 logger = logging.get_logger(__name__)
 
@@ -53,7 +38,8 @@ metric_router = APIRouter(prefix="/metrics", tags=["metric"])
 
 
 @metric_router.post(
-    "/analytics/request-counts",
+    "/analytics",
+    response_class=JSONResponse,
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
@@ -64,64 +50,42 @@ metric_router = APIRouter(prefix="/metrics", tags=["metric"])
             "description": "Service is unavailable due to client error",
         },
         status.HTTP_200_OK: {
-            "model": CountAnalyticsResponse,
-            "description": "Successfully get request count analytics",
+            "description": "Analytics response from metrics service",
         },
     },
-    description="Get request count analytics",
+    description="Proxy endpoint for analytics requests to the observability/analytics endpoint",
 )
-async def get_request_count_analytics(
+async def analytics_proxy(
     current_user: Annotated[User, Depends(get_current_active_user)],
-    # session: Annotated[Session, Depends(get_session)],
-    metric_request: CountAnalyticsRequest,
-) -> Union[CountAnalyticsResponse, ErrorResponse]:
-    """Get request count analytics."""
+    session: Annotated[Session, Depends(get_session)],
+    request_body: Dict[str, Any],
+):
+    """
+    Proxy analytics requests to the observability/analytics endpoint.
+    
+    This endpoint forwards the request body to the metrics service
+    and enriches the response with names for project, model, and endpoint IDs.
+    """
     try:
-        return await BudMetricService().get_request_count_analytics(metric_request)
+        response_data = await BudMetricService(session).proxy_analytics_request(request_body)
+        return JSONResponse(content=response_data, status_code=status.HTTP_200_OK)
     except ClientException as e:
-        logger.exception(f"Failed to get request count analytics: {e}")
-        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+        logger.exception(f"Failed to proxy analytics request: {e}")
+        error_response = ErrorResponse(code=e.status_code, message=e.message)
+        return JSONResponse(
+            content=error_response.model_dump(mode="json"),
+            status_code=e.status_code
+        )
     except Exception as e:
-        logger.exception(f"Failed to get request count analytics: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get request count analytics"
-        ).to_http_response()
-
-
-@metric_router.post(
-    "/analytics/request-performance",
-    responses={
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
-        status.HTTP_200_OK: {
-            "model": PerformanceAnalyticsResponse,
-            "description": "Successfully get request performance analytics",
-        },
-    },
-    description="Get request performance analytics",
-)
-async def get_request_performance_analytics(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    # session: Annotated[Session, Depends(get_session)],
-    metric_request: PerformanceAnalyticsRequest,
-) -> Union[PerformanceAnalyticsResponse, ErrorResponse]:
-    """Get request performance analytics."""
-    try:
-        return await BudMetricService().get_request_performance_analytics(metric_request)
-    except ClientException as e:
-        logger.exception(f"Failed to get request performance analytics: {e}")
-        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
-    except Exception as e:
-        logger.exception(f"Failed to get request performance analytics: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get request performance analytics"
-        ).to_http_response()
+        logger.exception(f"Failed to proxy analytics request: {e}")
+        error_response = ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            message="Failed to proxy analytics request"
+        )
+        return JSONResponse(
+            content=error_response.model_dump(mode="json"),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @metric_router.get(
@@ -167,120 +131,3 @@ async def get_dashboard_stats(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to fetch dashboard statistics"
         ).to_http_response()
-
-@metric_router.post(
-    "/analytics/cache-metrics/{endpoint_id}",
-    responses={
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
-        status.HTTP_200_OK: {
-            "model": CacheMetricsResponse,
-            "description": "Successfully get request performance analytics",
-        },
-    },
-    description="Get deployment cache metrics",
-)
-async def get_deployment_cache_metric(
-    endpoint_id: UUID,
-    _: Annotated[User, Depends(get_current_active_user)],
-    # session: Annotated[Session, Depends(get_session)],
-    page: int = 1,
-    limit: int = 10,
-) -> Union[CacheMetricsResponse, ErrorResponse]:
-    """Get deployment cache metrics."""
-    try:
-        response = await BudMetricService().get_deployment_cache_metric(endpoint_id, page=page, limit=limit)
-    except ClientException as e:
-        logger.exception(f"Failed to get deployment cache metrics: {e}")
-        return ErrorResponse(code=e.status_code, message=e.message)
-    except Exception as e:
-        logger.exception(f"Failed to get deployment cache metrics: {e}")
-        response = ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get deployment cache metrics"
-        )
-    return response.to_http_response()
-
-@metric_router.post(
-    "/analytics/inference-quality/{endpoint_id}",
-    responses={
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
-        status.HTTP_200_OK: {
-            "model": InferenceQualityAnalyticsPromptResponse,
-            "description": "Successfully get inference quality score analytics",
-        },
-    },
-    description="Get inference quality score analytics",
-)
-async def get_inference_quality_score_analytics(
-    endpoint_id: UUID,
-    _: Annotated[User, Depends(get_current_active_user)],
-    # session: Annotated[Session, Depends(get_session)],
-) -> Union[InferenceQualityAnalyticsResponse, ErrorResponse]:
-    """Get inference quality score analytics."""
-    try:
-        response = await BudMetricService().get_inference_quality_analytics(endpoint_id)
-    except ClientException as e:
-        logger.exception(f"Failed to get inference quality score analytics: {e}")
-        response = ErrorResponse(code=e.status_code, message=e.message)
-    except Exception as e:
-        logger.exception(f"Failed to get inference quality score analytics: {e}")
-        response = ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get inference quality score analytics"
-        )
-    return response.to_http_response()
-
-@metric_router.post(
-    "/analytics/inference-quality-prompts/{endpoint_id}/{score_type}",
-    responses={
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
-        status.HTTP_200_OK: {
-            "model": InferenceQualityAnalyticsPromptResponse,
-            "description": "Successfully get inference quality prompt analytics",
-        },
-    },
-    description="Get inference quality prompt analytics",
-)
-async def get_inference_quality_prompt_analytics(
-    endpoint_id: UUID,
-    score_type: Literal["hallucination", "harmfulness", "sensitive_info", "prompt_injection"],
-    _: Annotated[User, Depends(get_current_active_user)],
-    # session: Annotated[Session, Depends(get_session)],
-    filters: Annotated[InferenceQualityAnalyticsPromptFilter, Depends()],
-    search: bool = False,
-    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
-    page: int = 1,
-    limit: int = 10,
-) -> Union[InferenceQualityAnalyticsPromptResponse, ErrorResponse]:
-    """Get inference quality prompt analytics."""
-    try:
-        order_by_str = ",".join(":".join(item) for item in order_by)
-        response = await BudMetricService().get_inference_quality_prompt_analytics(endpoint_id, score_type, page, limit, filters, search, order_by_str if order_by_str else "created_at:desc")
-    except ClientException as e:
-        logger.exception(f"Failed to get inference quality prompt analytics: {e}")
-        response = ErrorResponse(code=e.status_code, message=e.message)
-    except Exception as e:
-        logger.exception(f"Failed to get inference quality prompt analytics: {e}")
-        response = ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get inference quality prompt analytics"
-        )
-    return response.to_http_response()
