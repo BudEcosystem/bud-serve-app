@@ -88,60 +88,72 @@ class BudMetricService(SessionMixin):
     
     async def _enrich_response_with_names(self, response_data: Dict) -> None:
         """Enrich the response data with names for project, model, and endpoint IDs."""
-        from sqlalchemy import select
-        
-        # Collect all unique IDs from the response
-        project_ids = set()
-        model_ids = set()
-        endpoint_ids = set()
-        
-        # Extract IDs from the response structure
-        if "items" in response_data:
-            for time_bucket in response_data["items"]:
-                for item in time_bucket.get("items", []):
-                    if "project_id" in item and item["project_id"]:
-                        project_ids.add(item["project_id"])
-                    if "model_id" in item and item["model_id"]:
-                        model_ids.add(item["model_id"])
-                    if "endpoint_id" in item and item["endpoint_id"]:
-                        endpoint_ids.add(item["endpoint_id"])
-        
-        # Fetch names for all IDs
-        project_names = {}
-        model_names = {}
-        endpoint_names = {}
-        
-        if project_ids:
-            # Query projects
-            stmt = select(ProjectModel).where(ProjectModel.id.in_(list(project_ids)))
-            result = self.session.execute(stmt)
-            projects = result.scalars().all()
-            project_names = {str(p.id): p.name for p in projects}
-        
-        if model_ids:
-            # Query models
-            stmt = select(Model).where(Model.id.in_(list(model_ids)))
-            result = self.session.execute(stmt)
-            models = result.scalars().all()
-            model_names = {str(m.id): m.name for m in models}
-        
-        if endpoint_ids:
-            # Query endpoints
-            stmt = select(EndpointModel).where(EndpointModel.id.in_(list(endpoint_ids)))
-            result = self.session.execute(stmt)
-            endpoints = result.scalars().all()
-            endpoint_names = {str(e.id): e.name for e in endpoints}
-        
-        # Add names to the response items
-        if "items" in response_data:
-            for time_bucket in response_data["items"]:
-                for item in time_bucket.get("items", []):
-                    if "project_id" in item and item["project_id"]:
-                        item["project_name"] = project_names.get(str(item["project_id"]), "Unknown")
-                    if "model_id" in item and item["model_id"]:
-                        item["model_name"] = model_names.get(str(item["model_id"]), "Unknown")
-                    if "endpoint_id" in item and item["endpoint_id"]:
-                        item["endpoint_name"] = endpoint_names.get(str(item["endpoint_id"]), "Unknown")
+        try:
+            from sqlalchemy import select
+            
+            # Collect all unique IDs from the response
+            project_ids = set()
+            model_ids = set()
+            endpoint_ids = set()
+            
+            # Extract IDs from the response structure
+            if "items" in response_data and response_data["items"]:
+                for time_bucket in response_data["items"]:
+                    if time_bucket and isinstance(time_bucket, dict):
+                        items = time_bucket.get("items", [])
+                        if items:
+                            for item in items:
+                                if item and isinstance(item, dict):
+                                    if "project_id" in item and item["project_id"]:
+                                        project_ids.add(item["project_id"])
+                                    if "model_id" in item and item["model_id"]:
+                                        model_ids.add(item["model_id"])
+                                    if "endpoint_id" in item and item["endpoint_id"]:
+                                        endpoint_ids.add(item["endpoint_id"])
+            
+            # Fetch names for all IDs
+            project_names = {}
+            model_names = {}
+            endpoint_names = {}
+            
+            if project_ids:
+                # Query projects
+                stmt = select(ProjectModel).where(ProjectModel.id.in_(list(project_ids)))
+                result = self.session.execute(stmt)
+                projects = result.scalars().all()
+                project_names = {str(p.id): p.name for p in projects}
+            
+            if model_ids:
+                # Query models
+                stmt = select(Model).where(Model.id.in_(list(model_ids)))
+                result = self.session.execute(stmt)
+                models = result.scalars().all()
+                model_names = {str(m.id): m.name for m in models}
+            
+            if endpoint_ids:
+                # Query endpoints
+                stmt = select(EndpointModel).where(EndpointModel.id.in_(list(endpoint_ids)))
+                result = self.session.execute(stmt)
+                endpoints = result.scalars().all()
+                endpoint_names = {str(e.id): e.name for e in endpoints}
+            
+            # Add names to the response items
+            if "items" in response_data and response_data["items"]:
+                for time_bucket in response_data["items"]:
+                    if time_bucket and isinstance(time_bucket, dict):
+                        items = time_bucket.get("items", [])
+                        if items:
+                            for item in items:
+                                if item and isinstance(item, dict):
+                                    if "project_id" in item and item["project_id"]:
+                                        item["project_name"] = project_names.get(str(item["project_id"]), "Unknown")
+                                    if "model_id" in item and item["model_id"]:
+                                        item["model_name"] = model_names.get(str(item["model_id"]), "Unknown")
+                                    if "endpoint_id" in item and item["endpoint_id"]:
+                                        item["endpoint_name"] = endpoint_names.get(str(item["endpoint_id"]), "Unknown")
+        except Exception as e:
+            logger.warning(f"Failed to enrich response with names: {e}. Response structure: {type(response_data)}")
+            # Don't fail the entire request if enrichment fails
 
 
 class MetricService(SessionMixin):
