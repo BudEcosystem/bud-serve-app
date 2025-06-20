@@ -695,22 +695,7 @@ class ProjectService(SessionMixin):
                 logger.debug(f"Failed to get permissions for user {user.id} from Keycloak: {e}")
                 user_permissions = []
 
-            # Check project-level permissions
-            for permission in project_level_permissions:
-                # Extract scope from permission (e.g., "endpoint:view" -> "view")
-                scope = permission.split(":")[-1] if ":" in permission else permission
-
-                # Check if user has this scope
-                has_permission = scope in user_permissions
-
-                permissions.append(
-                    PermissionList(
-                        name=permission,
-                        has_permission=has_permission,
-                    )
-                )
-
-            # Check global project permissions
+            # Check global project permissions first to determine if user has project:manage
             try:
                 # Get user's global permissions
                 global_permissions = await kc_manager.get_user_permissions_for_resource(
@@ -725,6 +710,32 @@ class ProjectService(SessionMixin):
                 logger.debug(f"Failed to get global permissions for user {user.id} from Keycloak: {e}")
                 global_permissions = []
 
+            # Check if user has global project:manage permission
+            has_global_project_manage = "manage" in global_permissions
+
+            # Check project-level permissions
+            for permission in project_level_permissions:
+                # Extract scope from permission (e.g., "endpoint:view" -> "view")
+                scope = permission.split(":")[-1] if ":" in permission else permission
+
+                # Check if user has this scope
+                has_permission = scope in user_permissions
+
+                # If user has global project:manage, they automatically get endpoint:manage and endpoint:view
+                if has_global_project_manage and permission in [
+                    PermissionEnum.ENDPOINT_MANAGE.value,
+                    PermissionEnum.ENDPOINT_VIEW.value,
+                ]:
+                    has_permission = True
+
+                permissions.append(
+                    PermissionList(
+                        name=permission,
+                        has_permission=has_permission,
+                    )
+                )
+
+            # Add global project permissions
             for permission in global_project_permissions:
                 # Extract scope from permission
                 scope = permission.split(":")[-1] if ":" in permission else permission
