@@ -21,6 +21,7 @@ import tempfile
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
+import traceback
 
 import aiohttp
 import yaml
@@ -1619,16 +1620,83 @@ class ClusterService(SessionMixin):
         config = PrometheusConfig(base_url=app_settings.prometheus_url, cluster_id=str(db_cluster.cluster_id))
 
         try:
+            print(f"DEBUG: Starting get_node_wise_metrics for cluster_id: {cluster_id}")
+            
             client = PrometheusMetricsClient(config)
+            print(f"DEBUG: PrometheusMetricsClient created with config: {config}")
+            
+            print("DEBUG: Calling client.get_nodes_status()")
             nodes_status = client.get_nodes_status()
+            print(f"DEBUG: nodes_status received: {json.dumps(nodes_status, indent=2) if nodes_status else 'None'}")
+            
+            print("DEBUG: Calling _perform_get_cluster_nodes_request()")
             nodes_data = await self._perform_get_cluster_nodes_request(db_cluster.cluster_id)
+            print(f"DEBUG: nodes_data received: {json.dumps(nodes_data, indent=2) if nodes_data else 'None'}")
+            
+            print("DEBUG: Creating node_name_id_mapping")
             node_name_id_mapping = {node["name"]: {"id": node["id"], "devices": node["hardware_info"]} for node in nodes_data.get("nodes", [])}
-            for _, value in nodes_status.get("nodes", {}).items():
-                hostname = value["hostname"]
+            print(f"DEBUG: node_name_id_mapping created: {json.dumps(node_name_id_mapping, indent=2)}")
+            
+            print("DEBUG: Processing nodes_status to add id and devices")
+            for node_ip, value in nodes_status.get("nodes", {}).items():
+                print(f"DEBUG: Processing node_ip: {node_ip}")
+                print(f"DEBUG: Node value: {json.dumps(value, indent=2)}")
+                
+                hostname = value.get("hostname")
+                print(f"DEBUG: Extracted hostname: '{hostname}'")
+                
+                if hostname is None:
+                    print(f"ERROR: hostname is None for node_ip: {node_ip}")
+                    value["id"] = None
+                    value["devices"] = []
+                    continue
+                    
                 node_map = node_name_id_mapping.get(hostname)
-                value["id"] = node_map["id"]
-                value["devices"] = node_map["devices"]
+                print(f"DEBUG: node_map lookup result: {node_map}")
+                
+                if node_map is None:
+                    print(f"ERROR: No matching node found for hostname '{hostname}'")
+                    print(f"DEBUG: Available node names in mapping: {list(node_name_id_mapping.keys())}")
+                    
+                    # Try case-insensitive lookup
+                    hostname_lower = hostname.lower()
+                    print(f"DEBUG: Trying case-insensitive lookup with '{hostname_lower}'")
+                    
+                    case_insensitive_mapping = {k.lower(): v for k, v in node_name_id_mapping.items()}
+                    node_map = case_insensitive_mapping.get(hostname_lower)
+                    print(f"DEBUG: Case-insensitive lookup result: {node_map}")
+                
+                if node_map is not None:
+                    print(f"DEBUG: Setting id: {node_map['id']} and devices for hostname: {hostname}")
+                    value["id"] = node_map["id"]
+                    value["devices"] = node_map["devices"]
+                else:
+                    print(f"ERROR: Failed to find mapping for hostname '{hostname}' even with case-insensitive lookup")
+                    value["id"] = None
+                    value["devices"] = []
+            
+            print("DEBUG: Successfully completed node processing")
+            print(f"DEBUG: Final nodes_status: {json.dumps(nodes_status, indent=2)}")
+            
         except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"ERROR: Exception occurred in get_node_wise_metrics:")
+            print(f"ERROR: Exception type: {type(e).__name__}")
+            print(f"ERROR: Exception message: {str(e)}")
+            print(f"ERROR: Full traceback:\n{error_trace}")
+            
+            # Log the state of variables at the time of error
+            try:
+                print(f"DEBUG: cluster_id at error: {cluster_id}")
+                print(f"DEBUG: db_cluster at error: {db_cluster if 'db_cluster' in locals() else 'Not defined'}")
+                print(f"DEBUG: config at error: {config if 'config' in locals() else 'Not defined'}")
+                print(f"DEBUG: nodes_status at error: {nodes_status if 'nodes_status' in locals() else 'Not defined'}")
+                print(f"DEBUG: nodes_data at error: {nodes_data if 'nodes_data' in locals() else 'Not defined'}")
+                print(f"DEBUG: node_name_id_mapping at error: {node_name_id_mapping if 'node_name_id_mapping' in locals() else 'Not defined'}")
+            except Exception as debug_e:
+                print(f"ERROR: Failed to log debug info: {debug_e}")
+            
             raise ClientException(f"Failed to get node metrics: {str(e)}")
 
         return nodes_status
