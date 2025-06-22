@@ -80,13 +80,13 @@ class PrometheusMetricsClient:
             node_status = {}
             for metric in status_metrics:
                 node_name = metric["metric"].get("node", "unknown")
-                node_status[node_name] = "Ready"
+                node_status[node_name.lower()] = "Ready"  # ← Convert to lowercase
 
             all_nodes = self.query_prometheus("node_uname_info")
             for node in all_nodes:
                 node_name = node["metric"].get("nodename", "unknown")
-                if node_name not in node_status:
-                    node_status[node_name] = "NotReady"
+                if node_name.lower() not in node_status:  # ← Check lowercase
+                    node_status[node_name.lower()] = "NotReady"  # ← Store lowercase
 
             return node_status
         except HTTPException as e:
