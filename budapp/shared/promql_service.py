@@ -80,22 +80,23 @@ class PrometheusMetricsClient:
             node_status = {}
             for metric in status_metrics:
                 node_name = metric["metric"].get("node", "unknown")
-                node_status[node_name] = "Ready"
+                node_status[node_name] = "Ready"  # Keep original case from Prometheus
 
             all_nodes = self.query_prometheus("node_uname_info")
             for node in all_nodes:
                 node_name = node["metric"].get("nodename", "unknown")
-                if node_name not in node_status:
-                    node_status[node_name] = "NotReady"
+                # Convert NodeMaster to nodemaster to match Prometheus node labels
+                prometheus_node_name = node_name.lower()
+                if prometheus_node_name not in node_status:
+                    node_status[prometheus_node_name] = "NotReady"
 
             return node_status
         except HTTPException as e:
-            # Re-raise the HTTPException to maintain the status code
             raise
         except Exception as e:
-            # Convert any other exceptions to HTTPException
             raise HTTPException(
-                status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=f"Failed to get node status: {str(e)}"
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR, 
+                detail=f"Failed to get node status: {str(e)}"
             )
 
     def get_pod_status(self) -> Dict[str, Dict]:
@@ -117,7 +118,9 @@ class PrometheusMetricsClient:
         """Get node information, pod counts, status, max pods, and pod availability."""
         nodes = self.query_prometheus("node_uname_info")
         pod_metrics = self.query_prometheus("kubelet_running_pods")
-        max_pods_metrics = self.query_prometheus("kube_node_status_allocatable_pods")
+        
+        # ✅ Fix: Use allocatable with resource filter instead of allocatable_pods
+        max_pods_metrics = self.query_prometheus('kube_node_status_allocatable{resource="pods"}')
 
         pod_counts = {}
         for pod_metric in pod_metrics:
@@ -126,6 +129,7 @@ class PrometheusMetricsClient:
 
         max_pods = {}
         for max_pod_metric in max_pods_metrics:
+            # ✅ Fix: Get node name from the correct field structure
             node_name = max_pod_metric["metric"].get("node", "unknown")
             max_pods[node_name] = float(max_pod_metric["value"][1]) if "value" in max_pod_metric else 0
 
@@ -137,8 +141,12 @@ class PrometheusMetricsClient:
     def get_node_description(self, node_name: str) -> Dict:
         """Get detailed node description information."""
         description = {}
-        conditions = self.query_prometheus(f'kube_node_status_condition{{node="{node_name}"}}')
-        capacity = self.query_prometheus(f'kube_node_status_capacity{{node="{node_name}"}}')
+        
+        # ✅ Fix: Convert NodeMaster to nodemaster for Prometheus queries
+        prometheus_node_name = node_name.lower()
+        
+        conditions = self.query_prometheus(f'kube_node_status_condition{{node="{prometheus_node_name}"}}')
+        capacity = self.query_prometheus(f'kube_node_status_capacity{{node="{prometheus_node_name}"}}')
 
         description["conditions"] = []
         for condition in conditions:
@@ -332,24 +340,27 @@ class PrometheusMetricsClient:
         nodes_json = {"nodes": {}}
 
         for node in nodes:
-            node_name = node["metric"].get("nodename", "unknown")
+            node_name = node["metric"].get("nodename", "unknown")  # This is "NodeMaster"
             node_ip = node["metric"].get("instance", "unknown").split(":")[0]
 
-            pod_count = pod_counts.get(node_name, 0)
-            status = node_status.get(node_name, "Unknown")
+            # ✅ Fix: Use lowercase for pod_counts lookup (if needed)
+            pod_count = pod_counts.get(node_name.lower(), 0)
+            
+            # ✅ Fix: Use lowercase for status lookup  
+            status = node_status.get(node_name.lower(), "Unknown")
 
             description = self.get_node_description(node_name)
-            max_pods = int(float(description.get("capacity", {}).get("pods", 0)))
-            cpu_capacity = description.get("capacity", {}).get("cpu", "0")
+            
+            # ✅ Fix: Handle missing capacity data gracefully
+            capacity_data = description.get("capacity", {})
+            max_pods_count = int(float(capacity_data.get("pods", 0)))
+            cpu_capacity = capacity_data.get("cpu", "0")
 
             try:
-                # Try multiple CPU usage metrics with fallbacks
+                # CPU metrics remain the same...
                 cpu_metrics = [
-                    # Node level CPU usage
                     f'sum(rate(node_cpu_seconds_total{{instance=~".*{node_ip}.*",mode!="idle"}}[5m])) by (instance)',
-                    # Container level CPU usage
                     f'sum(rate(container_cpu_usage_seconds_total{{instance=~".*{node_ip}.*"}}[5m])) by (instance)',
-                    # Alternate container metric
                     f'sum(container_cpu_system_seconds_total{{instance=~".*{node_ip}.*"}}) by (instance)',
                 ]
 
@@ -360,15 +371,16 @@ class PrometheusMetricsClient:
                         for metric in cpu_data:
                             if "value" in metric:
                                 current_cpu = float(metric["value"][1])
-                                if current_cpu > 0:  # If we found a valid value, break
+                                if current_cpu > 0:
                                     break
-                        if current_cpu > 0:  # If we found a valid value, break
+                        if current_cpu > 0:
                             break
             except Exception:
                 current_cpu = 0
 
             try:
-                memory_capacity = description.get("capacity", {}).get("memory", "0")
+                # ✅ Fix: Handle missing memory capacity
+                memory_capacity = capacity_data.get("memory", "0")
                 memory_capacity_bytes = self.parse_memory_value(memory_capacity)
                 current_memory = self.get_node_memory_usage(node_ip)
             except Exception:
@@ -376,8 +388,7 @@ class PrometheusMetricsClient:
                 memory_capacity_bytes = 0
 
             bandwidth_metrics = self.get_network_bandwidth(node_ip)
-            # network_stats = self.get_network_stats(node_ip)
-            events_count = self.get_node_events_count(node_name)
+            events_count = self.get_node_events_count(node_name.lower())  # ✅ Use lowercase
 
             nodes_json["nodes"][node_ip] = {
                 "hostname": node_name,
@@ -387,7 +398,7 @@ class PrometheusMetricsClient:
                     "kernel": node["metric"].get("release", "N/A"),
                     "architecture": node["metric"].get("machine", "N/A"),
                 },
-                "pods": {"current": int(pod_count), "max": max_pods},
+                "pods": {"current": int(pod_count), "max": max_pods_count},
                 "cpu": {"current": round(current_cpu, 2), "capacity": float(cpu_capacity)},
                 "memory": {
                     "current": round(current_memory / (1024 * 1024 * 1024), 2),
@@ -395,7 +406,7 @@ class PrometheusMetricsClient:
                 },
                 "network": {"bandwidth": bandwidth_metrics},
                 "events_count": events_count,
-                "capacity": description.get("capacity", {}),
+                "capacity": capacity_data,
             }
 
         return nodes_json

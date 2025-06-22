@@ -21,6 +21,7 @@ import tempfile
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
+import traceback
 
 import aiohttp
 import yaml
@@ -1605,29 +1606,38 @@ class ClusterService(SessionMixin):
         return metrics
 
     async def get_node_wise_metrics(self, cluster_id: UUID) -> Dict[str, Dict[str, Any]]:
-        """Get node-wise metrics for a cluster.
-
-        Args:
-            cluster_id: The ID of the cluster to get metrics for
-
-        Returns:
-            Dict containing the node-wise metrics
-        """
-        # Get cluster details to verify it exists
+        """Get node-wise metrics for a cluster."""
         db_cluster = await self.get_cluster_details(cluster_id)
-
         config = PrometheusConfig(base_url=app_settings.prometheus_url, cluster_id=str(db_cluster.cluster_id))
 
         try:
             client = PrometheusMetricsClient(config)
             nodes_status = client.get_nodes_status()
             nodes_data = await self._perform_get_cluster_nodes_request(db_cluster.cluster_id)
-            node_name_id_mapping = {node["name"]: {"id": node["id"], "devices": node["hardware_info"]} for node in nodes_data.get("nodes", [])}
-            for _, value in nodes_status.get("nodes", {}).items():
-                hostname = value["hostname"]
-                node_map = node_name_id_mapping.get(hostname)
-                value["id"] = node_map["id"]
-                value["devices"] = node_map["devices"]
+            
+            # ✅ Create case-insensitive mapping
+            node_name_id_mapping = {}
+            for node in nodes_data.get("nodes", []):
+                node_name = node["name"]
+                node_info = {"id": node["id"], "devices": node["hardware_info"]}
+                # Map both original and lowercase versions
+                node_name_id_mapping[node_name] = node_info
+                node_name_id_mapping[node_name.lower()] = node_info
+
+            for node_ip, node_data in nodes_status.get("nodes", {}).items():
+                hostname = node_data.get("hostname", "")
+                
+                # ✅ Try exact match first, then case-insensitive
+                node_map = node_name_id_mapping.get(hostname) or node_name_id_mapping.get(hostname.lower())
+                
+                if node_map is not None:
+                    node_data["id"] = node_map["id"]
+                    node_data["devices"] = node_map["devices"]
+                else:
+                    node_data["id"] = None
+                    node_data["devices"] = []
+                    print(f"Warning: No matching node found for hostname '{hostname}'")
+                    
         except Exception as e:
             raise ClientException(f"Failed to get node metrics: {str(e)}")
 
