@@ -47,9 +47,45 @@ class BaseKeycloakSeeder(BaseSeeder):
             missing_ok=True,
         )
 
-        # If both exist, we can skip the entire seeding process
+        # If both exist, we still need to sync permissions
         if keycloak_realm_exists and db_user:
-            logger.info(f"::KEYCLOAK::Realm {default_realm_name} and user {app_settings.superuser_email} both exist. Skipping seeding.")
+            logger.info(
+                f"::KEYCLOAK::Realm {default_realm_name} and user {app_settings.superuser_email} both exist. Syncing permissions..."
+            )
+
+            # Get tenant client info to sync permissions
+            tenant_client = await UserDataManager(session).retrieve_by_fields(
+                TenantClient,
+                {"tenant_id": db_user.id, "client_named_id": default_client_id},
+                missing_ok=True,
+            )
+
+            if not tenant_client:
+                # Try to get tenant info first
+                tenant = await UserDataManager(session).retrieve_by_fields(
+                    Tenant,
+                    {"realm_name": default_realm_name},
+                    missing_ok=True,
+                )
+
+                if tenant:
+                    tenant_client = await UserDataManager(session).retrieve_by_fields(
+                        TenantClient,
+                        {"tenant_id": tenant.id, "client_named_id": default_client_id},
+                        missing_ok=True,
+                    )
+
+            if tenant_client:
+                # Sync permissions for the super user
+                await keycloak_manager.sync_user_permissions(
+                    user_id=db_user.auth_id,
+                    realm_name=default_realm_name,
+                    client_id=tenant_client.client_id,
+                )
+                logger.info("::KEYCLOAK::Permissions synced for super user")
+            else:
+                logger.warning("::KEYCLOAK::Could not find tenant client info to sync permissions")
+
             return
 
         # Create realm in Keycloak if it doesn't exist

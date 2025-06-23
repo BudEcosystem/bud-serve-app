@@ -33,6 +33,8 @@ from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse, SingleResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 
+from ..commons.constants import PermissionEnum
+from ..commons.permission_handler import require_permissions
 from .schemas import (
     EditProjectRequest,
     ProjectClusterFilter,
@@ -79,110 +81,6 @@ project_router = APIRouter(prefix="/projects", tags=["project"])
 #     return SingleResponse(message="Project created successfully", result=db_project)
 
 
-@project_router.patch(
-    "/{project_id}",
-    responses={
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
-        status.HTTP_200_OK: {
-            "model": SingleProjectResponse,
-            "description": "Successfully edited project",
-        },
-    },
-    description="Edit project",
-)
-async def edit_project(
-    project_id: UUID,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
-    edit_project: EditProjectRequest,
-) -> Union[SingleProjectResponse, ErrorResponse]:
-    """Edit project"""
-    try:
-        db_project = await ProjectService(session).edit_project(
-            project_id=project_id, data=edit_project.model_dump(exclude_unset=True, exclude_none=True)
-        )
-        return SingleProjectResponse(
-            project=db_project,
-            message="Project details updated successfully",
-            code=status.HTTP_200_OK,
-            object="project.edit",
-        )
-    except ClientException as e:
-        logger.exception(f"Failed to edit project: {e}")
-        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
-    except Exception as e:
-        logger.exception(f"Failed to edit project: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit project"
-        ).to_http_response()
-
-
-@project_router.get(
-    "/{project_id}/clusters",
-    responses={
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
-        status.HTTP_200_OK: {
-            "model": ProjectClusterPaginatedResponse,
-            "description": "Successfully list all clusters in a project",
-        },
-    },
-    description="List all clusters in a project.\n\nOrder by values are: name, endpoint_count, hardware_type, node_count, worker_count, status, created_at, modified_at",
-)
-async def list_all_clusters(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
-    filters: Annotated[ProjectClusterFilter, Depends()],
-    project_id: UUID,
-    page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=0),
-    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
-    search: bool = False,
-) -> Union[ProjectClusterPaginatedResponse, ErrorResponse]:
-    """List all clusters in a project."""
-    # Calculate offset
-    offset = (page - 1) * limit
-
-    # Construct filters
-    filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True)
-
-    try:
-        result, count = await ProjectService(session).get_all_clusters_in_project(
-            project_id, offset, limit, filters_dict, order_by, search
-        )
-    except ClientException as e:
-        logger.exception(f"Failed to get all clusters: {e}")
-        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
-    except Exception as e:
-        logger.exception(f"Failed to get all clusters: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all clusters"
-        ).to_http_response()
-
-    return ProjectClusterPaginatedResponse(
-        clusters=result,
-        total_record=count,
-        page=page,
-        limit=limit,
-        object="project.clusters.list",
-        code=status.HTTP_200_OK,
-        message="Successfully list all clusters in a project",
-    ).to_http_response()
-
-
 @project_router.get(
     "/tags/search",
     responses={
@@ -201,7 +99,9 @@ async def list_all_clusters(
     },
     description="Search tags by name",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW])
 async def search_project_tags(
+    current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     search_term: str = Query(..., description="Tag name to search for"),
     page: int = Query(1, ge=1),
@@ -251,7 +151,9 @@ async def search_project_tags(
     },
     description="List all project tags",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW])
 async def get_project_tags(
+    current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ) -> Union[PaginatedTagsResponse, ErrorResponse]:
     """List all project tags."""
@@ -298,6 +200,7 @@ async def get_project_tags(
     },
     description="Create a new project",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
 async def create_project(
     project_data: ProjectCreateRequest,
     current_user: Annotated[
@@ -397,6 +300,112 @@ async def get_all_projects(
     ).to_http_response()
 
 
+@project_router.patch(
+    "/{project_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SingleProjectResponse,
+            "description": "Successfully edited project",
+        },
+    },
+    description="Edit project",
+)
+@require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
+async def edit_project(
+    project_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    edit_project: EditProjectRequest,
+) -> Union[SingleProjectResponse, ErrorResponse]:
+    """Edit project"""
+    try:
+        db_project = await ProjectService(session).edit_project(
+            project_id=project_id, data=edit_project.model_dump(exclude_unset=True, exclude_none=True)
+        )
+        return SingleProjectResponse(
+            project=db_project,
+            message="Project details updated successfully",
+            code=status.HTTP_200_OK,
+            object="project.edit",
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to edit project: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to edit project: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit project"
+        ).to_http_response()
+
+
+@project_router.get(
+    "/{project_id}/clusters",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ProjectClusterPaginatedResponse,
+            "description": "Successfully list all clusters in a project",
+        },
+    },
+    description="List all clusters in a project.\n\nOrder by values are: name, endpoint_count, hardware_type, node_count, worker_count, status, created_at, modified_at",
+)
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW])
+async def list_all_clusters(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[ProjectClusterFilter, Depends()],
+    project_id: UUID,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[ProjectClusterPaginatedResponse, ErrorResponse]:
+    """List all clusters in a project."""
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Construct filters
+    filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True)
+
+    try:
+        result, count = await ProjectService(session).get_all_clusters_in_project(
+            project_id, offset, limit, filters_dict, order_by, search
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to get all clusters: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get all clusters: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all clusters"
+        ).to_http_response()
+
+    return ProjectClusterPaginatedResponse(
+        clusters=result,
+        total_record=count,
+        page=page,
+        limit=limit,
+        object="project.clusters.list",
+        code=status.HTTP_200_OK,
+        message="Successfully list all clusters in a project",
+    ).to_http_response()
+
+
 @project_router.get(
     "/{project_id}",
     responses={
@@ -415,6 +424,7 @@ async def get_all_projects(
     },
     description="Get a single active project from the database",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW])
 async def retrieve_project(
     project_id: UUID,
     current_user: Annotated[
@@ -470,6 +480,7 @@ async def retrieve_project(
     },
     description="Delete an active project from the database",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
 async def delete_project(
     project_id: UUID,
     current_user: Annotated[
@@ -521,6 +532,7 @@ async def delete_project(
     },
     description="For existing users, user_id must be provided. For new users, email must be provided.",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
 async def add_users_to_project(
     project_id: UUID,
     users_to_add: ProjectUserAddList,
@@ -572,6 +584,7 @@ async def add_users_to_project(
     },
     description="Remove users from an active project",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
 async def remove_users_from_project(
     project_id: UUID,
     users: ProjectUserUpdate,
@@ -624,6 +637,7 @@ async def remove_users_from_project(
     },
     description="Get all active users in a project. Additional Sorting: project_role",
 )
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW])
 async def list_project_users(
     project_id: UUID,
     current_user: Annotated[

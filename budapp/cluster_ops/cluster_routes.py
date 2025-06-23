@@ -39,6 +39,8 @@ from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
+from ..commons.constants import PermissionEnum
+from ..commons.permission_handler import require_permissions
 from .schemas import (
     AnalyticsPanelResponse,
     AnalyticsPanelsResponse,
@@ -85,6 +87,7 @@ cluster_router = APIRouter(prefix="/clusters", tags=["cluster"])
     },
     description="Get Grafana dashboard URL by cluster id",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def get_grafana_dashboard_url(
     cluster_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -127,6 +130,7 @@ async def get_grafana_dashboard_url(
     },
     description="Create cluster workflow",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_MANAGE])
 async def create_cluster_workflow(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -233,6 +237,7 @@ async def create_cluster_workflow(
     },
     description="List all clusters",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def list_clusters(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -285,6 +290,7 @@ async def list_clusters(
     },
     description="Edit cluster",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_MANAGE])
 async def edit_cluster(
     cluster_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -330,6 +336,7 @@ async def edit_cluster(
     },
     description="Retrieve details of a cluster by ID",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def get_cluster_details(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -374,6 +381,7 @@ async def get_cluster_details(
     },
     description="Delete a cluster by ID",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_MANAGE])
 async def delete_cluster(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -417,6 +425,7 @@ async def delete_cluster(
     },
     description="Cancel cluster onboarding",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_MANAGE])
 async def cancel_cluster_onboarding(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -458,6 +467,7 @@ async def cancel_cluster_onboarding(
     },
     description="List all endpoints in a cluster.\n\nOrder by values are: name, status, created_at, project_name, model_name.",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def list_all_endpoints(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -518,6 +528,7 @@ async def list_all_endpoints(
     },
     description="Get detailed metrics for a specific cluster including CPU, memory, disk, GPU, HPU, and network statistics. Use metric_type to filter specific metrics.",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def get_cluster_metrics(
     cluster_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -562,6 +573,7 @@ async def get_cluster_metrics(
     },
     description="Get node-wise metrics for a cluster",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def get_node_wise_metrics(
     cluster_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -601,6 +613,7 @@ async def get_node_wise_metrics(
     },
     description="Get node-wise Events by hostname with pagination",
 )
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def get_node_wise_events_by_hostname(
     cluster_id: UUID,
     node_hostname: str,
