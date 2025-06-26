@@ -85,6 +85,7 @@ class EndpointListResponse(BaseModel):
     created_at: datetime
     modified_at: datetime
     is_deprecated: bool
+    supported_endpoints: list[ModelEndpointEnum]
 
 
 class EndpointPaginatedResponse(PaginatedSuccessResponse):
