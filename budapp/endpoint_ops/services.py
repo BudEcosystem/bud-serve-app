@@ -42,6 +42,7 @@ from ..commons.constants import (
     BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
     EndpointStatusEnum,
+    ModelEndpointEnum,
     ModelProviderTypeEnum,
     ModelStatusEnum,
     NotificationTypeEnum,
@@ -321,6 +322,15 @@ class EndpointService(SessionMixin):
         number_of_nodes = payload.content.result.get("number_of_nodes")
         total_replicas = payload.content.result["deployment_status"]["replicas"]["total"]
         node_list = payload.content.result.get("deploy_config", [])
+        supported_endpoints = payload.content.result['deployment_status'].get("supported_endpoints", {})
+
+        # Handle both list and dict formats
+        if isinstance(supported_endpoints, dict):
+            # Filter only enabled endpoints (where value is True)
+            enabled_endpoints = [endpoint for endpoint, enabled in supported_endpoints.items() if enabled]
+        else:
+            # Legacy format - list of endpoint strings
+            enabled_endpoints = supported_endpoints
 
         # Calculate the active replicas with status "Running"
         active_replicas = sum(
@@ -399,6 +409,7 @@ class EndpointService(SessionMixin):
             total_replicas=total_replicas,
             deployment_config=required_data["deploy_config"],
             node_list=[node["name"] for node in node_list],
+            supported_endpoints=enabled_endpoints,
         )
 
         db_endpoint = await EndpointDataManager(self.session).insert_one(
@@ -407,7 +418,7 @@ class EndpointService(SessionMixin):
         logger.debug(f"Endpoint created successfully: {db_endpoint.id}")
 
         # Update proxy cache for project
-        await self.add_model_to_proxy_cache(db_endpoint.id, db_endpoint.namespace, "vllm", db_endpoint.url)
+        await self.add_model_to_proxy_cache(db_endpoint.id, db_endpoint.namespace, "vllm", db_endpoint.url, enabled_endpoints)
         await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
         logger.debug(f"Updated proxy cache for project {db_endpoint.project_id}")
 
@@ -2025,9 +2036,20 @@ class EndpointService(SessionMixin):
         )
         await BudNotifyService().send_notification(notification_request)
 
-    async def add_model_to_proxy_cache(self, endpoint_id: UUID, model_name: str, model_type: str, api_base: str) -> None:
+    async def add_model_to_proxy_cache(self, endpoint_id: UUID, model_name: str, model_type: str, api_base: str, supported_endpoints: Union[List[str], Dict[str, bool]]) -> None:
         """Add model to proxy cache for a project."""
+
+        endpoints = []
         
+            
+        for support_endpoint in supported_endpoints:
+            try:
+                enum_member = ModelEndpointEnum(support_endpoint)
+                # Use the enum name in lowercase (e.g., "chat", "embedding", etc.)
+                endpoints.append(enum_member.name.lower())
+            except ValueError:
+                logger.debug(f"Support endpoint {support_endpoint} is not a valid ModelEndpointEnum")
+        logger.debug(f"Supported Endpoints: {endpoints}")
         model_config = ProxyModelConfig(
             routing=[ProxyProviderEnum.VLLM.value],
             providers={
@@ -2037,7 +2059,8 @@ class EndpointService(SessionMixin):
                     api_base=api_base + "/v1",
                     api_key_location="none"
                 )
-            }
+            },
+            endpoints=endpoints
         )
 
         redis_service = RedisService()
