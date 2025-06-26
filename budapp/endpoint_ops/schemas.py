@@ -22,7 +22,7 @@ from uuid import UUID
 from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator
 
 from budapp.cluster_ops.schemas import ClusterResponse
-from budapp.commons.constants import AdapterStatusEnum, EndpointStatusEnum, ProxyProviderEnum
+from budapp.commons.constants import AdapterStatusEnum, EndpointStatusEnum, ModelEndpointEnum, ProxyProviderEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from budapp.model_ops.schemas import ModelDetailResponse, ModelResponse
 
@@ -49,6 +49,7 @@ class EndpointCreate(BaseModel):
     number_of_nodes: int
     deployment_config: dict | None
     node_list: list | None
+    supported_endpoints: list[ModelEndpointEnum]
 
 
 class EndpointFilter(BaseModel):
@@ -296,3 +297,4 @@ class ProxyModelConfig(BaseModel):
 
     routing: list[ProxyProviderEnum]
     providers: dict[ProxyProviderEnum, VLLMConfig]
+    endpoints: list[str]
