@@ -46,6 +46,7 @@ from .router_ops import router_routes
 from .user_ops import user_routes
 from .workflow_ops import workflow_routes
 from .eval_ops import eval_routes
+from .eval_ops.workflows import EvalDataSyncWorkflows
 
 
 logger = logging.get_logger(__name__)
@@ -74,6 +75,10 @@ async def execute_initial_dapr_workflows() -> None:
 
     response = await ClusterRecommendedSchedulerWorkflows().__call__()
     logger.debug("Recommended cluster scheduler workflow response: %s", response)
+    
+    # Execute initial eval data sync workflow
+    eval_sync_response = await EvalDataSyncWorkflows().__call__()
+    logger.debug("Evaluation data sync workflow response: %s", eval_sync_response)
 
 
 @asynccontextmanager
@@ -109,6 +114,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     app_settings.max_sync_interval,
                 )
             )
+    
+    async def schedule_eval_data_sync() -> None:
+        """Schedule hourly evaluation data synchronization from cloud repository."""
+        # Wait for Dapr workflow runtime to be ready
+        await asyncio.sleep(10)
+        
+        while True:
+            try:
+                logger.info("Running scheduled evaluation data sync workflow")
+                response = await EvalDataSyncWorkflows().__call__()
+                logger.info("Scheduled eval data sync workflow response: %s", response)
+            except Exception as e:
+                logger.error("Failed to run scheduled eval data sync: %s", e)
+            
+            # Sleep for 1 hour (3600 seconds)
+            await asyncio.sleep(3600)
 
     task = asyncio.create_task(schedule_secrets_and_config_sync())
 
@@ -121,12 +142,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Execute initial dapr workflows
     dapr_workflow_task = asyncio.create_task(execute_initial_dapr_workflows())
+    
+    # Start the hourly eval data sync scheduler
+    eval_sync_task = asyncio.create_task(schedule_eval_data_sync())
 
     yield
 
     try:
         task.cancel()
         dapr_workflow_task.cancel()
+        eval_sync_task.cancel()
     except asyncio.CancelledError:
         logger.exception("Failed to cleanup config & store sync.")
 
