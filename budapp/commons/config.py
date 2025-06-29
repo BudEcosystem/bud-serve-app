@@ -97,6 +97,20 @@ class AppConfig(BaseAppConfig):
     # Base Directory
     base_dir: DirectoryPath = Field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
 
+    # Evaluation Data Sync
+    eval_manifest_url: str = Field(
+        default="https://eval-datasets.bud.eco/v2/manifest.json",
+        description="URL to the evaluation datasets manifest file"
+    )
+    eval_sync_enabled: bool = Field(
+        default=True,
+        description="Enable automatic evaluation data synchronization"
+    )
+    eval_sync_use_bundles: bool = Field(
+        default=True,
+        description="Use bundle downloads when available for evaluation datasets"
+    )
+
     # Profiling
     profiler_enabled: bool = Field(False, alias="ENABLE_PROFILER")
 

@@ -49,59 +49,89 @@ class EvalDataSyncWorkflows:
 
     @dapr_workflow.register_activity
     @staticmethod
-    def check_and_sync_eval_data(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    async def check_and_sync_eval_data(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         """Check cloud repository for updated evaluation data and sync if needed.
-        
+
         This activity will:
         1. Check a cloud URL for the latest version of eval datasets and traits
         2. Compare with current local version
         3. Download and migrate if a newer version is available
-        
+
         Args:
             ctx: Workflow activity context
             kwargs: Dictionary containing sync parameters
-            
+
         Returns:
             Dictionary with sync results
         """
-        repository_url = kwargs.get("repository_url", "https://webhook.site/21df9b68-74a3-40a5-ad85-51d6fe7d6b3b/manifest.json")
+        from ..commons.config import app_settings
+        from ..commons.database import SessionLocal
+        from .sync_service import EvalDataSyncService
+
+        repository_url = kwargs.get("repository_url", app_settings.eval_manifest_url)
         force_sync = kwargs.get("force_sync", False)
-        
+
         try:
             logger.info("Checking cloud repository for evaluation data updates: %s", repository_url)
-            
-            # TODO: Implement actual logic to:
-            # 1. Fetch manifest from repository_url
-            # 2. Check version against local database
-            # 3. Download new data if available
-            # 4. Run migration/update process
-            
-            # For now, just log the dummy check
+
+            sync_service = EvalDataSyncService()
+
+            # Fetch manifest
+            manifest = await sync_service.fetch_manifest(repository_url)
+            logger.info(f"Fetched manifest version: {manifest.version_info.current_version}")
+
+            # Get current version from database
+            async with SessionLocal() as db:
+                current_version = await sync_service.get_current_version(db)
+
             result = {
                 "checked": True,
                 "repository_url": repository_url,
-                "current_version": "1.0.0",  # Would fetch from database
-                "latest_version": "1.0.0",   # Would fetch from cloud
+                "current_version": current_version or "none",
+                "latest_version": manifest.version_info.current_version,
                 "updated": False,
-                "message": "No updates available"
+                "message": "No updates available",
+                "manifest": {
+                    "total_datasets": len(manifest.get_all_datasets()),
+                    "total_size_mb": manifest.get_total_size_mb(),
+                    "sources": list(manifest.datasets.keys()),
+                },
             }
-            
+
+            # Check if sync is needed
+            if force_sync or current_version != manifest.version_info.current_version:
+                logger.info(
+                    "Sync required: current=%s, latest=%s", current_version, manifest.version_info.current_version
+                )
+
+                # Run migrations if needed
+                if manifest.requires_migration(current_version):
+                    await sync_service.run_migrations(manifest, current_version)
+
+                # Sync datasets
+                use_bundles = kwargs.get("use_bundles", app_settings.eval_sync_use_bundles)
+                sync_results = await sync_service.sync_datasets(manifest, current_version, force_sync, use_bundles)
+
+                result.update(
+                    {
+                        "updated": True,
+                        "message": f"Synced {len(sync_results['synced_datasets'])} datasets",
+                        "sync_results": sync_results,
+                    }
+                )
+
             logger.info("Evaluation data sync check completed: %s", result)
             return result
-            
+
         except Exception as e:
             logger.exception("Failed to check/sync evaluation data: %s", e)
-            return {
-                "checked": False,
-                "error": str(e),
-                "message": "Failed to sync evaluation data"
-            }
+            return {"checked": False, "error": str(e), "message": "Failed to sync evaluation data"}
 
     @dapr_workflow.register_workflow
     @staticmethod
     def run_eval_data_sync(ctx: wf.DaprWorkflowContext, payload: Dict[str, Any]):
         """Run the evaluation data synchronization workflow.
-        
+
         Args:
             ctx: Dapr workflow context
             payload: Dictionary containing workflow parameters
@@ -112,39 +142,42 @@ class EvalDataSyncWorkflows:
         workflow_name = "eval_data_sync_workflow"
         workflow_id = ctx.instance_id
 
-        repository_url = payload.get("repository_url", "https://webhook.site/21df9b68-74a3-40a5-ad85-51d6fe7d6b3b/manifest.json")
+        from ..commons.config import app_settings
+
+        repository_url = payload.get("repository_url", app_settings.eval_manifest_url)
         force_sync = payload.get("force_sync", False)
 
         result = yield ctx.call_activity(
             EvalDataSyncWorkflows.check_and_sync_eval_data,
-            input={
-                "repository_url": repository_url,
-                "force_sync": force_sync
-            },
+            input={"repository_url": repository_url, "force_sync": force_sync},
             retry_policy=retry_policy,
         )
-        
+
         logger.info("Evaluation data sync workflow completed with result: %s", result)
         logger.info("Workflow %s with id %s completed", workflow_name, workflow_id)
-        
+
         return result
 
-    def __call__(self, repository_url: Optional[str] = None, force_sync: bool = False, workflow_id: Optional[str] = None):
+    def __call__(
+        self, repository_url: Optional[str] = None, force_sync: bool = False, workflow_id: Optional[str] = None
+    ):
         """Trigger the evaluation data sync workflow.
-        
+
         Args:
             repository_url: URL of the cloud repository to check
             force_sync: Force synchronization even if versions match
             workflow_id: Optional workflow ID
-            
+
         Returns:
             Workflow scheduling response
         """
+        from ..commons.config import app_settings
+
         response = dapr_workflow.schedule_workflow(
             workflow_name="run_eval_data_sync",
             workflow_input={
-                "repository_url": repository_url or "https://webhook.site/21df9b68-74a3-40a5-ad85-51d6fe7d6b3b/manifest.json",
-                "force_sync": force_sync
+                "repository_url": repository_url or app_settings.eval_manifest_url,
+                "force_sync": force_sync,
             },
             workflow_id=str(workflow_id or uuid.uuid4()),
             workflow_steps=[
