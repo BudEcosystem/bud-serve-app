@@ -3444,7 +3444,8 @@ class ModelService(SessionMixin):
             model_source = db_model.source
             if model_uri.startswith(f"{model_source}/"):
                 model_uri = model_uri.removeprefix(f"{model_source}/")
-            deploy_model_uri = model_uri if not credential_id else f"{model_source}/{model_uri}"
+            # deploy_model_uri = model_uri if not credential_id else f"{model_source}/{model_uri}"
+            deploy_model_uri = model_uri
             # Update made in lite-llm pr merge
         else:
             deploy_model_uri = db_model.local_path
@@ -3466,6 +3467,7 @@ class ModelService(SessionMixin):
             source_topic=app_settings.source_topic,
             credential_id=credential_id,
             podscaler=scaling_specification,
+            provider=db_model.source
         )
         model_deployment_endpoint = (
             f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"

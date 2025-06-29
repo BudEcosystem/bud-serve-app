@@ -1138,6 +1138,7 @@ class ModelDeploymentRequest(BaseModel):
     source_topic: str
     credential_id: UUID4 | None = None
     podscaler: ScalingSpecification | None = None
+    provider: str | None = None
 
 
 class TopLeaderboardRequest(BaseModel):
