@@ -95,6 +95,15 @@ class BenchmarkService(SessionMixin):
             {"workflow_id": db_workflow.id}
         )
 
+        # Check duplicate benchmark name
+        if request.name:
+            with BenchmarkCRUD() as crud:
+                db_benchmark = crud.fetch_one(
+                    conditions={"name": request.name, "user_id": current_user_id},
+                )
+                if db_benchmark:
+                    raise ClientException("Benchmark name already exists")
+
         # Validate resources
         if model_id:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
