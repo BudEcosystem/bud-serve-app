@@ -41,6 +41,14 @@ class TraitCategory(BaseModel):
     traits: List[str]
 
 
+class TraitDefinition(BaseModel):
+    """Individual trait definition."""
+    
+    name: str
+    description: str
+    icon: str
+
+
 class TraitsInfo(BaseModel):
     """Traits definition information."""
 
@@ -48,7 +56,8 @@ class TraitsInfo(BaseModel):
     checksum: str
     url: str
     count: int
-    categories: List[TraitCategory]
+    categories: Optional[List[TraitCategory]] = None  # Old format support
+    definitions: Optional[List[TraitDefinition]] = None  # New format
 
 
 class DatasetMetadata(BaseModel):
@@ -70,6 +79,10 @@ class DatasetMetadata(BaseModel):
     # Access control
     requires_auth: Optional[bool] = False
     privacy_level: Optional[str] = None
+    
+    # Token estimates
+    estimated_input_tokens: Optional[int] = None
+    estimated_output_tokens: Optional[int] = None
 
 
 class Dataset(BaseModel):

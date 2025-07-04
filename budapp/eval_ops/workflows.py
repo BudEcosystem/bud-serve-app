@@ -127,15 +127,8 @@ class EvalDataSyncWorkflows:
                         {"source": "local" if app_settings.eval_sync_local_mode else "cloud"}
                     )
 
-                # Sync datasets
-                use_bundles = kwargs.get("use_bundles", app_settings.eval_sync_use_bundles)
-
-                # Disable bundles in local mode
-                if app_settings.eval_sync_local_mode:
-                    logger.info("Local mode enabled - disabling bundle downloads")
-                    use_bundles = False
-
-                sync_results = asyncio.run(sync_service.sync_datasets(manifest, current_version, force_sync, use_bundles))
+                # Sync dataset metadata
+                sync_results = asyncio.run(sync_service.sync_datasets(manifest, current_version, force_sync))
 
                 # Record sync completion
                 with Session(engine) as db:
@@ -146,7 +139,7 @@ class EvalDataSyncWorkflows:
                         {
                             "synced_datasets": sync_results["synced_datasets"],
                             "failed_datasets": sync_results["failed_datasets"],
-                            "total_size_mb": sync_results["total_size_mb"],
+                            "total_datasets": sync_results.get("total_datasets", 0),
                             "source": "local" if app_settings.eval_sync_local_mode else "cloud"
                         }
                     )
