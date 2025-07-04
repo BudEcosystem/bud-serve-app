@@ -12,28 +12,23 @@ from budapp.eval_ops.schemas import (
     CreateExperimentResponse,
     CreateRunRequest,
     CreateRunResponse,
+    DatasetFilter,
     DeleteExperimentResponse,
     DeleteRunResponse,
     GetDatasetResponse,
+    GetEvaluationResponse,
+    GetRunResponse,
     ListDatasetsResponse,
-    CreateDatasetRequest,
-    CreateDatasetResponse,
-    UpdateDatasetRequest,
-    UpdateDatasetResponse,
-    DeleteDatasetResponse,
-    DatasetFilter,
+    ListEvaluationsResponse,
     ListExperimentsResponse,
     ListRunsResponse,
     ListTraitsResponse,
+    UpdateEvaluationRequest,
+    UpdateEvaluationResponse,
     UpdateExperimentRequest,
     UpdateExperimentResponse,
     UpdateRunRequest,
     UpdateRunResponse,
-    ListEvaluationsResponse,
-    GetRunResponse,
-    GetEvaluationResponse,
-    UpdateEvaluationRequest,
-    UpdateEvaluationResponse,
 )
 from budapp.eval_ops.services import ExperimentService
 from budapp.user_ops.models import User
@@ -72,7 +67,7 @@ def create_experiment(
     except Exception as e:
         logger.debug(f"Failed to create experiment: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to create experiment") from e
-    
+
     return CreateExperimentResponse(
         code=status.HTTP_201_CREATED,
         object="experiment.create",
@@ -102,7 +97,7 @@ def list_experiments(
         experiments = ExperimentService(session).list_experiments(current_user.id)
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to list experiments") from e
-    
+
     return ListExperimentsResponse(
         code=status.HTTP_200_OK,
         object="experiment.list",
@@ -142,7 +137,7 @@ def update_experiment(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to update experiment") from e
-    
+
     return UpdateExperimentResponse(
         code=status.HTTP_200_OK,
         object="experiment.update",
@@ -179,7 +174,7 @@ def delete_experiment(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to delete experiment") from e
-    
+
     return DeleteExperimentResponse(
         code=status.HTTP_200_OK,
         object="experiment.delete",
@@ -219,7 +214,7 @@ def create_run(
     except Exception as e:
         logger.debug(f"Failed to create run: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to create run") from e
-    
+
     return CreateRunResponse(
         code=status.HTTP_201_CREATED,
         object="run.create",
@@ -253,7 +248,7 @@ def list_runs(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to list runs") from e
-    
+
     return ListRunsResponse(
         code=status.HTTP_200_OK,
         object="run.list",
@@ -290,7 +285,7 @@ def get_run(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to get run") from e
-    
+
     return GetRunResponse(
         code=status.HTTP_200_OK,
         object="run.get",
@@ -330,7 +325,7 @@ def update_run(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to update run") from e
-    
+
     return UpdateRunResponse(
         code=status.HTTP_200_OK,
         object="run.update",
@@ -367,7 +362,7 @@ def delete_run(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to delete run") from e
-    
+
     return DeleteRunResponse(
         code=status.HTTP_200_OK,
         object="run.delete",
@@ -403,7 +398,7 @@ def list_evaluations(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to list evaluations") from e
-    
+
     return ListEvaluationsResponse(
         code=status.HTTP_200_OK,
         object="evaluation.list",
@@ -440,7 +435,7 @@ def get_evaluation(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to get evaluation") from e
-    
+
     return GetEvaluationResponse(
         code=status.HTTP_200_OK,
         object="evaluation.get",
@@ -480,7 +475,7 @@ def update_evaluation(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to update evaluation") from e
-    
+
     return UpdateEvaluationResponse(
         code=status.HTTP_200_OK,
         object="evaluation.update",
@@ -514,7 +509,7 @@ def list_traits(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to list traits") from e
-    
+
     return ListTraitsResponse(
         code=status.HTTP_200_OK,
         object="trait.list",
@@ -545,7 +540,7 @@ def list_datasets(
     """List datasets with optional filtering and pagination."""
     try:
         offset = (page - 1) * limit
-        
+
         # Parse comma-separated filters
         filters = DatasetFilter(
             name=name,
@@ -553,13 +548,13 @@ def list_datasets(
             language=language.split(",") if language else None,
             domains=domains.split(",") if domains else None,
         )
-        
+
         datasets, total_count = ExperimentService(session).list_datasets(
             offset=offset, limit=limit, filters=filters
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to list datasets") from e
-    
+
     return ListDatasetsResponse(
         code=status.HTTP_200_OK,
         object="dataset.list",
@@ -592,7 +587,7 @@ def get_dataset_by_id(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to get dataset") from e
-    
+
     return GetDatasetResponse(
         code=status.HTTP_200_OK,
         object="dataset.get",
@@ -600,95 +595,3 @@ def get_dataset_by_id(
         dataset=dataset,
     )
 
-
-@router.post(
-    "/datasets",
-    response_model=CreateDatasetResponse,
-    status_code=status.HTTP_201_CREATED,
-    responses={
-        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
-    },
-)
-def create_dataset(
-    request: Annotated[CreateDatasetRequest, Depends()],
-    session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    """Create a new dataset with traits."""
-    try:
-        dataset = ExperimentService(session).create_dataset(request)
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        logger.debug(f"Failed to create dataset: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to create dataset") from e
-    
-    return CreateDatasetResponse(
-        code=status.HTTP_201_CREATED,
-        object="dataset.create",
-        message="Successfully created dataset",
-        dataset=dataset,
-    )
-
-
-@router.patch(
-    "/datasets/{dataset_id}",
-    response_model=UpdateDatasetResponse,
-    status_code=status.HTTP_200_OK,
-    responses={
-        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
-        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
-    },
-)
-def update_dataset(
-    dataset_id: Annotated[uuid.UUID, Path(..., description="ID of dataset to update")],
-    request: Annotated[UpdateDatasetRequest, Depends()],
-    session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    """Update an existing dataset and its traits."""
-    try:
-        dataset = ExperimentService(session).update_dataset(dataset_id, request)
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        logger.debug(f"Failed to update dataset: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to update dataset") from e
-    
-    return UpdateDatasetResponse(
-        code=status.HTTP_200_OK,
-        object="dataset.update",
-        message="Successfully updated dataset",
-        dataset=dataset,
-    )
-
-
-@router.delete(
-    "/datasets/{dataset_id}",
-    response_model=DeleteDatasetResponse,
-    status_code=status.HTTP_200_OK,
-    responses={
-        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
-    },
-)
-def delete_dataset(
-    dataset_id: Annotated[uuid.UUID, Path(..., description="ID of dataset to delete")],
-    session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    """Delete a dataset and its trait associations."""
-    try:
-        ExperimentService(session).delete_dataset(dataset_id)
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to delete dataset") from e
-    
-    return DeleteDatasetResponse(
-        code=status.HTTP_200_OK,
-        object="dataset.delete",
-        message="Successfully deleted dataset",
-    )
