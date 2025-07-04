@@ -37,6 +37,8 @@ from .core import common_routes, meta_routes, notify_routes
 from .credential_ops import credential_routes
 from .dataset_ops import dataset_routes
 from .endpoint_ops import endpoint_routes
+from .eval_ops import eval_routes
+from .eval_ops.workflows import EvalDataSyncWorkflows
 from .initializers.seeder import seeders
 from .metric_ops import metric_routes
 from .model_ops import model_routes
@@ -79,6 +81,13 @@ async def execute_initial_dapr_workflows() -> None:
     response = await ClusterRecommendedSchedulerWorkflows().__call__()
     logger.debug("Recommended cluster scheduler workflow response: %s", response)
 
+    # Execute initial eval data sync workflow if enabled
+    if app_settings.eval_sync_enabled:
+        eval_sync_response = await EvalDataSyncWorkflows().__call__()
+        logger.debug("Evaluation data sync workflow response: %s", eval_sync_response)
+    else:
+        logger.info("Evaluation data sync is disabled")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -114,6 +123,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 )
             )
 
+    async def schedule_eval_data_sync() -> None:
+        """Schedule hourly evaluation data synchronization from cloud repository."""
+        if not app_settings.eval_sync_enabled:
+            logger.info("Evaluation data sync is disabled, skipping scheduler")
+            return
+
+        # Wait for Dapr workflow runtime to be ready
+        await asyncio.sleep(10)
+
+        while True:
+            try:
+                logger.info("Running scheduled evaluation data sync workflow")
+                response = await EvalDataSyncWorkflows().__call__()
+                logger.info("Scheduled eval data sync workflow response: %s", response)
+            except Exception as e:
+                logger.error("Failed to run scheduled eval data sync: %s", e)
+
+            # Sleep for 1 hour (3600 seconds)
+            await asyncio.sleep(3600)
+
     task = asyncio.create_task(schedule_secrets_and_config_sync())
 
     for seeder_name, seeder in seeders.items():
@@ -126,11 +155,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Execute initial dapr workflows
     dapr_workflow_task = asyncio.create_task(execute_initial_dapr_workflows())
 
+    # Start the hourly eval data sync scheduler
+    eval_sync_task = asyncio.create_task(schedule_eval_data_sync())
+
     yield
 
     try:
         task.cancel()
         dapr_workflow_task.cancel()
+        eval_sync_task.cancel()
     except asyncio.CancelledError:
         logger.exception("Failed to cleanup config & store sync.")
 
@@ -184,6 +217,7 @@ internal_router.include_router(workflow_routes.workflow_router)
 internal_router.include_router(playground_routes.playground_router)
 internal_router.include_router(project_routes.project_router)
 internal_router.include_router(router_routes.router_router)
+internal_router.include_router(eval_routes.router)
 
 app.include_router(internal_router)
 
