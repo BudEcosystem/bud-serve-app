@@ -136,6 +136,14 @@ class ExpTrait(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=True)
     icon: Mapped[str] = mapped_column(String, nullable=True)
+    
+    # Relationships
+    datasets = relationship(
+        "ExpDataset",
+        secondary="exp_traits_dataset_pivot",
+        back_populates="traits",
+        lazy="select"
+    )
 
 
 class ExpDataset(Base, TimestampMixin):
@@ -169,6 +177,12 @@ class ExpDataset(Base, TimestampMixin):
 
     # Relationships
     versions = relationship("ExpDatasetVersion", back_populates="dataset", cascade="all, delete-orphan")
+    traits = relationship(
+        "ExpTrait",
+        secondary="exp_traits_dataset_pivot",
+        back_populates="datasets",
+        lazy="select"
+    )
 
 
 class ExpTraitsDatasetPivot(Base, TimestampMixin):

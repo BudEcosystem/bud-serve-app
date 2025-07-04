@@ -234,6 +234,8 @@ class ExperimentService:
             HTTPException(status_code=500): If database query fails.
         """
         try:
+            from sqlalchemy.orm import selectinload
+            
             q = self.session.query(TraitModel)
             
             # Apply filters
@@ -250,22 +252,16 @@ class ExperimentService:
             # Get total count before applying pagination
             total_count = q.count()
             
-            # Apply pagination and get results
-            traits = q.offset(offset).limit(limit).all()
+            # Apply pagination and eager load datasets using selectinload
+            # This will execute 2 queries total: one for traits, one for all related datasets
+            traits = q.options(selectinload(TraitModel.datasets)).offset(offset).limit(limit).all()
             
-            # For each trait, get associated datasets
+            # Convert to schema objects
             trait_schemas = []
+            from budapp.eval_ops.schemas import DatasetBasic
+            
             for trait in traits:
-                # Get datasets associated with this trait
-                datasets_query = (
-                    self.session.query(DatasetModel)
-                    .join(PivotModel, DatasetModel.id == PivotModel.dataset_id)
-                    .filter(PivotModel.trait_id == trait.id)
-                    .all()
-                )
-                
-                # Convert datasets to DatasetBasic schema
-                from budapp.eval_ops.schemas import DatasetBasic
+                # Convert datasets to DatasetBasic schema - datasets are already loaded
                 datasets = [
                     DatasetBasic(
                         id=dataset.id,
@@ -277,7 +273,7 @@ class ExperimentService:
                         sample_questions_answers=dataset.sample_questions_answers,
                         advantages_disadvantages=dataset.advantages_disadvantages,
                     )
-                    for dataset in datasets_query
+                    for dataset in trait.datasets
                 ]
                 
                 trait_schema = TraitSchema(
