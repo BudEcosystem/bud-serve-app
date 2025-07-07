@@ -83,8 +83,9 @@ async def execute_initial_dapr_workflows() -> None:
 
     # Execute initial eval data sync workflow if enabled
     if app_settings.eval_sync_enabled:
-        eval_sync_response = await EvalDataSyncWorkflows().__call__()
-        logger.debug("Evaluation data sync workflow response: %s", eval_sync_response)
+        logger.info("Evaluation data sync is enabled")
+        # eval_sync_response = await EvalDataSyncWorkflows().__call__()
+        #logger.debug("Evaluation data sync workflow response: %s", eval_sync_response)
     else:
         logger.info("Evaluation data sync is disabled")
 
