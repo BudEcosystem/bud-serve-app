@@ -1,8 +1,8 @@
-"""message
+"""evals-tables
 
-Revision ID: a6b06da360b5
-Revises: 7e39e9ca4074
-Create Date: 2025-07-04 03:02:07.582728
+Revision ID: 5ebb7b813ad4
+Revises: c301ac188f1b
+Create Date: 2025-07-07 09:37:38.203430
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'a6b06da360b5'
-down_revision: Union[str, None] = '7e39e9ca4074'
+revision: str = '5ebb7b813ad4'
+down_revision: Union[str, None] = 'c301ac188f1b'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -23,6 +23,16 @@ def upgrade() -> None:
     sa.Enum('pending', 'running', 'completed', 'failed', 'cancelled', 'skipped', 'deleted', name='evaluation_status_enum').create(op.get_bind())
     sa.Enum('pending', 'running', 'completed', 'failed', 'cancelled', 'deleted', name='run_status_enum').create(op.get_bind())
     sa.Enum('active', 'deleted', name='experiment_status_enum').create(op.get_bind())
+    op.create_table('eval_sync_state',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('manifest_version', sa.String(length=50), nullable=False),
+    sa.Column('sync_timestamp', sa.String(), nullable=False),
+    sa.Column('sync_status', sa.String(length=20), nullable=False),
+    sa.Column('sync_metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('modified_at', sa.DateTime(timezone=True), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('exp_datasets',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
@@ -159,6 +169,7 @@ def downgrade() -> None:
     op.drop_table('exp_traits')
     op.drop_table('exp_models')
     op.drop_table('exp_datasets')
+    op.drop_table('eval_sync_state')
     sa.Enum('active', 'deleted', name='experiment_status_enum').drop(op.get_bind())
     sa.Enum('pending', 'running', 'completed', 'failed', 'cancelled', 'deleted', name='run_status_enum').drop(op.get_bind())
     sa.Enum('pending', 'running', 'completed', 'failed', 'cancelled', 'skipped', 'deleted', name='evaluation_status_enum').drop(op.get_bind())
