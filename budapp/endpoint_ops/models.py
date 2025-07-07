@@ -18,16 +18,18 @@
 
 import json
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.cluster_ops.models import Cluster
-from budapp.commons.constants import AdapterStatusEnum, EndpointStatusEnum
+from budapp.commons.constants import AdapterStatusEnum, EndpointStatusEnum, ModelEndpointEnum
 from budapp.commons.database import Base, TimestampMixin
 from budapp.model_ops.models import Model
 from budapp.project_ops.models import Project
@@ -65,6 +67,17 @@ class Endpoint(Base, TimestampMixin):
     deployment_config: Mapped[dict] = mapped_column(JSONB, nullable=True)
     node_list: Mapped[list[str]] = mapped_column(JSONB, nullable=True)
     is_deprecated: Mapped[bool] = mapped_column(Boolean, default=False)
+    supported_endpoints: Mapped[List[str]] = mapped_column(
+        PG_ARRAY(
+            PG_ENUM(
+                ModelEndpointEnum,
+                name="model_endpoint_enum",
+                values_callable=lambda x: [e.value for e in x],
+                create_type=False,
+            ),
+        ),
+        nullable=False,
+    )
 
     model: Mapped[Model] = relationship("Model", back_populates="endpoints", foreign_keys=[model_id])
     # worker: Mapped[Worker] = relationship(
