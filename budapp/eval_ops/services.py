@@ -1191,7 +1191,7 @@ class ExperimentWorkflowService:
                 experiment_id = await self._create_experiment_from_workflow(workflow.id, current_user_id)
                 # Mark workflow as completed
                 await WorkflowDataManager(self.session).update_by_fields(
-                    workflow, {"status": WorkflowStatusEnum.COMPLETED}
+                    workflow, {"status": WorkflowStatusEnum.COMPLETED.value}  # type: ignore
                 )
 
             # After storing the workflow step, retrieve all accumulated data
@@ -1452,7 +1452,7 @@ class ExperimentWorkflowService:
         )
 
         # Combine data from all steps
-        combined_data = ExperimentWorkflowStepData()
+        combined_data = ExperimentWorkflowStepData(performance_point=None)
         for step in workflow_steps:
             step_data = step.data
             if step.step_number == 1:
