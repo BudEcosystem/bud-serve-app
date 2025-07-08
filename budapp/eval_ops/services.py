@@ -1526,6 +1526,12 @@ class ExperimentWorkflowService:
             workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
                 WorkflowModel, {"id": workflow_id, "created_by": current_user_id}
             )
+            if not workflow:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Workflow not found"
+                )
+            workflow = cast(WorkflowModel, workflow)
 
             # Get all accumulated step data
             all_step_data = await self._get_accumulated_step_data(workflow_id)
