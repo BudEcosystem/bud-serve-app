@@ -15,6 +15,8 @@ from budapp.eval_ops.schemas import (
     DatasetFilter,
     DeleteExperimentResponse,
     DeleteRunResponse,
+    ExperimentWorkflowResponse,
+    ExperimentWorkflowStepRequest,
     GetDatasetResponse,
     GetEvaluationResponse,
     GetRunResponse,
@@ -30,7 +32,7 @@ from budapp.eval_ops.schemas import (
     UpdateRunRequest,
     UpdateRunResponse,
 )
-from budapp.eval_ops.services import ExperimentService
+from budapp.eval_ops.services import ExperimentService, ExperimentWorkflowService
 from budapp.user_ops.models import User
 
 
@@ -180,6 +182,109 @@ def delete_experiment(
         object="experiment.delete",
         message="Successfully deleted experiment",
     )
+
+
+@router.post(
+    "/workflow",
+    response_model=ExperimentWorkflowResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_422_UNPROCESSABLE_ENTITY: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+async def experiment_workflow_step(
+    request: ExperimentWorkflowStepRequest,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Process a step in the experiment creation workflow.
+
+    This endpoint handles the multi-stage experiment creation process:
+    
+    **Step 1: Basic Information**
+    - Required: name, project_id
+    - Optional: description
+    
+    **Step 2: Model Selection**
+    - Required: model_ids (list of model UUIDs)
+    
+    **Step 3: Traits Selection**
+    - Required: trait_ids (list of trait UUIDs)
+    - Optional: dataset_ids (specific datasets)
+    
+    **Step 4: Performance Point**
+    - Required: performance_point (integer between 0-100)
+    
+    **Step 5: Finalization**
+    - Optional: run_name, run_description, evaluation_config
+    - Set trigger_workflow=true to create the experiment
+
+    - **request**: Workflow step request with stage_data
+    - **session**: Database session dependency
+    - **current_user**: The authenticated user
+
+    Returns an `ExperimentWorkflowResponse` with workflow status and next step guidance.
+    """
+    try:
+        workflow_service = ExperimentWorkflowService(session)
+        response = await workflow_service.process_experiment_workflow_step(request, current_user.id)
+        return response
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.debug(f"Failed to process experiment workflow step: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to process workflow step") from e
+
+
+@router.get(
+    "/workflow/{workflow_id}",
+    response_model=ExperimentWorkflowResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+async def review_experiment_workflow(
+    workflow_id: Annotated[uuid.UUID, Path(..., description="Workflow ID to review")],
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Review experiment workflow data.
+
+    This endpoint allows you to review all data collected during the experiment creation workflow.
+    It returns the complete workflow state including:
+    
+    - Current step and total steps
+    - All accumulated data from completed steps
+    - Workflow status and completion state
+    - Next step information (if not complete)
+    
+    Useful for:
+    - Reviewing data before final submission
+    - Checking workflow progress
+    - Auditing completed workflows
+    - Debugging workflow issues
+
+    - **workflow_id**: UUID of the workflow to review
+    - **session**: Database session dependency
+    - **current_user**: The authenticated user
+
+    Returns an `ExperimentWorkflowResponse` with complete workflow data.
+    """
+    try:
+        workflow_service = ExperimentWorkflowService(session)
+        response = await workflow_service.get_experiment_workflow_data(workflow_id, current_user.id)
+        return response
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.debug(f"Failed to review experiment workflow: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to review workflow") from e
 
 
 @router.post(

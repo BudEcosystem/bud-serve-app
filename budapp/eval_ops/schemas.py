@@ -407,3 +407,54 @@ class DeleteDatasetResponse(SuccessResponse):
     """Response schema for deleting a dataset."""
 
     pass
+
+
+# ------------------------ Experiment Workflow Schemas ------------------------
+
+
+class ExperimentWorkflowStepRequest(BaseModel):
+    """Base request for experiment workflow steps."""
+    
+    workflow_id: Optional[UUID4] = Field(None, description="Workflow ID for continuing existing workflow")
+    step_number: int = Field(..., description="Current step number (1-5)")
+    workflow_total_steps: int = Field(default=5, description="Total steps in workflow")
+    trigger_workflow: bool = Field(default=False, description="Whether to trigger workflow completion")
+    stage_data: dict = Field(..., description="Stage-specific data")
+
+
+class ExperimentWorkflowResponse(SuccessResponse):
+    """Response for experiment workflow steps."""
+    
+    workflow_id: UUID4 = Field(..., description="Workflow ID")
+    current_step: int = Field(..., description="Current step number")
+    total_steps: int = Field(..., description="Total steps")
+    next_step: Optional[int] = Field(None, description="Next step number (null if complete)")
+    is_complete: bool = Field(..., description="Whether workflow is complete")
+    status: str = Field(..., description="Workflow status")
+    experiment_id: Optional[UUID4] = Field(None, description="Created experiment ID (only on completion)")
+    data: Optional[dict] = Field(None, description="Accumulated data from all completed steps")
+    next_step_data: Optional[dict] = Field(None, description="Data for next step (e.g., available models/traits)")
+
+
+class ExperimentWorkflowStepData(BaseModel):
+    """Combined data from all workflow steps."""
+    
+    # Step 1 data - Basic Info
+    name: Optional[str] = None
+    description: Optional[str] = None
+    project_id: Optional[UUID4] = None
+    
+    # Step 2 data - Model Selection
+    model_ids: Optional[List[UUID4]] = None
+    
+    # Step 3 data - Traits Selection
+    trait_ids: Optional[List[UUID4]] = None
+    dataset_ids: Optional[List[UUID4]] = None
+    
+    # Step 4 data - Performance Point
+    performance_point: Optional[int] = Field(None, ge=0, le=100, description="Performance point value between 0-100")
+    
+    # Step 5 data - Finalization
+    run_name: Optional[str] = None
+    run_description: Optional[str] = None
+    evaluation_config: Optional[dict] = None

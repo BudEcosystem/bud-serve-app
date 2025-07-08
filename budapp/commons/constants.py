@@ -528,6 +528,7 @@ class WorkflowTypeEnum(StrEnum):
     MODEL_BENCHMARK = auto()
     ADD_ADAPTER = auto()
     DELETE_ADAPTER = auto()
+    EXPERIMENT_CREATION = auto()
 
 
 class NotificationType(Enum):
@@ -2932,3 +2933,13 @@ class ModelLicenseObjectTypeEnum(StrEnum):
 
     URL = "url"
     MINIO = "minio"
+
+
+class ExperimentWorkflowStepEnum(StrEnum):
+    """Enumeration of experiment workflow step types."""
+
+    BASIC_INFO = "basic_info"
+    MODEL_SELECTION = "model_selection"
+    TRAITS_SELECTION = "traits_selection"
+    PERFORMANCE_POINT = "performance_point"
+    FINALIZE = "finalize"

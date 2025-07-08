@@ -18,6 +18,7 @@ from budapp.commons.database import Base, TimestampMixin
 class ExperimentStatusEnum(PyEnum):
     ACTIVE = "active"
     DELETED = "deleted"
+    DRAFT = "draft"
 
 
 class RunStatusEnum(PyEnum):
