@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, cast
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -36,6 +36,7 @@ from budapp.eval_ops.schemas import (
     ExperimentWorkflowResponse,
     ExperimentWorkflowStepData,
     ExperimentWorkflowStepRequest,
+    TraitBasic,
     UpdateDatasetRequest,
     UpdateEvaluationRequest,
     UpdateExperimentRequest,
@@ -238,7 +239,7 @@ class ExperimentService:
         limit: int = 10,
         name: Optional[str] = None,
         unique_id: Optional[str] = None,
-    ) -> Tuple[List[TraitSchema], int]:
+    ) -> Tuple[List[TraitBasic], int]:
         """List Trait entries with optional filters and pagination.
 
         Parameters:
@@ -254,8 +255,6 @@ class ExperimentService:
             HTTPException(status_code=500): If database query fails.
         """
         try:
-            from sqlalchemy.orm import selectinload
-
             q = self.session.query(TraitModel)
 
             # Apply filters
@@ -272,37 +271,18 @@ class ExperimentService:
             # Get total count before applying pagination
             total_count = q.count()
 
-            # Apply pagination and eager load datasets using selectinload
-            # This will execute 2 queries total: one for traits, one for all related datasets
-            traits = q.options(selectinload(TraitModel.datasets)).offset(offset).limit(limit).all()
+            # Apply pagination - no need to load datasets for listing
+            traits = q.offset(offset).limit(limit).all()
 
-            # Convert to schema objects
+            # Convert to lightweight schema objects without datasets
             trait_schemas = []
-            from budapp.eval_ops.schemas import DatasetBasic
+            from budapp.eval_ops.schemas import TraitBasic
 
             for trait in traits:
-                # Convert datasets to DatasetBasic schema - datasets are already loaded
-                datasets = [
-                    DatasetBasic(
-                        id=dataset.id,
-                        name=dataset.name,
-                        description=dataset.description,
-                        estimated_input_tokens=dataset.estimated_input_tokens,
-                        estimated_output_tokens=dataset.estimated_output_tokens,
-                        modalities=dataset.modalities,
-                        sample_questions_answers=dataset.sample_questions_answers,
-                        advantages_disadvantages=dataset.advantages_disadvantages,
-                    )
-                    for dataset in trait.datasets
-                ]
-
-                trait_schema = TraitSchema(
+                trait_schema = TraitBasic(
                     id=trait.id,
                     name=trait.name,
                     description=trait.description or "",
-                    category="",  # Optional field, can be empty
-                    exps_ids=[],  # Optional field for UI, can be empty
-                    datasets=datasets,
                 )
                 trait_schemas.append(trait_schema)
 
@@ -1162,6 +1142,7 @@ class ExperimentWorkflowService:
                         status_code=status.HTTP_404_NOT_FOUND,
                         detail="Workflow not found"
                     )
+                workflow = cast(WorkflowModel, workflow)
                 if workflow.created_by != current_user_id:
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
@@ -1190,6 +1171,7 @@ class ExperimentWorkflowService:
                         progress={}
                     )
                 )
+                workflow = cast(WorkflowModel, workflow)
 
             # Validate step data based on current step
             await self._validate_step_data(request.step_number, request.stage_data)
@@ -1198,8 +1180,9 @@ class ExperimentWorkflowService:
             await self._store_workflow_step(workflow.id, request.step_number, request.stage_data)
 
             # Update workflow current step
-            await WorkflowDataManager(self.session).update_by_fields(
-                workflow, {"current_step": request.step_number}
+            workflow_manager = WorkflowDataManager(self.session)
+            await workflow_manager.update_by_fields(
+                workflow, {"current_step": request.step_number}  # type: ignore
             )
 
             # If this is the final step and trigger_workflow is True, create the experiment
@@ -1215,12 +1198,12 @@ class ExperimentWorkflowService:
             all_step_data = await self._get_accumulated_step_data(workflow.id)
 
             # Determine if workflow is complete
-            is_complete = (request.step_number == 5 and request.trigger_workflow) or workflow.status == WorkflowStatusEnum.COMPLETED
+            is_complete = (request.step_number == 5 and request.trigger_workflow) or workflow.status == WorkflowStatusEnum.COMPLETED.value
             next_step = None if is_complete else request.step_number + 1
 
             # Prepare next step data only if not complete
             next_step_data = None
-            if not is_complete:
+            if not is_complete and next_step is not None:
                 next_step_data = await self._prepare_next_step_data(next_step, current_user_id)
 
             return ExperimentWorkflowResponse(
@@ -1232,7 +1215,7 @@ class ExperimentWorkflowService:
                 total_steps=request.workflow_total_steps,
                 next_step=next_step,
                 is_complete=is_complete,
-                status=workflow.status.value,
+                status=workflow.status,
                 experiment_id=experiment_id,
                 data=all_step_data,
                 next_step_data=next_step_data
@@ -1280,6 +1263,61 @@ class ExperimentWorkflowService:
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail="At least one trait must be selected in step 3"
                 )
+
+            # Validate trait_ids exist in database
+            trait_ids = stage_data["trait_ids"]
+            if not isinstance(trait_ids, list):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="trait_ids must be a list"
+                )
+
+            # Validate each trait_id is a valid UUID and exists in database
+            for trait_id in trait_ids:
+                try:
+                    # Convert to UUID to validate format
+                    trait_uuid = uuid.UUID(str(trait_id))
+                except (ValueError, TypeError):
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"Invalid trait ID format: {trait_id}"
+                    )
+
+                # Check if trait exists in database
+                trait = self.session.get(TraitModel, trait_uuid)
+                if not trait:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"Trait with ID {trait_id} does not exist"
+                    )
+
+            # Validate dataset_ids if provided (optional field)
+            if "dataset_ids" in stage_data and stage_data["dataset_ids"]:
+                dataset_ids = stage_data["dataset_ids"]
+                if not isinstance(dataset_ids, list):
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="dataset_ids must be a list"
+                    )
+
+                # Validate each dataset_id is a valid UUID and exists in database
+                for dataset_id in dataset_ids:
+                    try:
+                        # Convert to UUID to validate format
+                        dataset_uuid = uuid.UUID(str(dataset_id))
+                    except (ValueError, TypeError):
+                        raise HTTPException(
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail=f"Invalid dataset ID format: {dataset_id}"
+                        )
+
+                    # Check if dataset exists in database
+                    dataset = self.session.get(DatasetModel, dataset_uuid)
+                    if not dataset:
+                        raise HTTPException(
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail=f"Dataset with ID {dataset_id} does not exist"
+                        )
         elif step_number == 4:
             # Performance Point validation
             if "performance_point" not in stage_data:
@@ -1345,7 +1383,7 @@ class ExperimentWorkflowService:
                 "available_models": []  # TODO: Implement model fetching
             }
         elif next_step == 3:
-            # Prepare available traits
+            # Prepare available traits using lightweight approach
             traits_service = ExperimentService(self.session)
             traits, _ = traits_service.list_traits(offset=0, limit=100)
             return {
@@ -1488,19 +1526,19 @@ class ExperimentWorkflowService:
             workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
                 WorkflowModel, {"id": workflow_id, "created_by": current_user_id}
             )
-            
+
             # Get all accumulated step data
             all_step_data = await self._get_accumulated_step_data(workflow_id)
-            
+
             # Determine completion state
             is_complete = workflow.current_step >= 5
             next_step = None if is_complete else workflow.current_step + 1
-            
+
             # Prepare next step data if not complete
             next_step_data = None
             if not is_complete:
                 next_step_data = await self._prepare_next_step_data(workflow.current_step + 1, current_user_id)
-            
+
             return ExperimentWorkflowResponse(
                 code=status.HTTP_200_OK,
                 object="experiment.workflow.review",
@@ -1515,7 +1553,7 @@ class ExperimentWorkflowService:
                 data=all_step_data,
                 next_step_data=next_step_data
             )
-            
+
         except Exception as e:
             logger.error(f"Failed to get experiment workflow data: {e}")
             raise ClientException(f"Failed to retrieve workflow data: {str(e)}")

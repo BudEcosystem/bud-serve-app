@@ -258,6 +258,22 @@ class DatasetBasic(BaseModel):
         from_attributes = True
 
 
+# ------------------------ Trait Schemas ------------------------
+
+
+class TraitBasic(BaseModel):
+    """Basic trait information for lightweight listing."""
+
+    id: UUID4 = Field(..., description="The UUID of the trait.")
+    name: str = Field(..., description="The name of the trait.")
+    description: Optional[str] = Field(None, description="The description of the trait.")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
 class Trait(BaseModel):
     """A trait that experiments can be grouped by."""
 
@@ -277,7 +293,7 @@ class Trait(BaseModel):
 class ListTraitsResponse(SuccessResponse):
     """The response schema for listing traits."""
 
-    traits: List[Trait] = Field(..., description="The traits.")
+    traits: List[TraitBasic] = Field(..., description="The traits.")
     total_record: int = Field(..., description="Total number of traits matching the query.")
     page: int = Field(..., description="Current page number.")
     limit: int = Field(..., description="Number of traits per page.")
