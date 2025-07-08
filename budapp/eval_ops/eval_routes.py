@@ -98,6 +98,7 @@ def list_experiments(
     try:
         experiments = ExperimentService(session).list_experiments(current_user.id)
     except Exception as e:
+        logger.debug(f"Failed to list experiments: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to list experiments") from e
 
     return ListExperimentsResponse(
@@ -119,8 +120,7 @@ def list_experiments(
     },
 )
 def update_experiment(
-    experiment_id: Annotated[uuid.UUID, Path(..., description="ID of experiment to update")],
-    request: Annotated[UpdateExperimentRequest, Depends()],
+    request: UpdateExperimentRequest,
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):
@@ -699,4 +699,3 @@ def get_dataset_by_id(
         message="Successfully retrieved dataset",
         dataset=dataset,
     )
-

@@ -14,4 +14,4 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""The core package, containing essential business logic, services, and routing configurations for the model ops."""
+"""The core package, containing essential business logic, services, and routing configurations for the evaluation ops."""
