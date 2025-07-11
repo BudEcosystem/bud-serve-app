@@ -4,6 +4,7 @@ from enum import Enum as PyEnum
 from uuid import uuid4
 
 from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import JSONB, NUMERIC
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -66,6 +67,7 @@ class Experiment(Base, TimestampMixin):
     )
     created_by: Mapped[uuid4] = mapped_column(ForeignKey("user.id"), nullable=False)
     project_id: Mapped[uuid4] = mapped_column(ForeignKey("project.id"), nullable=False)
+    tags: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True, default=list)
 
     # Relationships
     runs = relationship("Run", back_populates="experiment", cascade="all, delete-orphan")
@@ -137,7 +139,7 @@ class ExpTrait(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=True)
     icon: Mapped[str] = mapped_column(String, nullable=True)
-    
+
     # Relationships
     datasets = relationship(
         "ExpDataset",
@@ -245,9 +247,9 @@ class ExpRawResult(Base, TimestampMixin):
 
 class EvalSyncState(Base, TimestampMixin):
     """Track evaluation dataset synchronization state and history."""
-    
+
     __tablename__ = "eval_sync_state"
-    
+
     id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     manifest_version: Mapped[str] = mapped_column(String(50), nullable=False)
     sync_timestamp: Mapped[str] = mapped_column(String, nullable=False)  # ISO format timestamp

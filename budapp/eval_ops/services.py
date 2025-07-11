@@ -122,6 +122,7 @@ class ExperimentService:
             project_id=req.project_id,
             created_by=user_id,
             status="active",
+            tags=req.tags or [],
         )
         try:
             self.session.add(ev)
@@ -1249,6 +1250,22 @@ class ExperimentWorkflowService:
                         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                         detail=f"Field '{field}' is required for step 1"
                     )
+            
+            # Validate tags if provided
+            if "tags" in stage_data and stage_data["tags"] is not None:
+                tags = stage_data["tags"]
+                if not isinstance(tags, list):
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="tags must be a list of strings"
+                    )
+                # Validate each tag is a string
+                for tag in tags:
+                    if not isinstance(tag, str):
+                        raise HTTPException(
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="Each tag must be a string"
+                        )
         elif step_number == 2:
             # Model Selection validation
             if "model_ids" not in stage_data or not stage_data["model_ids"]:
@@ -1277,11 +1294,11 @@ class ExperimentWorkflowService:
                 try:
                     # Convert to UUID to validate format
                     trait_uuid = uuid.UUID(str(trait_id))
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
                     raise HTTPException(
                         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                         detail=f"Invalid trait ID format: {trait_id}"
-                    )
+                    ) from e
 
                 # Check if trait exists in database
                 trait = self.session.get(TraitModel, trait_uuid)
@@ -1305,11 +1322,11 @@ class ExperimentWorkflowService:
                     try:
                         # Convert to UUID to validate format
                         dataset_uuid = uuid.UUID(str(dataset_id))
-                    except (ValueError, TypeError):
+                    except (ValueError, TypeError) as e:
                         raise HTTPException(
                             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail=f"Invalid dataset ID format: {dataset_id}"
-                        )
+                        ) from e
 
                     # Check if dataset exists in database
                     dataset = self.session.get(DatasetModel, dataset_uuid)
@@ -1354,7 +1371,7 @@ class ExperimentWorkflowService:
         if existing_step:
             # Update existing step
             await WorkflowStepDataManager(self.session).update_by_fields(
-                existing_step, {"data": stage_data}
+                existing_step, {"data": stage_data}  # type: ignore
             )
         else:
             # Create new step
@@ -1409,10 +1426,10 @@ class ExperimentWorkflowService:
 
     async def _get_accumulated_step_data(self, workflow_id: uuid.UUID) -> dict:
         """Get all accumulated step data for a workflow.
-        
+
         Parameters:
             workflow_id (uuid.UUID): Workflow ID to get data for.
-            
+
         Returns:
             dict: Accumulated data from all steps organized by step type.
         """
@@ -1459,6 +1476,7 @@ class ExperimentWorkflowService:
                 combined_data.name = step_data.get("name")
                 combined_data.description = step_data.get("description")
                 combined_data.project_id = step_data.get("project_id")
+                combined_data.tags = step_data.get("tags")
             elif step.step_number == 2:
                 combined_data.model_ids = step_data.get("model_ids", [])
             elif step.step_number == 3:
@@ -1478,6 +1496,7 @@ class ExperimentWorkflowService:
             project_id=combined_data.project_id,
             created_by=current_user_id,
             status=ExperimentStatusEnum.ACTIVE.value,
+            tags=combined_data.tags or [],
         )
         self.session.add(experiment)
         self.session.flush()
@@ -1513,11 +1532,11 @@ class ExperimentWorkflowService:
 
     async def get_experiment_workflow_data(self, workflow_id: uuid.UUID, current_user_id: uuid.UUID) -> ExperimentWorkflowResponse:
         """Get complete experiment workflow data for review.
-        
+
         Parameters:
             workflow_id (uuid.UUID): Workflow ID to retrieve data for.
             current_user_id (uuid.UUID): Current user ID for authorization.
-            
+
         Returns:
             ExperimentWorkflowResponse: Complete workflow data response.
         """
@@ -1554,7 +1573,7 @@ class ExperimentWorkflowService:
                 total_steps=5,
                 next_step=next_step,
                 is_complete=is_complete,
-                status=workflow.status.value,
+                status=workflow.status,
                 experiment_id=None,  # Will be populated when workflow is complete
                 data=all_step_data,
                 next_step_data=next_step_data
@@ -1562,4 +1581,4 @@ class ExperimentWorkflowService:
 
         except Exception as e:
             logger.error(f"Failed to get experiment workflow data: {e}")
-            raise ClientException(f"Failed to retrieve workflow data: {str(e)}")
+            raise ClientException(f"Failed to retrieve workflow data: {str(e)}") from e
