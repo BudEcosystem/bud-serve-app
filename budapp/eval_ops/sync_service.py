@@ -96,13 +96,13 @@ class EvalDataSyncService:
             db: Database session
         """
         from .models import ExpDataset, ExpDatasetVersion, ExpTrait, ExpTraitsDatasetPivot
-        
+
         logger.info(f"Importing dataset metadata for {dataset.id}")
         logger.debug(f"Dataset details: name={dataset.name}, version={dataset.version}, traits={dataset.traits}")
-        
+
         # 1. Get or create ExpDataset
         existing_dataset = db.query(ExpDataset).filter_by(name=dataset.name).first()
-        
+
         # Prepare dataset fields from manifest
         dataset_fields = {
             "name": dataset.name,  # Use dataset name
@@ -119,7 +119,25 @@ class EvalDataSyncService:
             "sample_questions_answers": {"sample_count": dataset.sample_count} if dataset.sample_count else None,
             "advantages_disadvantages": None,
         }
-        
+
+        # Extract creator info and links from original_data if available
+        if hasattr(dataset, 'original_data') and dataset.original_data:
+            original_data = dataset.original_data if isinstance(dataset.original_data, dict) else dataset.original_data.__dict__
+
+            # Update meta_links with GitHub, paper, website links and creator info
+            if original_data.get("githubLink"):
+                dataset_fields["meta_links"]["github"] = original_data["githubLink"]
+            if original_data.get("paperLink"):
+                dataset_fields["meta_links"]["paper"] = original_data["paperLink"]
+            if original_data.get("officialWebsiteLink"):
+                dataset_fields["meta_links"]["website"] = original_data["officialWebsiteLink"]
+            if original_data.get("creatorInfo"):
+                dataset_fields["meta_links"]["creator"] = original_data["creatorInfo"]
+            if original_data.get("createDate"):
+                dataset_fields["meta_links"]["create_date"] = original_data["createDate"]
+            if original_data.get("updateDate"):
+                dataset_fields["meta_links"]["update_date"] = original_data["updateDate"]
+
         # Extract metadata fields if available
         if dataset.metadata:
             # Handle languages
@@ -127,32 +145,32 @@ class EvalDataSyncService:
                 dataset_fields["language"] = dataset.metadata.languages
             elif dataset.metadata.language:
                 dataset_fields["language"] = [dataset.metadata.language]
-            
+
             # Handle domain
             if dataset.metadata.domain:
                 dataset_fields["domains"] = [dataset.metadata.domain]
-            
+
             # Handle token estimates if present
             if hasattr(dataset.metadata, 'estimated_input_tokens') and dataset.metadata.estimated_input_tokens:
                 dataset_fields["estimated_input_tokens"] = dataset.metadata.estimated_input_tokens
             if hasattr(dataset.metadata, 'estimated_output_tokens') and dataset.metadata.estimated_output_tokens:
                 dataset_fields["estimated_output_tokens"] = dataset.metadata.estimated_output_tokens
-            
+
             # Handle difficulty as task_type
             if hasattr(dataset.metadata, 'difficulty') and dataset.metadata.difficulty:
                 dataset_fields["task_type"] = [f"difficulty:{dataset.metadata.difficulty}"]
-            
+
             # Handle programming language as concept
             if hasattr(dataset.metadata, 'programming_language') and dataset.metadata.programming_language:
                 dataset_fields["concepts"] = [f"programming:{dataset.metadata.programming_language}"]
-            
+
             # Handle format in sample_questions_answers
             if hasattr(dataset.metadata, 'format') and dataset.metadata.format:
                 if dataset_fields["sample_questions_answers"]:
                     dataset_fields["sample_questions_answers"]["format"] = dataset.metadata.format
                 else:
                     dataset_fields["sample_questions_answers"] = {"format": dataset.metadata.format}
-        
+
         if existing_dataset:
             # Update existing dataset
             for key, value in dataset_fields.items():
@@ -167,7 +185,7 @@ class EvalDataSyncService:
             try:
                 db.flush()  # Get the dataset ID
                 logger.info(f"Created new dataset {dataset.id}")
-            except Exception as e:
+            except Exception:
                 # Handle race condition - another thread may have created it
                 db.rollback()
                 existing_dataset = db.query(ExpDataset).filter_by(name=dataset.name).first()
@@ -180,14 +198,14 @@ class EvalDataSyncService:
                             setattr(existing_dataset, key, value)
                 else:
                     raise  # Re-raise if it's not a duplicate issue
-        
+
         # 2. Create ExpDatasetVersion
         existing_version = (
             db.query(ExpDatasetVersion)
             .filter_by(dataset_id=db_dataset.id, version=dataset.version)
             .first()
         )
-        
+
         if not existing_version:
             dataset_version = ExpDatasetVersion(
                 dataset_id=db_dataset.id,
@@ -204,14 +222,14 @@ class EvalDataSyncService:
             logger.info(f"Created dataset version {dataset.version} for {dataset.id}")
         else:
             logger.info(f"Dataset version {dataset.version} already exists for {dataset.id}")
-        
+
         # 3. Handle traits through pivot table
         if dataset.traits:
             # Get all traits with case-insensitive lookup
             all_traits = db.query(ExpTrait).all()
             traits_by_name = {trait.name: trait for trait in all_traits}
             traits_by_name_lower = {trait.name.lower(): trait for trait in all_traits}
-            
+
             # Get existing pivots for this dataset
             existing_pivots = {
                 str(pivot.trait_id)
@@ -219,7 +237,7 @@ class EvalDataSyncService:
                 .filter_by(dataset_id=db_dataset.id)
                 .all()
             }
-            
+
             for trait_name in dataset.traits:
                 # Try exact match first, then case-insensitive
                 trait = None
@@ -228,11 +246,11 @@ class EvalDataSyncService:
                 elif trait_name.lower() in traits_by_name_lower:
                     trait = traits_by_name_lower[trait_name.lower()]
                     logger.info(f"Found case-insensitive match for trait '{trait_name}' -> '{trait.name}'")
-                
+
                 if trait is None:
                     logger.warning(f"Trait '{trait_name}' not found in database (available traits: {list(traits_by_name.keys())}), skipping for dataset {dataset.id}")
                     continue
-                
+
                 # Create pivot if it doesn't exist
                 if str(trait.id) not in existing_pivots:
                     pivot = ExpTraitsDatasetPivot(
@@ -241,7 +259,7 @@ class EvalDataSyncService:
                     )
                     db.add(pivot)
                     logger.info(f"Linked dataset {dataset.id} with trait {trait.name}")
-        
+
         # Don't commit here - let the caller handle transaction
         logger.info(f"Prepared dataset metadata for {dataset.id}")
 
@@ -280,35 +298,35 @@ class EvalDataSyncService:
         with Session(engine) as db:
             batch_size = 50  # Process and commit in batches
             batch_count = 0
-            
+
             for collection_name, collection in manifest.datasets.items():
                 dataset_count = len(collection.datasets)
                 logger.info(f"Processing {collection_name} dataset collection with {dataset_count} datasets")
 
                 for i, dataset in enumerate(collection.datasets):
                     results["total_datasets"] += 1
-                    
+
                     # Log progress every 10 datasets
                     if i % 10 == 0 and i > 0:
                         logger.info(f"Progress: {i}/{dataset_count} datasets processed in {collection_name}")
-                    
+
                     try:
                         self.import_dataset(dataset, db)
                         results["synced_datasets"].append(dataset.id)
                         batch_count += 1
-                        
+
                         # Commit in batches to avoid memory issues with large datasets
                         if batch_count >= batch_size:
                             db.commit()
                             logger.info(f"Committed batch of {batch_count} datasets")
                             batch_count = 0
-                            
+
                     except Exception as e:
                         logger.error(f"Failed to import dataset {dataset.id}: {e}")
                         results["failed_datasets"].append({"dataset_id": dataset.id, "error": str(e)})
                         # Rollback the session to clear the error state
                         db.rollback()
-            
+
             # Commit any remaining dataset changes
             if batch_count > 0:
                 try:
@@ -367,7 +385,7 @@ class EvalDataSyncService:
         db.commit()
 
         logger.info(f"Recorded sync state: version={manifest_version}, status={sync_status}")
-    
+
     async def import_traits(self, manifest: EvalDataManifest, db: Session) -> Dict[str, Any]:
         """Import traits from manifest into the database.
         
@@ -379,24 +397,24 @@ class EvalDataSyncService:
             Dictionary with import results
         """
         from .models import ExpTrait
-        
+
         results = {
             "created": 0,
             "updated": 0,
             "total": 0,
         }
-        
+
         # Check if manifest has traits information
         if not manifest.traits:
             logger.info("No traits information in manifest")
             return results
-        
+
         logger.info(f"Importing traits from manifest (version: {manifest.traits.version})")
-        
+
         # Get existing traits by name for efficient lookup
         existing_traits = {trait.name: trait for trait in db.query(ExpTrait).all()}
         logger.debug(f"Found {len(existing_traits)} existing traits in database")
-        
+
         # Check if manifest has trait definitions in the new format
         trait_definitions = []
         if hasattr(manifest.traits, 'definitions') and manifest.traits.definitions:
@@ -414,16 +432,16 @@ class EvalDataSyncService:
                     "description": f"Evaluation trait: {trait_name}",
                     "icon": f"icons/traits/{trait_name.lower().replace(' ', '_') if trait_name else 'default'}.png"
                 })
-        
+
         # Process each trait definition
         for trait_def in trait_definitions:
             results["total"] += 1
-            
+
             trait_name = trait_def.get("name") if isinstance(trait_def, dict) else trait_def.name
             trait_desc = trait_def.get("description", f"Evaluation trait: {trait_name}") if isinstance(trait_def, dict) else trait_def.description
             default_icon = f"icons/traits/{trait_name.lower().replace(' ', '_')}.png" if trait_name else "icons/traits/default.png"
             trait_icon = trait_def.get("icon", default_icon) if isinstance(trait_def, dict) else trait_def.icon
-            
+
             if trait_name in existing_traits:
                 # Update existing trait
                 existing_trait = existing_traits[trait_name]
@@ -441,9 +459,9 @@ class EvalDataSyncService:
                 db.add(new_trait)
                 logger.info(f"Created new trait '{trait_name}'")
                 results["created"] += 1
-        
+
         # Commit all changes
         db.commit()
-        
+
         logger.info(f"Trait import completed: {results['created']} created, {results['updated']} existing, {results['total']} total")
         return results

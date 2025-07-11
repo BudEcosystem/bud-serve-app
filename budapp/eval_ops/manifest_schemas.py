@@ -1,7 +1,7 @@
 """Schema definitions for evaluation dataset manifest."""
 
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from pydantic import BaseModel, Field
 
@@ -98,6 +98,7 @@ class Dataset(BaseModel):
     sample_count: int
     traits: List[str]
     metadata: DatasetMetadata
+    original_data: Optional[Dict[str, Any]] = None  # Original metadata from source
 
 
 class DatasetCollection(BaseModel):
