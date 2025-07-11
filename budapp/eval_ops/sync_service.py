@@ -125,18 +125,22 @@ class EvalDataSyncService:
             original_data = dataset.original_data if isinstance(dataset.original_data, dict) else dataset.original_data.__dict__
 
             # Update meta_links with GitHub, paper, website links and creator info
-            if original_data.get("githubLink"):
-                dataset_fields["meta_links"]["github"] = original_data["githubLink"]
-            if original_data.get("paperLink"):
-                dataset_fields["meta_links"]["paper"] = original_data["paperLink"]
-            if original_data.get("officialWebsiteLink"):
-                dataset_fields["meta_links"]["website"] = original_data["officialWebsiteLink"]
+            # Always set github, paper, and website to empty string if not present
+            dataset_fields["meta_links"]["github"] = original_data.get("githubLink", "")
+            dataset_fields["meta_links"]["paper"] = original_data.get("paperLink", "")
+            dataset_fields["meta_links"]["website"] = original_data.get("officialWebsiteLink", "")
+
             if original_data.get("creatorInfo"):
                 dataset_fields["meta_links"]["creator"] = original_data["creatorInfo"]
             if original_data.get("createDate"):
                 dataset_fields["meta_links"]["create_date"] = original_data["createDate"]
             if original_data.get("updateDate"):
                 dataset_fields["meta_links"]["update_date"] = original_data["updateDate"]
+        else:
+            # If no original_data, still ensure empty strings for URL fields
+            dataset_fields["meta_links"]["github"] = ""
+            dataset_fields["meta_links"]["paper"] = ""
+            dataset_fields["meta_links"]["website"] = ""
 
         # Extract metadata fields if available
         if dataset.metadata:
