@@ -173,8 +173,8 @@ jobs:
         run: |
           cp .env.sample .env
           # Update test database connection
-          sed -i 's/POSTGRES_HOST=.*/POSTGRES_HOST=localhost/' .env
-          sed -i 's/POSTGRES_DB=.*/POSTGRES_DB=bud_serve_test/' .env
+          sed -i 's/PSQL_HOST=.*/PSQL_HOST=localhost/' .env
+          sed -i 's/PSQL_DB_NAME=.*/PSQL_DB_NAME=bud_serve_test/' .env
           sed -i 's/REDIS_HOST=.*/REDIS_HOST=localhost/' .env
           
           # Fix placeholder URLs and set required test values
