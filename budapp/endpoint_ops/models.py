@@ -46,7 +46,7 @@ class Endpoint(Base, TimestampMixin):
     cache_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     cache_config: Mapped[str] = mapped_column(String, nullable=True)
     cluster_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("cluster.id", ondelete="CASCADE"), nullable=True)
-    bud_cluster_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    bud_cluster_id: Mapped[Optional[UUID]] = mapped_column(Uuid, nullable=True)
     url: Mapped[str] = mapped_column(String, nullable=False)
     namespace: Mapped[str] = mapped_column(String, nullable=False)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
@@ -114,6 +114,7 @@ class Endpoint(Base, TimestampMixin):
             "cache_enabled": self.cache_enabled,
             "cache_config": self.cache_config_dict,
             "cluster_id": str(self.cluster_id) if self.cluster_id else None,
+            "bud_cluster_id": str(self.bud_cluster_id) if self.bud_cluster_id else None,
             "url": self.url,
             "namespace": self.namespace,
             "replicas": self.replicas,
@@ -131,6 +132,7 @@ class Endpoint(Base, TimestampMixin):
             cache_enabled=data.get("cache_enabled"),
             cache_config=json.dumps(data.get("cache_config")),
             cluster_id=UUID(data.get("cluster_id")) if data.get("cluster_id") else None,
+            bud_cluster_id=UUID(data.get("bud_cluster_id")) if data.get("bud_cluster_id") else None,
             url=data.get("url"),
             namespace=data.get("namespace"),
             replicas=data.get("replicas"),

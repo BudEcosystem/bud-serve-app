@@ -18,7 +18,7 @@
 
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import UUID
 
 import aiohttp
@@ -197,7 +197,7 @@ class EndpointService(SessionMixin):
         return db_workflow
 
     async def _perform_bud_cluster_delete_endpoint_request(
-        self, bud_cluster_id: UUID, namespace: str, current_user_id: UUID, workflow_id: UUID
+        self, bud_cluster_id: Optional[UUID], namespace: str, current_user_id: UUID, workflow_id: UUID
     ) -> Dict:
         """Perform delete endpoint request to bud_cluster app.
 
@@ -205,6 +205,12 @@ class EndpointService(SessionMixin):
             bud_cluster_id: The ID of the cluster being served by the endpoint to delete.
             namespace: The namespace of the cluster endpoint to delete.
         """
+        if not bud_cluster_id:
+            logger.warning(
+                f"Skipping bud cluster delete request - no bud_cluster_id provided for namespace {namespace}"
+            )
+            return {}
+
         delete_endpoint_url = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/delete"
         )
@@ -469,9 +475,10 @@ class EndpointService(SessionMixin):
         # Create request to trigger endpoint status update periodic task
         is_cloud_model = db_endpoint.model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL
 
-        await self._perform_endpoint_status_update_request(
-            db_endpoint.bud_cluster_id, db_endpoint.namespace, is_cloud_model
-        )
+        if db_endpoint.bud_cluster_id:
+            await self._perform_endpoint_status_update_request(
+                db_endpoint.bud_cluster_id, db_endpoint.namespace, is_cloud_model
+            )
 
         return db_endpoint
 
@@ -616,7 +623,7 @@ class EndpointService(SessionMixin):
         filters_dict = filters.model_dump(exclude_none=True)
         payload = {
             "namespace": db_endpoint.namespace,
-            "cluster_id": str(db_endpoint.bud_cluster_id),
+            "cluster_id": str(db_endpoint.bud_cluster_id) if db_endpoint.bud_cluster_id else "",
             "page": page,
             "limit": limit,
             "order_by": order_by or [],
@@ -716,9 +723,11 @@ class EndpointService(SessionMixin):
             cluster_detail = await ClusterService(self.session).get_cluster_details(cluster_id)
 
         # Get running and crashed worker count
-        running_worker_count, crashed_worker_count = await self.get_endpoint_worker_count(
-            db_endpoint.namespace, str(db_endpoint.bud_cluster_id)
-        )
+        running_worker_count, crashed_worker_count = None, None
+        if db_endpoint.bud_cluster_id:
+            running_worker_count, crashed_worker_count = await self.get_endpoint_worker_count(
+                db_endpoint.namespace, str(db_endpoint.bud_cluster_id)
+            )
 
         # An endpoint always have at least one worker
         if running_worker_count == 0 and crashed_worker_count == 0:
@@ -1294,7 +1303,7 @@ class EndpointService(SessionMixin):
             deploy_model_uri = db_model.local_path
 
         add_worker_payload = {
-            "cluster_id": str(db_endpoint.bud_cluster_id),
+            "cluster_id": str(db_endpoint.bud_cluster_id) if db_endpoint.bud_cluster_id else "",
             "simulator_id": data["simulator_id"],
             "endpoint_name": db_endpoint.name,
             "model": deploy_model_uri,
@@ -1677,7 +1686,7 @@ class EndpointService(SessionMixin):
             else:
                 # For cloud models without cluster
                 required_data["ingress_url"] = ""
-                required_data["cluster_id"] = str(db_endpoint.bud_cluster_id)
+                required_data["cluster_id"] = str(db_endpoint.bud_cluster_id) if db_endpoint.bud_cluster_id else ""
 
             try:
                 # Perform model quantization
@@ -1933,7 +1942,7 @@ class EndpointService(SessionMixin):
             "adapter_name": db_adapter.deployment_name,
             "adapters": adapters,
             "namespace": db_endpoint.namespace,
-            "cluster_id": str(db_endpoint.bud_cluster_id),
+            "cluster_id": str(db_endpoint.bud_cluster_id) if db_endpoint.bud_cluster_id else "",
             "adapter_id": str(adapter_id),
             "action": "delete",
             "notification_metadata": {

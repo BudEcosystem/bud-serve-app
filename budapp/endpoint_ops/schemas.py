@@ -36,7 +36,7 @@ class EndpointCreate(BaseModel):
     project_id: UUID4
     model_id: UUID4
     cluster_id: Optional[UUID4] = None
-    bud_cluster_id: UUID4
+    bud_cluster_id: Optional[UUID4] = None
     name: str
     url: str
     namespace: str
