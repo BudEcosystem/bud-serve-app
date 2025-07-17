@@ -26,7 +26,14 @@ def upgrade() -> None:
     op.alter_column('cloud_model', 'supported_endpoints',
                existing_type=postgresql.ARRAY(postgresql.ENUM('/v1/chat/completions', '/v1/completions', '/v1/images/generations', '/v1/audio/transcriptions', '/v1/audio/speech', '/v1/embeddings', '/v1/batch', '/v1/responses', '/v1/rerank', '/v1/moderations', name='model_endpoint_enum')),
                nullable=False)
-    op.add_column('endpoint', sa.Column('supported_endpoints', postgresql.ARRAY(postgresql.ENUM('/v1/chat/completions', '/v1/completions', '/v1/images/generations', '/v1/audio/transcriptions', '/v1/audio/speech', '/v1/embeddings', '/v1/batch', '/v1/responses', '/v1/rerank', '/v1/moderations', name='model_endpoint_enum', create_type=False)), nullable=False))
+    # First add column as nullable
+    op.add_column('endpoint', sa.Column('supported_endpoints', postgresql.ARRAY(postgresql.ENUM('/v1/chat/completions', '/v1/completions', '/v1/images/generations', '/v1/audio/transcriptions', '/v1/audio/speech', '/v1/embeddings', '/v1/batch', '/v1/responses', '/v1/rerank', '/v1/moderations', name='model_endpoint_enum', create_type=False)), nullable=True))
+    
+    # Set default value for existing rows
+    op.execute("UPDATE endpoint SET supported_endpoints = ARRAY['/v1/chat/completions']::model_endpoint_enum[] WHERE supported_endpoints IS NULL")
+    
+    # Now make it non-nullable
+    op.alter_column('endpoint', 'supported_endpoints', nullable=False)
     op.alter_column('model', 'modality',
                existing_type=postgresql.ARRAY(postgresql.ENUM('text_input', 'text_output', 'image_input', 'image_output', 'audio_input', 'audio_output', name='modality_enum')),
                nullable=False)
