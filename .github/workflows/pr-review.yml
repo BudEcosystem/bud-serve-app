@@ -157,15 +157,31 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install Dapr CLI
-        run: |
-          wget -q https://raw.githubusercontent.com/dapr/cli/master/install/install.sh -O - | /bin/bash -s ${{ env.DAPR_VERSION }}
-          echo "$HOME/.dapr/bin" >> $GITHUB_PATH
+      - name: Setup Dapr
+        uses: dapr/setup-dapr@v1
+        with:
+          version: ${{ env.DAPR_VERSION }}
+          install-cli: true
+          install-runtime: true
 
-      - name: Initialize Dapr
+      - name: Create Dapr components directory
         run: |
-          dapr init --runtime-version ${{ env.DAPR_VERSION }}
-          dapr --version
+          mkdir -p .dapr/components
+          # Create a minimal Redis pubsub component for testing
+          cat > .dapr/components/redis-pubsub.yaml << 'EOF'
+          apiVersion: dapr.io/v1alpha1
+          kind: Component
+          metadata:
+            name: redis-pubsub
+          spec:
+            type: pubsub.redis
+            version: v1
+            metadata:
+            - name: redisHost
+              value: localhost:6379
+            - name: redisPassword
+              value: ""
+          EOF
 
       - name: Cache pip dependencies
         uses: actions/cache@v4
@@ -200,9 +216,9 @@ jobs:
                    --app-port 8080 \
                    --dapr-http-port ${{ env.DAPR_HTTP_PORT }} \
                    --log-level debug \
-                   --components-path ./dapr/components \
+                   --components-path .dapr/components \
                    -- echo "Dapr sidecar ready" &
-          sleep 5  # Give Dapr time to start
+          sleep 10  # Give Dapr time to start
 
       - name: Run tests with coverage
         run: |
