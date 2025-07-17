@@ -19,6 +19,7 @@
 import os
 import re
 import tempfile
+from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional, Tuple
 from urllib.parse import unquote, urlparse
 from urllib.request import ProxyHandler, Request, build_opener
@@ -39,6 +40,7 @@ from budapp.commons.helpers import assign_random_colors_to_names, normalize_valu
 from budapp.commons.schemas import Tag, Task
 from budapp.credential_ops.crud import ProprietaryCredentialDataManager
 from budapp.credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
+from budapp.credential_ops.services import CredentialService
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
@@ -88,6 +90,8 @@ from ..core.models import ModelTemplate as ModelTemplateModel
 from ..core.schemas import NotificationPayload, NotificationResult
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..endpoint_ops.schemas import EndpointCreate
+from ..endpoint_ops.services import EndpointService
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
 from ..shared.minio_store import ModelStore
@@ -3293,35 +3297,84 @@ class ModelService(SessionMixin):
             if db_endpoint:
                 raise ClientException("An endpoint with this name already exists in this project")
 
-            # Trigger model deployment and get deployment events
-            model_deployment_response = await self._initiate_model_deployment(
-                cluster_id=UUID(required_data["cluster_id"]),
-                endpoint_name=required_data["endpoint_name"],
-                simulator_id=UUID(required_data["simulator_id"]),
-                model_id=UUID(required_data["model_id"]),
-                deploy_config=DeploymentTemplateCreate(**required_data["deploy_config"]),
-                workflow_id=db_workflow.id,
-                subscriber_id=current_user_id,
-                credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
-                scaling_specification=required_data["scaling_specification"],
+            # Check if this is a cloud model that should use direct endpoint creation
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model,
+                {"id": required_data["model_id"], "status": ModelStatusEnum.ACTIVE},
             )
-            model_deployment_events = {
-                "budserve_cluster_events": model_deployment_response,
-            }
 
-            # Update or create next workflow step
-            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                db_workflow.id, current_step_number, model_deployment_events
-            )
-            logger.debug(f"Workflow step updated {db_workflow_step.id}")
+            if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+                # Direct endpoint creation for cloud models
+                logger.info("Using direct endpoint creation for cloud model deployment")
 
-            # Update workflow progress
-            model_deployment_response["progress_type"] = "budserve_cluster_events"
-            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-                db_workflow,
-                {"progress": model_deployment_response, "current_step": workflow_current_step},
-            )
-            logger.debug("Successfully triggered model deployment")
+                # Create endpoint directly without calling budcluster
+                db_endpoint = await self._create_endpoint_directly(
+                    model_id=UUID(required_data["model_id"]),
+                    project_id=UUID(required_data["project_id"]),
+                    cluster_id=UUID(required_data["cluster_id"]),
+                    endpoint_name=required_data["endpoint_name"],
+                    deploy_config=DeploymentTemplateCreate(**required_data["deploy_config"]),
+                    workflow_id=db_workflow.id,
+                    current_user_id=current_user_id,
+                    credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
+                )
+
+                # Create deployment events for workflow tracking
+                model_deployment_events = {
+                    "budserve_cluster_events": {
+                        "status": "completed",
+                        "endpoint_id": str(db_endpoint.id),
+                        "endpoint_url": db_endpoint.url,
+                        "message": "Cloud model endpoint created successfully",
+                    }
+                }
+
+                # Update workflow status to completed
+                db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                    db_workflow,
+                    {
+                        "status": WorkflowStatusEnum.COMPLETED,
+                        "current_step": workflow_current_step,
+                        "progress": model_deployment_events["budserve_cluster_events"],
+                    },
+                )
+
+                # Update or create workflow step with endpoint details
+                db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                    db_workflow.id, current_step_number, model_deployment_events
+                )
+                logger.info(f"Cloud model endpoint {db_endpoint.id} created successfully")
+
+            else:
+                # Existing flow for local models - trigger model deployment via budcluster
+                model_deployment_response = await self._initiate_model_deployment(
+                    cluster_id=UUID(required_data["cluster_id"]),
+                    endpoint_name=required_data["endpoint_name"],
+                    simulator_id=UUID(required_data["simulator_id"]),
+                    model_id=UUID(required_data["model_id"]),
+                    deploy_config=DeploymentTemplateCreate(**required_data["deploy_config"]),
+                    workflow_id=db_workflow.id,
+                    subscriber_id=current_user_id,
+                    credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
+                    scaling_specification=required_data["scaling_specification"],
+                )
+                model_deployment_events = {
+                    "budserve_cluster_events": model_deployment_response,
+                }
+
+                # Update or create next workflow step
+                db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                    db_workflow.id, current_step_number, model_deployment_events
+                )
+                logger.debug(f"Workflow step updated {db_workflow_step.id}")
+
+                # Update workflow progress
+                model_deployment_response["progress_type"] = "budserve_cluster_events"
+                db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                    db_workflow,
+                    {"progress": model_deployment_response, "current_step": workflow_current_step},
+                )
+                logger.debug("Successfully triggered model deployment")
 
         return db_workflow
 
@@ -3467,7 +3520,7 @@ class ModelService(SessionMixin):
             source_topic=app_settings.source_topic,
             credential_id=credential_id,
             podscaler=scaling_specification,
-            provider=db_model.source
+            provider=db_model.source,
         )
         model_deployment_endpoint = (
             f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"
@@ -3498,6 +3551,106 @@ class ModelService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to perform model deployment: {e}")
             raise ClientException("Unable to perform model deployment") from e
+
+    async def _create_endpoint_directly(
+        self,
+        model_id: UUID,
+        project_id: UUID,
+        cluster_id: UUID,
+        endpoint_name: str,
+        deploy_config: DeploymentTemplateCreate,
+        workflow_id: UUID,
+        current_user_id: UUID,
+        credential_id: Optional[UUID] = None,
+    ) -> EndpointModel:
+        """Create endpoint directly for cloud/proprietary models without calling budcluster.
+
+        Args:
+            model_id: The model ID to deploy
+            project_id: The project ID for the endpoint
+            cluster_id: The cluster ID for the endpoint
+            endpoint_name: The name of the endpoint
+            deploy_config: Deployment configuration
+            workflow_id: The workflow ID for tracking
+            current_user_id: The user creating the endpoint
+            credential_id: Optional credential ID for cloud models
+
+        Returns:
+            The created endpoint model
+        """
+        logger.info(f"Creating endpoint directly for cloud model {model_id}")
+
+        # Retrieve the model
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
+        )
+
+        # For cloud models, get the cloud model details for supported endpoints
+        if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
+                CloudModel, {"id": db_model.cloud_model_id}
+            )
+            supported_endpoints = db_cloud_model.supported_endpoints
+        else:
+            # This should not happen as this method is only for cloud models
+            raise ClientException("Direct endpoint creation is only supported for cloud models")
+
+        # Generate namespace and deployment URL
+        timestamp = int(datetime.now().timestamp())
+        namespace = f"model-{model_id}-{timestamp}"
+
+        # Construct deployment URL - using the pattern from existing endpoints
+        base_url = app_settings.base_deployment_url if hasattr(app_settings, "base_deployment_url") else ""
+        deployment_url = f"{base_url}/{namespace}" if base_url else namespace
+
+        # For cloud models, we set replicas to 1 as they are API-based
+        replicas = deploy_config.replicas if hasattr(deploy_config, "replicas") else 1
+
+        # Prepare endpoint data
+        endpoint_data = EndpointCreate(
+            project_id=project_id,
+            model_id=model_id,
+            cluster_id=cluster_id,
+            bud_cluster_id=cluster_id,  # For cloud models, use same cluster_id
+            name=endpoint_name,
+            url=deployment_url,
+            namespace=namespace,
+            status=EndpointStatusEnum.RUNNING,  # Cloud models are immediately available
+            created_by=current_user_id,
+            status_sync_at=datetime.now(),
+            credential_id=credential_id,
+            active_replicas=replicas,
+            total_replicas=replicas,
+            number_of_nodes=1,  # Cloud models run on 1 virtual node
+            deployment_config=deploy_config.model_dump(),
+            node_list=[],  # Empty for cloud models
+            supported_endpoints=supported_endpoints,
+        )
+
+        # Create the endpoint in database
+        db_endpoint = await EndpointDataManager(self.session).insert_one(endpoint_data.model_dump())
+
+        logger.info(f"Successfully created endpoint {db_endpoint.id} for cloud model {model_id}")
+
+        # Update proxy cache for the endpoint
+        # For cloud models, we use the model source as the model type
+        model_type = db_model.source.lower() if db_model.source else "openai"
+
+        # Add model to proxy cache
+        endpoint_service = EndpointService(self.session)
+        await endpoint_service.add_model_to_proxy_cache(
+            endpoint_id=db_endpoint.id,
+            model_name=namespace,
+            model_type=model_type,
+            api_base=deployment_url,
+            supported_endpoints=supported_endpoints,
+        )
+
+        # Update proxy cache for the project
+        await CredentialService(self.session).update_proxy_cache(project_id)
+        logger.info(f"Updated proxy cache for project {project_id}")
+
+        return db_endpoint
 
 
 class ModelServiceUtil(SessionMixin):
