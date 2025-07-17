@@ -27,7 +27,6 @@ from fastapi import status
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.schemas import BudNotificationMetadata
-from budapp.model_ops.schemas import Model
 from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.models import Project as ProjectModel
 
@@ -52,10 +51,11 @@ from ..commons.constants import (
 )
 from ..commons.exceptions import ClientException, RedisException
 from ..core.schemas import NotificationPayload, NotificationResult
+from ..credential_ops.services import CredentialService
 from ..model_ops.crud import ModelDataManager, ProviderDataManager
 from ..model_ops.models import Model as ModelsModel
 from ..model_ops.models import Provider as ProviderModel
-from ..model_ops.services import ModelService, ModelServiceUtil
+from ..model_ops.services import ModelServiceUtil
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..shared.redis_service import RedisService
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
@@ -63,7 +63,6 @@ from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
-from ..credential_ops.services import CredentialService
 from .crud import AdapterDataManager, EndpointDataManager
 from .models import Adapter as AdapterModel
 from .models import Endpoint as EndpointModel
@@ -140,9 +139,59 @@ class EndpointService(SessionMixin):
         )
         logger.debug(f"Delete endpoint workflow {db_workflow.id} created")
 
+        # Check if this is a cloud model without cluster - handle immediate deletion
+        is_cloud_model = db_endpoint.model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL
+        has_cluster = db_endpoint.cluster and db_endpoint.cluster.cluster_id
+
+        if is_cloud_model and not has_cluster:
+            # For cloud models without cluster, perform immediate deletion
+            logger.debug(f"Performing immediate deletion for cloud model endpoint {db_endpoint.id}")
+
+            # Delete endpoint details from redis
+            try:
+                await self.delete_model_from_proxy_cache(db_endpoint.id)
+                await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+                logger.debug(f"Updated proxy cache for project {db_endpoint.project_id}")
+            except (RedisException, Exception) as e:
+                logger.error(f"Failed to delete endpoint details from redis: {e}")
+
+            # Mark endpoint as deleted immediately
+            await EndpointDataManager(self.session).update_by_fields(
+                db_endpoint, {"status": EndpointStatusEnum.DELETED}
+            )
+            logger.debug(f"Cloud model endpoint {db_endpoint.id} marked as deleted")
+
+            # Mark workflow as completed
+            await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"status": WorkflowStatusEnum.COMPLETED}
+            )
+            logger.debug(f"Workflow {db_workflow.id} marked as completed")
+
+            # Send notification to workflow creator
+            notification_request = (
+                NotificationBuilder()
+                .set_content(
+                    title=db_endpoint.name,
+                    message="Deployment Deleted",
+                    icon=model_icon,
+                    result=NotificationResult(target_id=db_endpoint.project.id, target_type="project").model_dump(
+                        exclude_none=True, exclude_unset=True
+                    ),
+                )
+                .set_payload(
+                    workflow_id=str(db_workflow.id), type=NotificationTypeEnum.DEPLOYMENT_DELETION_SUCCESS.value
+                )
+                .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+                .build()
+            )
+            await BudNotifyService().send_notification(notification_request)
+
+            return db_workflow
+
+        # For non-cloud models or cloud models with cluster, follow the existing workflow process
         try:
             # Perform delete endpoint request to bud_cluster app
-            if db_endpoint.cluster and db_endpoint.cluster.cluster_id:
+            if has_cluster:
                 bud_cluster_response = await self._perform_bud_cluster_delete_endpoint_request(
                     db_endpoint.cluster.cluster_id, db_endpoint.namespace, current_user_id, db_workflow.id
                 )
@@ -186,7 +235,7 @@ class EndpointService(SessionMixin):
         await EndpointDataManager(self.session).update_by_fields(db_endpoint, {"status": EndpointStatusEnum.DELETING})
         logger.debug(f"Endpoint {db_endpoint.id} status updated to {EndpointStatusEnum.DELETING.value}")
 
-        # Delete endpoint details with pattern “router_config:*:<endpoint_name>“,
+        # Delete endpoint details with pattern "router_config:*:<endpoint_name>",
         try:
             await self.delete_model_from_proxy_cache(db_endpoint.id)
             await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
@@ -2062,7 +2111,6 @@ class EndpointService(SessionMixin):
         supported_endpoints: Union[List[str], Dict[str, bool]],
     ) -> None:
         """Add model to proxy cache for a project."""
-
         endpoints = []
 
         for support_endpoint in supported_endpoints:
