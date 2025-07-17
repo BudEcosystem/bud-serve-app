@@ -30,29 +30,29 @@ from budapp.commons.dependencies import (
     parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
-from budapp.commons.schemas import ErrorResponse, SingleResponse, SuccessResponse
+from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 
 from ..commons.constants import PermissionEnum
 from ..commons.permission_handler import require_permissions
+from ..user_ops.schemas import UserFilter
 from .schemas import (
     EditProjectRequest,
+    PagenatedProjectUserResponse,
+    PaginatedProjectsResponse,
+    PaginatedTagsResponse,
     ProjectClusterFilter,
     ProjectClusterPaginatedResponse,
+    ProjectCreateRequest,
+    ProjectDetailResponse,
+    ProjectFilter,
+    ProjectSuccessResopnse,
+    ProjectUserAddList,
+    ProjectUserUpdate,
     # ProjectRequest,
     # ProjectResponse,
     SingleProjectResponse,
-    PaginatedTagsResponse,
-    ProjectCreateRequest,
-    ProjectSuccessResopnse,
-    PaginatedProjectsResponse,
-    ProjectFilter,
-    ProjectDetailResponse,
-    ProjectUserAddList,
-    ProjectUserUpdate,
-    PagenatedProjectUserResponse,
 )
-from ..user_ops.schemas import UserFilter
 from .services import ProjectService
 
 
@@ -325,7 +325,7 @@ async def edit_project(
     session: Annotated[Session, Depends(get_session)],
     edit_project: EditProjectRequest,
 ) -> Union[SingleProjectResponse, ErrorResponse]:
-    """Edit project"""
+    """Edit project."""
     try:
         db_project = await ProjectService(session).edit_project(
             project_id=project_id, data=edit_project.model_dump(exclude_unset=True, exclude_none=True)

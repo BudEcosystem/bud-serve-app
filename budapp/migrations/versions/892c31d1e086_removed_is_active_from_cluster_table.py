@@ -1,4 +1,4 @@
-"""removed is active from cluster table
+"""removed is active from cluster table.
 
 Revision ID: 892c31d1e086
 Revises: b2c9ac9ba65b
@@ -8,8 +8,8 @@ Create Date: 2024-12-19 09:58:34.806743
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 
 # revision identifiers, used by Alembic.

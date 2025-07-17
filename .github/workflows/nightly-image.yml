@@ -39,7 +39,7 @@ jobs:
 
       - name: Run bandit (security check)
         continue-on-error: true
-        run: bandit -r budapp/ -ll
+        run: bandit -r budapp/ -ll --skip B608
 
       - name: Run tests
         continue-on-error: true

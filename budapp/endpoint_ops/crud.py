@@ -142,7 +142,7 @@ class EndpointDataManager(DataManagerUtils):
         result = self.scalars_all(stmt)
 
         return result, count
-    
+
     async def get_all_running_endpoints(self, project_id: UUID) -> List[EndpointModel]:
         """Get all running endpoints for a given project."""
         stmt = select(EndpointModel).filter(
@@ -246,7 +246,7 @@ class EndpointDataManager(DataManagerUtils):
         - Total endpoints count (excluding deleted ones)
         - Running endpoints count
         - Sum of active replicas (workers)
-        - Sum of total replicas (workers)
+        - Sum of total replicas (workers).
 
         Args:
             cluster_id (UUID): The ID of the cluster.

@@ -66,7 +66,9 @@ class BenchmarkSchema(PSQLBase, TimestampMixin):
     model: Mapped["Model"] = relationship("Model", back_populates="benchmarks")
     cluster: Mapped["Cluster"] = relationship("Cluster", back_populates="benchmarks")
     user: Mapped["User"] = relationship("User", back_populates="benchmarks")
-    request_metrics: Mapped[list["BenchmarkRequestMetricsSchema"]] = relationship("BenchmarkRequestMetricsSchema", back_populates="benchmark")
+    request_metrics: Mapped[list["BenchmarkRequestMetricsSchema"]] = relationship(
+        "BenchmarkRequestMetricsSchema", back_populates="benchmark"
+    )
 
 
 class BenchmarkCRUD(CRUDMixin[BenchmarkSchema, None, None]):
@@ -91,12 +93,20 @@ class BenchmarkCRUD(CRUDMixin[BenchmarkSchema, None, None]):
         translated_filters = filters.copy()
         translated_order_by = order_by.copy()
         for field in translated_filters:
-            if field in ["model_name", "cluster_name", "min_concurrency", "max_concurrency", "min_tpot", "max_tpot", "min_ttft", "max_ttft"]:
+            if field in [
+                "model_name",
+                "cluster_name",
+                "min_concurrency",
+                "max_concurrency",
+                "min_tpot",
+                "max_tpot",
+                "min_ttft",
+                "max_ttft",
+            ]:
                 filters.pop(field)
 
         print(translated_filters)
         print(translated_order_by)
-
 
         await self.validate_fields(self.model, filters)
 
@@ -122,7 +132,6 @@ class BenchmarkCRUD(CRUDMixin[BenchmarkSchema, None, None]):
                 explicit_conditions.extend(sorting_stmt)
                 order_by.remove(field)
 
-
         if search:
             search_conditions = []
             for field, value in translated_filters.items():
@@ -144,12 +153,7 @@ class BenchmarkCRUD(CRUDMixin[BenchmarkSchema, None, None]):
                     search_conditions.append(cast(self.model.result["mean_ttft_ms"], Float) <= value)
             search_conditions.extend(await self.generate_search_stmt(self.model, filters))
 
-            stmt = (
-                select(self.model)
-                .join(Model)
-                .join(ClusterModel)
-                .filter(and_(*search_conditions))
-            )
+            stmt = select(self.model).join(Model).join(ClusterModel).filter(and_(*search_conditions))
             count_stmt = (
                 select(func.count())
                 .select_from(self.model)

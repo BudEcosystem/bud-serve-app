@@ -1,6 +1,4 @@
 import os
-import shutil
-import filecmp
 
 from sqlalchemy.orm import Session
 
@@ -37,14 +35,14 @@ class IconSeeder(BaseSeeder):
         """Process icon name to be used as the name of the icon
         - Remove file extension
         - Replace underscores with spaces
-        - Convert to title case (camel case for multi-word names)
+        - Convert to title case (camel case for multi-word names).
         """
         name = os.path.splitext(filename)[0]
         name = name.replace("_", " ")
         return name.title()
 
     async def _seed_icons(self, session: Session) -> None:
-        """Seed icons into the database"""
+        """Seed icons into the database."""
         # Store new icons as a list for bulk creation
         icons_to_create = []
         if app_settings.static_dir != os.path.join(str(app_settings.base_dir), "static"):

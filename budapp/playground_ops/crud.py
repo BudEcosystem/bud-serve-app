@@ -19,12 +19,12 @@
 from typing import Dict, List, Tuple
 from uuid import UUID
 
-from sqlalchemy import func, select, or_
+from sqlalchemy import func, or_, select
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 
-from .models import ChatSession, Message, ChatSetting, Note
+from .models import ChatSession, ChatSetting, Message, Note
 
 
 logger = logging.get_logger(__name__)

@@ -16,9 +16,9 @@
 
 """The metric ops package, containing essential business logic, services, and routing configurations for the metric ops."""
 
-from typing import Any, Dict, Union
+from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
@@ -31,6 +31,7 @@ from budapp.user_ops.schemas import User
 
 from .schemas import DashboardStatsResponse
 from .services import BudMetricService, MetricService
+
 
 logger = logging.get_logger(__name__)
 
@@ -60,9 +61,8 @@ async def analytics_proxy(
     session: Annotated[Session, Depends(get_session)],
     request_body: Dict[str, Any],
 ):
-    """
-    Proxy analytics requests to the observability/analytics endpoint.
-    
+    """Proxy analytics requests to the observability/analytics endpoint.
+
     This endpoint forwards the request body to the metrics service
     and enriches the response with names for project, model, and endpoint IDs.
     """
@@ -72,19 +72,14 @@ async def analytics_proxy(
     except ClientException as e:
         logger.exception(f"Failed to proxy analytics request: {e}")
         error_response = ErrorResponse(code=e.status_code, message=e.message)
-        return JSONResponse(
-            content=error_response.model_dump(mode="json"),
-            status_code=e.status_code
-        )
+        return JSONResponse(content=error_response.model_dump(mode="json"), status_code=e.status_code)
     except Exception as e:
         logger.exception(f"Failed to proxy analytics request: {e}")
         error_response = ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-            message="Failed to proxy analytics request"
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to proxy analytics request"
         )
         return JSONResponse(
-            content=error_response.model_dump(mode="json"),
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            content=error_response.model_dump(mode="json"), status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
@@ -110,8 +105,7 @@ async def get_dashboard_stats(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ) -> DashboardStatsResponse:
-    """
-    Retrieves the dashboard statistics, including counts for models, projects, endpoints, and clusters.
+    """Retrieves the dashboard statistics, including counts for models, projects, endpoints, and clusters.
 
     Args:
         current_user (User): The current authenticated user making the request.

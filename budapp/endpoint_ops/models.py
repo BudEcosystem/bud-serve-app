@@ -138,6 +138,7 @@ class Endpoint(Base, TimestampMixin):
             modified_at=datetime.fromisoformat(data.get("modified_at")),
         )
 
+
 class Adapter(Base, TimestampMixin):
     """Adapter model."""
 
@@ -148,7 +149,10 @@ class Adapter(Base, TimestampMixin):
     endpoint_id: Mapped[UUID] = mapped_column(ForeignKey("endpoint.id", ondelete="CASCADE"), nullable=False)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id", ondelete="CASCADE"), nullable=False)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
-    status: Mapped[str] = mapped_column(Enum(AdapterStatusEnum, name="adapter_status_enum", values_callable=lambda x: [e.value for e in x]), nullable=False)
+    status: Mapped[str] = mapped_column(
+        Enum(AdapterStatusEnum, name="adapter_status_enum", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
     status_sync_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     endpoint: Mapped[Endpoint] = relationship("Endpoint", back_populates="adapters", foreign_keys=[endpoint_id])

@@ -50,21 +50,30 @@ from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 from .crud import ModelDataManager, ProviderDataManager, QuantizationMethodDataManager
 from .models import Model, QuantizationMethod
 from .models import Provider as ProviderModel
-from .schemas import QuantizeConfig, QuantizeModelWorkflowRequest, QuantizeModelWorkflowStepData
+from .schemas import QuantizeModelWorkflowRequest, QuantizeModelWorkflowStepData
 
 
 logger = logging.get_logger(__name__)
 
+
 class QuantizationService(SessionMixin):
     """Quantization service."""
 
-    async def get_quantization_methods(self, offset: int, limit: int, filters: Dict[str, Any] = {}, order_by: List[Tuple[str, str]] = [], search: bool = False) -> Tuple[List[QuantizationMethod], int]:
+    async def get_quantization_methods(
+        self,
+        offset: int,
+        limit: int,
+        filters: Dict[str, Any] = {},
+        order_by: List[Tuple[str, str]] = [],
+        search: bool = False,
+    ) -> Tuple[List[QuantizationMethod], int]:
         """Get all quantization methods."""
-        return await QuantizationMethodDataManager(self.session).get_all_quantization_methods(offset, limit, filters, order_by, search)
+        return await QuantizationMethodDataManager(self.session).get_all_quantization_methods(
+            offset, limit, filters, order_by, search
+        )
 
     async def quantize_model_workflow(self, current_user_id: UUID, request: QuantizeModelWorkflowRequest) -> None:
         """Quantize a model."""
-        
         step_number = request.step_number
         workflow_id = request.workflow_id
         workflow_total_steps = request.workflow_total_steps
@@ -91,8 +100,7 @@ class QuantizationService(SessionMixin):
             workflow_id, workflow_create, current_user_id
         )
 
-
-        #validate base model id
+        # validate base model id
         if model_id:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
                 Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
@@ -135,9 +143,7 @@ class QuantizationService(SessionMixin):
                 raise ClientException("Invalid quantization method")
 
         if cluster_id is not None:
-            db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-                Cluster, {"cluster_id": cluster_id}
-            )
+            db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(Cluster, {"cluster_id": cluster_id})
             if db_cluster is None:
                 raise ClientException("Invalid cluster id")
 
@@ -207,10 +213,7 @@ class QuantizationService(SessionMixin):
             )
 
             # Define the keys required for model security scan
-            keys_of_interest = [
-                "model_id",
-                "method"
-            ]
+            keys_of_interest = ["model_id", "method"]
 
             # from workflow steps extract necessary information
             required_data = {}
@@ -249,7 +252,7 @@ class QuantizationService(SessionMixin):
                 "activation_config",
                 "cluster_id",
                 "simulator_id",
-                "target_device"
+                "target_device",
             ]
 
             # from workflow steps extract necessary information
@@ -260,7 +263,16 @@ class QuantizationService(SessionMixin):
                         required_data[key] = db_workflow_step.data[key]
 
             # Check if all required keys are present
-            required_keys = ["model_id", "quantized_model_name", "method", "weight_config", "activation_config", "cluster_id", "simulator_id", "target_device"]
+            required_keys = [
+                "model_id",
+                "quantized_model_name",
+                "method",
+                "weight_config",
+                "activation_config",
+                "cluster_id",
+                "simulator_id",
+                "target_device",
+            ]
             missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data for add worker to deployment: {', '.join(missing_keys)}")
@@ -286,10 +298,7 @@ class QuantizationService(SessionMixin):
         self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID
     ) -> None:
         """Trigger quantization simulation."""
-
-        db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"id": data["model_id"]}
-        )
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": data["model_id"]})
 
         # Create request payload
         deployment_config = {
@@ -298,7 +307,7 @@ class QuantizationService(SessionMixin):
             "ttft": [1000, 4000],
             "per_session_tokens_per_sec": [6, 10],
             "e2e_latency": [100, 200],
-            "additional_concurrency": 1
+            "additional_concurrency": 1,
         }
         payload = {
             "pretrained_model_uri": db_model.local_path,
@@ -376,9 +385,9 @@ class QuantizationService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to perform quantization simulation request: {e}")
             raise ClientException("Unable to perform quantization simulation") from e
-    
+
     async def _trigger_quantization_deployment(
-            self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID
+        self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID
     ) -> Dict:
         """Trigger quantization deployment."""
         # Create request payload
@@ -425,14 +434,9 @@ class QuantizationService(SessionMixin):
             db_workflow, {"progress": deployment_response, "current_step": workflow_current_step}
         )
 
-    async def _perform_quantization_deployment_request(
-        self, payload: Dict
-    ) -> None:
+    async def _perform_quantization_deployment_request(self, payload: Dict) -> None:
         """Perform quantization deployment request."""
-
-        quantize_endpoint = (
-            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/deploy-quantization"
-        )
+        quantize_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/deploy-quantization"
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -448,7 +452,7 @@ class QuantizationService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to perform model quantization request: {e}")
             raise ClientException("Unable to perform model quantization") from e
-    
+
     async def add_quantization_to_model_from_notification_event(self, payload: NotificationPayload) -> None:
         """Add quantization to model from notification event."""
         logger.debug("Received event for adding quantization to model")
@@ -461,10 +465,7 @@ class QuantizationService(SessionMixin):
         )
 
         # Define the keys required for model extraction
-        keys_of_interest = [
-            "model_id",
-            "quantized_model_name"
-        ]
+        keys_of_interest = ["model_id", "quantized_model_name"]
 
         # from workflow steps extract necessary information
         required_data = {}
@@ -481,13 +482,12 @@ class QuantizationService(SessionMixin):
             case_sensitive=False,
         )
         if db_model:
-            logger.error(f"Unable to create model with name {required_data['quantized_model_name']} as it already exists")
+            logger.error(
+                f"Unable to create model with name {required_data['quantized_model_name']} as it already exists"
+            )
             required_data["quantized_model_name"] = f"{required_data['quantized_model_name']}_quantized"
 
-
-        model_info = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"id": required_data["model_id"]}
-        )
+        model_info = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": required_data["model_id"]})
 
         # Create a new model instance with the quantized model data
         new_model_info = Model(
@@ -525,18 +525,17 @@ class QuantizationService(SessionMixin):
             # organization_id=model_info.organization_id
         )
 
-        #create model
+        # create model
         db_model = await ModelDataManager(self.session).insert_one(new_model_info)
 
         # Update to workflow step
         workflow_update_data = {
             "quantized_model_id": str(db_model.id),
             "quantized_model": db_model,
-            "quantization_data": payload.content.result['quantization_data'],
+            "quantization_data": payload.content.result["quantization_data"],
         }
 
         current_step_number = db_workflow.current_step + 1
-        workflow_current_step = current_step_number
 
         # Update or create next workflow step
         db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
@@ -585,7 +584,9 @@ class QuantizationService(SessionMixin):
         if required_data.get(BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value) is None:
             raise ClientException("Model quantization process has not been initiated")
 
-        budserve_quantization_response = required_data.get(BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value)
+        budserve_quantization_response = required_data.get(
+            BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value
+        )
         dapr_workflow_id = budserve_quantization_response.get("workflow_id")
 
         try:
@@ -601,9 +602,13 @@ class QuantizationService(SessionMixin):
         """
         cancel_model_quantization_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/cancel/{workflow_id}"
 
-        logger.debug(f"Performing cancel model quantization request to budcluster {cancel_model_quantization_endpoint}")
+        logger.debug(
+            f"Performing cancel model quantization request to budcluster {cancel_model_quantization_endpoint}"
+        )
         try:
-            async with aiohttp.ClientSession() as session, session.post(cancel_model_quantization_endpoint) as response:
+            async with aiohttp.ClientSession() as session, session.post(
+                cancel_model_quantization_endpoint
+            ) as response:
                 response_data = await response.json()
                 if response.status != 200 or response_data.get("object") == "error":
                     logger.error(f"Failed to cancel model quantization: {response.status} {response_data}")

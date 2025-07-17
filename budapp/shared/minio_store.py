@@ -72,16 +72,14 @@ class ModelStore:
         Returns:
             bool: True if the removal was successful, False otherwise
         """
-        delete_object_list = list(
-            map(
-                lambda x: DeleteObject(x.object_name),
-                self.client.list_objects(
-                    bucket_name,
-                    prefix,
-                    recursive=recursive,
-                ),
+        delete_object_list = [
+            DeleteObject(x.object_name)
+            for x in self.client.list_objects(
+                bucket_name,
+                prefix,
+                recursive=recursive,
             )
-        )
+        ]
 
         # Remove the objects
         try:

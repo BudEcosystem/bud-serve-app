@@ -1,4 +1,4 @@
-"""removed is active from user table
+"""removed is active from user table.
 
 Revision ID: da9cd25f9dcc
 Revises: e3ac5a852b2c
@@ -8,9 +8,10 @@ Create Date: 2024-12-23 06:33:11.002691
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from alembic_postgresql_enum import TableReference
+
 
 # revision identifiers, used by Alembic.
 revision: str = "da9cd25f9dcc"

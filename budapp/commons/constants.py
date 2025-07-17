@@ -690,6 +690,7 @@ class AdapterStatusEnum(StrEnum):
     DELETED = auto()
     PENDING = auto()
 
+
 class ScalingTypeEnum(StrEnum):
     """Scaling type types."""
 
@@ -711,6 +712,7 @@ class ProxyProviderEnum(StrEnum):
 
     VLLM = "vllm"
     OPENAI = "openai"
+
 
 # class ModelTemplateTypeEnum(StrEnum):
 #     """Model template types."""

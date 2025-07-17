@@ -21,6 +21,7 @@ CURRENT_FILE_PATH = os.path.dirname(os.path.abspath(__file__))
 # seeder file path
 QUANTIZATION_METHODS_SEEDER_FILE_PATH = os.path.join(CURRENT_FILE_PATH, "data", "quantization_method_seeder.json")
 
+
 class QuantizationMethodSeeder(BaseSeeder):
     """Seeder for the QuantizationMethod model."""
 
@@ -41,9 +42,9 @@ class QuantizationMethodSeeder(BaseSeeder):
         limit = 100
 
         while True:
-            db_quantization_methods, count = await QuantizationMethodDataManager(
-                session
-            ).get_all_quantization_methods(offset=offset, limit=limit)
+            db_quantization_methods, count = await QuantizationMethodDataManager(session).get_all_quantization_methods(
+                offset=offset, limit=limit
+            )
 
             if not db_quantization_methods:
                 break
@@ -51,7 +52,9 @@ class QuantizationMethodSeeder(BaseSeeder):
             existing_db_quantization_methods.extend(db_quantization_methods)
             offset += limit
 
-            logger.info(f"Fetched {count} quantization methods. Total quantization methods found: {len(existing_db_quantization_methods)}")
+            logger.info(
+                f"Fetched {count} quantization methods. Total quantization methods found: {len(existing_db_quantization_methods)}"
+            )
 
             if count < limit:
                 break
@@ -76,9 +79,7 @@ class QuantizationMethodSeeder(BaseSeeder):
                 update_quantization_method_data = QuantizationMethod(
                     **quantization_method_seeder_data_mapping[db_quantization_method.name]
                 )
-                db_updated_quantization_method = await QuantizationMethodDataManager(
-                    session
-                ).update_by_fields(
+                db_updated_quantization_method = await QuantizationMethodDataManager(session).update_by_fields(
                     db_quantization_method, update_quantization_method_data.model_dump(exclude_unset=True)
                 )
                 logger.debug(f"Updated quantization method: {db_updated_quantization_method.name}")
@@ -96,7 +97,9 @@ class QuantizationMethodSeeder(BaseSeeder):
             logger.info(f"Added quantization method: {quantization_method_name} to seed")
 
         # Bulk create new quantization methods
-        created_quantization_methods = await QuantizationMethodDataManager(session).insert_all(quantization_method_data_to_seed)
+        created_quantization_methods = await QuantizationMethodDataManager(session).insert_all(
+            quantization_method_data_to_seed
+        )
         logger.info(f"Created {len(created_quantization_methods)} quantization methods")
 
     @staticmethod

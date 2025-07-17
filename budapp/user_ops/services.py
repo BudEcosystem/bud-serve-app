@@ -45,8 +45,8 @@ from ..shared.notification_service import BudNotifyService, NotificationBuilder
 logger = logging.get_logger(__name__)
 settings = app_settings
 
-class UserService(SessionMixin):
 
+class UserService(SessionMixin):
     async def get_permissions_for_users(
         self,
         user_ids: List[UUID],
@@ -60,7 +60,9 @@ class UserService(SessionMixin):
             TenantClient, {"tenant_id": tenant.id}, missing_ok=True
         )
 
-        return await KeycloakManager().get_multiple_users_permissions_via_admin(user_ids, app_settings.default_realm_name, tenant_client.client_id)
+        return await KeycloakManager().get_multiple_users_permissions_via_admin(
+            user_ids, app_settings.default_realm_name, tenant_client.client_id
+        )
 
     async def update_active_user(
         self,
@@ -72,9 +74,7 @@ class UserService(SessionMixin):
         """Update active user."""
         if user_id == current_user.id:  # noqa: SIM102
             # Invited users can only update password
-            if current_user.status == UserStatusEnum.INVITED and {"role", "name"} & set(
-                fields
-            ):
+            if current_user.status == UserStatusEnum.INVITED and {"role", "name"} & set(fields):
                 logger.error("Invited user can only update password")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -82,9 +82,7 @@ class UserService(SessionMixin):
                 )
 
         # Check if user exists
-        db_user = await UserDataManager(self.session).retrieve_by_fields(
-            UserModel, {"id": user_id}
-        )
+        db_user = await UserDataManager(self.session).retrieve_by_fields(UserModel, {"id": user_id})
 
         if db_user.is_superuser and "role" in fields:
             raise HTTPException(
@@ -107,7 +105,6 @@ class UserService(SessionMixin):
                 realm_name,
             )
 
-
             if user_id == current_user.id:
                 # Updating user own password doesn't require password after login
                 fields["is_reset_password"] = False
@@ -128,19 +125,14 @@ class UserService(SessionMixin):
                     email=db_user.email,
                     first_name=fields.get("name"),
                 )
-                await BudNotifyHandler().update_subscriber(
-                    str(user_id), subscriber_data
-                )
+                await BudNotifyHandler().update_subscriber(str(user_id), subscriber_data)
                 logger.info("Updated Budserve user in BudNotify subscriber")
                 fields["is_subscriber"] = True
             except BudNotifyException as e:
                 fields["is_subscriber"] = False
                 logger.error(f"Failed to update user in budnotify subscriber: {e}")
 
-        return await UserDataManager(self.session).update_by_fields(
-            db_user, fields
-        )
-
+        return await UserDataManager(self.session).update_by_fields(db_user, fields)
 
     async def get_user_roles_and_permissions(
         self,
@@ -212,9 +204,7 @@ class UserService(SessionMixin):
         realm_name = app_settings.default_realm_name
 
         # Get the user from db
-        db_user = await UserDataManager(self.session).retrieve_by_fields(
-            UserModel, {"id": user_id}, missing_ok=True
-        )
+        db_user = await UserDataManager(self.session).retrieve_by_fields(UserModel, {"id": user_id}, missing_ok=True)
 
         if not db_user:
             raise ClientException(message="User not found", status_code=status.HTTP_404_NOT_FOUND)
@@ -226,7 +216,6 @@ class UserService(SessionMixin):
         tenant_client = await UserDataManager(self.session).retrieve_by_fields(
             TenantClient, {"tenant_id": tenant.id}, missing_ok=True
         )
-
 
         # Keycloak Manager
         keycloak_manager = KeycloakManager()
@@ -357,15 +346,21 @@ class UserService(SessionMixin):
 
         # Check if user is active
         if db_user.status == UserStatusEnum.DELETED:
-            raise ClientException(message="Inactive user not allowed to reset password", status_code=status.HTTP_400_BAD_REQUEST)
+            raise ClientException(
+                message="Inactive user not allowed to reset password", status_code=status.HTTP_400_BAD_REQUEST
+            )
 
         # Check user is super admin
         if db_user.is_superuser:
-            raise ClientException(message="Super user not allowed to reset password", status_code=status.HTTP_400_BAD_REQUEST)
+            raise ClientException(
+                message="Super user not allowed to reset password", status_code=status.HTTP_400_BAD_REQUEST
+            )
 
         # Check max reset password attempts exceeded
         if db_user.reset_password_attempt == 3:
-            raise ClientException(message="Reset password attempt limit exceeded", status_code=status.HTTP_400_BAD_REQUEST)
+            raise ClientException(
+                message="Reset password attempt limit exceeded", status_code=status.HTTP_400_BAD_REQUEST
+            )
 
         # Generate a temporary password
         temp_password = ""

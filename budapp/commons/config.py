@@ -22,7 +22,6 @@ from typing import Annotated, Any, List, Optional
 
 from budmicroframe.commons.config import (
     BaseAppConfig,
-    BaseConfig,
     BaseSecretsConfig,
     enable_periodic_sync_from_store,
     register_settings,
@@ -257,7 +256,7 @@ class SecretsConfig(BaseSecretsConfig):
 
     @property
     def public_key(self) -> PublicKeyTypes:
-        """Return Public key loaded from the PEM file"""
+        """Return Public key loaded from the PEM file."""
         try:
             # Read the public key from PEM file
             public_pem_bytes = Path(os.path.join(self.vault_path, "public_key.pem")).read_bytes()
@@ -271,7 +270,7 @@ class SecretsConfig(BaseSecretsConfig):
 
     @property
     def private_key(self) -> PrivateKeyTypes:
-        """Return Private key loaded from the PEM file"""
+        """Return Private key loaded from the PEM file."""
         try:
             # Read the private key from PEM file
             private_pem_bytes = Path(os.path.join(self.vault_path, "private_key.pem")).read_bytes()
@@ -287,7 +286,7 @@ class SecretsConfig(BaseSecretsConfig):
 
     @property
     def aes_key(self) -> bytes:
-        """Return AES key loaded from the HEX format"""
+        """Return AES key loaded from the HEX format."""
         if not self.aes_key_hex:
             raise RuntimeError("AES key is not set")
 

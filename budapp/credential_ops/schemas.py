@@ -56,26 +56,26 @@ class CredentialUpdateRequest(CloudEventBase):
 
 
 class CredentialBase(BaseModel):
-    """Credential base schema"""
+    """Credential base schema."""
 
     key: str
 
 
 class CredentialCreate(CredentialBase):
-    """Create credential schema"""
+    """Create credential schema."""
 
     user_id: UUID
 
 
 class CredentialFilter(BaseModel):
-    """Credential filter schema"""
+    """Credential filter schema."""
 
     name: Optional[str] = None
     project_id: Optional[UUID] = None
 
 
 class BudCredentialCreate(CredentialCreate):
-    """Create credential schema"""
+    """Create credential schema."""
 
     name: str
     project_id: UUID
@@ -87,14 +87,14 @@ class BudCredentialCreate(CredentialCreate):
 
 
 class ExpiryEnum(IntEnum):
-    """Expiry enum"""
+    """Expiry enum."""
 
     THIRTY_DAYS = 30
     SIXTY_DAYS = 60
 
 
 class CredentialRequest(BaseModel):
-    """Credential request schema"""
+    """Credential request schema."""
 
     model_config = ConfigDict(protected_namespaces=())
 
@@ -114,7 +114,7 @@ class CredentialRequest(BaseModel):
 
 
 class Credential(BudCredentialCreate):
-    """Credential schema"""
+    """Credential schema."""
 
     id: UUID
     created_at: datetime
@@ -122,7 +122,7 @@ class Credential(BudCredentialCreate):
 
 
 class CredentialResponse(BaseModel):
-    """Credential response schema"""
+    """Credential response schema."""
 
     name: str
     key: str
@@ -136,7 +136,7 @@ class CredentialResponse(BaseModel):
 
 
 class CredentialProject(BaseModel):
-    """Credential project schema"""
+    """Credential project schema."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -145,7 +145,7 @@ class CredentialProject(BaseModel):
 
 
 class CredentialDetails(BaseModel):
-    """BudServe credential details"""
+    """BudServe credential details."""
 
     model_config = ConfigDict(protected_namespaces=())
 
@@ -160,7 +160,7 @@ class CredentialDetails(BaseModel):
 
 
 class CredentialUpdate(BaseModel):
-    """Credential Update schema"""
+    """Credential Update schema."""
 
     model_config = ConfigDict(protected_namespaces=())
 
@@ -177,7 +177,7 @@ class CredentialUpdate(BaseModel):
 
 
 class ProprietaryCredentialRequest(BaseModel):
-    """Proprietary credential request schema"""
+    """Proprietary credential request schema."""
 
     name: str
     type: CredentialTypeEnum
@@ -194,7 +194,7 @@ class ProprietaryCredentialRequest(BaseModel):
 
 
 class ProprietaryCredentialResponse(BaseModel):
-    """Proprietary Credential response schema"""
+    """Proprietary Credential response schema."""
 
     model_config = ConfigDict(protected_namespaces=(), from_attributes=True)
 
@@ -205,7 +205,7 @@ class ProprietaryCredentialResponse(BaseModel):
 
 
 class ProprietaryCredentialFilter(BaseModel):
-    """Filter proprietary credential schema"""
+    """Filter proprietary credential schema."""
 
     name: str | None = None
     type: CredentialTypeEnum | None = None
@@ -213,7 +213,7 @@ class ProprietaryCredentialFilter(BaseModel):
 
 
 class ProprietaryCredentialUpdate(BaseModel):
-    """Proprietary Credential update schema"""
+    """Proprietary Credential update schema."""
 
     name: str | None = None
     type: CredentialTypeEnum
@@ -230,7 +230,7 @@ class ProprietaryCredentialUpdate(BaseModel):
 
 
 class ProprietaryCredentialResponseList(ProprietaryCredentialResponse):
-    """Proprietary Credential response list schema"""
+    """Proprietary Credential response list schema."""
 
     created_at: datetime
     num_of_endpoints: int
@@ -238,20 +238,19 @@ class ProprietaryCredentialResponseList(ProprietaryCredentialResponse):
 
 
 class ProprietaryCredentialDetailedView(ProprietaryCredentialResponseList):
-    """Proprietary Credential detailed view schema"""
+    """Proprietary Credential detailed view schema."""
 
     endpoints: list
 
 
 class PaginatedCredentialResponse(PaginatedSuccessResponse):
-    """Paginated Credential response schema"""
+    """Paginated Credential response schema."""
 
     credentials: List[Union[ProprietaryCredentialResponseList, CredentialDetails]]
 
 
 def common_validator_for_provider_creds(v, info: ValidationInfo):
-    """Common validator for provider credentials"""
-
+    """Common validator for provider credentials."""
     credential_type = info.data.get("type")
     if not credential_type:
         raise ValueError("Credential type must be specified")
@@ -302,7 +301,7 @@ class CacheConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    """Model config schema"""
+    """Model config schema."""
 
     model_config = ConfigDict(protected_namespaces=())
 
@@ -320,7 +319,7 @@ class ModelConfig(BaseModel):
 
 
 class RoutingPolicy(BaseModel):
-    """Routing policy schema"""
+    """Routing policy schema."""
 
     name: str
     strategies: List[Dict[str, Any]]
@@ -329,7 +328,7 @@ class RoutingPolicy(BaseModel):
 
 
 class RouterConfig(BaseModel):
-    """Router config schema"""
+    """Router config schema."""
 
     model_config = ConfigDict(protected_namespaces=())
 
@@ -343,8 +342,7 @@ class RouterConfig(BaseModel):
 
 # Cloud Providers
 class CloudProvidersSchema(BaseModel):
-    """
-    Schema for cloud providers.
+    """Schema for cloud providers.
 
     Attributes:
         id: Unique identifier for the cloud provider
@@ -367,8 +365,7 @@ class CloudProvidersSchema(BaseModel):
     @field_validator("schema_definition")
     @classmethod
     def validate_schema_definition(cls, v: Union[str, Dict[str, Any]]) -> str:
-        """
-        Validates the schema_definition field, ensuring it's in the correct format.
+        """Validates the schema_definition field, ensuring it's in the correct format.
 
         If a dictionary is provided, it's converted to a JSON string.
         If a string is provided, it's validated as valid JSON.
@@ -396,8 +393,7 @@ class CloudProvidersSchema(BaseModel):
 
     @model_validator(mode="after")
     def validate_schema(self) -> "CloudProvidersSchema":
-        """
-        Validates the entire model after all fields have been processed.
+        """Validates the entire model after all fields have been processed.
 
         This can be used for cross-field validation or additional schema validation.
 
@@ -417,8 +413,7 @@ class CloudProvidersSchema(BaseModel):
         return self
 
     def get_schema_as_dict(self) -> Dict[str, Any]:
-        """
-        Helper method to get the schema definition as a Python dictionary.
+        """Helper method to get the schema definition as a Python dictionary.
 
         Returns:
             The schema definition as a dictionary
@@ -443,8 +438,7 @@ class CloudProvidersCreateRequest(BaseModel):
 
 
 class CloudCredentialSchema(BaseModel):
-    """
-    Schema for cloud credential.
+    """Schema for cloud credential.
 
     Attributes:
         id: Unique identifier for the credential
@@ -473,8 +467,7 @@ class CloudCredentialResponse(SuccessResponse):
 
 
 class CloudProviderRegionsResponse(SuccessResponse):
-    """
-    Response model for cloud provider regions.
+    """Response model for cloud provider regions.
 
     Attributes:
         provider_id: Unique identifier of the cloud provider

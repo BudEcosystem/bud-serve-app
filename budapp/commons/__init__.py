@@ -22,8 +22,8 @@ from budapp.auth.models import Token as Token
 from budapp.cluster_ops.models import Cluster as Cluster
 from budapp.core.models import Icon as Icon
 from budapp.core.models import ModelTemplate as ModelTemplate
-from budapp.credential_ops.models import ProprietaryCredential as ProprietaryCredential
 from budapp.credential_ops.models import Credential as Credential
+from budapp.credential_ops.models import ProprietaryCredential as ProprietaryCredential
 from budapp.endpoint_ops.models import Endpoint as Endpoint
 from budapp.model_ops.models import CloudModel as CloudModel
 from budapp.model_ops.models import Model as Model
@@ -31,6 +31,8 @@ from budapp.model_ops.models import Provider as Provider
 from budapp.permissions.models import Permission as Permission
 from budapp.permissions.models import ProjectPermission as ProjectPermission
 from budapp.project_ops.models import Project as Project
+from budapp.router_ops.models import Router as Router
+from budapp.router_ops.models import RouterEndpoint as RouterEndpoint
 from budapp.user_ops.models import User as User
 from budapp.workflow_ops.models import Workflow as Workflow
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStep
@@ -41,8 +43,5 @@ from ..cluster_ops.models import ModelClusterRecommended as ModelClusterRecommen
 from ..dataset_ops.models import DatasetSchema as DatasetSchema
 from ..playground_ops.models import ChatSession as ChatSession
 from ..playground_ops.models import Message as Message
-from budapp.router_ops.models import Router as Router
-from budapp.router_ops.models import RouterEndpoint as RouterEndpoint
 from ..playground_ops.models import Note as Note
-
 from .database import Base as Base

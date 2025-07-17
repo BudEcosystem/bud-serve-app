@@ -1,4 +1,4 @@
-"""removed is active from endpint table
+"""removed is active from endpint table.
 
 Revision ID: 0c7fdc4b7072
 Revises: 892c31d1e086
@@ -8,8 +8,8 @@ Create Date: 2024-12-23 11:55:08.540869
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 
 # revision identifiers, used by Alembic.

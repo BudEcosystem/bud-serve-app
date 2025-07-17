@@ -169,7 +169,7 @@ async def reset_password(
             message="Email notification triggered for reset password",
             acknowledged=response["acknowledged"],
             status=response["status"],
-            transaction_id=response["transaction_id"]
+            transaction_id=response["transaction_id"],
         ).to_http_response()
     except ClientException as e:
         logger.error(f"Failed to trigger reset password email: {e}")
@@ -251,6 +251,7 @@ async def update_current_user(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update current user"
         ).to_http_response()
 
+
 @user_router.get(
     "/me/permissions",
     responses={
@@ -278,13 +279,14 @@ async def get_user_roles(
         kc_user = await UserService(session).get_user_roles_and_permissions(current_user)
         permissions_list = kc_user.get("permissions", [])
         return MyPermissions(
-            object="user.permissions", code=status.HTTP_200_OK, message="Successfully get user permissions", permissions=permissions_list
+            object="user.permissions",
+            code=status.HTTP_200_OK,
+            message="Successfully get user permissions",
+            permissions=permissions_list,
         ).to_http_response()
     except ClientException as e:
         logger.error(f"Client error getting user permissions: {e.message}")
-        return ErrorResponse(
-            code=e.status_code or status.HTTP_401_UNAUTHORIZED, message=e.message
-        ).to_http_response()
+        return ErrorResponse(code=e.status_code or status.HTTP_401_UNAUTHORIZED, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Unexpected error getting user permissions: {e}")
         return ErrorResponse(
@@ -387,6 +389,7 @@ async def retrieve_user(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get user by id"
         ).to_http_response()
 
+
 @user_router.get(
     "/{user_id}/permissions",
     responses={
@@ -416,7 +419,10 @@ async def get_user_permissions_by_id(
         kc_user = await UserService(session).get_user_permissions_by_id(user_id)
         permissions_list = kc_user.get("result", [])
         return UserPermissions(
-            object="user.permissions", code=status.HTTP_200_OK, message="Successfully get user permissions", result=permissions_list
+            object="user.permissions",
+            code=status.HTTP_200_OK,
+            message="Successfully get user permissions",
+            result=permissions_list,
         ).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to get user permissions: {e}")

@@ -33,7 +33,6 @@ from ..credential_ops.models import ProprietaryCredential as ProprietaryCredenti
 from ..dataset_ops.models import DatasetCRUD
 from ..dataset_ops.schemas import DatasetResponse
 from ..endpoint_ops.schemas import ModelClusterDetail
-from ..endpoint_ops.services import EndpointService
 from ..model_ops.crud import ModelDataManager, ProviderDataManager
 from ..model_ops.models import Model
 from ..model_ops.models import Provider as ProviderModel
@@ -628,21 +627,24 @@ class BenchmarkService(SessionMixin):
 
     def get_field1_vs_field2_data(self, field1: str, field2: str, model_ids: Optional[List[str]] = None) -> dict:
         """Get field1 vs field2 data."""
-        GET_DATA_QUERY = f"""
+        # Use parameterized query to prevent SQL injection
+        GET_DATA_QUERY = """
             SELECT
                 b.model_id,
                 m.uri,
-                b.result->>'{field1}' AS {field1},
-                b.result->>'{field2}' AS {field2}
+                b.result->>:field1 AS field1_value,
+                b.result->>:field2 AS field2_value
             FROM benchmark as b
             JOIN model m ON b.model_id = m.id
-            WHERE b.result is not NULL AND b.result->>'{field1}' is not NULL AND b.result->>'{field2}' is not NULL
+            WHERE b.result is not NULL AND b.result->>:field1 is not NULL AND b.result->>:field2 is not NULL
         """
+        params = {"field1": field1, "field2": field2}
         if model_ids:
             GET_DATA_QUERY += " AND m.id = ANY(:model_ids)"
+            params["model_ids"] = model_ids
         print(GET_DATA_QUERY)
         with BenchmarkCRUD() as crud:
-            analysis_data = crud.execute_raw_query(query=text(GET_DATA_QUERY), params={"model_ids": model_ids})
+            analysis_data = crud.execute_raw_query(query=text(GET_DATA_QUERY), params=params)
 
         analysis_data_list = []
         for row in analysis_data:
@@ -766,9 +768,22 @@ class BenchmarkRequestMetricsService(SessionMixin):
         bins = []
         with BenchmarkRequestMetricsCRUD() as crud:
             params = {"dataset_ids": dataset_ids}
-            query = (
-                f"SELECT MAX({distribution_type}) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
-            )
+            # Use parameterized query to prevent SQL injection
+            if distribution_type == "prompt_len":
+                query = "SELECT MAX(prompt_len) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
+            elif distribution_type == "completion_len":
+                query = (
+                    "SELECT MAX(completion_len) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
+                )
+            elif distribution_type == "ttft":
+                query = "SELECT MAX(ttft) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
+            elif distribution_type == "tpot":
+                query = "SELECT MAX(tpot) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
+            elif distribution_type == "latency":
+                query = "SELECT MAX(latency) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
+            else:
+                raise ValueError(f"Invalid distribution_type: {distribution_type}")
+
             if benchmark_id:
                 query += " AND benchmark_id = :benchmark_id"
                 params["benchmark_id"] = benchmark_id
@@ -804,10 +819,10 @@ class BenchmarkRequestMetricsService(SessionMixin):
 
         with BenchmarkRequestMetricsCRUD() as crud:
             params = {"dataset_ids": dataset_ids}
-            query = f"""
+            query = f"""  # nosec B608
                     WITH bins AS (
                         SELECT * FROM (VALUES
-                            {', '.join([f"({bin_id}, {bin_start}, {bin_end})" for bin_id, bin_start, bin_end in bins])}
+                            {", ".join([f"({bin_id}, {bin_start}, {bin_end})" for bin_id, bin_start, bin_end in bins])}
                         ) AS t(bin_id, bin_start, bin_end)
                     )
                     SELECT
@@ -824,7 +839,8 @@ class BenchmarkRequestMetricsService(SessionMixin):
                 query += """
                         ,ROUND(COALESCE(AVG(m.output_len)::numeric, 0), 2) AS avg_output_len
                 """
-            query += f"""
+            # nosec B608 - distribution_type is validated against allowed values
+            query += f"""  # nosec B608
                     FROM bins b
                     LEFT JOIN benchmark_request_metrics m
                         ON m.{distribution_type} >= b.bin_start
@@ -875,6 +891,13 @@ class BenchmarkRequestMetricsService(SessionMixin):
 
     def get_field1_vs_field2_data(self, field1: str, field2: str, benchmark_id: UUID) -> dict:
         """Get field1 vs field2 data."""
+        # Use parameterized query to prevent SQL injection
+        # Validate field names to prevent SQL injection
+        allowed_fields = ["prompt_len", "completion_len", "ttft", "tpot", "latency"]
+        if field1 not in allowed_fields or field2 not in allowed_fields:
+            raise ValueError(f"Invalid field names. Allowed fields: {allowed_fields}")
+
+        # nosec B608 - field names are validated against allowed values above
         GET_DATA_QUERY = f"""
             SELECT
                 b.{field1},

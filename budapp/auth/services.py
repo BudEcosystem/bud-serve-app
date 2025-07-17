@@ -18,6 +18,7 @@
 """Implements auth services and business logic that power the microservices, including key functionality and integrations."""
 
 from fastapi import status
+
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import UserColorEnum, UserStatusEnum
@@ -27,7 +28,7 @@ from budapp.commons.keycloak import KeycloakManager
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
-from budapp.user_ops.schemas import TenantClientSchema, User, UserCreate
+from budapp.user_ops.schemas import TenantClientSchema, UserCreate
 
 from ..commons.constants import PermissionEnum
 from ..commons.exceptions import BudNotifyException
@@ -85,7 +86,7 @@ class AuthService(SessionMixin):
             # if tenant_mapping:
             #     tenant = await UserDataManager(self.session).retrieve_by_fields(
             #         Tenant, {"id": tenant_mapping.tenant_id}, missing_ok=True
-              #  )
+            #  )
 
         logger.debug(f"::USER:: Tenant: {tenant.realm_name}")
 
@@ -335,7 +336,7 @@ class AuthService(SessionMixin):
             await UserDataManager(self.session).insert_one(tenant_user_mapping)
             logger.info(f"User {db_user.email} mapped to tenant {tenant.name}")
 
-            response = await BudNotifyHandler().create_subscriber(subscriber_data)
+            await BudNotifyHandler().create_subscriber(subscriber_data)
             logger.info("User added to budnotify subscriber")
 
             _ = await UserDataManager(self.session).update_subscriber_status(user_ids=[db_user.id], is_subscriber=True)

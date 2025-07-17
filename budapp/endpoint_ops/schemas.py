@@ -147,6 +147,7 @@ class WorkerInfoResponse(PaginatedSuccessResponse):
 
     workers: list[WorkerInfo]
 
+
 class WorkerLogsResponse(SuccessResponse):
     """Worker logs response."""
 
@@ -227,11 +228,10 @@ class WorkerMetricsResponse(SuccessResponse):
 
     model_config = ConfigDict(extra="allow")
 
-    metrics: Union[dict[str,Any], None] = None
+    metrics: Union[dict[str, Any], None] = None
 
 
 class AddAdapterRequest(BaseModel):
-
     workflow_id: UUID4 | None = None
     workflow_total_steps: int | None = None
     step_number: int = Field(..., gt=0)
@@ -251,6 +251,7 @@ class AddAdapterRequest(BaseModel):
 
         return self
 
+
 class AddAdapterWorkflowStepData(BaseModel):
     """Add adapter workflow step data."""
 
@@ -259,6 +260,7 @@ class AddAdapterWorkflowStepData(BaseModel):
     adapter_name: str | None = None
     adapter_model_id: UUID4 | None = None
     adapter_id: UUID4 | None = None
+
 
 class AdapterFilter(BaseModel):
     """Adapter filter."""
@@ -292,6 +294,7 @@ class VLLMConfig(BaseModel):
     model_name: str
     api_base: str
     api_key_location: str
+
 
 class ProxyModelConfig(BaseModel):
     """Proxy model config."""
