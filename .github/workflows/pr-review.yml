@@ -1,0 +1,293 @@
+name: PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  PYTHON_VERSION: "3.11"
+  DAPR_VERSION: "1.14.4"
+  DAPR_HTTP_PORT: 3510
+  DAPR_API_TOKEN: ${{ secrets.DAPR_API_TOKEN }}
+
+jobs:
+  pre-commit:
+    name: Pre-commit Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for commit linting
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pre-commit environment
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: ${{ runner.os }}-pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pre-commit-
+
+      - name: Install pre-commit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pre-commit
+
+      - name: Run pre-commit on all files
+        run: |
+          echo "::group::Running pre-commit checks"
+          pre-commit run --all-files --show-diff-on-failure
+          echo "::endgroup::"
+
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('**/requirements-lint.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-lint-
+            ${{ runner.os }}-pip-
+
+      - name: Install linting dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-lint.txt
+          pip install pydantic ujson types-ujson  # Additional mypy dependencies from pre-commit
+
+      - name: Run Ruff linter
+        run: |
+          echo "::group::Running Ruff linter"
+          ruff check .
+          echo "::endgroup::"
+
+      - name: Run Ruff formatter check
+        run: |
+          echo "::group::Checking code formatting with Ruff"
+          ruff format --check .
+          echo "::endgroup::"
+
+      - name: Run mypy type checker
+        run: |
+          echo "::group::Running mypy type checker"
+          mypy budapp/
+          echo "::endgroup::"
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install bandit
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit[toml]
+
+      - name: Run bandit security scan
+        run: |
+          echo "::group::Running bandit security scan"
+          bandit -r budapp/ -ll -f json -o bandit-report.json || true
+          bandit -r budapp/ -ll
+          echo "::endgroup::"
+
+      - name: Upload bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bud_serve_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Dapr CLI
+        run: |
+          wget -q https://raw.githubusercontent.com/dapr/cli/master/install/install.sh -O - | /bin/bash -s ${{ env.DAPR_VERSION }}
+          echo "$HOME/.dapr/bin" >> $GITHUB_PATH
+
+      - name: Initialize Dapr
+        run: |
+          dapr init --runtime-version ${{ env.DAPR_VERSION }}
+          dapr --version
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-test-${{ hashFiles('**/requirements.txt', '**/requirements-test.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-test-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Set up environment
+        run: |
+          cp .env.sample .env
+          # Update test database connection
+          sed -i 's/POSTGRES_HOST=.*/POSTGRES_HOST=localhost/' .env
+          sed -i 's/POSTGRES_DB=.*/POSTGRES_DB=bud_serve_test/' .env
+          sed -i 's/REDIS_HOST=.*/REDIS_HOST=localhost/' .env
+
+      - name: Run database migrations
+        run: |
+          alembic -c ./budapp/alembic.ini upgrade head
+
+      - name: Start Dapr sidecar
+        run: |
+          dapr run --app-id bud-serve-test \
+                   --app-port 8080 \
+                   --dapr-http-port ${{ env.DAPR_HTTP_PORT }} \
+                   --log-level debug \
+                   --components-path ./dapr/components \
+                   -- echo "Dapr sidecar ready" &
+          sleep 5  # Give Dapr time to start
+
+      - name: Run tests with coverage
+        run: |
+          echo "::group::Running pytest with coverage"
+          pytest tests/ \
+            --dapr-http-port ${{ env.DAPR_HTTP_PORT }} \
+            --dapr-api-token ${{ env.DAPR_API_TOKEN }} \
+            --cov=budapp \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term-missing \
+            -v
+          echo "::endgroup::"
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            htmlcov/
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Cleanup Dapr
+        if: always()
+        run: |
+          dapr stop --app-id bud-serve-test || true
+          dapr uninstall || true
+
+  dependency-check:
+    name: Check Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+
+      - name: Run dependency vulnerability scan
+        run: |
+          echo "::group::Checking for vulnerable dependencies"
+          pip-audit -r requirements.txt -r requirements-test.txt -r requirements-lint.txt
+          echo "::endgroup::"
+
+  pr-status:
+    name: PR Review Status
+    runs-on: ubuntu-latest
+    needs: [pre-commit, lint, security, test, dependency-check]
+    if: always()
+    steps:
+      - name: Check job results
+        run: |
+          if [[ "${{ needs.pre-commit.result }}" == "failure" ]]; then
+            echo "❌ Pre-commit checks failed"
+            exit 1
+          fi
+          if [[ "${{ needs.lint.result }}" == "failure" ]]; then
+            echo "❌ Linting failed"
+            exit 1
+          fi
+          if [[ "${{ needs.security.result }}" == "failure" ]]; then
+            echo "❌ Security scan failed"
+            exit 1
+          fi
+          if [[ "${{ needs.test.result }}" == "failure" ]]; then
+            echo "❌ Tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.dependency-check.result }}" == "failure" ]]; then
+            echo "❌ Dependency check failed"
+            exit 1
+          fi
+          echo "✅ All checks passed!"
