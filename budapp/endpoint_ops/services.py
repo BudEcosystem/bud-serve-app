@@ -210,7 +210,6 @@ class EndpointService(SessionMixin):
                 f"Skipping bud cluster delete request - no bud_cluster_id provided for namespace {namespace}"
             )
             return {}
-
         delete_endpoint_url = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/delete"
         )

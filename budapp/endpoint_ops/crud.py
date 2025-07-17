@@ -97,7 +97,7 @@ class EndpointDataManager(DataManagerUtils):
             stmt = (
                 select(EndpointModel)
                 .join(Model)
-                .join(ClusterModel)
+                .outerjoin(ClusterModel)
                 .filter(or_(*search_conditions))
                 .filter(
                     and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
@@ -107,15 +107,15 @@ class EndpointDataManager(DataManagerUtils):
                 select(func.count())
                 .select_from(EndpointModel)
                 .join(Model)
-                .join(ClusterModel)
+                .outerjoin(ClusterModel)
                 .filter(and_(*search_conditions))
                 .filter(
                     and_(EndpointModel.status != EndpointStatusEnum.DELETED, EndpointModel.project_id == project_id)
                 )
             )
         else:
-            stmt = select(EndpointModel).join(Model).join(ClusterModel)
-            count_stmt = select(func.count()).select_from(EndpointModel).join(Model).join(ClusterModel)
+            stmt = select(EndpointModel).join(Model).outerjoin(ClusterModel)
+            count_stmt = select(func.count()).select_from(EndpointModel).join(Model).outerjoin(ClusterModel)
             for key, value in filters.items():
                 stmt = stmt.filter(getattr(EndpointModel, key) == value)
                 count_stmt = count_stmt.filter(getattr(EndpointModel, key) == value)
