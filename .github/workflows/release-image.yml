@@ -62,6 +62,16 @@ jobs:
           CLEAN_TAG=${RAW_TAG#v}
           echo "RELEASE_TAG=$CLEAN_TAG" >> $GITHUB_ENV
 
+      - name: Save private key to file
+        run: |
+          echo "${{ secrets.PRIVATE_KEY }}" > private_key.pem
+          chmod 600 private_key.pem
+
+      - name: Save public key to file
+        run: |
+          echo "${{ secrets.PUBLIC_KEY }}" > public_key.pem
+          chmod 600 public_key.pem
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
