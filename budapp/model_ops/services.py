@@ -3615,17 +3615,17 @@ class ModelService(SessionMixin):
         # For cloud models, we set replicas to 1 as they are API-based
         replicas = deploy_config.replicas if hasattr(deploy_config, "replicas") else 1
 
-        # For cloud models without a cluster, generate a dummy UUID v4
-        # This maintains schema compatibility while indicating no physical cluster
-        dummy_cluster_id = uuid4()  # Generate a valid UUID v4
-        effective_cluster_id = cluster_id if cluster_id else dummy_cluster_id
+        # For cloud models without a cluster, use None for cluster_id
+        # Generate a dummy UUID v4 for bud_cluster_id for compatibility
+        dummy_bud_cluster_id = uuid4()  # Generate a valid UUID v4 for bud_cluster_id
+        effective_bud_cluster_id = cluster_id if cluster_id else dummy_bud_cluster_id
 
         # Prepare endpoint data
         endpoint_data = EndpointCreate(
             project_id=project_id,
             model_id=model_id,
-            cluster_id=effective_cluster_id,
-            bud_cluster_id=effective_cluster_id,  # For cloud models, use same cluster_id
+            cluster_id=cluster_id,  # None for cloud models
+            bud_cluster_id=effective_bud_cluster_id,  # Use dummy for cloud models
             name=endpoint_name,
             url=deployment_url,
             namespace=namespace,

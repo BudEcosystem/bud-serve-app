@@ -142,7 +142,7 @@ class EndpointDataManager(DataManagerUtils):
         result = self.scalars_all(stmt)
 
         return result, count
-    
+
     async def get_all_running_endpoints(self, project_id: UUID) -> List[EndpointModel]:
         """Get all running endpoints for a given project."""
         stmt = select(EndpointModel).filter(
@@ -155,14 +155,20 @@ class EndpointDataManager(DataManagerUtils):
         return self.scalars_all(stmt)
 
     async def get_all_endpoints_in_cluster(
-        self, cluster_id: UUID, offset: int, limit: int, filters: Dict[str, Any], order_by: List[str], search: bool
+        self,
+        cluster_id: Optional[UUID],
+        offset: int,
+        limit: int,
+        filters: Dict[str, Any],
+        order_by: List[str],
+        search: bool,
     ) -> Tuple[List[EndpointModel], int, int, int]:
         """Get all endpoints in a cluster."""
         await self.validate_fields(EndpointModel, filters)
 
         # Base conditions
         base_conditions = [
-            EndpointModel.cluster_id == cluster_id,
+            EndpointModel.cluster_id == cluster_id if cluster_id else EndpointModel.cluster_id.is_(None),
             EndpointModel.status != EndpointStatusEnum.DELETED,
         ]
 
@@ -241,7 +247,7 @@ class EndpointDataManager(DataManagerUtils):
 
         return result, count
 
-    async def get_cluster_count_details(self, cluster_id: UUID) -> Tuple[int, int, int, int]:
+    async def get_cluster_count_details(self, cluster_id: Optional[UUID]) -> Tuple[int, int, int, int]:
         """Retrieve cluster statistics including:
         - Total endpoints count (excluding deleted ones)
         - Running endpoints count
@@ -264,7 +270,7 @@ class EndpointDataManager(DataManagerUtils):
             func.coalesce(
                 func.sum(EndpointModel.total_replicas).filter(EndpointModel.status != EndpointStatusEnum.DELETED), 0
             ).label("total_workers"),
-        ).where(EndpointModel.cluster_id == cluster_id)
+        ).where(EndpointModel.cluster_id == cluster_id if cluster_id else EndpointModel.cluster_id.is_(None))
 
         result = self.session.execute(query)
         total_endpoints, running_endpoints, active_replicas, total_replicas = result.fetchone()

@@ -521,7 +521,7 @@ class BenchmarkService(SessionMixin):
                 # benchmark_dict["model"] = ModelResponse.model_validate(db_benchmark.model).model_dump(
                 #     mode="json"
                 # )  # Ensure relationships are included
-                benchmark_dict["cluster"] = {**db_benchmark.cluster.__dict__}
+                benchmark_dict["cluster"] = {**db_benchmark.cluster.__dict__} if db_benchmark.cluster else None
                 benchmark_dict["tpot"] = (
                     round(benchmark_dict["result"].get("mean_tpot_ms", 0.0), 2) if benchmark_dict["result"] else 0.0
                 )
@@ -807,7 +807,7 @@ class BenchmarkRequestMetricsService(SessionMixin):
             query = f"""
                     WITH bins AS (
                         SELECT * FROM (VALUES
-                            {', '.join([f"({bin_id}, {bin_start}, {bin_end})" for bin_id, bin_start, bin_end in bins])}
+                            {", ".join([f"({bin_id}, {bin_start}, {bin_end})" for bin_id, bin_start, bin_end in bins])}
                         ) AS t(bin_id, bin_start, bin_end)
                     )
                     SELECT

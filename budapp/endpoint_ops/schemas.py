@@ -35,7 +35,7 @@ class EndpointCreate(BaseModel):
 
     project_id: UUID4
     model_id: UUID4
-    cluster_id: UUID4
+    cluster_id: Optional[UUID4] = None
     bud_cluster_id: UUID4
     name: str
     url: str
@@ -81,7 +81,7 @@ class EndpointListResponse(BaseModel):
     name: str
     status: EndpointStatusEnum
     model: ModelResponse
-    cluster: ClusterResponse
+    cluster: Optional[ClusterResponse] = None
     created_at: datetime
     modified_at: datetime
     is_deprecated: bool
@@ -147,6 +147,7 @@ class WorkerInfoResponse(PaginatedSuccessResponse):
 
     workers: list[WorkerInfo]
 
+
 class WorkerLogsResponse(SuccessResponse):
     """Worker logs response."""
 
@@ -171,7 +172,7 @@ class ModelClusterDetail(BaseModel):
     name: str
     status: str
     model: ModelDetailResponse
-    cluster: ClusterResponse
+    cluster: Optional[ClusterResponse] = None
     deployment_config: Optional[dict] = None
     running_worker_count: int | None = None
     crashed_worker_count: int | None = None
@@ -227,11 +228,10 @@ class WorkerMetricsResponse(SuccessResponse):
 
     model_config = ConfigDict(extra="allow")
 
-    metrics: Union[dict[str,Any], None] = None
+    metrics: Union[dict[str, Any], None] = None
 
 
 class AddAdapterRequest(BaseModel):
-
     workflow_id: UUID4 | None = None
     workflow_total_steps: int | None = None
     step_number: int = Field(..., gt=0)
@@ -251,6 +251,7 @@ class AddAdapterRequest(BaseModel):
 
         return self
 
+
 class AddAdapterWorkflowStepData(BaseModel):
     """Add adapter workflow step data."""
 
@@ -259,6 +260,7 @@ class AddAdapterWorkflowStepData(BaseModel):
     adapter_name: str | None = None
     adapter_model_id: UUID4 | None = None
     adapter_id: UUID4 | None = None
+
 
 class AdapterFilter(BaseModel):
     """Adapter filter."""
@@ -292,6 +294,7 @@ class VLLMConfig(BaseModel):
     model_name: str
     api_base: str
     api_key_location: str
+
 
 class ProxyModelConfig(BaseModel):
     """Proxy model config."""

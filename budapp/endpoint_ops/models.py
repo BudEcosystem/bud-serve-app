@@ -45,7 +45,7 @@ class Endpoint(Base, TimestampMixin):
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id", ondelete="CASCADE"), nullable=False)
     cache_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     cache_config: Mapped[str] = mapped_column(String, nullable=True)
-    cluster_id: Mapped[UUID] = mapped_column(ForeignKey("cluster.id", ondelete="CASCADE"), nullable=False)
+    cluster_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("cluster.id", ondelete="CASCADE"), nullable=True)
     bud_cluster_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     url: Mapped[str] = mapped_column(String, nullable=False)
     namespace: Mapped[str] = mapped_column(String, nullable=False)
@@ -88,7 +88,7 @@ class Endpoint(Base, TimestampMixin):
     # )
     project: Mapped[Project] = relationship("Project", back_populates="endpoints", foreign_keys=[project_id])
 
-    cluster: Mapped[Cluster] = relationship("Cluster", back_populates="endpoints", foreign_keys=[cluster_id])
+    cluster: Mapped[Optional[Cluster]] = relationship("Cluster", back_populates="endpoints", foreign_keys=[cluster_id])
     adapters: Mapped[list["Adapter"]] = relationship(back_populates="endpoint")
     created_user: Mapped["User"] = relationship(back_populates="created_endpoints", foreign_keys=[created_by])
     credential: Mapped[Optional["ProprietaryCredential"]] = relationship(
@@ -113,7 +113,7 @@ class Endpoint(Base, TimestampMixin):
             "model_id": str(self.model_id),
             "cache_enabled": self.cache_enabled,
             "cache_config": self.cache_config_dict,
-            "cluster_id": str(self.cluster_id),
+            "cluster_id": str(self.cluster_id) if self.cluster_id else None,
             "url": self.url,
             "namespace": self.namespace,
             "replicas": self.replicas,
@@ -130,13 +130,14 @@ class Endpoint(Base, TimestampMixin):
             model_id=UUID(data.get("model_id")),
             cache_enabled=data.get("cache_enabled"),
             cache_config=json.dumps(data.get("cache_config")),
-            cluster_id=UUID(data.get("cluster_id")),
+            cluster_id=UUID(data.get("cluster_id")) if data.get("cluster_id") else None,
             url=data.get("url"),
             namespace=data.get("namespace"),
             replicas=data.get("replicas"),
             created_at=datetime.fromisoformat(data.get("created_at")),
             modified_at=datetime.fromisoformat(data.get("modified_at")),
         )
+
 
 class Adapter(Base, TimestampMixin):
     """Adapter model."""
@@ -148,7 +149,10 @@ class Adapter(Base, TimestampMixin):
     endpoint_id: Mapped[UUID] = mapped_column(ForeignKey("endpoint.id", ondelete="CASCADE"), nullable=False)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id", ondelete="CASCADE"), nullable=False)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
-    status: Mapped[str] = mapped_column(Enum(AdapterStatusEnum, name="adapter_status_enum", values_callable=lambda x: [e.value for e in x]), nullable=False)
+    status: Mapped[str] = mapped_column(
+        Enum(AdapterStatusEnum, name="adapter_status_enum", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
     status_sync_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     endpoint: Mapped[Endpoint] = relationship("Endpoint", back_populates="adapters", foreign_keys=[endpoint_id])
