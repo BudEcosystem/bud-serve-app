@@ -188,9 +188,9 @@ jobs:
           sed -i 's/JWT_SECRET_KEY=.*/JWT_SECRET_KEY=test-secret-key-for-ci-testing-only/' .env
           sed -i 's/SUPER_USER_PASSWORD=.*/SUPER_USER_PASSWORD=test-password/' .env
           
-          # Generate test RSA keys for CI
-          openssl genrsa -out private_key.pem 2048
-          openssl rsa -in private_key.pem -pubout -out public_key.pem
+          # Generate test RSA keys for CI (with encryption)
+          openssl genrsa -aes256 -passout pass:bud_encryption_password -out private_key.pem 2048
+          openssl rsa -in private_key.pem -passin pass:bud_encryption_password -pubout -out public_key.pem
           
           # Show environment file for debugging (without sensitive data)
           echo "Environment file setup complete"
