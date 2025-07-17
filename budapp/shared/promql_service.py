@@ -1,10 +1,11 @@
-import requests
-import json
 import time
-from typing import Dict, List, Tuple, Any
-from budapp.cluster_ops.schemas import PrometheusConfig
-from fastapi import HTTPException
 from http import HTTPStatus
+from typing import Any, Dict, List, Tuple
+
+import requests
+from fastapi import HTTPException
+
+from budapp.cluster_ops.schemas import PrometheusConfig
 from budapp.commons.config import app_settings
 
 
@@ -89,7 +90,7 @@ class PrometheusMetricsClient:
                     node_status[node_name] = "NotReady"
 
             return node_status
-        except HTTPException as e:
+        except HTTPException:
             # Re-raise the HTTPException to maintain the status code
             raise
         except Exception as e:
@@ -304,9 +305,9 @@ class PrometheusMetricsClient:
             events_data = response.json()
             # Extract the events count for the specific node from the response
             # Assuming the response contains a mapping of node IPs to event counts
-            
-            # Fetch the node details 
-            
+
+            # Fetch the node details
+
             return events_data.get("data", {}).get(node_name, 0)
 
         except HTTPException as e:
@@ -327,7 +328,6 @@ class PrometheusMetricsClient:
 
     def get_nodes_status(self) -> Dict:
         """Get comprehensive node status information in JSON format."""
-
         nodes, pod_counts, node_status, max_pods, pod_status = self.get_node_info()
         nodes_json = {"nodes": {}}
 

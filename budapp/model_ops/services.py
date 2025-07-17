@@ -485,7 +485,7 @@ class CloudModelWorkflowService(SessionMixin):
         for db_step in db_workflow_steps:
             # Get current workflow step
             if db_step.step_number == current_step_number:
-                db_current_workflow_step = db_step
+                pass
 
             if "uri" in db_step.data:
                 db_step_uri = db_step.data["uri"]
@@ -1145,15 +1145,13 @@ class LocalModelWorkflowService(SessionMixin):
         # Create papers
         extracted_papers = model_info.get("papers", [])
         if extracted_papers:
-            db_papers = await self._create_papers_from_model_info(extracted_papers, db_model.id)
+            await self._create_papers_from_model_info(extracted_papers, db_model.id)
             logger.debug(f"Papers created for model {db_model.id}")
 
         # Create model licenses
         extracted_license = model_info.get("license", {})
         if extracted_license:
-            db_model_licenses = await self._create_model_licenses_from_model_info(
-                extracted_license, db_model.id, local_path
-            )
+            await self._create_model_licenses_from_model_info(extracted_license, db_model.id, local_path)
             logger.debug(f"Model licenses created for model {db_model.id}")
 
         # Update to workflow step
@@ -1384,10 +1382,7 @@ class LocalModelWorkflowService(SessionMixin):
             for faq in license_faqs:
                 faq_description = " ".join(faq.get("reason", [])).strip()
                 impact = faq.get("impact", "")
-                if impact == "POSITIVE":
-                    answer = "YES"
-                else:
-                    answer = "NO"
+                answer = "YES" if impact == "POSITIVE" else "NO"
                 updated_license_faqs.append(
                     {
                         "question": faq.get("question"),
@@ -1741,7 +1736,7 @@ class LocalModelWorkflowService(SessionMixin):
         )
 
         # Mark scan_verified according to overall scan status
-        scan_verified = True if overall_scan_status == ModelSecurityScanStatusEnum.SAFE else False
+        scan_verified = overall_scan_status == ModelSecurityScanStatusEnum.SAFE
 
         db_model = await ModelDataManager(self.session).update_by_fields(
             db_model,
@@ -2551,7 +2546,7 @@ class ModelService(SessionMixin):
         }
 
         # Insert step details in db
-        db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+        await WorkflowStepDataManager(self.session).insert_one(
             WorkflowStepModel(
                 workflow_id=db_workflow.id,
                 step_number=current_step_number,
@@ -2885,17 +2880,15 @@ class ModelService(SessionMixin):
 
         logger.debug(f"Performing top leaderboard by uris request to budmodel {query_params}")
         try:
-            async with (
-                aiohttp.ClientSession() as session,
-                session.get(bud_model_endpoint, params=query_params) as response,
-            ):
-                response_data = await response.json()
-                if response.status != 200:
-                    logger.error(f"Failed to fetch top leaderboards: {response.status} {response_data}")
-                    raise ClientException("Failed to fetch top leaderboards")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(bud_model_endpoint, params=query_params) as response:
+                    response_data = await response.json()
+                    if response.status != 200:
+                        logger.error(f"Failed to fetch top leaderboards: {response.status} {response_data}")
+                        raise ClientException("Failed to fetch top leaderboards")
 
-                logger.debug("Successfully fetched top leaderboards from budmodel")
-                return response_data
+                    logger.debug("Successfully fetched top leaderboards from budmodel")
+                    return response_data
         except Exception as e:
             logger.exception(f"Failed to send top leaderboard by uris request: {e}")
             raise ClientException("Failed to fetch top leaderboards") from e
@@ -2952,17 +2945,15 @@ class ModelService(SessionMixin):
 
         logger.debug(f"Performing leaderboard by uri request to budmodel {query_params}")
         try:
-            async with (
-                aiohttp.ClientSession() as session,
-                session.get(bud_model_endpoint, params=query_params) as response,
-            ):
-                response_data = await response.json()
-                if response.status != 200:
-                    logger.error(f"Failed to fetch leaderboards: {response.status} {response_data}")
-                    raise ClientException("Failed to fetch leaderboards")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(bud_model_endpoint, params=query_params) as response:
+                    response_data = await response.json()
+                    if response.status != 200:
+                        logger.error(f"Failed to fetch leaderboards: {response.status} {response_data}")
+                        raise ClientException("Failed to fetch leaderboards")
 
-                logger.debug("Successfully fetched leaderboards from budmodel")
-                return response_data
+                    logger.debug("Successfully fetched leaderboards from budmodel")
+                    return response_data
         except Exception as e:
             logger.exception(f"Failed to send leaderboard by uris request: {e}")
             raise ClientException("Failed to fetch leaderboards") from e
@@ -3037,9 +3028,7 @@ class ModelService(SessionMixin):
 
         # Validate template
         if template_id:
-            db_template = await ModelTemplateDataManager(self.session).retrieve_by_fields(
-                ModelTemplateModel, {"id": template_id}
-            )
+            await ModelTemplateDataManager(self.session).retrieve_by_fields(ModelTemplateModel, {"id": template_id})
 
         # Validate cluster
         if cluster_id:
@@ -3053,7 +3042,7 @@ class ModelService(SessionMixin):
 
         # Validate credential
         if credential_id:
-            db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_by_fields(
+            await ProprietaryCredentialDataManager(self.session).retrieve_by_fields(
                 ProprietaryCredentialModel, {"id": credential_id}
             )
 
@@ -3386,22 +3375,21 @@ class ModelService(SessionMixin):
 
         # Perform recommended cluster simulation
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    recommended_cluster_endpoint, json=recommended_cluster_request.model_dump()
-                ) as response:
-                    response_data = await response.json()
-                    if response.status >= 400:
-                        raise ClientException("Unable to perform recommended cluster simulation")
+            async with aiohttp.ClientSession() as session, session.post(
+                recommended_cluster_endpoint, json=recommended_cluster_request.model_dump()
+            ) as response:
+                response_data = await response.json()
+                if response.status >= 400:
+                    raise ClientException("Unable to perform recommended cluster simulation")
 
-                    # Add payload key to steps
-                    if "steps" in response_data:
-                        steps = response_data["steps"]
-                        for step in steps:
-                            step["payload"] = {}
-                        response_data["steps"] = steps
+                # Add payload key to steps
+                if "steps" in response_data:
+                    steps = response_data["steps"]
+                    for step in steps:
+                        step["payload"] = {}
+                    response_data["steps"] = steps
 
-                    return response_data
+                return response_data
         except ClientException as e:
             raise e
         except Exception as e:
@@ -3467,7 +3455,7 @@ class ModelService(SessionMixin):
             source_topic=app_settings.source_topic,
             credential_id=credential_id,
             podscaler=scaling_specification,
-            provider=db_model.source
+            provider=db_model.source,
         )
         model_deployment_endpoint = (
             f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"

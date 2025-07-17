@@ -1,4 +1,4 @@
-"""updated notes and message table
+"""updated notes and message table.
 
 Revision ID: 36428218a248
 Revises: f94d2a607eb9
@@ -8,9 +8,10 @@ Create Date: 2025-03-06 06:09:07.209383
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision: str = "36428218a248"

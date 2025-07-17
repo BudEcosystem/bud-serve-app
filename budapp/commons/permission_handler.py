@@ -1,7 +1,7 @@
 from functools import wraps
 from typing import Callable, List, Optional, Union
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from keycloak.exceptions import KeycloakAuthenticationError
 from sqlalchemy.orm import Session
 
@@ -102,7 +102,7 @@ async def check_resource_based_permissions(
 
 def require_permissions(
     permissions: Union[PermissionEnum, List[PermissionEnum]] | None = None,
-    roles: Union[UserRoleEnum, List[UserRoleEnum]] | None = None
+    roles: Union[UserRoleEnum, List[UserRoleEnum]] | None = None,
 ):
     """Decorator to check if user has required Keycloak roles or authorization scopes.
 
@@ -132,7 +132,7 @@ def require_permissions(
 
             logger.debug(f"::PERMISSION::Checking permissions for user: {current_user.id}")
             logger.debug(f"::PERMISSION::Resource headers - Type: {x_resource_type}, Entity ID: {x_entity_id}")
-            
+
             # Superuser shortcut
             if current_user.is_superuser:
                 return await func(current_user=current_user, session=session, *args, **kwargs)
@@ -172,7 +172,7 @@ def require_permissions(
                     id=tenant_client.id,
                     client_id=tenant_client.client_id,
                     client_named_id=tenant_client.client_named_id,
-                    client_secret=tenant_client.client_secret
+                    client_secret=tenant_client.client_secret,
                 )
                 openid = keycloak_manager.get_keycloak_openid_client(realm_name, credentials)
 
@@ -191,7 +191,7 @@ def require_permissions(
                             token=current_user.raw_token,
                             permissions=permissions_str,
                             resource_server_id=credentials.client_id,
-                            submit_request=False
+                            submit_request=False,
                         )
 
                         logger.debug(f"::PERMISSION:: UMA Permissions: {uma_permissions}")
@@ -210,8 +210,7 @@ def require_permissions(
                     except Exception as e:
                         logger.warning(f"::PERMISSION:: User {current_user.id} lacks required permissions: {str(e)}")
                         raise HTTPException(
-                            status_code=status.HTTP_403_FORBIDDEN,
-                            detail="Insufficient permissions for this operation"
+                            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for this operation"
                         )
 
             return await func(current_user=current_user, session=session, *args, **kwargs)

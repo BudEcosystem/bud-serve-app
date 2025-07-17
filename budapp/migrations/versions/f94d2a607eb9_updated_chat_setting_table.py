@@ -1,4 +1,4 @@
-"""updated chat setting table
+"""updated chat setting table.
 
 Revision ID: f94d2a607eb9
 Revises: 1003edcadb5d
@@ -8,9 +8,10 @@ Create Date: 2025-03-05 04:51:50.958104
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision: str = "f94d2a607eb9"

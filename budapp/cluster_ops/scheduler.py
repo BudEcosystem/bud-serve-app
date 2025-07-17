@@ -207,19 +207,17 @@ class RecommendedClusterScheduler:
 
         logger.debug(f"Performing bud simulator request {payload}")
         try:
-            async with (
-                aiohttp.ClientSession() as session,
-                session.post(bud_simulator_endpoint, json=payload) as response,
-            ):
-                response_data = await response.json()
-                if response.status != 200:
-                    logger.error(f"Failed to fetch bud simulator response: {response.status} {response_data}")
-                    raise ClientException(
-                        "Failed to fetch bud simulator response", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-                    )
+            async with aiohttp.ClientSession() as session:
+                async with session.post(bud_simulator_endpoint, json=payload) as response:
+                    response_data = await response.json()
+                    if response.status != 200:
+                        logger.error(f"Failed to fetch bud simulator response: {response.status} {response_data}")
+                        raise ClientException(
+                            "Failed to fetch bud simulator response", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
 
-                logger.debug(f"Successfully fetched bud simulator response{response_data}")
-                return response_data
+                    logger.debug(f"Successfully fetched bud simulator response{response_data}")
+                    return response_data
         except Exception as e:
             logger.exception(f"Failed to send bud simulator request: {e}")
             raise ClientException(

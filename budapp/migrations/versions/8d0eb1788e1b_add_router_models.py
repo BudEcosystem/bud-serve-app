@@ -1,19 +1,21 @@
-"""add router models
+"""add router models.
 
 Revision ID: 8d0eb1788e1b
 Revises: 1da691d14fd0
 Create Date: 2025-03-24 09:47:51.805210
 
 """
+
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
+
 # revision identifiers, used by Alembic.
-revision: str = '8d0eb1788e1b'
-down_revision: Union[str, None] = '1da691d14fd0'
+revision: str = "8d0eb1788e1b"
+down_revision: Union[str, None] = "1da691d14fd0"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -45,32 +47,40 @@ def upgrade() -> None:
     # sa.ForeignKeyConstraint(['user_id'], ['user.id'], name=op.f('fk_cloud_credentials_user_id_user'), ondelete='CASCADE'),
     # sa.PrimaryKeyConstraint('id', name=op.f('pk_cloud_credentials'))
     # )
-    op.create_table('router',
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('project_id', sa.Uuid(), nullable=False),
-    sa.Column('name', sa.String(), nullable=False),
-    sa.Column('description', sa.String(), nullable=False),
-    sa.Column('tags', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('routing_strategy', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('modified_at', sa.DateTime(timezone=True), nullable=False),
-    sa.ForeignKeyConstraint(['project_id'], ['project.id'], name=op.f('fk_router_project_id_project'), ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id', name=op.f('pk_router'))
+    op.create_table(
+        "router",
+        sa.Column("id", sa.Uuid(), nullable=False),
+        sa.Column("project_id", sa.Uuid(), nullable=False),
+        sa.Column("name", sa.String(), nullable=False),
+        sa.Column("description", sa.String(), nullable=False),
+        sa.Column("tags", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("routing_strategy", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("modified_at", sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["project_id"], ["project.id"], name=op.f("fk_router_project_id_project"), ondelete="CASCADE"
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_router")),
     )
-    op.create_table('router_endpoint',
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('router_id', sa.Uuid(), nullable=False),
-    sa.Column('endpoint_id', sa.Uuid(), nullable=False),
-    sa.Column('fallback_endpoint_ids', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('tpm', sa.Float(), nullable=True),
-    sa.Column('rpm', sa.Float(), nullable=True),
-    sa.Column('weight', sa.Float(), nullable=True),
-    sa.Column('cool_down_period', sa.Integer(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('modified_at', sa.DateTime(timezone=True), nullable=False),
-    sa.ForeignKeyConstraint(['endpoint_id'], ['endpoint.id'], name=op.f('fk_router_endpoint_endpoint_id_endpoint'), ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['router_id'], ['router.id'], name=op.f('fk_router_endpoint_router_id_router'), ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id', name=op.f('pk_router_endpoint'))
+    op.create_table(
+        "router_endpoint",
+        sa.Column("id", sa.Uuid(), nullable=False),
+        sa.Column("router_id", sa.Uuid(), nullable=False),
+        sa.Column("endpoint_id", sa.Uuid(), nullable=False),
+        sa.Column("fallback_endpoint_ids", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("tpm", sa.Float(), nullable=True),
+        sa.Column("rpm", sa.Float(), nullable=True),
+        sa.Column("weight", sa.Float(), nullable=True),
+        sa.Column("cool_down_period", sa.Integer(), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("modified_at", sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["endpoint_id"], ["endpoint.id"], name=op.f("fk_router_endpoint_endpoint_id_endpoint"), ondelete="CASCADE"
+        ),
+        sa.ForeignKeyConstraint(
+            ["router_id"], ["router.id"], name=op.f("fk_router_endpoint_router_id_router"), ondelete="CASCADE"
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_router_endpoint")),
     )
     # op.add_column('cluster', sa.Column('cluster_type', sa.String(), nullable=False))
     # op.add_column('cluster', sa.Column('cloud_provider_id', sa.Uuid(), nullable=True))
@@ -91,8 +101,8 @@ def downgrade() -> None:
     # op.drop_column('cluster', 'credential_id')
     # op.drop_column('cluster', 'cloud_provider_id')
     # op.drop_column('cluster', 'cluster_type')
-    op.drop_table('router_endpoint')
-    op.drop_table('router')
+    op.drop_table("router_endpoint")
+    op.drop_table("router")
     # op.drop_table('cloud_credentials')
     # op.drop_table('cloud_providers')
     # ### end Alembic commands ###

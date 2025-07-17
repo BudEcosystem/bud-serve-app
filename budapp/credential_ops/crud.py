@@ -110,7 +110,7 @@ class CredentialDataManager(DataManagerUtils):
         return
 
     async def delete_credential_by_fields(self, fields: Dict):
-        """Delete credentials by fields"""
+        """Delete credentials by fields."""
         await self.validate_fields(CredentialModel, fields)
 
         if len(fields) == 0:
@@ -124,14 +124,10 @@ class CredentialDataManager(DataManagerUtils):
             self.session.commit()
         except SQLAlchemyError as e:
             logger.error(f"Query execution failed. Error: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e._message()
-            ) from None
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e._message()) from None
         except Exception as e:
             logger.error(f"Query execution failed. Error: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-            ) from None
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)) from None
 
 
 class ProprietaryCredentialDataManager(DataManagerUtils):
@@ -217,7 +213,7 @@ class ProprietaryCredentialDataManager(DataManagerUtils):
         await self.delete_one(db_credential)
 
     async def delete_credential_by_fields(self, fields: Dict):
-        """Delete credentials by fields"""
+        """Delete credentials by fields."""
         await self.validate_fields(ProprietaryCredentialModel, fields)
 
         if len(fields) == 0:
@@ -231,14 +227,10 @@ class ProprietaryCredentialDataManager(DataManagerUtils):
             self.session.commit()
         except SQLAlchemyError as e:
             logger.error(f"Query execution failed. Error: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e._message()
-            ) from None
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e._message()) from None
         except Exception as e:
             logger.error(f"Query execution failed. Error: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-            ) from None
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)) from None
 
 
 class CloudProviderDataManager(DataManagerUtils):
@@ -249,12 +241,14 @@ class CloudProviderDataManager(DataManagerUtils):
         stmt = select(CloudProviders)
         return self.scalars_all(stmt)
 
+
 class CloudProviderCredentialDataManager(DataManagerUtils):
     """Data manager for the CloudProviderCredential model."""
 
-    async def get_credentials_by_user(self, user_id: UUID, provider_id: Optional[UUID] = None) -> list[CloudCredentials]:
-        """
-        Get cloud provider credentials by user ID, optionally filtered by provider ID.
+    async def get_credentials_by_user(
+        self, user_id: UUID, provider_id: Optional[UUID] = None
+    ) -> list[CloudCredentials]:
+        """Get cloud provider credentials by user ID, optionally filtered by provider ID.
 
         Args:
             user_id: The ID of the user whose credentials to retrieve

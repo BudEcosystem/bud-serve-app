@@ -28,6 +28,7 @@ from budapp.permissions.models import ProjectPermission
 from ..commons.constants import ProjectStatusEnum
 from ..permissions.models import ProjectPermission
 
+
 project_user_association = Table(
     "project_user_association",
     Base.metadata,

@@ -1,4 +1,4 @@
-"""modified endpoint and cluster table
+"""modified endpoint and cluster table.
 
 Revision ID: 33225f9cc055
 Revises: 28422b983323
@@ -8,9 +8,10 @@ Create Date: 2025-03-14 13:11:53.342345
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision: str = "33225f9cc055"

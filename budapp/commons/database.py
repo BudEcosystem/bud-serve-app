@@ -21,9 +21,9 @@ import os
 from alembic import command
 from alembic.config import Config
 from budmicroframe.shared.psql_service import PSQLBase, TimestampMixin  # noqa: F401
+from pydantic import PostgresDsn
 from sqlalchemy import Engine, MetaData, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
-from pydantic import PostgresDsn
 
 from . import logging
 from .config import app_settings, secrets_settings

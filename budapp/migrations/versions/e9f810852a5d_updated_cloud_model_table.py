@@ -1,4 +1,4 @@
-"""updated cloud model table
+"""updated cloud model table.
 
 Revision ID: e9f810852a5d
 Revises: 33225f9cc055
@@ -8,9 +8,10 @@ Create Date: 2025-03-18 03:46:28.169177
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision: str = "e9f810852a5d"

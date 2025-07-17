@@ -17,7 +17,8 @@ from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.model_ops.crud import ProviderDataManager
 
 # from ..models import Route as RouteModel
-from budapp.model_ops.models import Model, Provider as ProviderModel
+from budapp.model_ops.models import Model
+from budapp.model_ops.models import Provider as ProviderModel
 from budapp.permissions.crud import PermissionDataManager, ProjectPermissionDataManager
 from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.services import ProjectService
@@ -120,11 +121,13 @@ class CredentialService(SessionMixin):
 
         return db_credential
 
-    async def update_proxy_cache(self, project_id: UUID, api_key: Optional[str] = None, expiry: Optional[datetime] = None):
+    async def update_proxy_cache(
+        self, project_id: UUID, api_key: Optional[str] = None, expiry: Optional[datetime] = None
+    ):
         """Update the proxy cache in Redis with the latest endpoints and adapters for a given project.
 
         This method collects all active endpoints and adapters associated with the specified project,
-        maps their names to their IDs with additional metadata (model_id, project_id), and updates 
+        maps their names to their IDs with additional metadata (model_id, project_id), and updates
         the Redis cache with this information.
 
         Args:
@@ -145,14 +148,14 @@ class CredentialService(SessionMixin):
             keys_to_update.append({"api_key": api_key, "expiry": expiry})
 
         models = {}
-        
+
         # Get endpoints with their model_id and project_id
         endpoints = await EndpointDataManager(self.session).get_all_running_endpoints(project_id)
         for endpoint in endpoints:
             models[endpoint.name] = {
                 "endpoint_id": str(endpoint.id),
                 "model_id": str(endpoint.model_id),
-                "project_id": str(endpoint.project_id)
+                "project_id": str(endpoint.project_id),
             }
 
         # Get adapters with their model_id and project_id
@@ -162,7 +165,7 @@ class CredentialService(SessionMixin):
             models[adapter.name] = {
                 "endpoint_id": str(adapter.id),
                 "model_id": str(adapter.model_id),
-                "project_id": str(project_id)  # Adapters don't have direct project_id, use the passed project_id
+                "project_id": str(project_id),  # Adapters don't have direct project_id, use the passed project_id
             }
 
         redis_service = RedisService()
@@ -171,7 +174,7 @@ class CredentialService(SessionMixin):
             ttl = None
             if key["expiry"]:
                 ttl = int((key["expiry"] - datetime.now()).total_seconds())
-            await redis_service.set(f"api_key:{key['api_key']}", json.dumps({key['api_key']: models}), ex=ttl)
+            await redis_service.set(f"api_key:{key['api_key']}", json.dumps({key["api_key"]: models}), ex=ttl)
 
         logger.info("Updated api keys in proxy cache")
 
@@ -226,7 +229,7 @@ class CredentialService(SessionMixin):
         return bud_serve_credentials
 
     async def delete_credential(self, credential_id: UUID, user_id: UUID) -> None:
-        """Delete the credential from the database"""
+        """Delete the credential from the database."""
         # Retrieve the credential from the database
         db_credential = await CredentialDataManager(self.session).retrieve_credential_by_fields(
             {"id": credential_id, "user_id": user_id}
@@ -256,7 +259,7 @@ class CredentialService(SessionMixin):
         return
 
     async def update_credential(self, data: CredentialUpdate, credential_id: UUID, user_id: UUID) -> CredentialModel:
-        """Update the OpenAI or HuggingFace credential in the database"""
+        """Update the OpenAI or HuggingFace credential in the database."""
         # Check if credential exists
         db_credential = await CredentialDataManager(self.session).retrieve_credential_by_fields({"id": credential_id})
 
@@ -465,7 +468,6 @@ class CredentialService(SessionMixin):
         api_base = f"{db_endpoint.url}/v1"
         deploy_model_uri = f"{db_adapter.deployment_name}"
         actual_model_name = f"openai/{deploy_model_uri}"
-
 
         model_config = ModelConfig(
             model_name=db_adapter.deployment_name,
@@ -795,7 +797,7 @@ class ProprietaryCredentialService(SessionMixin):
         return db_credential
 
     async def delete_credential(self, credential_id: UUID, current_user_id: UUID):
-        """Delete the proprietary credential from the database"""
+        """Delete the proprietary credential from the database."""
         # Retrieve the credential from the database
         db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_credential_by_fields(
             {"id": credential_id}
@@ -812,8 +814,8 @@ class ProprietaryCredentialService(SessionMixin):
             project_names = [endpoint.project.name for endpoint in endpoints]
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"""Credential is associated with deployed models in the below projects : 
-                {", ".join(project_names)}. 
+                detail=f"""Credential is associated with deployed models in the below projects :
+                {", ".join(project_names)}.
                 Please delete the deployed models first or link other credentials to those models for deleting this credential""",
             )
 
@@ -823,7 +825,7 @@ class ProprietaryCredentialService(SessionMixin):
     async def get_credential_details(
         self, credential_id: UUID, detailed_view: bool = False
     ) -> Union[ProprietaryCredentialModel, ProprietaryCredentialDetailedView]:
-        """Get details of a proprietary credential"""
+        """Get details of a proprietary credential."""
         db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_credential_by_fields(
             {"id": credential_id}
         )
@@ -870,8 +872,7 @@ class ClusterProviderService(SessionMixin):
     """ClusterProviderService is a service class that provides cluster-related operations."""
 
     async def create_provider_credential(self, req: CloudProvidersCreateRequest, current_user_id: UUID) -> None:
-        """
-        Create a new credential for a provider.
+        """Create a new credential for a provider.
 
         Args:
             req: CloudProvidersCreateRequest containing provider_id and credential_values
@@ -936,8 +937,7 @@ class ClusterProviderService(SessionMixin):
             ) from None
 
     def _get_schema_definition(self, schema_definition: Union[Dict[str, Any], str]) -> Dict[str, Any]:
-        """
-        Parse the schema_definition which could be a dict or a JSON string.
+        """Parse the schema_definition which could be a dict or a JSON string.
 
         Args:
             schema_definition: The schema definition as either a dict or JSON string
@@ -961,8 +961,7 @@ class ClusterProviderService(SessionMixin):
             return {}  # Return empty dict as fallback
 
     async def get_provider_regions(self, unique_id: str) -> List[Dict[str, Any]]:
-        """
-        Get the regions supported by a specific cloud provider.
+        """Get the regions supported by a specific cloud provider.
 
         Args:
             provider: The cloud provider entity
@@ -970,7 +969,6 @@ class ClusterProviderService(SessionMixin):
         Returns:
             List of regions as dictionaries with at least 'id' and 'name' keys
         """
-
         provider_regions = {
             "aws": [
                 {"id": "us-east-1", "name": "US East (N. Virginia)"},

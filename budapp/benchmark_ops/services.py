@@ -33,7 +33,6 @@ from ..credential_ops.models import ProprietaryCredential as ProprietaryCredenti
 from ..dataset_ops.models import DatasetCRUD
 from ..dataset_ops.schemas import DatasetResponse
 from ..endpoint_ops.schemas import ModelClusterDetail
-from ..endpoint_ops.services import EndpointService
 from ..model_ops.crud import ModelDataManager, ProviderDataManager
 from ..model_ops.models import Model
 from ..model_ops.models import Provider as ProviderModel
@@ -807,7 +806,7 @@ class BenchmarkRequestMetricsService(SessionMixin):
             query = f"""
                     WITH bins AS (
                         SELECT * FROM (VALUES
-                            {', '.join([f"({bin_id}, {bin_start}, {bin_end})" for bin_id, bin_start, bin_end in bins])}
+                            {", ".join([f"({bin_id}, {bin_start}, {bin_end})" for bin_id, bin_start, bin_end in bins])}
                         ) AS t(bin_id, bin_start, bin_end)
                     )
                     SELECT

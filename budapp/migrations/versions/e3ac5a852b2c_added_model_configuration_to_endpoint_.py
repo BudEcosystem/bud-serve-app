@@ -1,4 +1,4 @@
-"""added model configuration to endpoint table
+"""added model configuration to endpoint table.
 
 Revision ID: e3ac5a852b2c
 Revises: 0c7fdc4b7072
@@ -8,9 +8,10 @@ Create Date: 2024-12-24 05:44:36.018289
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision: str = "e3ac5a852b2c"

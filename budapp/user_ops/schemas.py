@@ -65,6 +65,7 @@ class UserResponse(SuccessResponse):
 
     user: UserInfo
 
+
 class TenantClientSchema(BaseModel):
     """Tenant client schema."""
 
@@ -73,8 +74,9 @@ class TenantClientSchema(BaseModel):
     client_named_id: str
     client_secret: str
 
+
 class UserCreate(UserBase):
-    """Create user schema"""
+    """Create user schema."""
 
     password: str = Field(min_length=8, max_length=100)
     permissions: List[PermissionList] | None = None
@@ -97,14 +99,15 @@ class UserCreate(UserBase):
 
 
 class UserFilter(BaseModel):
-    """Filter user schema"""
+    """Filter user schema."""
 
     name: str | None = None
     email: str | None = None
     role: UserRoleEnum | None = None
 
+
 class UserUpdate(BaseModel):
-    """Update user schema"""
+    """Update user schema."""
 
     name: str | None = Field(None, min_length=1, max_length=100)
     password: str | None = Field(None, min_length=8, max_length=100)
@@ -127,20 +130,21 @@ class UserUpdate(BaseModel):
 
 
 class MyPermissions(SuccessResponse):
-    """User permissions schema"""
+    """User permissions schema."""
 
     model_config = ConfigDict(from_attributes=True)
     permissions: List[Dict[str, Union[str, List[str]]]] = []
 
+
 class UserPermissions(SuccessResponse):
-    """User permissions schema"""
+    """User permissions schema."""
 
     model_config = ConfigDict(from_attributes=True)
     result: Any
 
 
 class UserListResponse(PaginatedSuccessResponse):
-    """User list response to client schema"""
+    """User list response to client schema."""
 
     model_config = ConfigDict(extra="ignore")
 
@@ -148,13 +152,13 @@ class UserListResponse(PaginatedSuccessResponse):
 
 
 class UserListFilter(UserFilter):
-    """Filter user list schema"""
+    """Filter user list schema."""
 
     status: UserStatusEnum | None = None
 
 
 class ResetPasswordResponse(SuccessResponse):
-    """Reset password response schema"""
+    """Reset password response schema."""
 
     acknowledged: bool
     status: str
@@ -162,7 +166,7 @@ class ResetPasswordResponse(SuccessResponse):
 
 
 class ResetPasswordRequest(BaseModel):
-    """Reset password request schema"""
+    """Reset password request schema."""
 
     email: EmailStr = Field(min_length=1, max_length=100)
     tenant_id: UUID4 | None = Field(

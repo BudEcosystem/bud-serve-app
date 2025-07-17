@@ -27,7 +27,6 @@ from fastapi import status
 from budapp.commons import logging
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.schemas import BudNotificationMetadata
-from budapp.model_ops.schemas import Model
 from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.models import Project as ProjectModel
 
@@ -52,10 +51,11 @@ from ..commons.constants import (
 )
 from ..commons.exceptions import ClientException, RedisException
 from ..core.schemas import NotificationPayload, NotificationResult
+from ..credential_ops.services import CredentialService
 from ..model_ops.crud import ModelDataManager, ProviderDataManager
 from ..model_ops.models import Model as ModelsModel
 from ..model_ops.models import Provider as ProviderModel
-from ..model_ops.services import ModelService, ModelServiceUtil
+from ..model_ops.services import ModelServiceUtil
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..shared.redis_service import RedisService
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
@@ -63,7 +63,6 @@ from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
 from ..workflow_ops.services import WorkflowService, WorkflowStepService
-from ..credential_ops.services import CredentialService
 from .crud import AdapterDataManager, EndpointDataManager
 from .models import Adapter as AdapterModel
 from .models import Endpoint as EndpointModel
@@ -163,7 +162,7 @@ class EndpointService(SessionMixin):
         }
 
         # Insert step details in db
-        db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+        await WorkflowStepDataManager(self.session).insert_one(
             WorkflowStepModel(
                 workflow_id=db_workflow.id,
                 step_number=current_step_number,
@@ -322,7 +321,7 @@ class EndpointService(SessionMixin):
         number_of_nodes = payload.content.result.get("number_of_nodes")
         total_replicas = payload.content.result["deployment_status"]["replicas"]["total"]
         node_list = payload.content.result.get("deploy_config", [])
-        supported_endpoints = payload.content.result['deployment_status'].get("supported_endpoints", {})
+        supported_endpoints = payload.content.result["deployment_status"].get("supported_endpoints", {})
 
         # Handle both list and dict formats
         if isinstance(supported_endpoints, dict):
@@ -418,7 +417,9 @@ class EndpointService(SessionMixin):
         logger.debug(f"Endpoint created successfully: {db_endpoint.id}")
 
         # Update proxy cache for project
-        await self.add_model_to_proxy_cache(db_endpoint.id, db_endpoint.namespace, "vllm", db_endpoint.url, enabled_endpoints)
+        await self.add_model_to_proxy_cache(
+            db_endpoint.id, db_endpoint.namespace, "vllm", db_endpoint.url, enabled_endpoints
+        )
         await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
         logger.debug(f"Updated proxy cache for project {db_endpoint.project_id}")
 
@@ -698,7 +699,6 @@ class EndpointService(SessionMixin):
     async def get_model_cluster_detail(self, endpoint_id: UUID) -> ModelClusterDetail:
         """Get model cluster detail."""
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})
-        model_id = db_endpoint.model_id
         # Commented out since it is same as a db retrieve
         # model_detail_json_response = await ModelService(self.session).retrieve_model(model_id)
         # model_detail = json.loads(model_detail_json_response.body.decode("utf-8"))
@@ -966,7 +966,7 @@ class EndpointService(SessionMixin):
         }
 
         # Insert step details in db
-        db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+        await WorkflowStepDataManager(self.session).insert_one(
             WorkflowStepModel(
                 workflow_id=db_workflow.id,
                 step_number=current_step_number,
@@ -1507,7 +1507,7 @@ class EndpointService(SessionMixin):
             # Assign project_id
             project_id = db_endpoint.project_id
 
-        #validate base model id
+        # validate base model id
         if adapter_model_id:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
                 ModelsModel,
@@ -1516,15 +1516,16 @@ class EndpointService(SessionMixin):
                     "status": ModelStatusEnum.ACTIVE,
                     "base_model_relation": BaseModelRelationEnum.ADAPTER,
                     # "base_model": [db_endpoint.model_id],
-                }
+                },
             )
             if not db_model:
                 raise ClientException("Adapter model not found")
 
             db_adapters = await AdapterDataManager(self.session).retrieve_by_fields(
-                AdapterModel, {"model_id": adapter_model_id, "endpoint_id": endpoint_id},
+                AdapterModel,
+                {"model_id": adapter_model_id, "endpoint_id": endpoint_id},
                 missing_ok=True,
-                exclude_fields={"status": AdapterStatusEnum.DELETED}
+                exclude_fields={"status": AdapterStatusEnum.DELETED},
             )
             logger.debug(f"db_adapters: {db_adapters}")
 
@@ -1533,17 +1534,19 @@ class EndpointService(SessionMixin):
 
         if adapter_name:
             db_adapters = await AdapterDataManager(self.session).retrieve_by_fields(
-                AdapterModel, {"name": adapter_name, "endpoint_id": endpoint_id},
+                AdapterModel,
+                {"name": adapter_name, "endpoint_id": endpoint_id},
                 missing_ok=True,
-                exclude_fields={"status": AdapterStatusEnum.DELETED}
+                exclude_fields={"status": AdapterStatusEnum.DELETED},
             )
             if db_adapters:
                 raise ClientException("Adapter name is already taken in the endpoint")
 
             db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-                EndpointModel, {"name": adapter_name, "project_id": project_id},
+                EndpointModel,
+                {"name": adapter_name, "project_id": project_id},
                 missing_ok=True,
-                exclude_fields={"status": EndpointStatusEnum.DELETED}
+                exclude_fields={"status": EndpointStatusEnum.DELETED},
             )
             if db_endpoint:
                 raise ClientException("Name already taken in the project")
@@ -1615,11 +1618,7 @@ class EndpointService(SessionMixin):
             )
 
             # Define the keys required for model extraction
-            keys_of_interest = [
-                "endpoint_id",
-                "adapter_name",
-                "adapter_model_id"
-            ]
+            keys_of_interest = ["endpoint_id", "adapter_name", "adapter_model_id"]
 
             # from workflow steps extract necessary information
             required_data = {}
@@ -1634,24 +1633,26 @@ class EndpointService(SessionMixin):
             if missing_keys:
                 raise ClientException(f"Missing required data for add worker to deployment: {', '.join(missing_keys)}")
 
-            if not required_data['adapter_name']:
+            if not required_data["adapter_name"]:
                 raise ClientException("Adapter name is required")
 
             db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-                EndpointModel, {"id": required_data["endpoint_id"]}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+                EndpointModel,
+                {"id": required_data["endpoint_id"]},
+                exclude_fields={"status": EndpointStatusEnum.DELETED},
             )
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
-                ModelsModel,{"id": required_data["adapter_model_id"]}
+                ModelsModel, {"id": required_data["adapter_model_id"]}
             )
             # Get base model
             required_data["adapter_model_uri"] = db_model.local_path
             required_data["namespace"] = db_endpoint.namespace
             required_data["endpoint_name"] = db_endpoint.name
-            required_data["adapters"], required_data['adapter_name'] = await self._get_adapters_by_endpoint(
+            required_data["adapters"], required_data["adapter_name"] = await self._get_adapters_by_endpoint(
                 db_endpoint.id,
                 required_data["namespace"],
                 required_data["adapter_name"],
-                required_data["adapter_model_uri"]
+                required_data["adapter_model_uri"],
             )
 
             db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
@@ -1671,12 +1672,7 @@ class EndpointService(SessionMixin):
         return db_workflow
 
     async def _get_adapters_by_endpoint(
-        self,
-        endpoint_id: UUID,
-        endpoint_name: str,
-        adapter_name: str,
-        adapter_model_uri: str,
-        adapter_id: UUID = None
+        self, endpoint_id: UUID, endpoint_name: str, adapter_name: str, adapter_model_uri: str, adapter_id: UUID = None
     ) -> Tuple[List[AdapterModel], str]:
         db_adapters = await AdapterDataManager(self.session).get_all_by_fields(
             AdapterModel, {"endpoint_id": endpoint_id}, exclude_fields={"id": adapter_id}
@@ -1684,16 +1680,20 @@ class EndpointService(SessionMixin):
 
         adapters = []
         if db_adapters:
-            adapters = [{"name": adapter.deployment_name, "artifactURL": adapter.model.local_path} for adapter in db_adapters]
+            adapters = [
+                {"name": adapter.deployment_name, "artifactURL": adapter.model.local_path} for adapter in db_adapters
+            ]
 
-        deployment_name = ''
+        deployment_name = ""
         if not adapter_id:
             deployment_name = endpoint_name + "-" + adapter_name
             adapters.append({"name": deployment_name, "artifactURL": adapter_model_uri})
 
         return adapters, deployment_name
 
-    async def _trigger_adapter_deployment(self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID) -> Dict:
+    async def _trigger_adapter_deployment(
+        self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID
+    ) -> Dict:
         """Trigger adapter deployment."""
         # Create request payload
         payload = {
@@ -1737,13 +1737,9 @@ class EndpointService(SessionMixin):
             db_workflow, {"progress": deployment_response, "current_step": workflow_current_step}
         )
 
-    async def _perform_adapter_deployment_request(
-        self, payload: Dict
-    ) -> None:
+    async def _perform_adapter_deployment_request(self, payload: Dict) -> None:
         """Perform adapter deployment request."""
-        quantize_endpoint = (
-            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/deploy-adapter"
-        )
+        quantize_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/deploy-adapter"
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -1759,7 +1755,7 @@ class EndpointService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to perform adapter deployment request: {e}")
             raise ClientException("Unable to perform adapter deployment") from e
-    
+
     async def get_adapters_by_endpoint(
         self,
         endpoint_id: UUID,
@@ -1767,7 +1763,7 @@ class EndpointService(SessionMixin):
         offset: int = 0,
         limit: int = 10,
         order_by: List[Tuple[str, str]] = [],
-        search: bool = False
+        search: bool = False,
     ) -> List[AdapterModel]:
         """Get all active adapters for a given endpoint.
 
@@ -1800,11 +1796,7 @@ class EndpointService(SessionMixin):
         )
 
         # Define the keys required for model extraction
-        keys_of_interest = [
-            "endpoint_id",
-            "adapter_name",
-            "adapter_model_id"
-        ]
+        keys_of_interest = ["endpoint_id", "adapter_name", "adapter_model_id"]
 
         # from workflow steps extract necessary information
         required_data = {}
@@ -1816,9 +1808,13 @@ class EndpointService(SessionMixin):
         # Check for adapter with duplicate name
         db_adapter = await AdapterDataManager(self.session).retrieve_by_fields(
             AdapterModel,
-            {"name": required_data["adapter_name"], "endpoint_id": required_data["endpoint_id"], "status": AdapterStatusEnum.RUNNING},
+            {
+                "name": required_data["adapter_name"],
+                "endpoint_id": required_data["endpoint_id"],
+                "status": AdapterStatusEnum.RUNNING,
+            },
             missing_ok=True,
-            case_sensitive=False
+            case_sensitive=False,
         )
         if db_adapter:
             logger.error(f"Unable to create adapter with name {required_data['adapter_name']} as it already exists")
@@ -1832,7 +1828,7 @@ class EndpointService(SessionMixin):
             model_id=required_data["adapter_model_id"],
             created_by=db_workflow.created_by,
             status=AdapterStatusEnum.RUNNING,
-            status_sync_at=datetime.now()
+            status_sync_at=datetime.now(),
         )
 
         # Insert the adapter into the database
@@ -1846,7 +1842,6 @@ class EndpointService(SessionMixin):
         }
 
         current_step_number = db_workflow.current_step + 1
-        workflow_current_step = current_step_number
 
         # Update or create next workflow step
         db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
@@ -1867,14 +1862,13 @@ class EndpointService(SessionMixin):
                 icon=model_icon,
                 result=NotificationResult(target_id=db_adapter.id, target_type="endpoint").model_dump(
                     exclude_none=True, exclude_unset=True
-                )
+                ),
             )
             .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.ADAPTER_DEPLOYMENT_SUCCESS.value)
             .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
             .build()
         )
         await BudNotifyService().send_notification(notification_request)
-
 
     async def delete_adapter_workflow(self, current_user_id: UUID, adapter_id: UUID) -> None:
         """Delete an adapter."""
@@ -1909,7 +1903,9 @@ class EndpointService(SessionMixin):
             EndpointModel, {"id": db_adapter.endpoint_id}
         )
 
-        adapters, _ = await self._get_adapters_by_endpoint(db_adapter.endpoint_id, db_endpoint.name, db_adapter.name, db_adapter.model.local_path, db_adapter.id)
+        adapters, _ = await self._get_adapters_by_endpoint(
+            db_adapter.endpoint_id, db_endpoint.name, db_adapter.name, db_adapter.model.local_path, db_adapter.id
+        )
         # Create request payload
         payload = {
             "endpoint_name": db_endpoint.name,
@@ -1949,7 +1945,7 @@ class EndpointService(SessionMixin):
         }
 
         # Insert step details in db
-        db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+        await WorkflowStepDataManager(self.session).insert_one(
             WorkflowStepModel(
                 workflow_id=db_workflow.id,
                 step_number=step_number,
@@ -1981,9 +1977,7 @@ class EndpointService(SessionMixin):
         )
 
         # Define the keys required for model extraction
-        keys_of_interest = [
-            "adapter_id"
-        ]
+        keys_of_interest = ["adapter_id"]
 
         # from workflow steps extract necessary information
         required_data = {}
@@ -1996,10 +1990,8 @@ class EndpointService(SessionMixin):
             AdapterModel, {"id": required_data["adapter_id"]}
         )
 
-        #Mark adapter as deleted
-        await AdapterDataManager(self.session).update_by_fields(
-            db_adapter, {"status": AdapterStatusEnum.DELETED}
-        )
+        # Mark adapter as deleted
+        await AdapterDataManager(self.session).update_by_fields(db_adapter, {"status": AdapterStatusEnum.DELETED})
         logger.debug(f"Adapter {db_adapter.id} marked as deleted")
 
         # Update proxy cache to remove the deleted adapter
@@ -2014,9 +2006,7 @@ class EndpointService(SessionMixin):
             logger.error(f"Failed to update proxy cache after adapter deletion: {e}")
 
         # Mark workflow as completed
-        await WorkflowDataManager(self.session).update_by_fields(
-            db_workflow, {"status": WorkflowStatusEnum.COMPLETED}
-        )
+        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"status": WorkflowStatusEnum.COMPLETED})
 
         # Send notification to workflow creator
         model_icon = await ModelServiceUtil(self.session).get_model_icon(db_adapter.model)
@@ -2036,12 +2026,17 @@ class EndpointService(SessionMixin):
         )
         await BudNotifyService().send_notification(notification_request)
 
-    async def add_model_to_proxy_cache(self, endpoint_id: UUID, model_name: str, model_type: str, api_base: str, supported_endpoints: Union[List[str], Dict[str, bool]]) -> None:
+    async def add_model_to_proxy_cache(
+        self,
+        endpoint_id: UUID,
+        model_name: str,
+        model_type: str,
+        api_base: str,
+        supported_endpoints: Union[List[str], Dict[str, bool]],
+    ) -> None:
         """Add model to proxy cache for a project."""
-
         endpoints = []
-        
-            
+
         for support_endpoint in supported_endpoints:
             try:
                 enum_member = ModelEndpointEnum(support_endpoint)
@@ -2054,17 +2049,16 @@ class EndpointService(SessionMixin):
             routing=[ProxyProviderEnum.VLLM.value],
             providers={
                 ProxyProviderEnum.VLLM.value: VLLMConfig(
-                    type=model_type,
-                    model_name=model_name,
-                    api_base=api_base + "/v1",
-                    api_key_location="none"
+                    type=model_type, model_name=model_name, api_base=api_base + "/v1", api_key_location="none"
                 )
             },
-            endpoints=endpoints
+            endpoints=endpoints,
         )
 
         redis_service = RedisService()
-        await redis_service.set(f"model_table:{endpoint_id}", json.dumps({str(endpoint_id): model_config.model_dump()}))
+        await redis_service.set(
+            f"model_table:{endpoint_id}", json.dumps({str(endpoint_id): model_config.model_dump()})
+        )
 
     async def delete_model_from_proxy_cache(self, endpoint_id: UUID) -> None:
         """Delete model from proxy cache for a project."""

@@ -28,8 +28,8 @@ from cryptography.hazmat.primitives.asymmetric.types import (
 )
 from passlib.context import CryptContext
 
-from .config import secrets_settings
 from . import logging
+from .config import secrets_settings
 
 
 logger = logging.get_logger(__name__)
@@ -145,7 +145,6 @@ class AESHandler:
 
     async def encrypt(self, message: Any) -> str:
         """Encrypt a message using the symmetric key."""
-
         encoded_message = message.encode("utf-8")
         encrypted_message = self.fernet.encrypt(encoded_message)
 
@@ -154,7 +153,6 @@ class AESHandler:
 
     async def decrypt(self, encrypted_message: str) -> str:
         """Decrypt a message using the symmetric key."""
-
         try:
             # Convert the encrypted message from a hex string to bytes
             encrypted_message_bytes = bytes.fromhex(encrypted_message)

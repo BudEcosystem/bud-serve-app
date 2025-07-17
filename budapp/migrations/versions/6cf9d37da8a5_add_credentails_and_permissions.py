@@ -1,4 +1,4 @@
-"""add credentails and permissions
+"""add credentails and permissions.
 
 Revision ID: 6cf9d37da8a5
 Revises: 28422b983323
@@ -8,9 +8,9 @@ Create Date: 2025-03-19 15:00:39.288952
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+from alembic import op
+
 
 # revision identifiers, used by Alembic.
 revision: str = "6cf9d37da8a5"
