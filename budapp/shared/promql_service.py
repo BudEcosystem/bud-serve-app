@@ -24,7 +24,7 @@ class PrometheusMetricsClient:
             else:
                 full_query = query
 
-            response = requests.get(f"{self.config.base_url}/api/v1/query", params={"query": full_query})
+            response = requests.get(f"{self.config.base_url}/api/v1/query", params={"query": full_query}, timeout=30)
 
             if response.status_code != 200:
                 raise HTTPException(
@@ -63,6 +63,7 @@ class PrometheusMetricsClient:
         response = requests.get(
             f"{self.config.base_url}/api/v1/query_range",
             params={"query": full_query, "start": start_time, "end": end_time, "step": step},
+            timeout=30,
         )
 
         if response.status_code != 200:
@@ -290,7 +291,7 @@ class PrometheusMetricsClient:
                 f"/cluster/{self.config.cluster_id}/events-count-by-node"
             )
 
-            response = requests.get(create_cluster_endpoint)
+            response = requests.get(create_cluster_endpoint, timeout=30)
 
             if response.status_code != 200:
                 raise HTTPException(

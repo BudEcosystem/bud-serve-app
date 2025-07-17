@@ -1892,7 +1892,7 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Download and save the image
         try:
-            response = requests.get(img_url)
+            response = requests.get(img_url, timeout=30)
             response.raise_for_status()
 
             # Save the image locally

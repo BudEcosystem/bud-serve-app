@@ -90,7 +90,20 @@ if __name__ == "__main__":
     params = {"dataset_id": dataset_id}
     # calculate distribution bins
     with BenchmarkRequestMetricsCRUD() as crud:
-        query = f"SELECT MAX({distribution_type}) FROM benchmark_request_metrics WHERE dataset_id = :dataset_id"
+        # Use parameterized query to prevent SQL injection
+        if distribution_type == "prompt_len":
+            query = "SELECT MAX(prompt_len) FROM benchmark_request_metrics WHERE dataset_id = :dataset_id"
+        elif distribution_type == "completion_len":
+            query = "SELECT MAX(completion_len) FROM benchmark_request_metrics WHERE dataset_id = :dataset_id"
+        elif distribution_type == "ttft":
+            query = "SELECT MAX(ttft) FROM benchmark_request_metrics WHERE dataset_id = :dataset_id"
+        elif distribution_type == "tpot":
+            query = "SELECT MAX(tpot) FROM benchmark_request_metrics WHERE dataset_id = :dataset_id"
+        elif distribution_type == "latency":
+            query = "SELECT MAX(latency) FROM benchmark_request_metrics WHERE dataset_id = :dataset_id"
+        else:
+            raise ValueError(f"Invalid distribution_type: {distribution_type}")
+
         if benchmark_id:
             query += " AND benchmark_id = :benchmark_id"
             params["benchmark_id"] = benchmark_id
