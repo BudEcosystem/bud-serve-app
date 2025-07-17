@@ -91,7 +91,6 @@ from ..core.schemas import NotificationPayload, NotificationResult
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..endpoint_ops.schemas import EndpointCreate
-from ..endpoint_ops.services import EndpointService
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
 from ..shared.minio_store import ModelStore
@@ -3256,18 +3255,15 @@ class ModelService(SessionMixin):
                     if key in db_workflow_step.data:
                         required_data[key] = db_workflow_step.data[key]
 
+            # Base required keys for all deployments
             required_keys = [
                 "model_id",
                 "project_id",
-                "cluster_id",
-                # "created_by",
-                # "replicas",
                 "endpoint_name",
-                "simulator_id",
                 "deploy_config",
-                "scaling_specification",
             ]
 
+            # Check model type to determine additional required keys
             if "model_id" in required_data:
                 db_model = await ModelDataManager(self.session).retrieve_by_fields(
                     Model,
@@ -3275,7 +3271,11 @@ class ModelService(SessionMixin):
                 )
 
                 if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+                    # Cloud models need credential but not cluster/simulator
                     required_keys.append("credential_id")
+                else:
+                    # Local models need cluster and simulator info
+                    required_keys.extend(["cluster_id", "simulator_id", "scaling_specification"])
 
             # Check if all required keys are present
             missing_keys = [key for key in required_keys if key not in required_data]
@@ -3308,10 +3308,13 @@ class ModelService(SessionMixin):
                 logger.info("Using direct endpoint creation for cloud model deployment")
 
                 # Create endpoint directly without calling budcluster
+                # For cloud models, cluster_id is optional
+                cluster_id = UUID(required_data["cluster_id"]) if "cluster_id" in required_data else None
+
                 db_endpoint = await self._create_endpoint_directly(
                     model_id=UUID(required_data["model_id"]),
                     project_id=UUID(required_data["project_id"]),
-                    cluster_id=UUID(required_data["cluster_id"]),
+                    cluster_id=cluster_id,
                     endpoint_name=required_data["endpoint_name"],
                     deploy_config=DeploymentTemplateCreate(**required_data["deploy_config"]),
                     workflow_id=db_workflow.id,
@@ -3556,7 +3559,7 @@ class ModelService(SessionMixin):
         self,
         model_id: UUID,
         project_id: UUID,
-        cluster_id: UUID,
+        cluster_id: Optional[UUID],
         endpoint_name: str,
         deploy_config: DeploymentTemplateCreate,
         workflow_id: UUID,
@@ -3568,7 +3571,7 @@ class ModelService(SessionMixin):
         Args:
             model_id: The model ID to deploy
             project_id: The project ID for the endpoint
-            cluster_id: The cluster ID for the endpoint
+            cluster_id: Optional cluster ID (not required for cloud models)
             endpoint_name: The name of the endpoint
             deploy_config: Deployment configuration
             workflow_id: The workflow ID for tracking
@@ -3588,9 +3591,15 @@ class ModelService(SessionMixin):
         # For cloud models, get the cloud model details for supported endpoints
         if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
             db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
-                CloudModel, {"id": db_model.cloud_model_id}
+                CloudModel,
+                fields={
+                    "status": CloudModelStatusEnum.ACTIVE,
+                    "source": db_model.source,
+                    "uri": db_model.uri,
+                    "provider_id": db_model.provider_id,
+                },
             )
-            supported_endpoints = db_cloud_model.supported_endpoints
+            supported_endpoints = db_cloud_model.supported_endpoints if db_cloud_model else []
         else:
             # This should not happen as this method is only for cloud models
             raise ClientException("Direct endpoint creation is only supported for cloud models")
@@ -3606,12 +3615,17 @@ class ModelService(SessionMixin):
         # For cloud models, we set replicas to 1 as they are API-based
         replicas = deploy_config.replicas if hasattr(deploy_config, "replicas") else 1
 
+        # For cloud models without a cluster, generate a dummy UUID v4
+        # This maintains schema compatibility while indicating no physical cluster
+        dummy_cluster_id = uuid4()  # Generate a valid UUID v4
+        effective_cluster_id = cluster_id if cluster_id else dummy_cluster_id
+
         # Prepare endpoint data
         endpoint_data = EndpointCreate(
             project_id=project_id,
             model_id=model_id,
-            cluster_id=cluster_id,
-            bud_cluster_id=cluster_id,  # For cloud models, use same cluster_id
+            cluster_id=effective_cluster_id,
+            bud_cluster_id=effective_cluster_id,  # For cloud models, use same cluster_id
             name=endpoint_name,
             url=deployment_url,
             namespace=namespace,
@@ -3628,7 +3642,9 @@ class ModelService(SessionMixin):
         )
 
         # Create the endpoint in database
-        db_endpoint = await EndpointDataManager(self.session).insert_one(endpoint_data.model_dump())
+        db_endpoint = await EndpointDataManager(self.session).insert_one(
+            EndpointModel(**endpoint_data.model_dump(exclude_unset=True, exclude_none=True))
+        )
 
         logger.info(f"Successfully created endpoint {db_endpoint.id} for cloud model {model_id}")
 
@@ -3637,6 +3653,9 @@ class ModelService(SessionMixin):
         model_type = db_model.source.lower() if db_model.source else "openai"
 
         # Add model to proxy cache
+        # Import here to avoid circular import
+        from ..endpoint_ops.services import EndpointService
+
         endpoint_service = EndpointService(self.session)
         await endpoint_service.add_model_to_proxy_cache(
             endpoint_id=db_endpoint.id,
