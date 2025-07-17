@@ -157,12 +157,17 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Setup Dapr
-        uses: dapr/setup-dapr@v1
-        with:
-          version: ${{ env.DAPR_VERSION }}
-          install-cli: true
-          install-runtime: true
+      - name: Install Dapr CLI
+        run: |
+          # Download and install Dapr CLI manually
+          curl -fsSL https://raw.githubusercontent.com/dapr/cli/master/install/install.sh | bash -s -- --version ${{ env.DAPR_VERSION }}
+          sudo mv ./dapr /usr/local/bin/dapr
+          dapr --version
+
+      - name: Initialize Dapr
+        run: |
+          dapr init --runtime-version ${{ env.DAPR_VERSION }}
+          dapr --version
 
       - name: Create Dapr components directory
         run: |
