@@ -192,6 +192,9 @@ jobs:
           openssl genrsa -aes256 -passout pass:bud_encryption_password -out private_key.pem 2048
           openssl rsa -in private_key.pem -passin pass:bud_encryption_password -pubout -out public_key.pem
           
+          # Set AES key for testing (32 bytes = 256 bits in hex)
+          echo "AES_KEY_HEX=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" >> .env
+          
           # Show environment file for debugging (without sensitive data)
           echo "Environment file setup complete"
 
