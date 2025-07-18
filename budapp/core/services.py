@@ -95,6 +95,7 @@ class NotificationService(SessionMixin):
         await self._update_workflow_progress(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value, payload)
 
         # Create endpoint when deployment is completed
+        # Note: Cloud models create endpoints directly and don't use this notification path
         if payload.event == "results":
             await EndpointService(self.session).create_endpoint_from_notification_event(payload)
 
