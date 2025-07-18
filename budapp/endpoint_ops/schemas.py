@@ -296,9 +296,125 @@ class VLLMConfig(BaseModel):
     api_key_location: str
 
 
+class OpenAIConfig(BaseModel):
+    """OpenAI provider config."""
+
+    type: str = "openai"
+    model_name: str
+
+
+class AnthropicConfig(BaseModel):
+    """Anthropic provider config."""
+
+    type: str = "anthropic"
+    model_name: str
+
+
+class AWSBedrockConfig(BaseModel):
+    """AWS Bedrock provider config."""
+
+    type: str = "aws_bedrock"
+    model_id: str
+    region: str
+
+
+class AWSSageMakerConfig(BaseModel):
+    """AWS SageMaker provider config."""
+
+    type: str = "aws_sagemaker"
+    endpoint_name: str
+    region: str
+    model_name: str
+    hosted_provider: str
+
+
+class AzureConfig(BaseModel):
+    """Azure OpenAI provider config."""
+
+    type: str = "azure"
+    deployment_id: str
+    endpoint: str
+
+
+class DeepSeekConfig(BaseModel):
+    """DeepSeek provider config."""
+
+    type: str = "deepseek"
+    model_name: str
+
+
+class FireworksConfig(BaseModel):
+    """Fireworks provider config."""
+
+    type: str = "fireworks"
+    model_name: str
+
+
+class GCPVertexConfig(BaseModel):
+    """GCP Vertex AI provider config."""
+
+    type: str = "gcp-vertex"
+    project_id: str
+    region: str
+    model_name: str
+
+
+class GoogleAIStudioConfig(BaseModel):
+    """Google AI Studio provider config."""
+
+    type: str = "google-ai-studio"
+    model_name: str
+
+
+class HyperbolicConfig(BaseModel):
+    """Hyperbolic provider config."""
+
+    type: str = "hyperbolic"
+    model_name: str
+
+
+class MistralConfig(BaseModel):
+    """Mistral provider config."""
+
+    type: str = "mistral"
+    model_name: str
+
+
+class TogetherConfig(BaseModel):
+    """Together provider config."""
+
+    type: str = "together"
+    model_name: str
+
+
+class XAIConfig(BaseModel):
+    """XAI provider config."""
+
+    type: str = "xai"
+    model_name: str
+
+
+ProviderConfig = Union[
+    VLLMConfig,
+    OpenAIConfig,
+    AnthropicConfig,
+    AWSBedrockConfig,
+    AWSSageMakerConfig,
+    AzureConfig,
+    DeepSeekConfig,
+    FireworksConfig,
+    GCPVertexConfig,
+    GoogleAIStudioConfig,
+    HyperbolicConfig,
+    MistralConfig,
+    TogetherConfig,
+    XAIConfig,
+]
+
+
 class ProxyModelConfig(BaseModel):
     """Proxy model config."""
 
     routing: list[ProxyProviderEnum]
-    providers: dict[ProxyProviderEnum, VLLMConfig]
+    providers: dict[ProxyProviderEnum, ProviderConfig]
     endpoints: list[str]

@@ -711,6 +711,18 @@ class ProxyProviderEnum(StrEnum):
 
     VLLM = "vllm"
     OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    AWS_BEDROCK = "aws-bedrock"
+    AWS_SAGEMAKER = "aws-sagemaker"
+    AZURE = "azure"
+    DEEPSEEK = "deepseek"
+    FIREWORKS = "fireworks"
+    GCP_VERTEX = "gcp-vertex"
+    GOOGLE_AI_STUDIO = "google-ai-studio"
+    HYPERBOLIC = "hyperbolic"
+    MISTRAL = "mistral"
+    TOGETHER = "together"
+    XAI = "xai"
 
 # class ModelTemplateTypeEnum(StrEnum):
 #     """Model template types."""

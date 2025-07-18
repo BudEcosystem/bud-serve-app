@@ -71,11 +71,24 @@ from .schemas import (
     AddAdapterWorkflowStepData,
     AddWorkerRequest,
     AddWorkerWorkflowStepData,
+    AnthropicConfig,
+    AWSBedrockConfig,
+    AWSSageMakerConfig,
+    AzureConfig,
+    DeepSeekConfig,
     EndpointCreate,
+    FireworksConfig,
+    GCPVertexConfig,
+    GoogleAIStudioConfig,
+    HyperbolicConfig,
+    MistralConfig,
     ModelClusterDetail,
+    OpenAIConfig,
     ProxyModelConfig,
+    TogetherConfig,
     VLLMConfig,
     WorkerInfoFilter,
+    XAIConfig,
 )
 
 
@@ -2121,13 +2134,90 @@ class EndpointService(SessionMixin):
             except ValueError:
                 logger.debug(f"Support endpoint {support_endpoint} is not a valid ModelEndpointEnum")
         logger.debug(f"Supported Endpoints: {endpoints}")
+
+        # Map model_type to ProxyProviderEnum
+        provider_mapping = {
+            "openai": ProxyProviderEnum.OPENAI,
+            "anthropic": ProxyProviderEnum.ANTHROPIC,
+            "aws-bedrock": ProxyProviderEnum.AWS_BEDROCK,
+            "bedrock": ProxyProviderEnum.AWS_BEDROCK,  # Handle both formats
+            "aws-sagemaker": ProxyProviderEnum.AWS_SAGEMAKER,
+            "sagemaker": ProxyProviderEnum.AWS_SAGEMAKER,  # Handle both formats
+            "azure": ProxyProviderEnum.AZURE,
+            "deepseek": ProxyProviderEnum.DEEPSEEK,
+            "fireworks": ProxyProviderEnum.FIREWORKS,
+            "gcp-vertex": ProxyProviderEnum.GCP_VERTEX,
+            "vertex-ai": ProxyProviderEnum.GCP_VERTEX,  # Handle alternate format
+            "google-ai-studio": ProxyProviderEnum.GOOGLE_AI_STUDIO,
+            "hyperbolic": ProxyProviderEnum.HYPERBOLIC,
+            "mistral": ProxyProviderEnum.MISTRAL,
+            "together": ProxyProviderEnum.TOGETHER,
+            "xai": ProxyProviderEnum.XAI,
+            "vllm": ProxyProviderEnum.VLLM,
+        }
+
+        # Get the provider enum, default to VLLM if not found
+        provider_enum = provider_mapping.get(model_type.lower(), ProxyProviderEnum.VLLM)
+
+        # Create the appropriate provider config based on the provider type
+        if provider_enum == ProxyProviderEnum.VLLM:
+            provider_config = VLLMConfig(
+                type=model_type, model_name=model_name, api_base=api_base + "/v1", api_key_location="none"
+            )
+        elif provider_enum == ProxyProviderEnum.OPENAI:
+            provider_config = OpenAIConfig(model_name=model_name)
+        elif provider_enum == ProxyProviderEnum.ANTHROPIC:
+            provider_config = AnthropicConfig(model_name=model_name)
+        elif provider_enum == ProxyProviderEnum.AWS_BEDROCK:
+            # TODO: Need to pass region and model_id from somewhere
+            provider_config = AWSBedrockConfig(
+                model_id=model_name,  # Using model_name as model_id for now
+                region="us-east-1",  # Default region, should be configurable
+            )
+        elif provider_enum == ProxyProviderEnum.AWS_SAGEMAKER:
+            # TODO: Need to pass endpoint_name, region, and hosted_provider
+            provider_config = AWSSageMakerConfig(
+                endpoint_name=model_name,  # Using model_name as endpoint_name for now
+                region="us-east-1",  # Default region
+                model_name=model_name,
+                hosted_provider="openai",  # Default, should be configurable
+            )
+        elif provider_enum == ProxyProviderEnum.AZURE:
+            # TODO: Need to pass deployment_id and endpoint
+            provider_config = AzureConfig(
+                deployment_id=model_name,  # Using model_name as deployment_id for now
+                endpoint=api_base,  # Using api_base as endpoint
+            )
+        elif provider_enum == ProxyProviderEnum.DEEPSEEK:
+            provider_config = DeepSeekConfig(model_name=model_name)
+        elif provider_enum == ProxyProviderEnum.FIREWORKS:
+            provider_config = FireworksConfig(model_name=model_name)
+        elif provider_enum == ProxyProviderEnum.GCP_VERTEX:
+            # TODO: Need to pass project_id and region
+            provider_config = GCPVertexConfig(
+                project_id="default-project",  # Should be configurable
+                region="us-central1",  # Default region
+                model_name=model_name,
+            )
+        elif provider_enum == ProxyProviderEnum.GOOGLE_AI_STUDIO:
+            provider_config = GoogleAIStudioConfig(model_name=model_name)
+        elif provider_enum == ProxyProviderEnum.HYPERBOLIC:
+            provider_config = HyperbolicConfig(model_name=model_name)
+        elif provider_enum == ProxyProviderEnum.MISTRAL:
+            provider_config = MistralConfig(model_name=model_name)
+        elif provider_enum == ProxyProviderEnum.TOGETHER:
+            provider_config = TogetherConfig(model_name=model_name)
+        elif provider_enum == ProxyProviderEnum.XAI:
+            provider_config = XAIConfig(model_name=model_name)
+        else:
+            # Default fallback to VLLM config
+            provider_config = VLLMConfig(
+                type=model_type, model_name=model_name, api_base=api_base + "/v1", api_key_location="none"
+            )
+
         model_config = ProxyModelConfig(
-            routing=[ProxyProviderEnum.VLLM.value],
-            providers={
-                ProxyProviderEnum.VLLM.value: VLLMConfig(
-                    type=model_type, model_name=model_name, api_base=api_base + "/v1", api_key_location="none"
-                )
-            },
+            routing=[provider_enum],
+            providers={provider_enum: provider_config},
             endpoints=endpoints,
         )
 
