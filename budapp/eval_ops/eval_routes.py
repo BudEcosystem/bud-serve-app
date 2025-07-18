@@ -34,6 +34,7 @@ router = APIRouter(prefix="/experiments", tags=["experiments"])
 
 logger = logging.get_logger(__name__)
 
+
 @router.post(
     "/",
     response_model=CreateExperimentResponse,
@@ -197,21 +198,21 @@ async def experiment_workflow_step(
     """Process a step in the experiment creation workflow.
 
     This endpoint handles the multi-stage experiment creation process:
-    
+
     **Step 1: Basic Information**
     - Required: name, project_id
     - Optional: description
-    
+
     **Step 2: Model Selection**
     - Required: model_ids (list of model UUIDs)
-    
+
     **Step 3: Traits Selection**
     - Required: trait_ids (list of trait UUIDs)
     - Optional: dataset_ids (specific datasets)
-    
+
     **Step 4: Performance Point**
     - Required: performance_point (integer between 0-100)
-    
+
     **Step 5: Finalization**
     - Optional: run_name, run_description, evaluation_config
     - Set trigger_workflow=true to create the experiment
@@ -252,12 +253,12 @@ async def review_experiment_workflow(
 
     This endpoint allows you to review all data collected during the experiment creation workflow.
     It returns the complete workflow state including:
-    
+
     - Current step and total steps
     - All accumulated data from completed steps
     - Workflow status and completion state
     - Next step information (if not complete)
-    
+
     Useful for:
     - Reviewing data before final submission
     - Checking workflow progress
@@ -279,7 +280,6 @@ async def review_experiment_workflow(
     except Exception as e:
         logger.debug(f"Failed to review experiment workflow: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to review workflow") from e
-
 
 
 @router.get(
@@ -429,7 +429,6 @@ def delete_run(
     )
 
 
-
 @router.get(
     "/traits",
     response_model=ListTraitsResponse,
@@ -495,9 +494,7 @@ def list_datasets(
             domains=domains.split(",") if domains else None,
         )
 
-        datasets, total_count = ExperimentService(session).list_datasets(
-            offset=offset, limit=limit, filters=filters
-        )
+        datasets, total_count = ExperimentService(session).list_datasets(offset=offset, limit=limit, filters=filters)
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to list datasets") from e
 

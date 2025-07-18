@@ -107,8 +107,6 @@ class RunWithResults(BaseModel):
         from_attributes = True
 
 
-
-
 class ListRunsResponse(SuccessResponse):
     """Response schema for listing runs."""
 

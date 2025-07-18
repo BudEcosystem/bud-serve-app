@@ -1,7 +1,7 @@
 """Schema definitions for evaluation dataset manifest."""
 
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -43,7 +43,7 @@ class TraitCategory(BaseModel):
 
 class TraitDefinition(BaseModel):
     """Individual trait definition."""
-    
+
     name: str
     description: str
     icon: str
@@ -79,7 +79,7 @@ class DatasetMetadata(BaseModel):
     # Access control
     requires_auth: Optional[bool] = False
     privacy_level: Optional[str] = None
-    
+
     # Token estimates
     estimated_input_tokens: Optional[int] = None
     estimated_output_tokens: Optional[int] = None

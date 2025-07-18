@@ -106,8 +106,6 @@ class EvalDataSyncWorkflows:
             logger.info(f"Current version: {current_version}")
             logger.info(f"Manifest version: {manifest.version_info.current_version}")
 
-
-
             # Check if sync is needed
             if force_sync or current_version != manifest.version_info.current_version:
                 logger.info(
@@ -124,7 +122,7 @@ class EvalDataSyncWorkflows:
                         db,
                         manifest.version_info.current_version,
                         "in_progress",
-                        {"source": "local" if app_settings.eval_sync_local_mode else "cloud"}
+                        {"source": "local" if app_settings.eval_sync_local_mode else "cloud"},
                     )
 
                 # Sync dataset metadata
@@ -140,8 +138,8 @@ class EvalDataSyncWorkflows:
                             "synced_datasets": sync_results["synced_datasets"],
                             "failed_datasets": sync_results["failed_datasets"],
                             "total_datasets": sync_results.get("total_datasets", 0),
-                            "source": "local" if app_settings.eval_sync_local_mode else "cloud"
-                        }
+                            "source": "local" if app_settings.eval_sync_local_mode else "cloud",
+                        },
                     )
 
                 result.update(
@@ -160,20 +158,20 @@ class EvalDataSyncWorkflows:
 
             # Record sync failure if we have a manifest version
             try:
-                if 'manifest' in locals() and manifest:
+                if "manifest" in locals() and manifest:
                     with Session(engine) as db:
                         sync_service.record_sync_results(
                             db,
                             manifest.version_info.current_version,
                             "failed",
-                            {"error": str(e), "source": "local" if app_settings.eval_sync_local_mode else "cloud"}
+                            {"error": str(e), "source": "local" if app_settings.eval_sync_local_mode else "cloud"},
                         )
             except Exception as record_error:
                 logger.error(f"Failed to record sync failure: {record_error}")
 
             return {"checked": False, "error": str(e), "message": "Failed to sync evaluation data"}
 
-    @dapr_workflow.register_workflow # type: ignore
+    @dapr_workflow.register_workflow  # type: ignore
     @staticmethod
     def run_eval_data_sync(ctx: wf.DaprWorkflowContext, payload: Dict[str, Any]):
         """Run the evaluation data synchronization workflow.

@@ -32,8 +32,6 @@ class RunStatusEnum(PyEnum):
     DELETED = "deleted"
 
 
-
-
 class ModalityEnum(PyEnum):
     TEXT = "text"  # Textual data, e.g., documents, sentences
     IMAGE = "image"  # Image data, e.g., photographs, diagrams
@@ -91,8 +89,6 @@ class Run(Base, TimestampMixin):
     raw_results = relationship("ExpRawResult", back_populates="run", cascade="all, delete-orphan")
 
 
-
-
 # ------------------------ Lookup Tables ------------------------
 
 
@@ -117,12 +113,7 @@ class ExpTrait(Base, TimestampMixin):
     icon: Mapped[str] = mapped_column(String, nullable=True)
 
     # Relationships
-    datasets = relationship(
-        "ExpDataset",
-        secondary="exp_traits_dataset_pivot",
-        back_populates="traits",
-        lazy="select"
-    )
+    datasets = relationship("ExpDataset", secondary="exp_traits_dataset_pivot", back_populates="traits", lazy="select")
 
 
 class ExpDataset(Base, TimestampMixin):
@@ -156,12 +147,7 @@ class ExpDataset(Base, TimestampMixin):
 
     # Relationships
     versions = relationship("ExpDatasetVersion", back_populates="dataset", cascade="all, delete-orphan")
-    traits = relationship(
-        "ExpTrait",
-        secondary="exp_traits_dataset_pivot",
-        back_populates="datasets",
-        lazy="select"
-    )
+    traits = relationship("ExpTrait", secondary="exp_traits_dataset_pivot", back_populates="datasets", lazy="select")
 
 
 class ExpTraitsDatasetPivot(Base, TimestampMixin):
@@ -191,9 +177,7 @@ class ExpDatasetVersion(Base, TimestampMixin):
 
 class ExpMetric(Base):
     __tablename__ = "exp_metrics"
-    __table_args__ = (
-        UniqueConstraint("run_id", "metric_name", "mode", name="uq_expmetrics_run_metric_mode"),
-    )
+    __table_args__ = (UniqueConstraint("run_id", "metric_name", "mode", name="uq_expmetrics_run_metric_mode"),)
 
     id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     run_id: Mapped[uuid4] = mapped_column(ForeignKey("runs.id"), nullable=False)
@@ -230,4 +214,6 @@ class EvalSyncState(Base, TimestampMixin):
     manifest_version: Mapped[str] = mapped_column(String(50), nullable=False)
     sync_timestamp: Mapped[str] = mapped_column(String, nullable=False)  # ISO format timestamp
     sync_status: Mapped[str] = mapped_column(String(20), nullable=False)  # 'completed', 'failed', 'in_progress'
-    sync_metadata: Mapped[dict] = mapped_column(JSONB, nullable=True)  # Store manifest details, datasets synced, errors, etc.
+    sync_metadata: Mapped[dict] = mapped_column(
+        JSONB, nullable=True
+    )  # Store manifest details, datasets synced, errors, etc.

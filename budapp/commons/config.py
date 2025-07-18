@@ -171,22 +171,18 @@ class AppConfig(BaseAppConfig):
     eval_manifest_url: str = Field(
         default="https://eval-datasets.bud.eco/v2/manifest.json",
         description="URL to the evaluation datasets manifest file",
-        alias="EVAL_MANIFEST_URL"
+        alias="EVAL_MANIFEST_URL",
     )
     eval_sync_enabled: bool = Field(
-        default=True,
-        description="Enable automatic evaluation data synchronization",
-        alias="EVAL_SYNC_ENABLED"
+        default=True, description="Enable automatic evaluation data synchronization", alias="EVAL_SYNC_ENABLED"
     )
     eval_sync_use_bundles: bool = Field(
         default=True,
         description="Use bundle downloads when available for evaluation datasets",
-        alias="EVAL_SYNC_USE_BUNDLES"
+        alias="EVAL_SYNC_USE_BUNDLES",
     )
     eval_sync_local_mode: bool = Field(
-        default=False,
-        description="Use local mode for evaluation data synchronization",
-        alias="EVAL_SYNC_LOCAL_MODE"
+        default=False, description="Use local mode for evaluation data synchronization", alias="EVAL_SYNC_LOCAL_MODE"
     )
 
     @computed_field

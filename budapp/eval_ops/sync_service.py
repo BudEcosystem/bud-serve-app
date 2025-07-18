@@ -87,7 +87,6 @@ class EvalDataSyncService:
         logger.info("No previous sync found")
         return None
 
-
     def import_dataset(self, dataset: Dataset, db: Session):
         """Import dataset metadata into the database.
 
@@ -121,8 +120,10 @@ class EvalDataSyncService:
         }
 
         # Extract creator info and links from original_data if available
-        if hasattr(dataset, 'original_data') and dataset.original_data:
-            original_data = dataset.original_data if isinstance(dataset.original_data, dict) else dataset.original_data.__dict__
+        if hasattr(dataset, "original_data") and dataset.original_data:
+            original_data = (
+                dataset.original_data if isinstance(dataset.original_data, dict) else dataset.original_data.__dict__
+            )
 
             # Update meta_links with GitHub, paper, website links and creator info
             # Always set github, paper, and website to empty string if not present
@@ -155,21 +156,21 @@ class EvalDataSyncService:
                 dataset_fields["domains"] = [dataset.metadata.domain]
 
             # Handle token estimates if present
-            if hasattr(dataset.metadata, 'estimated_input_tokens') and dataset.metadata.estimated_input_tokens:
+            if hasattr(dataset.metadata, "estimated_input_tokens") and dataset.metadata.estimated_input_tokens:
                 dataset_fields["estimated_input_tokens"] = dataset.metadata.estimated_input_tokens
-            if hasattr(dataset.metadata, 'estimated_output_tokens') and dataset.metadata.estimated_output_tokens:
+            if hasattr(dataset.metadata, "estimated_output_tokens") and dataset.metadata.estimated_output_tokens:
                 dataset_fields["estimated_output_tokens"] = dataset.metadata.estimated_output_tokens
 
             # Handle difficulty as task_type
-            if hasattr(dataset.metadata, 'difficulty') and dataset.metadata.difficulty:
+            if hasattr(dataset.metadata, "difficulty") and dataset.metadata.difficulty:
                 dataset_fields["task_type"] = [f"difficulty:{dataset.metadata.difficulty}"]
 
             # Handle programming language as concept
-            if hasattr(dataset.metadata, 'programming_language') and dataset.metadata.programming_language:
+            if hasattr(dataset.metadata, "programming_language") and dataset.metadata.programming_language:
                 dataset_fields["concepts"] = [f"programming:{dataset.metadata.programming_language}"]
 
             # Handle format in sample_questions_answers
-            if hasattr(dataset.metadata, 'format') and dataset.metadata.format:
+            if hasattr(dataset.metadata, "format") and dataset.metadata.format:
                 if dataset_fields["sample_questions_answers"]:
                     dataset_fields["sample_questions_answers"]["format"] = dataset.metadata.format
                 else:
@@ -205,9 +206,7 @@ class EvalDataSyncService:
 
         # 2. Create ExpDatasetVersion
         existing_version = (
-            db.query(ExpDatasetVersion)
-            .filter_by(dataset_id=db_dataset.id, version=dataset.version)
-            .first()
+            db.query(ExpDatasetVersion).filter_by(dataset_id=db_dataset.id, version=dataset.version).first()
         )
 
         if not existing_version:
@@ -220,7 +219,7 @@ class EvalDataSyncService:
                     "checksum": dataset.checksum,
                     "sample_count": dataset.sample_count,
                     "metadata": dataset.metadata.model_dump() if dataset.metadata else None,
-                }
+                },
             )
             db.add(dataset_version)
             logger.info(f"Created dataset version {dataset.version} for {dataset.id}")
@@ -237,9 +236,7 @@ class EvalDataSyncService:
             # Get existing pivots for this dataset
             existing_pivots = {
                 str(pivot.trait_id)
-                for pivot in db.query(ExpTraitsDatasetPivot)
-                .filter_by(dataset_id=db_dataset.id)
-                .all()
+                for pivot in db.query(ExpTraitsDatasetPivot).filter_by(dataset_id=db_dataset.id).all()
             }
 
             for trait_name in dataset.traits:
@@ -252,15 +249,14 @@ class EvalDataSyncService:
                     logger.info(f"Found case-insensitive match for trait '{trait_name}' -> '{trait.name}'")
 
                 if trait is None:
-                    logger.warning(f"Trait '{trait_name}' not found in database (available traits: {list(traits_by_name.keys())}), skipping for dataset {dataset.id}")
+                    logger.warning(
+                        f"Trait '{trait_name}' not found in database (available traits: {list(traits_by_name.keys())}), skipping for dataset {dataset.id}"
+                    )
                     continue
 
                 # Create pivot if it doesn't exist
                 if str(trait.id) not in existing_pivots:
-                    pivot = ExpTraitsDatasetPivot(
-                        trait_id=trait.id,
-                        dataset_id=db_dataset.id
-                    )
+                    pivot = ExpTraitsDatasetPivot(trait_id=trait.id, dataset_id=db_dataset.id)
                     db.add(pivot)
                     logger.info(f"Linked dataset {dataset.id} with trait {trait.name}")
 
@@ -345,7 +341,9 @@ class EvalDataSyncService:
                         results["failed_datasets"].append({"dataset_id": ds_id, "error": "Commit failed"})
                     results["synced_datasets"] = results["synced_datasets"][:-batch_count]
 
-        logger.info(f"Dataset sync completed: {len(results['synced_datasets'])} succeeded, {len(results['failed_datasets'])} failed")
+        logger.info(
+            f"Dataset sync completed: {len(results['synced_datasets'])} succeeded, {len(results['failed_datasets'])} failed"
+        )
         return results
 
     async def run_migrations(self, manifest: EvalDataManifest, current_version: Optional[str]):
@@ -392,11 +390,11 @@ class EvalDataSyncService:
 
     async def import_traits(self, manifest: EvalDataManifest, db: Session) -> Dict[str, Any]:
         """Import traits from manifest into the database.
-        
+
         Args:
             manifest: The evaluation data manifest
             db: Database session
-            
+
         Returns:
             Dictionary with import results
         """
@@ -421,9 +419,9 @@ class EvalDataSyncService:
 
         # Check if manifest has trait definitions in the new format
         trait_definitions = []
-        if hasattr(manifest.traits, 'definitions') and manifest.traits.definitions:
+        if hasattr(manifest.traits, "definitions") and manifest.traits.definitions:
             trait_definitions = manifest.traits.definitions
-        elif hasattr(manifest.traits, 'categories') and manifest.traits.categories:
+        elif hasattr(manifest.traits, "categories") and manifest.traits.categories:
             # Fallback to old format - collect all unique traits from categories
             all_trait_names = set()
             for category in manifest.traits.categories:
@@ -431,19 +429,29 @@ class EvalDataSyncService:
                     all_trait_names.add(trait_name)
             # Convert to definition format
             for trait_name in sorted(all_trait_names):
-                trait_definitions.append({
-                    "name": trait_name,
-                    "description": f"Evaluation trait: {trait_name}",
-                    "icon": f"icons/traits/{trait_name.lower().replace(' ', '_') if trait_name else 'default'}.png"
-                })
+                trait_definitions.append(
+                    {
+                        "name": trait_name,
+                        "description": f"Evaluation trait: {trait_name}",
+                        "icon": f"icons/traits/{trait_name.lower().replace(' ', '_') if trait_name else 'default'}.png",
+                    }
+                )
 
         # Process each trait definition
         for trait_def in trait_definitions:
             results["total"] += 1
 
             trait_name = trait_def.get("name") if isinstance(trait_def, dict) else trait_def.name
-            trait_desc = trait_def.get("description", f"Evaluation trait: {trait_name}") if isinstance(trait_def, dict) else trait_def.description
-            default_icon = f"icons/traits/{trait_name.lower().replace(' ', '_')}.png" if trait_name else "icons/traits/default.png"
+            trait_desc = (
+                trait_def.get("description", f"Evaluation trait: {trait_name}")
+                if isinstance(trait_def, dict)
+                else trait_def.description
+            )
+            default_icon = (
+                f"icons/traits/{trait_name.lower().replace(' ', '_')}.png"
+                if trait_name
+                else "icons/traits/default.png"
+            )
             trait_icon = trait_def.get("icon", default_icon) if isinstance(trait_def, dict) else trait_def.icon
 
             if trait_name in existing_traits:
@@ -455,11 +463,7 @@ class EvalDataSyncService:
                 results["updated"] += 1
             else:
                 # Create new trait
-                new_trait = ExpTrait(
-                    name=trait_name,
-                    description=trait_desc,
-                    icon=trait_icon
-                )
+                new_trait = ExpTrait(name=trait_name, description=trait_desc, icon=trait_icon)
                 db.add(new_trait)
                 logger.info(f"Created new trait '{trait_name}'")
                 results["created"] += 1
@@ -467,5 +471,7 @@ class EvalDataSyncService:
         # Commit all changes
         db.commit()
 
-        logger.info(f"Trait import completed: {results['created']} created, {results['updated']} existing, {results['total']} total")
+        logger.info(
+            f"Trait import completed: {results['created']} created, {results['updated']} existing, {results['total']} total"
+        )
         return results

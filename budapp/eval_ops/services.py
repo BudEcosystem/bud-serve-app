@@ -7,12 +7,12 @@ from sqlalchemy.orm import Session
 from budapp.commons import logging
 from budapp.commons.constants import WorkflowTypeEnum
 from budapp.commons.exceptions import ClientException
+from budapp.eval_ops.models import ExpDataset as DatasetModel
 from budapp.eval_ops.models import (
+    ExpDatasetVersion,
     ExperimentStatusEnum,
     RunStatusEnum,
 )
-from budapp.eval_ops.models import ExpDataset as DatasetModel
-from budapp.eval_ops.models import ExpDatasetVersion
 from budapp.eval_ops.models import Experiment as ExperimentModel
 from budapp.eval_ops.models import (
     ExpMetric as MetricModel,
@@ -59,6 +59,7 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
 
 logger = logging.get_logger(__name__)
+
 
 class ExperimentService:
     """Service layer for Experiment operations.
@@ -112,7 +113,7 @@ class ExperimentService:
         try:
             self.session.add(ev)
             self.session.flush()  # Get the experiment ID without committing
-            
+
             # Create runs for each model-dataset combination
             run_index = 1
             for model_id in req.model_ids:
@@ -125,24 +126,24 @@ class ExperimentService:
                         .order_by(ExpDatasetVersion.created_at.desc())
                         .first()
                     )
-                    
+
                     if not dataset_version:
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"No version found for dataset {dataset_id}"
+                            detail=f"No version found for dataset {dataset_id}",
                         )
-                    
+
                     run = RunModel(
                         experiment_id=ev.id,
                         run_index=run_index,
                         model_id=model_id,
                         dataset_version_id=dataset_version.id,
                         status=RunStatusEnum.PENDING.value,
-                        config={}
+                        config={},
                     )
                     self.session.add(run)
                     run_index += 1
-            
+
             self.session.commit()
             self.session.refresh(ev)
         except HTTPException:
@@ -152,8 +153,7 @@ class ExperimentService:
             self.session.rollback()
             logger.debug(f"Failed to create experiment: {e}", exc_info=True)
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create experiment"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create experiment"
             ) from e
         return ExperimentSchema.from_orm(ev)
 
@@ -181,8 +181,7 @@ class ExperimentService:
             evs = q.all()
         except Exception as e:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to list experiments"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list experiments"
             ) from e
         return [ExperimentSchema.from_orm(e) for e in evs]
 
@@ -208,10 +207,7 @@ class ExperimentService:
         """
         ev = self.session.get(ExperimentModel, ev_id)
         if not ev or ev.created_by != user_id or ev.status == "deleted":
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Experiment not found or access denied"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
         if req.name is not None:
             ev.name = req.name
         if req.description is not None:
@@ -222,8 +218,7 @@ class ExperimentService:
         except Exception as e:
             self.session.rollback()
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update experiment"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update experiment"
             ) from e
         return ExperimentSchema.from_orm(ev)
 
@@ -240,18 +235,14 @@ class ExperimentService:
         """
         ev = self.session.get(ExperimentModel, ev_id)
         if not ev or ev.created_by != user_id or ev.status == "deleted":
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Experiment not found or access denied"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
         ev.status = "deleted"
         try:
             self.session.commit()
         except Exception as e:
             self.session.rollback()
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to delete experiment"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete experiment"
             ) from e
 
     def list_traits(
@@ -311,8 +302,7 @@ class ExperimentService:
 
         except Exception as e:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to list traits"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list traits"
             ) from e
 
     # ------------------------ Run Methods ------------------------
@@ -332,17 +322,11 @@ class ExperimentService:
         """
         ev = self.session.get(ExperimentModel, experiment_id)
         if not ev or ev.created_by != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Experiment not found or access denied"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
 
         runs = (
             self.session.query(RunModel)
-            .filter(
-                RunModel.experiment_id == experiment_id,
-                RunModel.status != RunStatusEnum.DELETED.value
-            )
+            .filter(RunModel.experiment_id == experiment_id, RunModel.status != RunStatusEnum.DELETED.value)
             .order_by(RunModel.created_at.desc())
             .all()
         )
@@ -363,17 +347,10 @@ class ExperimentService:
         """
         run = self.session.get(RunModel, run_id)
         if not run or run.experiment.created_by != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Run not found or access denied"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found or access denied")
 
         # Get metrics for this run
-        metrics = (
-            self.session.query(MetricModel)
-            .filter(MetricModel.run_id == run_id)
-            .all()
-        )
+        metrics = self.session.query(MetricModel).filter(MetricModel.run_id == run_id).all()
         metrics_data = [
             {
                 "metric_name": metric.metric_name,
@@ -384,11 +361,7 @@ class ExperimentService:
         ]
 
         # Get raw results for this run
-        raw_result = (
-            self.session.query(RawResultModel)
-            .filter(RawResultModel.run_id == run_id)
-            .first()
-        )
+        raw_result = self.session.query(RawResultModel).filter(RawResultModel.run_id == run_id).first()
         raw_results_data = raw_result.preview_results if raw_result else None
 
         return RunWithResultsSchema(
@@ -425,10 +398,7 @@ class ExperimentService:
         """
         run = self.session.get(RunModel, run_id)
         if not run or run.experiment.created_by != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Run not found or access denied"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found or access denied")
 
         if req.status is not None:
             run.status = req.status.value
@@ -441,8 +411,7 @@ class ExperimentService:
         except Exception as e:
             self.session.rollback()
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update run"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update run"
             ) from e
         return RunSchema.from_orm(run)
 
@@ -459,18 +428,14 @@ class ExperimentService:
         """
         run = self.session.get(RunModel, run_id)
         if not run or run.experiment.created_by != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Run not found or access denied"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found or access denied")
         run.status = RunStatusEnum.DELETED.value
         try:
             self.session.commit()
         except Exception as e:
             self.session.rollback()
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to delete run"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete run"
             ) from e
 
     # ------------------------ Dataset Methods (Keep existing) ------------------------
@@ -492,10 +457,7 @@ class ExperimentService:
             # Get the dataset
             dataset = self.session.get(DatasetModel, dataset_id)
             if not dataset:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Dataset not found"
-                )
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
             # Get associated traits through pivot table
             traits_query = (
@@ -507,6 +469,7 @@ class ExperimentService:
 
             # Convert traits to schema
             from budapp.eval_ops.schemas import DatasetBasic
+
             traits = [
                 TraitSchema(
                     id=trait.id,
@@ -514,16 +477,18 @@ class ExperimentService:
                     description=trait.description or "",
                     category="",
                     exps_ids=[],
-                    datasets=[DatasetBasic(
-                        id=dataset.id,
-                        name=dataset.name,
-                        description=dataset.description,
-                        estimated_input_tokens=dataset.estimated_input_tokens,
-                        estimated_output_tokens=dataset.estimated_output_tokens,
-                        modalities=dataset.modalities,
-                        sample_questions_answers=dataset.sample_questions_answers,
-                        advantages_disadvantages=dataset.advantages_disadvantages,
-                    )],  # This trait is associated with the current dataset
+                    datasets=[
+                        DatasetBasic(
+                            id=dataset.id,
+                            name=dataset.name,
+                            description=dataset.description,
+                            estimated_input_tokens=dataset.estimated_input_tokens,
+                            estimated_output_tokens=dataset.estimated_output_tokens,
+                            modalities=dataset.modalities,
+                            sample_questions_answers=dataset.sample_questions_answers,
+                            advantages_disadvantages=dataset.advantages_disadvantages,
+                        )
+                    ],  # This trait is associated with the current dataset
                 )
                 for trait in traits_query
             ]
@@ -554,8 +519,7 @@ class ExperimentService:
             raise
         except Exception as e:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to get dataset"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get dataset"
             ) from e
 
     def list_datasets(
@@ -651,8 +615,7 @@ class ExperimentService:
 
         except Exception as e:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to list datasets"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list datasets"
             ) from e
 
     def create_dataset(self, req: CreateDatasetRequest) -> DatasetSchema:
@@ -696,8 +659,7 @@ class ExperimentService:
                     trait = self.session.get(TraitModel, trait_id)
                     if not trait:
                         raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"Trait with ID {trait_id} not found"
+                            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Trait with ID {trait_id} not found"
                         )
 
                     pivot = PivotModel(trait_id=trait_id, dataset_id=dataset.id)
@@ -716,8 +678,7 @@ class ExperimentService:
             self.session.rollback()
             logger.debug(f"Failed to create dataset: {e}", exc_info=True)
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create dataset"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create dataset"
             ) from e
 
     def update_dataset(self, dataset_id: uuid.UUID, req: UpdateDatasetRequest) -> DatasetSchema:
@@ -738,10 +699,7 @@ class ExperimentService:
         try:
             dataset = self.session.get(DatasetModel, dataset_id)
             if not dataset:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Dataset not found"
-                )
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
             # Update dataset fields
             if req.name is not None:
@@ -776,9 +734,7 @@ class ExperimentService:
             # Update trait associations if provided
             if req.trait_ids is not None:
                 # Remove existing associations
-                self.session.query(PivotModel).filter(
-                    PivotModel.dataset_id == dataset_id
-                ).delete()
+                self.session.query(PivotModel).filter(PivotModel.dataset_id == dataset_id).delete()
 
                 # Add new associations
                 for trait_id in req.trait_ids:
@@ -786,8 +742,7 @@ class ExperimentService:
                     trait = self.session.get(TraitModel, trait_id)
                     if not trait:
                         raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"Trait with ID {trait_id} not found"
+                            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Trait with ID {trait_id} not found"
                         )
 
                     pivot = PivotModel(trait_id=trait_id, dataset_id=dataset_id)
@@ -806,8 +761,7 @@ class ExperimentService:
             self.session.rollback()
             logger.debug(f"Failed to update dataset: {e}", exc_info=True)
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update dataset"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update dataset"
             ) from e
 
     def delete_dataset(self, dataset_id: uuid.UUID) -> None:
@@ -823,15 +777,10 @@ class ExperimentService:
         try:
             dataset = self.session.get(DatasetModel, dataset_id)
             if not dataset:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Dataset not found"
-                )
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
             # Delete trait associations first
-            self.session.query(PivotModel).filter(
-                PivotModel.dataset_id == dataset_id
-            ).delete()
+            self.session.query(PivotModel).filter(PivotModel.dataset_id == dataset_id).delete()
 
             # Delete the dataset
             self.session.delete(dataset)
@@ -843,8 +792,7 @@ class ExperimentService:
         except Exception as e:
             self.session.rollback()
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to delete dataset"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete dataset"
             ) from e
 
 
@@ -860,9 +808,7 @@ class ExperimentWorkflowService:
         self.session = session
 
     async def process_experiment_workflow_step(
-        self,
-        request: ExperimentWorkflowStepRequest,
-        current_user_id: uuid.UUID
+        self, request: ExperimentWorkflowStepRequest, current_user_id: uuid.UUID
     ) -> ExperimentWorkflowResponse:
         """Process a step in the experiment creation workflow.
 
@@ -880,8 +826,7 @@ class ExperimentWorkflowService:
             # Validate step number
             if request.step_number < 1 or request.step_number > 5:
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid step number. Must be between 1 and 5."
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid step number. Must be between 1 and 5."
                 )
 
             # Get or create workflow
@@ -891,27 +836,17 @@ class ExperimentWorkflowService:
                     WorkflowModel, {"id": request.workflow_id}
                 )
                 if not workflow:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="Workflow not found"
-                    )
+                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found")
                 workflow = cast(WorkflowModel, workflow)
                 if workflow.created_by != current_user_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Access denied to this workflow"
-                    )
+                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this workflow")
                 if workflow.status != WorkflowStatusEnum.IN_PROGRESS:
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail="Workflow is not in progress"
-                    )
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Workflow is not in progress")
             else:
                 # Creating new workflow (step 1 only)
                 if request.step_number != 1:
                     raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="workflow_id is required for steps 2-5"
+                        status_code=status.HTTP_400_BAD_REQUEST, detail="workflow_id is required for steps 2-5"
                     )
                 workflow = await WorkflowDataManager(self.session).insert_one(
                     WorkflowModel(
@@ -921,7 +856,7 @@ class ExperimentWorkflowService:
                         current_step=0,
                         total_steps=request.workflow_total_steps,
                         title="Experiment Creation",
-                        progress={}
+                        progress={},
                     )
                 )
                 workflow = cast(WorkflowModel, workflow)
@@ -935,7 +870,8 @@ class ExperimentWorkflowService:
             # Update workflow current step
             workflow_manager = WorkflowDataManager(self.session)
             await workflow_manager.update_by_fields(
-                workflow, {"current_step": request.step_number}  # type: ignore
+                workflow,
+                {"current_step": request.step_number},  # type: ignore
             )
 
             # If this is the final step and trigger_workflow is True, create the experiment
@@ -944,14 +880,17 @@ class ExperimentWorkflowService:
                 experiment_id = await self._create_experiment_from_workflow(workflow.id, current_user_id)
                 # Mark workflow as completed
                 await WorkflowDataManager(self.session).update_by_fields(
-                    workflow, {"status": WorkflowStatusEnum.COMPLETED.value}  # type: ignore
+                    workflow,
+                    {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
                 )
 
             # After storing the workflow step, retrieve all accumulated data
             all_step_data = await self._get_accumulated_step_data(workflow.id)
 
             # Determine if workflow is complete
-            is_complete = (request.step_number == 5 and request.trigger_workflow) or workflow.status == WorkflowStatusEnum.COMPLETED.value
+            is_complete = (
+                request.step_number == 5 and request.trigger_workflow
+            ) or workflow.status == WorkflowStatusEnum.COMPLETED.value
             next_step = None if is_complete else request.step_number + 1
 
             # Prepare next step data only if not complete
@@ -971,7 +910,7 @@ class ExperimentWorkflowService:
                 status=workflow.status,
                 experiment_id=experiment_id,
                 data=all_step_data,
-                next_step_data=next_step_data
+                next_step_data=next_step_data,
             )
 
         except HTTPException:
@@ -979,8 +918,7 @@ class ExperimentWorkflowService:
         except Exception as e:
             logger.debug(f"Failed to process experiment workflow step: {e}", exc_info=True)
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to process workflow step"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process workflow step"
             ) from e
 
     async def _validate_step_data(self, step_number: int, stage_data: dict) -> None:
@@ -1000,45 +938,42 @@ class ExperimentWorkflowService:
                 if field not in stage_data or not stage_data[field]:
                     raise HTTPException(
                         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                        detail=f"Field '{field}' is required for step 1"
+                        detail=f"Field '{field}' is required for step 1",
                     )
-            
+
             # Validate tags if provided
             if "tags" in stage_data and stage_data["tags"] is not None:
                 tags = stage_data["tags"]
                 if not isinstance(tags, list):
                     raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                        detail="tags must be a list of strings"
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="tags must be a list of strings"
                     )
                 # Validate each tag is a string
                 for tag in tags:
                     if not isinstance(tag, str):
                         raise HTTPException(
-                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                            detail="Each tag must be a string"
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Each tag must be a string"
                         )
         elif step_number == 2:
             # Model Selection validation
             if "model_ids" not in stage_data or not stage_data["model_ids"]:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="At least one model must be selected in step 2"
+                    detail="At least one model must be selected in step 2",
                 )
         elif step_number == 3:
             # Traits Selection validation
             if "trait_ids" not in stage_data or not stage_data["trait_ids"]:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="At least one trait must be selected in step 3"
+                    detail="At least one trait must be selected in step 3",
                 )
 
             # Validate trait_ids exist in database
             trait_ids = stage_data["trait_ids"]
             if not isinstance(trait_ids, list):
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="trait_ids must be a list"
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="trait_ids must be a list"
                 )
 
             # Validate each trait_id is a valid UUID and exists in database
@@ -1048,8 +983,7 @@ class ExperimentWorkflowService:
                     trait_uuid = uuid.UUID(str(trait_id))
                 except (ValueError, TypeError) as e:
                     raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                        detail=f"Invalid trait ID format: {trait_id}"
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Invalid trait ID format: {trait_id}"
                     ) from e
 
                 # Check if trait exists in database
@@ -1057,7 +991,7 @@ class ExperimentWorkflowService:
                 if not trait:
                     raise HTTPException(
                         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                        detail=f"Trait with ID {trait_id} does not exist"
+                        detail=f"Trait with ID {trait_id} does not exist",
                     )
 
             # Validate dataset_ids if provided (optional field)
@@ -1065,8 +999,7 @@ class ExperimentWorkflowService:
                 dataset_ids = stage_data["dataset_ids"]
                 if not isinstance(dataset_ids, list):
                     raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                        detail="dataset_ids must be a list"
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="dataset_ids must be a list"
                     )
 
                 # Validate each dataset_id is a valid UUID and exists in database
@@ -1077,7 +1010,7 @@ class ExperimentWorkflowService:
                     except (ValueError, TypeError) as e:
                         raise HTTPException(
                             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                            detail=f"Invalid dataset ID format: {dataset_id}"
+                            detail=f"Invalid dataset ID format: {dataset_id}",
                         ) from e
 
                     # Check if dataset exists in database
@@ -1085,21 +1018,21 @@ class ExperimentWorkflowService:
                     if not dataset:
                         raise HTTPException(
                             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                            detail=f"Dataset with ID {dataset_id} does not exist"
+                            detail=f"Dataset with ID {dataset_id} does not exist",
                         )
         elif step_number == 4:
             # Performance Point validation
             if "performance_point" not in stage_data:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="Field 'performance_point' is required for step 4"
+                    detail="Field 'performance_point' is required for step 4",
                 )
 
             performance_point = stage_data["performance_point"]
             if not isinstance(performance_point, int) or performance_point < 0 or performance_point > 100:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="Field 'performance_point' must be an integer between 0 and 100"
+                    detail="Field 'performance_point' must be an integer between 0 and 100",
                 )
         elif step_number == 5:
             # Finalization validation - optional fields
@@ -1115,24 +1048,19 @@ class ExperimentWorkflowService:
         """
         # Check if step already exists
         existing_step = await WorkflowStepDataManager(self.session).retrieve_by_fields(
-            WorkflowStepModel,
-            {"workflow_id": workflow_id, "step_number": step_number},
-            missing_ok=True
+            WorkflowStepModel, {"workflow_id": workflow_id, "step_number": step_number}, missing_ok=True
         )
 
         if existing_step:
             # Update existing step
             await WorkflowStepDataManager(self.session).update_by_fields(
-                existing_step, {"data": stage_data}  # type: ignore
+                existing_step,
+                {"data": stage_data},  # type: ignore
             )
         else:
             # Create new step
             await WorkflowStepDataManager(self.session).insert_one(
-                WorkflowStepModel(
-                    workflow_id=workflow_id,
-                    step_number=step_number,
-                    data=stage_data
-                )
+                WorkflowStepModel(workflow_id=workflow_id, step_number=step_number, data=stage_data)
             )
 
     async def _prepare_next_step_data(self, next_step: int, current_user_id: uuid.UUID) -> dict:
@@ -1149,7 +1077,7 @@ class ExperimentWorkflowService:
             # Prepare available models - this would need to be implemented based on your model structure
             return {
                 "message": "Select models for evaluation",
-                "available_models": []  # TODO: Implement model fetching
+                "available_models": [],  # TODO: Implement model fetching
             }
         elif next_step == 3:
             # Prepare available traits using lightweight approach
@@ -1158,22 +1086,16 @@ class ExperimentWorkflowService:
             return {
                 "message": "Select traits and datasets",
                 "available_traits": [
-                    {
-                        "id": str(trait.id),
-                        "name": trait.name,
-                        "description": trait.description
-                    } for trait in traits
-                ]
+                    {"id": str(trait.id), "name": trait.name, "description": trait.description} for trait in traits
+                ],
             }
         elif next_step == 4:
             return {
                 "message": "Set performance point (0-100)",
-                "description": "Specify the performance threshold for this experiment"
+                "description": "Specify the performance threshold for this experiment",
             }
         elif next_step == 5:
-            return {
-                "message": "Review and finalize experiment"
-            }
+            return {"message": "Review and finalize experiment"}
         return {}
 
     async def _get_accumulated_step_data(self, workflow_id: uuid.UUID) -> dict:
@@ -1185,9 +1107,7 @@ class ExperimentWorkflowService:
         Returns:
             dict: Accumulated data from all steps organized by step type.
         """
-        steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
-            {"workflow_id": workflow_id}
-        )
+        steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps({"workflow_id": workflow_id})
 
         accumulated_data = {}
 
@@ -1273,10 +1193,10 @@ class ExperimentWorkflowService:
                 # Convert model_id to UUID if it's a string
                 try:
                     model_uuid = uuid.UUID(str(model_id))
-                except (ValueError, TypeError) as e:
+                except (ValueError, TypeError):
                     logger.warning(f"Invalid model ID format: {model_id}, skipping")
                     continue
-                
+
                 for dataset_id in dataset_ids_to_use:
                     # Get the latest version of the dataset
                     dataset_version = (
@@ -1285,11 +1205,11 @@ class ExperimentWorkflowService:
                         .order_by(ExpDatasetVersion.created_at.desc())
                         .first()
                     )
-                    
+
                     if not dataset_version:
                         logger.warning(f"No version found for dataset {dataset_id}, skipping")
                         continue
-                    
+
                     run = RunModel(
                         experiment_id=experiment.id,
                         run_index=run_index,
@@ -1304,7 +1224,9 @@ class ExperimentWorkflowService:
         self.session.commit()
         return experiment.id
 
-    async def get_experiment_workflow_data(self, workflow_id: uuid.UUID, current_user_id: uuid.UUID) -> ExperimentWorkflowResponse:
+    async def get_experiment_workflow_data(
+        self, workflow_id: uuid.UUID, current_user_id: uuid.UUID
+    ) -> ExperimentWorkflowResponse:
         """Get complete experiment workflow data for review.
 
         Parameters:
@@ -1320,10 +1242,7 @@ class ExperimentWorkflowService:
                 WorkflowModel, {"id": workflow_id, "created_by": current_user_id}
             )
             if not workflow:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Workflow not found"
-                )
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found")
             workflow = cast(WorkflowModel, workflow)
 
             # Get all accumulated step data
@@ -1350,7 +1269,7 @@ class ExperimentWorkflowService:
                 status=workflow.status,
                 experiment_id=None,  # Will be populated when workflow is complete
                 data=all_step_data,
-                next_step_data=next_step_data
+                next_step_data=next_step_data,
             )
 
         except Exception as e:
