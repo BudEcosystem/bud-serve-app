@@ -25,6 +25,15 @@ from budapp.core.models import ModelTemplate as ModelTemplate
 from budapp.credential_ops.models import Credential as Credential
 from budapp.credential_ops.models import ProprietaryCredential as ProprietaryCredential
 from budapp.endpoint_ops.models import Endpoint as Endpoint
+from budapp.eval_ops.models import (  # noqa: F401
+    EvalSyncState,
+    ExpDataset,
+    ExpDatasetVersion,
+    Experiment,
+    ExpModel,
+    ExpTrait,
+    ExpTraitsDatasetPivot,
+)
 from budapp.model_ops.models import CloudModel as CloudModel
 from budapp.model_ops.models import Model as Model
 from budapp.model_ops.models import Provider as Provider
