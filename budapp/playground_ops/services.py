@@ -130,7 +130,7 @@ class PlaygroundService(SessionMixin):
 
 
 class ChatSessionService(SessionMixin):
-    """Chat Session Service"""
+    """Chat Session Service."""
 
     async def create_chat_session(self, user_id: UUID, chat_session_data: dict) -> ChatSession:
         """Create a new chat session and insert it into the database."""
@@ -202,12 +202,12 @@ class ChatSessionService(SessionMixin):
 
 
 class MessageService(SessionMixin):
-    """Message Service"""
+    """Message Service."""
 
     async def create_message(self, user_id: UUID, message_data: dict) -> Message:
         """Create a new message and insert it into the database."""
         # validate deployment id
-        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+        await EndpointDataManager(self.session).retrieve_by_fields(
             EndpointModel,
             fields={"id": message_data["deployment_id"]},
             exclude_fields={"status": EndpointStatusEnum.DELETED},
@@ -255,9 +255,7 @@ class MessageService(SessionMixin):
         search: bool = False,
     ) -> Tuple[List[MessageResponse], int]:
         """Retrieve messages based on provided filters."""
-        db_chat_session = await ChatSessionDataManager(self.session).retrieve_by_fields(
-            ChatSession, fields={"id": chat_session_id}
-        )
+        await ChatSessionDataManager(self.session).retrieve_by_fields(ChatSession, fields={"id": chat_session_id})
 
         db_messages, count = await MessageDataManager(self.session).get_messages(
             chat_session_id, filters, offset, limit, order_by, search
@@ -302,7 +300,7 @@ class MessageService(SessionMixin):
 
 
 class ChatSettingService(SessionMixin):
-    """Chat Setting Service"""
+    """Chat Setting Service."""
 
     async def create_chat_setting(self, user_id: UUID, chat_setting_data: dict) -> ChatSetting:
         """Create a new chat setting and insert it into the database."""
@@ -364,12 +362,12 @@ class ChatSettingService(SessionMixin):
 
 
 class NoteService(SessionMixin):
-    """Note Service"""
+    """Note Service."""
 
     async def create_note(self, user_id: UUID, note_data: dict) -> Note:
         """Create a new note and insert it into the database."""
         # validate chat session id
-        db_chat_session = await ChatSessionDataManager(self.session).retrieve_by_fields(
+        await ChatSessionDataManager(self.session).retrieve_by_fields(
             ChatSession, fields={"id": note_data["chat_session_id"]}
         )
 
@@ -393,9 +391,7 @@ class NoteService(SessionMixin):
     ) -> Tuple[List[NoteResponse], int]:
         """Retrieve all notes for a given chat session and user."""
         # validate chat session id
-        db_chat_session = await ChatSessionDataManager(self.session).retrieve_by_fields(
-            ChatSession, fields={"id": chat_session_id}
-        )
+        await ChatSessionDataManager(self.session).retrieve_by_fields(ChatSession, fields={"id": chat_session_id})
 
         db_notes, total_count = await NoteDataManager(self.session).get_all_notes(
             chat_session_id, user_id, offset, limit, filters, order_by, search

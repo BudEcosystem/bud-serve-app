@@ -4,9 +4,9 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from budapp.commons import logging
-from budapp.commons.schemas import Tag
 from budapp.commons.constants import ProjectStatusEnum
 from budapp.commons.db_utils import SessionMixin
+from budapp.commons.schemas import Tag
 from budapp.endpoint_ops.crud import EndpointDataManager
 from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.models import Project
@@ -28,7 +28,7 @@ class RouterService(SessionMixin):
 
     async def create_router(self, current_user_id: UUID, request: RouterRequest) -> RouterResponse:
         # Validate project id
-        db_project = await ProjectDataManager(self.session).retrieve_project_by_fields(
+        await ProjectDataManager(self.session).retrieve_project_by_fields(
             {"id": request.project_id, "status": ProjectStatusEnum.ACTIVE}
         )
 

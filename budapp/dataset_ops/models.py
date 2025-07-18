@@ -74,15 +74,8 @@ class DatasetCRUD(CRUDMixin[DatasetSchema, None, None]):
             search_conditions = []
             search_conditions.extend(await self.generate_search_stmt(self.model, filters))
 
-            stmt = (
-                select(self.model)
-                .filter(and_(*search_conditions))
-            )
-            count_stmt = (
-                select(func.count())
-                .select_from(self.model)
-                .filter(and_(*search_conditions))
-            )
+            stmt = select(self.model).filter(and_(*search_conditions))
+            count_stmt = select(func.count()).select_from(self.model).filter(and_(*search_conditions))
         else:
             stmt = select(self.model)
             count_stmt = select(func.count()).select_from(self.model)
@@ -107,7 +100,6 @@ class DatasetCRUD(CRUDMixin[DatasetSchema, None, None]):
         result = self.scalars_all(stmt)
 
         return result, count
-
 
     async def get_datatsets_by_ids(self, ids: List[UUID]):
         """Get datasets by ids."""

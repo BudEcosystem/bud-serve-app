@@ -132,7 +132,7 @@ async def get_router_config(
         **error_responses,
         500: {"model": ErrorResponse},
     },
-    description=f"""Add or generate a new credential for user. Valid credential types: 
+    description=f"""Add or generate a new credential for user. Valid credential types:
     {", ".join([value.value for value in CredentialTypeEnum])}.
     For budserve credential type, project_id, expiry(None or 30, 60) are required.""",
 )
@@ -695,8 +695,7 @@ async def get_provider_regions(
 
 # Helper function for masking sensitive data
 def _get_masked_credential_summary(credential_values: dict, schema_definition: dict, detailed: bool = False) -> dict:
-    """
-    Create a summary of credential values with sensitive information masked.
+    """Create a summary of credential values with sensitive information masked.
 
     Args:
         credential_values: The raw credential values
@@ -710,7 +709,7 @@ def _get_masked_credential_summary(credential_values: dict, schema_definition: d
 
     # If we don't have a schema definition, just mask everything
     if not schema_definition:
-        return {k: "********" for k in credential_values.keys()}
+        return dict.fromkeys(credential_values, "********")
 
     # Get the schema properties
     properties = schema_definition.get("properties", {})
@@ -720,7 +719,7 @@ def _get_masked_credential_summary(credential_values: dict, schema_definition: d
         # Check if this is a secret field (look for hints in the schema)
         is_secret = (
             property_info.get("format") == "password"
-            or property_info.get("x-sensitive") == True
+            or property_info.get("x-sensitive")
             or "secret" in key.lower()
             or "password" in key.lower()
             or "key" in key.lower()

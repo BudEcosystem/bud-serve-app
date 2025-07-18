@@ -22,7 +22,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Query, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
-
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -43,25 +42,25 @@ from .schemas import (
     ChatSessionFilter,
     ChatSessionPaginatedResponse,
     ChatSessionSuccessResponse,
+    ChatSettingCreate,
+    ChatSettingEditRequest,
+    ChatSettingFilter,
+    ChatSettingPaginatedResponse,
+    ChatSettingSuccessResponse,
     MessageCreateRequest,
     MessageEditRequest,
     MessageFilter,
     MessagePaginatedResponse,
     MessageSuccessResponse,
+    NoteCreateRequest,
+    NoteEditRequest,
+    NoteFilter,
+    NotePaginatedResponse,
+    NoteSuccessResponse,
     PlaygroundDeploymentFilter,
     PlaygroundDeploymentListResponse,
-    ChatSettingCreate,
-    ChatSettingSuccessResponse,
-    ChatSettingPaginatedResponse,
-    ChatSettingFilter,
-    ChatSettingEditRequest,
-    NoteCreateRequest,
-    NoteSuccessResponse,
-    NoteEditRequest,
-    NotePaginatedResponse,
-    NoteFilter,
 )
-from .services import ChatSessionService, MessageService, PlaygroundService, ChatSettingService, NoteService
+from .services import ChatSessionService, ChatSettingService, MessageService, NoteService, PlaygroundService
 
 
 logger = logging.get_logger(__name__)
@@ -364,7 +363,7 @@ async def edit_chat_session(
     session: Annotated[Session, Depends(get_session)],
     request: ChatSessionEditRequest,
 ) -> Union[ChatSessionSuccessResponse, ErrorResponse]:
-    """Edit chat session"""
+    """Edit chat session."""
     try:
         db_chat_session = await ChatSessionService(session).edit_chat_session(
             chat_session_id=chat_session_id, data=request.model_dump(exclude_unset=True, exclude_none=True)
@@ -748,7 +747,7 @@ async def edit_chat_setting(
     session: Annotated[Session, Depends(get_session)],
     request: ChatSettingEditRequest,
 ) -> Union[ChatSettingSuccessResponse, ErrorResponse]:
-    """Edit chat setting"""
+    """Edit chat setting."""
     try:
         db_chat_setting = await ChatSettingService(session).edit_chat_setting(
             chat_setting_id=chat_setting_id, data=request.model_dump(exclude_unset=True, exclude_none=True)
@@ -936,7 +935,7 @@ async def edit_note(
     session: Annotated[Session, Depends(get_session)],
     request: NoteEditRequest,
 ) -> Union[NoteSuccessResponse, ErrorResponse]:
-    """Edit note"""
+    """Edit note."""
     try:
         db_note = await NoteService(session).edit_note(
             note_id=note_id, data=request.model_dump(exclude_unset=True, exclude_none=True)

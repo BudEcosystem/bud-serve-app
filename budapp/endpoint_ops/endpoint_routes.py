@@ -300,7 +300,9 @@ async def get_endpoint_worker_metrics(
         response = ErrorResponse(message=e.message, code=e.status_code)
     except Exception as e:
         logger.exception(f"Failed to get endpoint worker metrics: {e}")
-        response = ErrorResponse(message="Failed to get endpoint worker metrics", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        response = ErrorResponse(
+            message="Failed to get endpoint worker metrics", code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
     return response.to_http_response()
 
 
@@ -417,7 +419,9 @@ async def delete_endpoint_worker(
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Delete a endpoint worker by its ID."""
     try:
-        db_workflow = await EndpointService(session).delete_endpoint_worker(request.endpoint_id, request.worker_id, request.worker_name, current_user.id)
+        db_workflow = await EndpointService(session).delete_endpoint_worker(
+            request.endpoint_id, request.worker_id, request.worker_name, current_user.id
+        )
         logger.debug(f"Endpoint deleting initiated with workflow id: {db_workflow.id}")
         response = SuccessResponse(
             message="Worker deleting initiated successfully",
@@ -429,7 +433,9 @@ async def delete_endpoint_worker(
         response = ErrorResponse(message=e.message, code=e.status_code)
     except Exception as e:
         logger.exception(f"Failed to get endpoint worker detail: {e}")
-        response = ErrorResponse(message="Failed to get endpoint worker detail", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        response = ErrorResponse(
+            message="Failed to get endpoint worker detail", code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
     return response.to_http_response()
 
 
@@ -475,6 +481,7 @@ async def add_worker_to_endpoint(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add worker to endpoint"
         ).to_http_response()
+
 
 @endpoint_router.post(
     "/add-adapter",
@@ -608,7 +615,7 @@ async def delete_adapter_from_endpoint(
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Add worker to endpoint."""
     try:
-        db_workflow = await EndpointService(session).delete_adapter_workflow(
+        await EndpointService(session).delete_adapter_workflow(
             current_user_id=current_user.id,
             adapter_id=adapter_id,
         )

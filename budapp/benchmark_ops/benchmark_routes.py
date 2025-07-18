@@ -248,9 +248,7 @@ async def get_benchmark_result(
         response = ErrorResponse(code=e.status_code, message=e.message)
     except Exception as e:
         logger.exception(f"Failed to get benchmark result: {e}")
-        response = ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get benchmark result"
-        )
+        response = ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get benchmark result")
 
     return response.to_http_response()
 
@@ -373,7 +371,9 @@ async def get_field1_vs_field2_benchmark_data(
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Fetch field1 vs field2 analysis."""
     try:
-        field1_vs_field2_data = BenchmarkRequestMetricsService(session).get_field1_vs_field2_data(field1, field2,benchmark_id)
+        field1_vs_field2_data = BenchmarkRequestMetricsService(session).get_field1_vs_field2_data(
+            field1, field2, benchmark_id
+        )
         response = SuccessResponse(
             object="benchmark.request.metrics.detail",
             param={"result": field1_vs_field2_data},
@@ -382,11 +382,11 @@ async def get_field1_vs_field2_benchmark_data(
     except Exception as e:
         logger.exception(f"Failed to fetch {field1} vs {field2} data for benchmark : {benchmark_id} : {e}")
         response = ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=f"Failed to fetch {field1} vs {field2} data for benchmark : {benchmark_id} : {e}"
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed to fetch {field1} vs {field2} data for benchmark : {benchmark_id} : {e}",
         )
 
     return response.to_http_response()
-
 
 
 @benchmark_router.post(
@@ -424,15 +424,13 @@ async def add_request_metrics(
         response = ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=str(e))
     except Exception as e:
         logger.exception(f"Failed to add request metrics: {e}")
-        response = ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add request metrics"
-        )
+        response = ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add request metrics")
 
     return response.to_http_response()
 
 
 @benchmark_router.post(
-   "/dataset/input-distribution",
+    "/dataset/input-distribution",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
@@ -454,8 +452,8 @@ async def get_dataset_input_distribution(
     dataset_ids: List[UUID],
     current_user: Annotated[User, Depends(get_current_active_user)],  # noqa: B008
     session: Annotated[Session, Depends(get_session)],
-    benchmark_id: Optional[UUID]=None,
-    num_bins: int=10,
+    benchmark_id: Optional[UUID] = None,
+    num_bins: int = 10,
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Get dataset input distribution."""
     try:
@@ -469,9 +467,7 @@ async def get_dataset_input_distribution(
         )
     except HTTPException as http_exc:
         logger.exception(f"Failed to fetch dataset input distribution: {http_exc}")
-        response = ErrorResponse(
-            code=http_exc.status_code, message=http_exc.detail
-        )
+        response = ErrorResponse(code=http_exc.status_code, message=http_exc.detail)
     except Exception as e:
         logger.exception(f"Failed to fetch dataset input distribution: {e}")
         response = ErrorResponse(
@@ -482,7 +478,7 @@ async def get_dataset_input_distribution(
 
 
 @benchmark_router.post(
-   "/dataset/output-distribution",
+    "/dataset/output-distribution",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
@@ -504,8 +500,8 @@ async def get_dataset_output_distribution(
     dataset_ids: List[UUID],
     current_user: Annotated[User, Depends(get_current_active_user)],  # noqa: B008
     session: Annotated[Session, Depends(get_session)],
-    benchmark_id: Optional[UUID]=None,
-    num_bins: int=10,
+    benchmark_id: Optional[UUID] = None,
+    num_bins: int = 10,
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Get dataset output distribution."""
     try:
@@ -519,9 +515,7 @@ async def get_dataset_output_distribution(
         )
     except HTTPException as http_exc:
         logger.exception(f"Failed to fetch dataset output distribution: {http_exc}")
-        response = ErrorResponse(
-            code=http_exc.status_code, message=http_exc.detail
-        )
+        response = ErrorResponse(code=http_exc.status_code, message=http_exc.detail)
     except Exception as e:
         logger.exception(f"Failed to fetch dataset output distribution: {e}")
         response = ErrorResponse(
@@ -532,7 +526,7 @@ async def get_dataset_output_distribution(
 
 
 @benchmark_router.get(
-   "/request-metrics",
+    "/request-metrics",
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
@@ -559,7 +553,9 @@ async def get_request_metrics(
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Get benchmark request metrics."""
     try:
-        request_metrics, count = await BenchmarkRequestMetricsService(session).get_request_metrics(benchmark_id=benchmark_id, offset=(page-1)*limit, limit=limit)
+        request_metrics, count = await BenchmarkRequestMetricsService(session).get_request_metrics(
+            benchmark_id=benchmark_id, offset=(page - 1) * limit, limit=limit
+        )
         response = PaginatedResponse(
             object="benchmark.request.metrics.list",
             items=request_metrics,

@@ -229,7 +229,7 @@ class EndpointService(SessionMixin):
         }
 
         # Insert step details in db
-        db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+        await WorkflowStepDataManager(self.session).insert_one(
             WorkflowStepModel(
                 workflow_id=db_workflow.id,
                 step_number=current_step_number,
@@ -774,7 +774,6 @@ class EndpointService(SessionMixin):
     async def get_model_cluster_detail(self, endpoint_id: UUID) -> ModelClusterDetail:
         """Get model cluster detail."""
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})
-        model_id = db_endpoint.model_id
         # Commented out since it is same as a db retrieve
         # model_detail_json_response = await ModelService(self.session).retrieve_model(model_id)
         # model_detail = json.loads(model_detail_json_response.body.decode("utf-8"))
@@ -1046,7 +1045,7 @@ class EndpointService(SessionMixin):
         }
 
         # Insert step details in db
-        db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+        await WorkflowStepDataManager(self.session).insert_one(
             WorkflowStepModel(
                 workflow_id=db_workflow.id,
                 step_number=current_step_number,
@@ -1930,7 +1929,6 @@ class EndpointService(SessionMixin):
         }
 
         current_step_number = db_workflow.current_step + 1
-        workflow_current_step = current_step_number
 
         # Update or create next workflow step
         db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
@@ -2034,7 +2032,7 @@ class EndpointService(SessionMixin):
         }
 
         # Insert step details in db
-        db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+        await WorkflowStepDataManager(self.session).insert_one(
             WorkflowStepModel(
                 workflow_id=db_workflow.id,
                 step_number=step_number,

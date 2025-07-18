@@ -1,11 +1,11 @@
-import json
-import asyncio
-import aiohttp
-from typing import Dict, Any, Optional, List
-from datetime import datetime, timezone, timedelta
-from budapp.commons import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 from uuid import UUID
-from cachetools import TTLCache
+
+import aiohttp
+
+from budapp.commons import logging
+
 
 logger = logging.get_logger(__name__)
 
@@ -151,13 +151,13 @@ class ClusterMetricsFetcher:
                 "network_bandwidth": {"total_mbps": 0, "change_percent": 0, "time_series": []},
             },
         }
-        
+
         nodename_to_instance = {}
         try:
-            for node_data in current_results.get('node_uname_info', []):
-                if 'metric' in node_data:
-                    nodename = node_data['metric'].get('nodename')
-                    instance = node_data['metric'].get('instance')
+            for node_data in current_results.get("node_uname_info", []):
+                if "metric" in node_data:
+                    nodename = node_data["metric"].get("nodename")
+                    instance = node_data["metric"].get("instance")
                     if nodename and instance:
                         nodename_to_instance[nodename] = instance
             logger.debug(f"Nodename to instance mapping: {nodename_to_instance}")
@@ -229,15 +229,15 @@ class ClusterMetricsFetcher:
         # Process Power Metrics
         if "power" in current_results:
             logger.debug(f"Power Metrics: {current_results['power']}")
-            
-            #[{'metric': {'instance': 'fl4u42'}, 'value': [1739776921.221, '1.0290890332632034']}, {'metric': {'instance': 'fl4u44'}, 'value': [1739776921.221, '1.0421553174477174']}]"
+
+            # [{'metric': {'instance': 'fl4u42'}, 'value': [1739776921.221, '1.0290890332632034']}, {'metric': {'instance': 'fl4u44'}, 'value': [1739776921.221, '1.0421553174477174']}]"
             for node_data in current_results["power"]:
                 nodename = node_data["metric"]["instance"]
                 instance = nodename_to_instance.get(nodename, nodename)
                 processed_nodes.add(instance)
                 init_node_metrics(instance)
                 total_values = round(float(node_data["value"][1]), 2)
-                
+
                 logger.debug(f"Nodename: {nodename}, Instance: {instance}, Total Values: {total_values}")
 
                 # Find previous power values for this node
@@ -738,13 +738,13 @@ class ClusterMetricsFetcher:
         else:
             # Map metric types to their required queries
             metric_query_mapping = {
-                "memory": ["memory_total", "memory_available","node_uname_info"],
-                "cpu": ["cpu_usage","node_uname_info"],
-                "disk": ["storage_total", "storage_available","node_uname_info"],
-                "network_in": ["network_in","node_uname_info"],
-                "network_out": ["network_out","node_uname_info"],
-                "network_bandwidth": ["network_bandwidth","node_uname_info"],
-                "network": ["network_in", "network_out", "network_bandwidth","node_uname_info"],
+                "memory": ["memory_total", "memory_available", "node_uname_info"],
+                "cpu": ["cpu_usage", "node_uname_info"],
+                "disk": ["storage_total", "storage_available", "node_uname_info"],
+                "network_in": ["network_in", "node_uname_info"],
+                "network_out": ["network_out", "node_uname_info"],
+                "network_bandwidth": ["network_bandwidth", "node_uname_info"],
+                "network": ["network_in", "network_out", "network_bandwidth", "node_uname_info"],
             }
 
             if metric_type in metric_query_mapping:
@@ -759,7 +759,7 @@ class ClusterMetricsFetcher:
         try:
             # Get Power Metrics
             if time_range == "today":
-                power_query = f"""                 
+                power_query = f"""
                 sum by (instance) (
                     increase(kepler_container_joules_total{{cluster="{cluster_id}"}}[24h])
                     * on(node) group_left()
@@ -865,7 +865,7 @@ class ClusterMetricsFetcher:
                 for metric_name, query in queries.items():
                     task = self._fetch_metrics(session, query, current_time_params)
                     tasks.append((metric_name, task))
-                    
+
                 # Condition to check if power query is present
                 if metric_type == "all" or metric_type == "power":
                     # Fetch Power Metrics
@@ -905,7 +905,7 @@ class ClusterMetricsFetcher:
             processed_metrics = self._process_metrics(
                 current_results, previous_results if previous_time_params else None
             )
-            
+
             logger.debug(f"Processed Metrics: {processed_metrics}")
 
             # Add metadata

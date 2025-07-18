@@ -28,15 +28,14 @@ from pydantic import (
     Field,
     field_validator,
     model_validator,
-    EmailStr,
 )
 
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 
 from ..commons.constants import ClusterStatusEnum, PermissionEnum, UserStatusEnum
+from ..commons.helpers import validate_icon
 from ..permissions.schemas import PermissionList
 from ..user_ops.schemas import UserInfo
-from ..commons.helpers import validate_icon
 
 
 class ProjectBase(BaseModel):
@@ -86,7 +85,7 @@ class EditProjectRequest(BaseModel):
 
 
 class ProjectUserAdd(BaseModel):
-    """User to add to project"""
+    """User to add to project."""
 
     user_id: UUID4 | None = None
     email: EmailStr | None = None
@@ -120,7 +119,7 @@ class ProjectUserAdd(BaseModel):
 
 
 class ProjectResponse(ProjectBase):
-    """Project response to client schema"""
+    """Project response to client schema."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -161,7 +160,7 @@ class ProjectClusterFilter(BaseModel):
 
 
 class Project(ProjectBase):
-    """Project response to client schema"""
+    """Project response to client schema."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -192,7 +191,7 @@ class ProjectSuccessResopnse(SuccessResponse):
 
 
 class ProjectListResponse(BaseModel):
-    """Project list response to client schema"""
+    """Project list response to client schema."""
 
     project: Project
     users_count: int
@@ -215,14 +214,14 @@ class PaginatedProjectsResponse(PaginatedSuccessResponse):
 
 
 class ProjectDetailResponse(SuccessResponse):
-    """Project response to client schema"""
+    """Project response to client schema."""
 
     project: ProjectResponse
     endpoints_count: int
 
 
 class ProjectUserAddList(BaseModel):
-    """List of users to add to project"""
+    """List of users to add to project."""
 
     users: list[ProjectUserAdd]
 
@@ -232,7 +231,7 @@ class ProjectUserUpdate(BaseModel):
 
 
 class ProjectUserList(UserInfo):
-    """List of users assigned to a project"""
+    """List of users assigned to a project."""
 
     permissions: List[PermissionList]
     project_role: str
@@ -240,6 +239,6 @@ class ProjectUserList(UserInfo):
 
 
 class PagenatedProjectUserResponse(PaginatedSuccessResponse):
-    """Paginated response for project users"""
+    """Paginated response for project users."""
 
     users: List[ProjectUserList]

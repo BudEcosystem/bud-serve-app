@@ -388,21 +388,15 @@ async def edit_model(
     license_url: str | None = Form(None),
     remove_license: bool = Form(False),
 ) -> Union[SuccessResponse, ErrorResponse]:
-    """Edit cloud model with file upload"""
+    """Edit cloud model with file upload."""
     logger.debug(
         f"Received data: name={name}, description={description}, tags={tags}, tasks={tasks}, paper_urls={paper_urls}, github_url={github_url}, huggingface_url={huggingface_url}, website_url={website_url}, license_file={license_file}, license_url={license_url}"
     )
 
     try:
-        if isinstance(tags, str) and len(tags) == 0:
-            tags = []
-        else:
-            tags = json.loads(tags) if tags else None
+        tags = [] if isinstance(tags, str) and len(tags) == 0 else json.loads(tags) if tags else None
 
-        if isinstance(tasks, str) and len(tasks) == 0:
-            tasks = []
-        else:
-            tasks = json.loads(tasks) if tasks else None
+        tasks = [] if isinstance(tasks, str) and len(tasks) == 0 else json.loads(tasks) if tasks else None
 
         if isinstance(tags, str) and len(paper_urls) == 0:
             paper_urls = []
@@ -731,6 +725,7 @@ async def list_all_model_authors(
         code=status.HTTP_200_OK,
     ).to_http_response()
 
+
 @model_router.get(
     "/quantization-methods",
     responses={
@@ -778,6 +773,7 @@ async def list_quantization_methods(
         object="quantization_methods.list",
         code=status.HTTP_200_OK,
     ).to_http_response()
+
 
 @model_router.get(
     "/{model_id}",
@@ -1020,6 +1016,7 @@ async def quantize_model_workflow(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to quantize model workflow"
         ).to_http_response()
+
 
 @model_router.post(
     "/cancel-quantization",

@@ -16,15 +16,15 @@
 
 """Provides helper functions for the project."""
 
+import filecmp
 import os
 import random
-import string
 import re
-from pathlib import Path
 import shutil
-import filecmp
+import string
 from enum import Enum
-from typing import Dict, List, Literal, Optional, Union, Tuple
+from pathlib import Path
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 from huggingface_hub.utils import validate_repo_id
 from huggingface_hub.utils._validators import HFValidationError
@@ -293,15 +293,14 @@ def get_param_range(num_params: int) -> tuple[int, int]:
 
         logger.debug(
             f"Model has {num_params_in_thousands:.2f}K params, "
-            f"using +/-{range_size/1000:.1f}K range: "
-            f"{min_num_params/1000:.2f}K to {max_num_params/1000:.2f}K"
+            f"using +/-{range_size / 1000:.1f}K range: "
+            f"{min_num_params / 1000:.2f}K to {max_num_params / 1000:.2f}K"
         )
         return min_num_params, max_num_params
 
 
 def generate_valid_password(min_length: int = 8) -> str:
-    """
-    Generates a valid password string that meets the following criteria:
+    """Generates a valid password string that meets the following criteria:
     - Contains at least one digit.
     - Contains at least one alphabetic character.
     - Contains at least one special character from the set `!@#$%^&*`.
@@ -343,12 +342,11 @@ def generate_valid_password(min_length: int = 8) -> str:
 
 
 def validate_password_string(password: str) -> Union[bool, Tuple[bool, str]]:
-    """
-    Validate the password based on the following conditions:
+    """Validate the password based on the following conditions:
     - Contains at least one digit
     - Contains at least one alphabet character
     - Contains at least one special character
-    - Contains no whitespace
+    - Contains no whitespace.
 
     Args:
         password: The password to validate.
@@ -370,8 +368,7 @@ def validate_password_string(password: str) -> Union[bool, Tuple[bool, str]]:
 
 
 def replicate_dir(source: str, destination: str, is_override: bool = False):
-    """
-    Sync files from `source` to `destination` recursively.
+    """Sync files from `source` to `destination` recursively.
 
     - Preserves directory structure.
     - Skips identical files unless `is_override=True`.

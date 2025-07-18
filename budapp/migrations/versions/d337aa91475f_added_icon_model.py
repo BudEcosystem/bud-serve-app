@@ -1,4 +1,4 @@
-"""Added Icon Model
+"""Added Icon Model.
 
 Revision ID: d337aa91475f
 Revises: 97795f1e0340

@@ -6,9 +6,9 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 
 from budapp.commons import logging
+from budapp.commons.constants import EndpointStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.endpoint_ops.models import Endpoint
-from budapp.commons.constants import EndpointStatusEnum
 
 from .models import Router, RouterEndpoint
 

@@ -60,6 +60,7 @@ class RunBenchmarkWorkflowStepData(BaseModel):
 
 class RunBenchmarkWorkflowRequest(RunBenchmarkWorkflowStepData):
     """Run Benchmark Workflow Request."""
+
     # workflow metadata
     workflow_id: UUID4 | None = None
     workflow_total_steps: int | None = None
@@ -75,7 +76,7 @@ class RunBenchmarkWorkflowRequest(RunBenchmarkWorkflowStepData):
         if self.workflow_id is not None and self.workflow_total_steps is not None:
             raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
 
-        # if self.use_cache is True and (self.embedding_model is None or self.eviction_policy is None or self.score_threshold is None):  # noqa: E501self.embedding_model is None:
+        # if self.use_cache is True and (self.embedding_model is None or self.eviction_policy is None or self.score_threshold is None):  # noqa: E501
         #     raise ValueError("embedding_model, eviction_policy and score_threshold must be provided if use_cache is True")
 
         return self
@@ -202,6 +203,7 @@ class BenchmarkRequestMetrics(BaseModel):
     def itl_sum(self) -> float:
         """Compute sum of inter-token latencies (itl) if available."""
         return sum(self.itl) if self.itl else 0.0
+
 
 class AddRequestMetricsRequest(BaseModel):
     metrics: list[BenchmarkRequestMetrics]

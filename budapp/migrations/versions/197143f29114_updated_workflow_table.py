@@ -1,4 +1,4 @@
-"""updated workflow table
+"""updated workflow table.
 
 Revision ID: 197143f29114
 Revises: 5dc1d24e7b7e
@@ -8,10 +8,11 @@ Create Date: 2025-01-29 12:14:05.465867
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from alembic_postgresql_enum import TableReference
 from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision: str = "197143f29114"

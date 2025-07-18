@@ -16,25 +16,26 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the project ops."""
 
-from typing import Dict, List, Optional, Tuple, Any, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import UUID
 
 from fastapi import status
 from fastapi.exceptions import HTTPException
+from sqlalchemy import Row, Sequence, and_, case, cast, distinct, func, inspect, or_, select, text
 from sqlalchemy import String as SqlAlchemyString
-from sqlalchemy import cast, distinct, func, select, Sequence, and_, Row, inspect, or_, text, case
-from sqlalchemy.sql import literal_column
 from sqlalchemy.orm import aliased
+from sqlalchemy.sql import literal_column
 
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 
-from ..commons.constants import ProjectStatusEnum, UserStatusEnum, EndpointStatusEnum
+from ..commons.constants import EndpointStatusEnum, ProjectStatusEnum, UserStatusEnum
 from ..commons.exceptions import ClientException
+from ..endpoint_ops.models import Endpoint
+from ..permissions.models import Permission, ProjectPermission
 from ..user_ops.models import User
 from .models import Project, project_user_association
-from ..endpoint_ops.models import Endpoint
-from ..permissions.models import ProjectPermission, Permission
+
 
 logger = logging.get_logger(__name__)
 
@@ -119,7 +120,6 @@ class ProjectDataManager(DataManagerUtils):
 
     async def search_tags_by_name(self, search_value: str, offset: int, limit: int) -> Tuple[List[dict], int]:
         """Search tags in the database filtered by the tag name with pagination."""
-
         # Subquery to extract individual tags
         subquery = (
             select(func.jsonb_array_elements(Project.tags).label("tag"))
@@ -386,7 +386,7 @@ class ProjectDataManager(DataManagerUtils):
                 project_user_association ON p.id = project_user_association.project_id
             LEFT JOIN
                 user u ON project_user_association.user_id = u.id AND u.is_active = 1
-            WHERE 
+            WHERE
                 u.is_active = 1
             GROUP BY
                 p.id;
@@ -410,7 +410,7 @@ class ProjectDataManager(DataManagerUtils):
     @staticmethod
     async def _generate_global_search_stmt(model: Project, fields: Dict):
         # Inspect model columns
-        model_columns = inspect(model).columns
+        inspect(model).columns
 
         # Initialize list to store search conditions
         search_conditions = []
@@ -444,7 +444,6 @@ class ProjectDataManager(DataManagerUtils):
 
     async def retrieve_project_details(self, project_id: UUID) -> Union[Tuple[Project, int], None]:
         """Retrieve project details with endpoint count for detail page."""
-
         # Subquery to count endpoints per project
         endpoint_count_subquery = (
             select(

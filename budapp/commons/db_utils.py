@@ -318,7 +318,7 @@ class DataManagerUtils(SQLAlchemyMixin):
         for field, direction in sort_details:
             # Check if column exists, if not, skip
             try:
-                column = getattr(model, field)
+                getattr(model, field)
             except AttributeError:
                 continue
 

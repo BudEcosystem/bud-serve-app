@@ -53,7 +53,7 @@ class ProprietaryCredential(Base, TimestampMixin):
 
 
 class Credential(Base, TimestampMixin):
-    """Project API Keys : Credential model"""
+    """Project API Keys : Credential model."""
 
     __tablename__ = "credential"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)

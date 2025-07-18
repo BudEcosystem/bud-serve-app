@@ -1,4 +1,4 @@
-"""added status to model and cloud model table
+"""added status to model and cloud model table.
 
 Revision ID: cbbdd257bedd
 Revises: 68f026ad7360
@@ -8,9 +8,10 @@ Create Date: 2024-12-17 09:16:24.851050
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision: str = "cbbdd257bedd"

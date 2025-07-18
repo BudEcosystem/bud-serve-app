@@ -23,10 +23,9 @@ from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
-from budapp.commons.dependencies import get_current_user, get_session
+from budapp.commons.dependencies import get_session
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
-from budapp.user_ops.schemas import User
 
 from .schemas import (
     LogoutRequest,
@@ -69,7 +68,7 @@ async def register_user(
 ) -> Union[UserRegisterResponse, ErrorResponse]:
     """Register a user with email and password."""
     try:
-        db_user = await AuthService(session).register_user(user)
+        await AuthService(session).register_user(user)
         return UserRegisterResponse(
             code=status.HTTP_200_OK,
             message="User registered successfully",
@@ -125,6 +124,7 @@ async def login_user(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Something went wrong"
         ).to_http_response()
 
+
 @auth_router.post(
     "/logout",
     responses={
@@ -149,10 +149,7 @@ async def logout_user(
     """Logout a user by invalidating their refresh token."""
     try:
         await AuthService(session).logout_user(logout_data)
-        return LogoutResponse(
-            code=status.HTTP_200_OK,
-            message="User logged out successfully"
-        ).to_http_response()
+        return LogoutResponse(code=status.HTTP_200_OK, message="User logged out successfully").to_http_response()
     except ClientException as e:
         logger.error(f"ClientException: {e}")
         return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
@@ -161,6 +158,7 @@ async def logout_user(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Something went wrong"
         ).to_http_response()
+
 
 # refresh token
 @auth_router.post(
@@ -189,6 +187,4 @@ async def refresh_token(
         return ErrorResponse(code=status.HTTP_401_UNAUTHORIZED, message="Token Expired or Invalid").to_http_response()
     except Exception as e:
         logger.exception(f"Exception: {e}")
-        return ErrorResponse(
-            code=status.HTTP_401_UNAUTHORIZED, message="Token Expired or Invalid"
-        ).to_http_response()
+        return ErrorResponse(code=status.HTTP_401_UNAUTHORIZED, message="Token Expired or Invalid").to_http_response()

@@ -20,19 +20,8 @@
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
-from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
-from pydantic import (
-    UUID4,
-    AnyHttpUrl,
-    BaseModel,
-    ConfigDict,
-    Field,
-    HttpUrl,
-    field_validator,
-)
 from pydantic import (
     UUID4,
     AnyHttpUrl,
@@ -48,7 +37,6 @@ from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 
 from ..commons.helpers import validate_icon
 from ..commons.schemas import BudNotificationMetadata
-from ..model_ops.schemas import Model
 from ..model_ops.schemas import Model
 from ..project_ops.schemas import Project
 
@@ -178,7 +166,6 @@ class CreateClusterWorkflowRequest(BaseModel):
     provider_id: UUID4 | None = None
     region: str | None = None
 
-
     @field_validator("icon", mode="before")
     @classmethod
     def icon_validate(cls, value: str | None) -> str | None:
@@ -196,7 +183,7 @@ class CreateClusterWorkflowSteps(BaseModel):
     ingress_url: AnyHttpUrl | None = None
     configuration_yaml: dict | None = None
 
-     # Cloud specific fields
+    # Cloud specific fields
     cluster_type: str = "ON_PREM"  # "ON_PREM" or "CLOUD"
     credential_id: UUID4 | None = None
     provider_id: UUID4 | None = None
@@ -241,7 +228,7 @@ class EditClusterRequest(BaseModel):
 
 
 class ClusterDetailResponse(ClusterResponse):
-    """Cluster detail response schema"""
+    """Cluster detail response schema."""
 
     total_workers_count: int
     active_workers_count: int
@@ -251,7 +238,7 @@ class ClusterDetailResponse(ClusterResponse):
 
 
 class SingleClusterResponse(SuccessResponse):
-    """Single cluster entity"""
+    """Single cluster entity."""
 
     cluster: Union[ClusterResponse, ClusterDetailResponse]
 
@@ -264,6 +251,7 @@ class CancelClusterOnboardingRequest(BaseModel):
 
 class ClusterEndpointResponse(BaseModel):
     """Cluster endpoint response schema."""
+
     id: UUID4
     name: str
     status: EndpointStatusEnum
@@ -287,10 +275,13 @@ class ClusterEndpointFilter(BaseModel):
     name: str | None = None
     status: EndpointStatusEnum | None = None
 
+
 # Cluster Events Schema Paginated Response
 class ClusterNodeWiseEventsResponse(SuccessResponse):
     """Cluster node-wise events response schema."""
+
     events: Optional[list] = []
+
 
 # Cluster Metrics Schema
 class TimeSeriesPoint(BaseModel):
@@ -350,12 +341,14 @@ class StorageMetrics(BaseModel):
     usage_percent: float = Field(default=0.0)
     change_percent: float = Field(default=0.0)
 
+
 class PowerMetrics(BaseModel):
     """Power metrics schema."""
 
     total_kwh: float = Field(default=0.0)
     unit: str = Field(default="kWh")
     change_percent: float = Field(default=0.0)
+
 
 class NodeMetrics(BaseModel):
     """Node level metrics schema."""
@@ -367,8 +360,6 @@ class NodeMetrics(BaseModel):
     network_out: Optional[NetworkOutMetrics] = Field(default_factory=NetworkOutMetrics)
     network_bandwidth: Optional[NetworkBandwidthMetrics] = Field(default_factory=NetworkBandwidthMetrics)
     power: Optional[Any] = Field(default=None)
-
-
 
 
 class ClusterSummaryMetrics(BaseModel):
@@ -498,6 +489,7 @@ class PrometheusConfig(BaseModel):
     base_url: HttpUrl = Field(default="https://metric.bud.studio")
     cluster_id: str = Field()
 
+
 class NodeMetricsResponse(SuccessResponse):
     """Node metrics response schema."""
 
@@ -513,6 +505,7 @@ class CreateCloudClusterRequest(BaseModel):
     credential_id: UUID4 = Field(description="UUID of the CloudCredentials record to use for this cluster")
     provider_id: UUID4 = Field(description="UUID of the CloudProviders record to use for this cluster")
     region: str = Field(min_length=4, max_length=100, description="Region to create the cluster in")
+
 
 # class CloudClusterResponse(SuccessResponse):
 #     """Cloud cluster response schema."""
@@ -553,7 +546,7 @@ class ModelClusterRecommendedUpdate(ModelClusterRecommendedCreate):
 
 
 class RecommendedClusterData(BaseModel):
-    """Recommended cluster benchmarks schema"""
+    """Recommended cluster benchmarks schema."""
 
     replicas: int
     concurrency: dict
@@ -564,7 +557,7 @@ class RecommendedClusterData(BaseModel):
 
 
 class RecommendedCluster(BaseModel):
-    """Recommended cluster response schema"""
+    """Recommended cluster response schema."""
 
     id: UUID
     cluster_id: UUID
@@ -588,7 +581,7 @@ class RecommendedClusterResponse(SuccessResponse):
 
 
 class RecommendedClusterRequest(BaseModel):
-    """Request to get recommended cluster events"""
+    """Request to get recommended cluster events."""
 
     pretrained_model_uri: str
     input_tokens: int
@@ -600,6 +593,7 @@ class RecommendedClusterRequest(BaseModel):
     notification_metadata: BudNotificationMetadata
     source_topic: str
     is_proprietary_model: bool
+
 
 class GrafanaDashboardResponse(SuccessResponse):
     """Grafana dashboard response schema."""
@@ -614,6 +608,7 @@ class AnalyticsPanel(BaseModel):
     name: str
     iframe_url: str
     status: str
+
 
 class AnalyticsPanelsResponse(SuccessResponse):
     """Analytics panels response schema."""

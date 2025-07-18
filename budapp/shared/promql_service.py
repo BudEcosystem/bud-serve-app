@@ -1,10 +1,11 @@
-import requests
-import json
 import time
-from typing import Dict, List, Tuple, Any
-from budapp.cluster_ops.schemas import PrometheusConfig
-from fastapi import HTTPException
 from http import HTTPStatus
+from typing import Any, Dict, List, Tuple
+
+import requests
+from fastapi import HTTPException
+
+from budapp.cluster_ops.schemas import PrometheusConfig
 from budapp.commons.config import app_settings
 
 
@@ -23,7 +24,7 @@ class PrometheusMetricsClient:
             else:
                 full_query = query
 
-            response = requests.get(f"{self.config.base_url}/api/v1/query", params={"query": full_query})
+            response = requests.get(f"{self.config.base_url}/api/v1/query", params={"query": full_query}, timeout=30)
 
             if response.status_code != 200:
                 raise HTTPException(
@@ -62,6 +63,7 @@ class PrometheusMetricsClient:
         response = requests.get(
             f"{self.config.base_url}/api/v1/query_range",
             params={"query": full_query, "start": start_time, "end": end_time, "step": step},
+            timeout=30,
         )
 
         if response.status_code != 200:
@@ -89,7 +91,7 @@ class PrometheusMetricsClient:
                     node_status[node_name] = "NotReady"
 
             return node_status
-        except HTTPException as e:
+        except HTTPException:
             # Re-raise the HTTPException to maintain the status code
             raise
         except Exception as e:
@@ -289,7 +291,7 @@ class PrometheusMetricsClient:
                 f"/cluster/{self.config.cluster_id}/events-count-by-node"
             )
 
-            response = requests.get(create_cluster_endpoint)
+            response = requests.get(create_cluster_endpoint, timeout=30)
 
             if response.status_code != 200:
                 raise HTTPException(
@@ -304,9 +306,9 @@ class PrometheusMetricsClient:
             events_data = response.json()
             # Extract the events count for the specific node from the response
             # Assuming the response contains a mapping of node IPs to event counts
-            
-            # Fetch the node details 
-            
+
+            # Fetch the node details
+
             return events_data.get("data", {}).get(node_name, 0)
 
         except HTTPException as e:
@@ -327,7 +329,6 @@ class PrometheusMetricsClient:
 
     def get_nodes_status(self) -> Dict:
         """Get comprehensive node status information in JSON format."""
-
         nodes, pod_counts, node_status, max_pods, pod_status = self.get_node_info()
         nodes_json = {"nodes": {}}
 

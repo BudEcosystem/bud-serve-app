@@ -24,6 +24,7 @@ class BaseKeycloakSeeder(BaseSeeder):
                 await self._seed_keycloak(session)
             except Exception as e:
                 import traceback
+
                 logger.error(f"Error during seeding: {traceback.format_exc()}")
                 logger.error(f"Failed to complete seeding. Error: {e}")
 
@@ -150,7 +151,9 @@ class BaseKeycloakSeeder(BaseSeeder):
         # If realm was just created or user doesn't exist, create user in Keycloak
         if not keycloak_realm_exists or not db_user:
             if keycloak_realm_exists and not db_user:
-                logger.info(f"::KEYCLOAK::Realm exists but user {app_settings.superuser_email} doesn't exist. Creating user...")
+                logger.info(
+                    f"::KEYCLOAK::Realm exists but user {app_settings.superuser_email} doesn't exist. Creating user..."
+                )
 
             # Create user in Keycloak
             keycloak_user_id = await keycloak_manager.create_realm_admin(

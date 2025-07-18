@@ -252,7 +252,7 @@ class EndpointDataManager(DataManagerUtils):
         - Total endpoints count (excluding deleted ones)
         - Running endpoints count
         - Sum of active replicas (workers)
-        - Sum of total replicas (workers)
+        - Sum of total replicas (workers).
 
         Args:
             cluster_id (UUID): The ID of the cluster.

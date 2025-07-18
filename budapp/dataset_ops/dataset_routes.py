@@ -29,7 +29,6 @@ from budapp.commons.dependencies import (
     get_session,
     parse_ordering_fields,
 )
-from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
 from budapp.user_ops.schemas import User
 
@@ -77,9 +76,7 @@ async def list_all_datasets(
     filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True)
 
     try:
-        db_datasets, count = await DatasetService(session).get_datasets(
-            offset, limit, filters_dict, order_by, search
-        )
+        db_datasets, count = await DatasetService(session).get_datasets(offset, limit, filters_dict, order_by, search)
     except Exception as e:
         logger.exception(f"Failed to get all datasets: {e}")
         return ErrorResponse(

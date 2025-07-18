@@ -22,7 +22,6 @@ from typing import Annotated, Any, List, Optional
 
 from budmicroframe.commons.config import (
     BaseAppConfig,
-    BaseConfig,
     BaseSecretsConfig,
     enable_periodic_sync_from_store,
     register_settings,
@@ -168,6 +167,24 @@ class AppConfig(BaseAppConfig):
     cloud_model_seeder_engine: str = Field(alias="CLOUD_MODEL_SEEDER_ENGINE")
     bud_connect_base_url: AnyHttpUrl = Field(alias="BUD_CONNECT_BASE_URL")
 
+    # Evaluation Data Sync
+    eval_manifest_url: str = Field(
+        default="https://eval-datasets.bud.eco/v2/manifest.json",
+        description="URL to the evaluation datasets manifest file",
+        alias="EVAL_MANIFEST_URL",
+    )
+    eval_sync_enabled: bool = Field(
+        default=True, description="Enable automatic evaluation data synchronization", alias="EVAL_SYNC_ENABLED"
+    )
+    eval_sync_use_bundles: bool = Field(
+        default=True,
+        description="Use bundle downloads when available for evaluation datasets",
+        alias="EVAL_SYNC_USE_BUNDLES",
+    )
+    eval_sync_local_mode: bool = Field(
+        default=False, description="Use local mode for evaluation data synchronization", alias="EVAL_SYNC_LOCAL_MODE"
+    )
+
     @computed_field
     def static_dir(self) -> str:
         """Get the static directory."""
@@ -257,7 +274,7 @@ class SecretsConfig(BaseSecretsConfig):
 
     @property
     def public_key(self) -> PublicKeyTypes:
-        """Return Public key loaded from the PEM file"""
+        """Return Public key loaded from the PEM file."""
         try:
             # Read the public key from PEM file
             public_pem_bytes = Path(os.path.join(self.vault_path, "public_key.pem")).read_bytes()
@@ -271,7 +288,7 @@ class SecretsConfig(BaseSecretsConfig):
 
     @property
     def private_key(self) -> PrivateKeyTypes:
-        """Return Private key loaded from the PEM file"""
+        """Return Private key loaded from the PEM file."""
         try:
             # Read the private key from PEM file
             private_pem_bytes = Path(os.path.join(self.vault_path, "private_key.pem")).read_bytes()
@@ -287,7 +304,7 @@ class SecretsConfig(BaseSecretsConfig):
 
     @property
     def aes_key(self) -> bytes:
-        """Return AES key loaded from the HEX format"""
+        """Return AES key loaded from the HEX format."""
         if not self.aes_key_hex:
             raise RuntimeError("AES key is not set")
 

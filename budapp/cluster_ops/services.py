@@ -635,7 +635,7 @@ class ClusterService(SessionMixin):
 
             # Run The Grafana Creation Workflow
             grafana = Grafana()
-            await grafana.create_dashboard_from_file(bud_cluster_id, "prometheus",cluster_data.name)
+            await grafana.create_dashboard_from_file(bud_cluster_id, "prometheus", cluster_data.name)
 
             logger.debug(f"Cluster created successfully: {db_cluster.id}")
         except Exception as e:
@@ -784,14 +784,12 @@ class ClusterService(SessionMixin):
         # Update data
         update_data = {"status": payload.content.result["status"]}
 
-        if "node_info" in payload.content.result:
-            if (
-                "nodes" in payload.content.result["node_info"]
-                and len(payload.content.result["node_info"]["nodes"]) > 0
-            ):
-                cluster_resources = await self._calculate_cluster_resources(payload.content.result["node_info"])
-                update_data.update(cluster_resources.model_dump(exclude_unset=True, exclude_none=True))
-                logger.debug(f"Cluster resources updated: {update_data}")
+        if "node_info" in payload.content.result and (
+            "nodes" in payload.content.result["node_info"] and len(payload.content.result["node_info"]["nodes"]) > 0
+        ):
+            cluster_resources = await self._calculate_cluster_resources(payload.content.result["node_info"])
+            update_data.update(cluster_resources.model_dump(exclude_unset=True, exclude_none=True))
+            logger.debug(f"Cluster resources updated: {update_data}")
 
         # Update cluster status
         db_cluster = await ClusterDataManager(self.session).update_by_fields(db_cluster, update_data)
@@ -998,7 +996,7 @@ class ClusterService(SessionMixin):
                 "credentials": credentials,
                 "provider_unique_id": str(provider_unique_id),
                 "cluster_type": db_cluster.cluster_type,
-                "name": db_cluster.name
+                "name": db_cluster.name,
             }
 
         # Perform delete cluster request to bud_cluster app
@@ -1024,7 +1022,7 @@ class ClusterService(SessionMixin):
         }
 
         # Insert step details in db
-        db_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+        await WorkflowStepDataManager(self.session).insert_one(
             WorkflowStepModel(
                 workflow_id=db_workflow.id,
                 step_number=current_step_number,
@@ -1061,11 +1059,7 @@ class ClusterService(SessionMixin):
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/delete"
         )
 
-        cluster_type = (
-            cloud_payload.get("cluster_type", "ON_PREM")
-            if cloud_payload is not None
-            else "ON_PREM"
-        )
+        cluster_type = cloud_payload.get("cluster_type", "ON_PREM") if cloud_payload is not None else "ON_PREM"
 
         payload = {
             "cluster_id": str(bud_cluster_id),
@@ -1079,7 +1073,7 @@ class ClusterService(SessionMixin):
         }
 
         if cloud_payload:
-                payload["cloud_payload"] = json.dumps(cloud_payload)
+            payload["cloud_payload"] = json.dumps(cloud_payload)
 
         logger.debug(f"Performing delete cluster request to budcluster {payload}")
         try:
@@ -1541,7 +1535,7 @@ class ClusterService(SessionMixin):
     ) -> Tuple[List[ClusterEndpointResponse], int]:
         """Get all endpoints in a cluster."""
         # verify cluster id
-        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+        await ClusterDataManager(self.session).retrieve_by_fields(
             ClusterModel,
             fields={"id": cluster_id},
             exclude_fields={"status": ClusterStatusEnum.DELETED},
@@ -1622,7 +1616,10 @@ class ClusterService(SessionMixin):
             client = PrometheusMetricsClient(config)
             nodes_status = client.get_nodes_status()
             nodes_data = await self._perform_get_cluster_nodes_request(db_cluster.cluster_id)
-            node_name_id_mapping = {node["name"]: {"id": node["id"], "devices": node["hardware_info"]} for node in nodes_data.get("nodes", [])}
+            node_name_id_mapping = {
+                node["name"]: {"id": node["id"], "devices": node["hardware_info"]}
+                for node in nodes_data.get("nodes", [])
+            }
             for _, value in nodes_status.get("nodes", {}).items():
                 hostname = value["hostname"]
                 node_map = node_name_id_mapping.get(hostname)
@@ -1677,9 +1674,7 @@ class ClusterService(SessionMixin):
         get_cluster_node_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_cluster_app_id}/method/cluster/{cluster_id}/nodes"
 
         try:
-            logger.debug(
-                f"Performing get cluster node request. endpoint: {get_cluster_node_endpoint}"
-            )
+            logger.debug(f"Performing get cluster node request. endpoint: {get_cluster_node_endpoint}")
             async with aiohttp.ClientSession() as session, session.get(get_cluster_node_endpoint) as response:
                 response_data = await response.json()
                 if response.status != 200 or response_data.get("object") == "error":
@@ -1706,7 +1701,7 @@ class ClusterService(SessionMixin):
             List of recommended clusters
         """
         # From workflow id get simulator_id and deploy_config
-        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
 
         # Get all workflow steps according with ascending order of step number
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
