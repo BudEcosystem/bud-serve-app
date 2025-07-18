@@ -72,7 +72,7 @@ class Grafana:
         }
 
         try:
-            response = requests.post(f"{self.url}/api/dashboards/import", headers=headers, json=payload)
+            response = requests.post(f"{self.url}/api/dashboards/import", headers=headers, json=payload, timeout=30)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -89,7 +89,10 @@ class Grafana:
 
         try:
             response = requests.post(
-                f"{self.url}/api/dashboards/uid/{dashboard_uid}/public-dashboards", headers=headers, json=payload
+                f"{self.url}/api/dashboards/uid/{dashboard_uid}/public-dashboards",
+                headers=headers,
+                json=payload,
+                timeout=30,
             )
             response.raise_for_status()
             return response.json()
@@ -103,7 +106,9 @@ class Grafana:
         """Get the public URL of a Grafana dashboard by its UID."""
         headers = {"Content-Type": "application/json"}
 
-        response = requests.get(f"{self.url}/api/dashboards/uid/{cluster_id}/public-dashboards", headers=headers)
+        response = requests.get(
+            f"{self.url}/api/dashboards/uid/{cluster_id}/public-dashboards", headers=headers, timeout=30
+        )
         if response.status_code == 200:
             data = response.json()
             logger.debug(f"Public dashboard: {data}")

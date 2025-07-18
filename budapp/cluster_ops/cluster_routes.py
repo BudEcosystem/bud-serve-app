@@ -42,14 +42,11 @@ from budapp.workflow_ops.services import WorkflowService
 from ..commons.constants import PermissionEnum
 from ..commons.permission_handler import require_permissions
 from .schemas import (
-    AnalyticsPanelResponse,
-    AnalyticsPanelsResponse,
     CancelClusterOnboardingRequest,
     ClusterEndpointFilter,
     ClusterEndpointPaginatedResponse,
     ClusterFilter,
     ClusterListResponse,
-    ClusterMetricsResponse,
     ClusterMetricsResponse,
     ClusterNodeWiseEventsResponse,
     CreateClusterWorkflowRequest,
@@ -59,7 +56,6 @@ from .schemas import (
     NodeMetricsResponse,
     RecommendedClusterResponse,
     SingleClusterResponse,
-    SingleClusterResponse,
 )
 from .services import ClusterService
 from .workflows import ClusterRecommendedSchedulerWorkflows
@@ -68,6 +64,7 @@ from .workflows import ClusterRecommendedSchedulerWorkflows
 logger = logging.get_logger(__name__)
 
 cluster_router = APIRouter(prefix="/clusters", tags=["cluster"])
+
 
 @cluster_router.get(
     "/{cluster_id}/grafana-dashboard",
@@ -102,7 +99,7 @@ async def get_grafana_dashboard_url(
             message="Successfully retrieved Grafana dashboard URL",
             code=status.HTTP_200_OK,
             object="cluster.grafana-dashboard",
-            url=url
+            url=url,
         )
     except Exception as e:
         logger.exception(f"Error retrieving Grafana dashboard URL: {e}")
@@ -137,22 +134,19 @@ async def create_cluster_workflow(
     step_number: Annotated[int, Form(gt=0)],
     name: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
     icon: Annotated[str | None, Form(min_length=1, max_length=100)] = None,
-
-
     ingress_url: Annotated[AnyHttpUrl | None, Form()] = None,
     configuration_file: Annotated[
         UploadFile | None, File(description="The configuration file for the cluster")
     ] = None,
-
     workflow_id: Annotated[UUID | None, Form()] = None,
     workflow_total_steps: Annotated[int | None, Form()] = None,
     trigger_workflow: Annotated[bool, Form()] = False,
     # Cloud Cluster
     cluster_type: Annotated[str, Form(description="Type of cluster", enum=["ON_PREM", "CLOUD"])] = "ON_PREM",
     # Cluster Specific Inputs
-    credential_id:  Annotated[UUID | None, Form()] = None,
-    provider_id:  Annotated[UUID | None, Form()] = None,
-    region: Annotated[str | None, Form()] = None
+    credential_id: Annotated[UUID | None, Form()] = None,
+    provider_id: Annotated[UUID | None, Form()] = None,
+    region: Annotated[str | None, Form()] = None,
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Create cluster workflow."""
     # Perform router level validation
@@ -200,7 +194,7 @@ async def create_cluster_workflow(
                 credential_id=credential_id,
                 provider_id=provider_id,
                 region=region,
-                cluster_type=cluster_type
+                cluster_type=cluster_type,
             ),
             configuration_file=configuration_file,
         )
@@ -583,9 +577,7 @@ async def get_node_wise_metrics(
     try:
         metrics = await ClusterService(session).get_node_wise_metrics(cluster_id)
 
-        return NodeMetricsResponse(
-            code=status.HTTP_200_OK, message="Successfully retrieved node metrics", **metrics
-        )
+        return NodeMetricsResponse(code=status.HTTP_200_OK, message="Successfully retrieved node metrics", **metrics)
     except ClientException as e:
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
@@ -594,6 +586,7 @@ async def get_node_wise_metrics(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Error retrieving node-wise metrics",
         ).to_http_response()
+
 
 @cluster_router.get(
     "/{cluster_id}/node-events/{node_hostname}",
@@ -627,8 +620,7 @@ async def get_node_wise_events_by_hostname(
         events = events_raw.get("events", [])
 
         return ClusterNodeWiseEventsResponse(
-            code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname",
-            events=events
+            code=status.HTTP_200_OK, message="Successfully retrieved node metrics by hostname", events=events
         )
     except ClientException as e:
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()

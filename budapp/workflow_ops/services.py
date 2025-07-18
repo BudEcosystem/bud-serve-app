@@ -139,7 +139,9 @@ class WorkflowService(SessionMixin):
             quantization_simulation_events = required_data.get(
                 BudServeWorkflowStepEventName.QUANTIZATION_SIMULATION_EVENTS.value
             )
-            adapter_deployment_events = required_data.get(BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value)
+            adapter_deployment_events = required_data.get(
+                BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value
+            )
             security_scan_result_id = required_data.get("security_scan_result_id")
             icon = required_data.get("icon")
             uri = required_data.get("uri")
@@ -164,26 +166,34 @@ class WorkflowService(SessionMixin):
             template_id = required_data.get("template_id")
             endpoint_details = required_data.get("endpoint_details")
             add_model_modality = required_data.get("add_model_modality")
-            quantization_config = QuantizeModelWorkflowStepData(
-                model_id=model_id,
-                quantized_model_name=required_data.get("quantized_model_name"),
-                target_type=required_data.get("target_type"),
-                target_device=required_data.get("target_device"),
-                method=required_data.get("method"),
-                weight_config=required_data.get("weight_config"),
-                activation_config=required_data.get("activation_config"),
-                cluster_id=required_data.get("cluster_id"),
-                simulation_id=required_data.get("simulation_id"),
-                quantization_data=required_data.get("quantization_data"),
-                quantized_model_id=required_data.get("quantized_model_id"),
-            ) if quantized_model_name else None
+            quantization_config = (
+                QuantizeModelWorkflowStepData(
+                    model_id=model_id,
+                    quantized_model_name=required_data.get("quantized_model_name"),
+                    target_type=required_data.get("target_type"),
+                    target_device=required_data.get("target_device"),
+                    method=required_data.get("method"),
+                    weight_config=required_data.get("weight_config"),
+                    activation_config=required_data.get("activation_config"),
+                    cluster_id=required_data.get("cluster_id"),
+                    simulation_id=required_data.get("simulation_id"),
+                    quantization_data=required_data.get("quantization_data"),
+                    quantized_model_id=required_data.get("quantized_model_id"),
+                )
+                if quantized_model_name
+                else None
+            )
 
-            adapter_config = AddAdapterWorkflowStepData(
-                adapter_model_id=adapter_model_id,
-                adapter_name=required_data.get("adapter_name"),
-                endpoint_id=required_data.get("endpoint_id"),
-                adapter_id=required_data.get("adapter_id")
-            ) if adapter_model_id else None
+            adapter_config = (
+                AddAdapterWorkflowStepData(
+                    adapter_model_id=adapter_model_id,
+                    adapter_name=required_data.get("adapter_name"),
+                    endpoint_id=required_data.get("endpoint_id"),
+                    adapter_id=required_data.get("adapter_id"),
+                )
+                if adapter_model_id
+                else None
+            )
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -289,8 +299,12 @@ class WorkflowService(SessionMixin):
                 project=db_project if db_project else None,
                 cluster=db_cluster if db_cluster else None,
                 quantization_config=quantization_config if quantization_config else None,
-                quantization_deployment_events=quantization_deployment_events if quantization_deployment_events else None,
-                quantization_simulation_events=quantization_simulation_events if quantization_simulation_events else None,
+                quantization_deployment_events=quantization_deployment_events
+                if quantization_deployment_events
+                else None,
+                quantization_simulation_events=quantization_simulation_events
+                if quantization_simulation_events
+                else None,
                 eval_with=eval_with,
                 max_input_tokens=max_input_tokens,
                 max_output_tokens=max_output_tokens,

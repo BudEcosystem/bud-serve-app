@@ -1,4 +1,4 @@
-"""added chat session, note, chat setting and message table
+"""added chat session, note, chat setting and message table.
 
 Revision ID: 19fcbbcc98ca
 Revises: de50a729b972
@@ -8,8 +8,8 @@ Create Date: 2025-02-25 08:43:31.659527
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 
 # revision identifiers, used by Alembic.

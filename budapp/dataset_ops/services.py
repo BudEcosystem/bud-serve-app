@@ -6,6 +6,7 @@ from .models import DatasetCRUD
 
 logger = logging.get_logger(__name__)
 
+
 class DatasetService(SessionMixin):
     """Dataset service."""
 

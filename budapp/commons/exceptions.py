@@ -204,7 +204,7 @@ class MinioException(Exception):
 
 
 class BudNotifyException(Exception):
-    """BudNotifyException is raised when there is an error in the budnotify server"""
+    """BudNotifyException is raised when there is an error in the budnotify server."""
 
     def __init__(self, message: str = "Error found from budnotify server"):
         self.message = message

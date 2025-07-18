@@ -49,12 +49,12 @@ from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..permissions.crud import ProjectPermissionDataManager
 from ..permissions.models import Permission, ProjectPermission
-from ..permissions.schemas import CheckUserResourceScope, PermissionList, ProjectPermissionCreate
+from ..permissions.schemas import CheckUserResourceScope, PermissionList
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..user_ops.crud import UserDataManager
+from ..user_ops.models import Tenant, TenantClient
 from ..user_ops.models import User as UserModel
 from ..user_ops.schemas import User, UserCreate
-from ..user_ops.models import Tenant, TenantClient
 from .crud import ProjectDataManager
 from .models import Project as ProjectModel
 from .schemas import (
@@ -79,7 +79,6 @@ class ProjectService(SessionMixin):
         # Permission check
         permission_service = PermissionService(self.session)
 
-
         if await ProjectDataManager(self.session).retrieve_by_fields(
             ProjectModel,
             {"name": project_data["name"], "status": ProjectStatusEnum.ACTIVE},
@@ -93,18 +92,19 @@ class ProjectService(SessionMixin):
         db_project = await ProjectDataManager(self.session).insert_one(project_model)
 
         # Get user with id
-        db_user = await UserDataManager(self.session).retrieve_by_fields(UserModel, {"id": current_user_id}, missing_ok=True)
+        db_user = await UserDataManager(self.session).retrieve_by_fields(
+            UserModel, {"id": current_user_id}, missing_ok=True
+        )
 
         try:
-
             # Update Permission in Keycloak
-            payload : ResourceCreate = ResourceCreate(
+            payload: ResourceCreate = ResourceCreate(
                 resource_id=str(db_project.id),
                 resource_type="project",
                 scopes=["view", "manage"],
             )
             await permission_service.create_resource_permission_by_user(db_user, payload)
-        
+
             # Add current user to project
             default_project_level_scopes = PermissionEnum.get_project_level_scopes()
             add_users_data = ProjectUserAdd(user_id=current_user_id, scopes=default_project_level_scopes)
@@ -114,7 +114,6 @@ class ProjectService(SessionMixin):
             raise ClientException("Failed to update permission in Keycloak")
 
         return db_project
-
 
     async def edit_project(self, project_id: UUID, data: Dict[str, Any]) -> ProjectResponse:
         """Edit project by validating and updating specific fields."""
@@ -607,7 +606,7 @@ class ProjectService(SessionMixin):
 
             # Remove user from project
             db_project.users.remove(db_user)
-            
+
             # Remove user permissions from Keycloak
             try:
                 await permission_service.remove_user_from_project_permissions(
@@ -654,7 +653,7 @@ class ProjectService(SessionMixin):
         results: List[Tuple[UserModel, str]],  # User and project_role
         project_id: UUID,
     ) -> List[ProjectUserList]:
-        """Get parsed project user list response with permissions from Keycloak"""
+        """Get parsed project user list response with permissions from Keycloak."""
         data = []
         project_level_permissions = PermissionEnum.get_project_level_scopes()
         global_project_permissions = [
@@ -770,7 +769,7 @@ class ProjectService(SessionMixin):
         self,
         results: List[Tuple[UserModel, str, ProjectPermission, Permission]],
     ) -> List[ProjectUserList]:
-        """Get parsed project user list response"""
+        """Get parsed project user list response."""
         data = []
         project_level_permissions = PermissionEnum.get_project_level_scopes()
         global_project_permissions = [

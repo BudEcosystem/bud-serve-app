@@ -135,7 +135,7 @@ class CloudModel(BaseModel):
 
 
 class PaperPublishedModel(BaseModel):
-    """Paper Published Model Schema"""
+    """Paper Published Model Schema."""
 
     id: UUID4
     title: str | None = None
@@ -149,7 +149,7 @@ class PaperPublishedModel(BaseModel):
 
 
 class PaperPublishedModelEditRequest(BaseModel):
-    """Paper Published Edit Model Schema"""
+    """Paper Published Edit Model Schema."""
 
     id: UUID4 | None = None
     title: str | None = None
@@ -157,7 +157,7 @@ class PaperPublishedModelEditRequest(BaseModel):
 
 
 class ModelLicensesModel(BaseModel):
-    """Model Licenses Model Schema"""
+    """Model Licenses Model Schema."""
 
     id: UUID4
     name: str | None = None
@@ -187,7 +187,7 @@ class ModelLicensesModel(BaseModel):
 
 
 class ModelLicenseTypeSchema(BaseModel):
-    """Model Licenses Model Schema"""
+    """Model Licenses Model Schema."""
 
     license_type: str | None = None
 
@@ -1138,6 +1138,7 @@ class ModelDeploymentRequest(BaseModel):
     source_topic: str
     credential_id: UUID4 | None = None
     podscaler: ScalingSpecification | None = None
+    provider: str | None = None
 
 
 class TopLeaderboardRequest(BaseModel):

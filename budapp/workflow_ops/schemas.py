@@ -15,7 +15,14 @@ from ..commons.constants import (
 from ..core.schemas import ModelTemplateResponse
 from ..credential_ops.schemas import ProprietaryCredentialResponse
 from ..endpoint_ops.schemas import AddAdapterWorkflowStepData, EndpointResponse
-from ..model_ops.schemas import CloudModel, Model, ModelSecurityScanResult, Provider, QuantizeModelWorkflowStepData, ScalingSpecification
+from ..model_ops.schemas import (
+    CloudModel,
+    Model,
+    ModelSecurityScanResult,
+    Provider,
+    QuantizeModelWorkflowStepData,
+    ScalingSpecification,
+)
 from ..project_ops.schemas import ProjectResponse
 
 

@@ -3,15 +3,15 @@ import os
 from typing import Any, Dict
 
 from datasets import load_dataset_builder
-from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.config import secrets_settings
 from budapp.commons.constants import DatasetStatusEnum
-from budapp.dataset_ops.models import DatasetSchema, DatasetCRUD
+from budapp.dataset_ops.models import DatasetCRUD
 from budapp.dataset_ops.schemas import DatasetCreate, DatasetUpdate
 
 from .base_seeder import BaseSeeder
+
 
 logger = logging.get_logger(__name__)
 
@@ -42,9 +42,7 @@ class DatasetSeeder(BaseSeeder):
         limit = 100
         while True:
             with DatasetCRUD() as crud:
-                db_datasets, count = await crud.fetch_many_with_search(
-                    offset=offset, limit=limit, search=False
-                )
+                db_datasets, count = await crud.fetch_many_with_search(offset=offset, limit=limit, search=False)
 
             if not db_datasets:
                 break
@@ -57,9 +55,7 @@ class DatasetSeeder(BaseSeeder):
             if count < limit:
                 break
 
-            logger.info(
-                f"Finished fetching datasets. Total datasets found: {len(existing_datasets)}"
-            )
+            logger.info(f"Finished fetching datasets. Total datasets found: {len(existing_datasets)}")
 
         datasets_data = await DatasetSeeder._get_datasets_data()
 
@@ -77,14 +73,16 @@ class DatasetSeeder(BaseSeeder):
                     datasets_data[existing_dataset.name]["formatting"] = "alpaca"
                 update_dataset_object = DatasetUpdate(**datasets_data[existing_dataset.name])
                 with DatasetCRUD() as crud:
-                    crud.update(data=update_dataset_object.model_dump(mode="json", exclude_none=True), conditions={"id": existing_dataset.id})
+                    crud.update(
+                        data=update_dataset_object.model_dump(mode="json", exclude_none=True),
+                        conditions={"id": existing_dataset.id},
+                    )
                 # delete from datasets_data
                 del datasets_data[existing_dataset.name]
             elif existing_dataset.status == DatasetStatusEnum.ACTIVE:
                 # update status to inactive
                 with DatasetCRUD() as crud:
                     crud.update(data={"status": DatasetStatusEnum.INACTIVE}, conditions={"id": existing_dataset.id})
-
 
         # remaining are new entries
         # insert in dataset table
@@ -112,7 +110,6 @@ class DatasetSeeder(BaseSeeder):
             with DatasetCRUD() as crud:
                 crud.bulk_insert(data_to_be_inserted)
 
-
     @staticmethod
     async def _get_datasets_data() -> Dict[str, Any]:
         """Get benchmark datasets data from the seeder file."""
@@ -121,7 +118,6 @@ class DatasetSeeder(BaseSeeder):
                 return json.load(file)
         except FileNotFoundError as e:
             raise FileNotFoundError(f"File not found: {DATASET_SEEDER_FILE_PATH}") from e
-
 
     @staticmethod
     async def get_huggingface_info(hf_hub_url):
@@ -134,7 +130,4 @@ class DatasetSeeder(BaseSeeder):
             splits = ds_builder.info.splits
         except Exception as e:
             logger.error(f"Failed to get data from huggingface: {e}")
-        return {
-            "description": description,
-            "splits": splits
-        }
+        return {"description": description, "splits": splits}

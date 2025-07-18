@@ -1,4 +1,4 @@
-"""updated message table
+"""updated message table.
 
 Revision ID: 1003edcadb5d
 Revises: 19fcbbcc98ca
@@ -8,9 +8,10 @@ Create Date: 2025-02-28 13:32:43.431142
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision: str = "1003edcadb5d"

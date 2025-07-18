@@ -16,7 +16,7 @@
 
 """The models package, containing the database models for the user ops."""
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import ARRAY, Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
@@ -27,8 +27,8 @@ from budapp.commons.constants import UserRoleEnum, UserStatusEnum
 from budapp.commons.database import Base, TimestampMixin
 from budapp.endpoint_ops.models import Endpoint
 from budapp.model_ops.models import Model
-from budapp.project_ops.models import Project, project_user_association
 from budapp.permissions.models import ProjectPermission
+from budapp.project_ops.models import Project, project_user_association
 
 
 class User(Base, TimestampMixin):
@@ -37,7 +37,9 @@ class User(Base, TimestampMixin):
     __tablename__ = "user"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    auth_id: Mapped[UUID] = mapped_column(Uuid, unique=True, default=uuid4) # repurpose the auth_id to store keycloak id
+    auth_id: Mapped[UUID] = mapped_column(
+        Uuid, unique=True, default=uuid4
+    )  # repurpose the auth_id to store keycloak id
     name: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     role: Mapped[str] = mapped_column(
@@ -77,7 +79,6 @@ class User(Base, TimestampMixin):
     created_endpoints: Mapped[list[Endpoint]] = relationship(back_populates="created_user")
 
 
-
 class Tenant(Base, TimestampMixin):
     """Tenant model."""
 
@@ -85,8 +86,8 @@ class Tenant(Base, TimestampMixin):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    realm_name: Mapped[str] = mapped_column(String, nullable=False) # Keycloak realm name
-    tenant_identifier: Mapped[str] = mapped_column(String, nullable=False) # Will be same as realm name
+    realm_name: Mapped[str] = mapped_column(String, nullable=False)  # Keycloak realm name
+    tenant_identifier: Mapped[str] = mapped_column(String, nullable=False)  # Will be same as realm name
     description: Mapped[str] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
@@ -95,6 +96,7 @@ class Tenant(Base, TimestampMixin):
     # Add relationships
     clients: Mapped[list["TenantClient"]] = relationship(back_populates="tenant")
     user_mappings: Mapped[list["TenantUserMapping"]] = relationship(back_populates="tenant")
+
 
 class TenantClient(Base, TimestampMixin):
     """Tenant client model."""
@@ -112,6 +114,7 @@ class TenantClient(Base, TimestampMixin):
 
     # Add relationship
     tenant: Mapped["Tenant"] = relationship(back_populates="clients")
+
 
 class TenantUserMapping(Base, TimestampMixin):
     """Tenant user mapping model."""

@@ -1,19 +1,20 @@
-"""add model licneses table
+"""add model licneses table.
 
 Revision ID: 7420487c5f37
 Revises: f91763325460
 Create Date: 2024-11-04 18:01:06.341718
 
 """
+
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 
 # revision identifiers, used by Alembic.
-revision: str = '7420487c5f37'
-down_revision: Union[str, None] = 'f91763325460'
+revision: str = "7420487c5f37"
+down_revision: Union[str, None] = "f91763325460"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -31,4 +32,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table('model_licenses')
+    op.drop_table("model_licenses")

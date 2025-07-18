@@ -17,7 +17,7 @@
 """The cluster ops package, containing essential business logic, services, and routing configurations for the cluster ops."""
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Uuid
@@ -35,8 +35,12 @@ class Cluster(Base, TimestampMixin):
     __tablename__ = "cluster"
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    ingress_url: Mapped[str] = mapped_column(String, nullable=True) # as cloud cluster doesnt have ingress url by default
-    cluster_type: Mapped[str] = mapped_column(String, nullable=False,default="ON_PERM") # New Addition ->  ON_PERM || CLOUD
+    ingress_url: Mapped[str] = mapped_column(
+        String, nullable=True
+    )  # as cloud cluster doesnt have ingress url by default
+    cluster_type: Mapped[str] = mapped_column(
+        String, nullable=False, default="ON_PERM"
+    )  # New Addition ->  ON_PERM || CLOUD
     status: Mapped[str] = mapped_column(
         Enum(
             ClusterStatusEnum,
@@ -69,8 +73,6 @@ class Cluster(Base, TimestampMixin):
 
     # cloud_credential: Mapped["CloudCredentials"] = relationship("CloudCredentials",foreign_keys=[credential_id])
     # cloud_provider: Mapped["CloudProviders"] = relationship("CloudProviders",foreign_keys=[cloud_provider_id])
-
-
 
     endpoints: Mapped[list["Endpoint"]] = relationship(
         "Endpoint",

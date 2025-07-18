@@ -1,4 +1,3 @@
-import json
 from typing import List
 
 from fastapi import status
@@ -55,7 +54,6 @@ class PermissionService(SessionMixin):
         except Exception as e:
             logger.error(f"Error creating resource permission: {e}")
             raise
-
 
     async def delete_permission_for_resource(self, resource: DeletePermissionRequest) -> None:
         """Delete a resource permission for a user."""
@@ -435,10 +433,7 @@ class PermissionService(SessionMixin):
             keycloak_scopes = []
             for scope in scopes:
                 # Extract actual scope from format like "endpoint:view" -> "view"
-                if ":" in scope:
-                    actual_scope = scope.split(":")[-1]
-                else:
-                    actual_scope = scope
+                actual_scope = scope.split(":")[-1] if ":" in scope else scope
 
                 if actual_scope in ["view", "manage"]:
                     keycloak_scopes.append(actual_scope)

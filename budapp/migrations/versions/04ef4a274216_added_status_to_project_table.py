@@ -1,4 +1,4 @@
-"""added status to project table
+"""added status to project table.
 
 Revision ID: 04ef4a274216
 Revises: cbbdd257bedd
@@ -8,9 +8,10 @@ Create Date: 2024-12-18 10:16:17.791188
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision: str = "04ef4a274216"

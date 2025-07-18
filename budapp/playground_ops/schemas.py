@@ -19,7 +19,7 @@
 
 import re
 from datetime import datetime
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -80,7 +80,7 @@ class PlaygroundDeploymentFilter(BaseModel):
 
 
 class ChatSessionCreate(BaseModel):
-    """Chat session create schema"""
+    """Chat session create schema."""
 
     name: str | None = None
     chat_setting_id: UUID4 | None = None
@@ -92,7 +92,7 @@ class ChatSessionCreate(BaseModel):
 
 
 class ChatSettingResponse(BaseModel):
-    """Chat setting response schema"""
+    """Chat setting response schema."""
 
     id: UUID4
     name: str
@@ -112,7 +112,7 @@ class ChatSettingResponse(BaseModel):
 
 
 class ChatSessionResponse(BaseModel):
-    """Chat session response schema"""
+    """Chat session response schema."""
 
     id: UUID4
     name: str
@@ -125,13 +125,13 @@ class ChatSessionResponse(BaseModel):
 
 
 class ChatSessionSuccessResponse(SuccessResponse):
-    """Chat session success response schema"""
+    """Chat session success response schema."""
 
     chat_session: ChatSessionResponse
 
 
 class ChatSessionListResponse(BaseModel):
-    """Chat session list response schema"""
+    """Chat session list response schema."""
 
     id: UUID4
     name: str
@@ -143,26 +143,26 @@ class ChatSessionListResponse(BaseModel):
 
 
 class ChatSessionPaginatedResponse(PaginatedSuccessResponse):
-    """Chat session paginated response schema"""
+    """Chat session paginated response schema."""
 
     chat_sessions: list[ChatSessionListResponse] = []
 
 
 class ChatSessionFilter(BaseModel):
-    """Chat session filter schema"""
+    """Chat session filter schema."""
 
     name: str | None = None
 
 
 class ChatSessionEditRequest(BaseModel):
-    """Chat session edit schema"""
+    """Chat session edit schema."""
 
     name: str | None = Field(None, min_length=1, max_length=300)
     chat_setting_id: UUID4 | None = None
 
 
 class MessageBase(BaseModel):
-    """Base schema for Message model containing shared attributes"""
+    """Base schema for Message model containing shared attributes."""
 
     prompt: str
     response: dict
@@ -181,7 +181,7 @@ class MessageBase(BaseModel):
 
 
 class MessageCreateRequest(MessageBase):
-    """Schema for creating a message"""
+    """Schema for creating a message."""
 
     chat_session_id: UUID4 | None = None
     chat_setting_id: UUID4 | None = None
@@ -223,7 +223,7 @@ class MessageCreateRequest(MessageBase):
 
 
 class MessageResponse(MessageBase):
-    """Schema for returning a message response"""
+    """Schema for returning a message response."""
 
     id: UUID4
     chat_session_id: UUID4
@@ -238,13 +238,13 @@ class MessageResponse(MessageBase):
 
 
 class MessageSuccessResponse(SuccessResponse):
-    """Chat session success response schema"""
+    """Chat session success response schema."""
 
     chat_message: MessageResponse
 
 
 class MessagePaginatedResponse(PaginatedSuccessResponse):
-    """Paginated response schema for retrieving messages"""
+    """Paginated response schema for retrieving messages."""
 
     chat_messages: list[MessageResponse] = []
 
@@ -309,7 +309,7 @@ class MessageEditRequest(BaseModel):
 
 
 class ChatSettingCreate(BaseModel):
-    """Chat setting create schema"""
+    """Chat setting create schema."""
 
     name: str = Field(..., min_length=1, max_length=300)
     system_prompt: str | None = None
@@ -323,13 +323,13 @@ class ChatSettingCreate(BaseModel):
 
 
 class ChatSettingSuccessResponse(SuccessResponse):
-    """Chat setting success response schema"""
+    """Chat setting success response schema."""
 
     chat_setting: ChatSettingResponse
 
 
 class ChatSettingListResponse(BaseModel):
-    """Chat session list response schema"""
+    """Chat session list response schema."""
 
     id: UUID4
     name: str
@@ -340,13 +340,13 @@ class ChatSettingListResponse(BaseModel):
 
 
 class ChatSettingPaginatedResponse(PaginatedSuccessResponse):
-    """Chat setting paginated response schema"""
+    """Chat setting paginated response schema."""
 
     chat_settings: list[ChatSettingListResponse] = []
 
 
 class ChatSettingFilter(BaseModel):
-    """Chat session filter schema"""
+    """Chat session filter schema."""
 
     name: str | None = None
 
@@ -366,20 +366,20 @@ class ChatSettingEditRequest(BaseModel):
 
 
 class NoteCreateRequest(BaseModel):
-    """Schema for creating a note"""
+    """Schema for creating a note."""
 
     chat_session_id: UUID4
     note: str = Field(..., min_length=1, max_length=5000)
 
 
 class NoteEditRequest(BaseModel):
-    """Schema for editing a note"""
+    """Schema for editing a note."""
 
     note: str = Field(..., min_length=1, max_length=5000)
 
 
 class NoteResponse(BaseModel):
-    """Schema for note response"""
+    """Schema for note response."""
 
     id: UUID4
     note: str
@@ -390,18 +390,18 @@ class NoteResponse(BaseModel):
 
 
 class NoteSuccessResponse(SuccessResponse):
-    """Note success response schema"""
+    """Note success response schema."""
 
     note: NoteResponse
 
 
 class NotePaginatedResponse(PaginatedSuccessResponse):
-    """Note paginated response schema"""
+    """Note paginated response schema."""
 
     notes: list[NoteResponse] = []
 
 
 class NoteFilter(BaseModel):
-    """Note filter schema"""
+    """Note filter schema."""
 
     note: str | None = None

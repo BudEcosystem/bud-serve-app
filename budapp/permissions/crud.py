@@ -16,13 +16,13 @@
 
 """The core package, containing essential business logic, services, and routing configurations for the permissions."""
 
-from typing import Dict, Optional, List, Union
+from typing import Dict, List, Optional
+from uuid import UUID
 
 from fastapi import status
 from fastapi.exceptions import HTTPException
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 
-from uuid import UUID
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 
@@ -71,7 +71,6 @@ class ProjectPermissionDataManager(DataManagerUtils):
         self, user_ids: List[UUID], project_id: UUID
     ) -> List[ProjectPermission]:
         """Delete all project permissions by user ids."""
-
         stmt = delete(ProjectPermission).where(
             ProjectPermission.user_id.in_(user_ids),
             ProjectPermission.project_id == project_id,

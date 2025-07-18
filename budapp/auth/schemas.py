@@ -114,14 +114,14 @@ class LogoutResponse(SuccessResponse):
 
 
 class UserBase(BaseModel):
-    """Base user schema"""
+    """Base user schema."""
 
     name: str = Field(min_length=1, max_length=100)
     email: EmailStr = Field(min_length=1, max_length=100)
 
 
 class UserCreate(UserBase):
-    """Create user schema"""
+    """Create user schema."""
 
     password: str = Field(min_length=8, max_length=100)
     permissions: List[PermissionList] | None = None
@@ -160,7 +160,7 @@ class ResourceCreate(BaseModel):
     resource_type: str
     resource_id: str
     scopes: List[str]  # view , manage
-    
+
 
 class DeletePermissionRequest(BaseModel):
     """Delete permission request schema."""

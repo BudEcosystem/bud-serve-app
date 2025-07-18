@@ -1,4 +1,4 @@
-"""removed palm from proprietary credential table
+"""removed palm from proprietary credential table.
 
 Revision ID: d92d92c1c90c
 Revises: 04ef4a274216
@@ -9,8 +9,8 @@ Create Date: 2024-12-18 10:17:52.151093
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
 from alembic_postgresql_enum import TableReference
+
 
 # revision identifiers, used by Alembic.
 revision: str = "d92d92c1c90c"

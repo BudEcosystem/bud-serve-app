@@ -3,14 +3,17 @@ from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, field_validator
-from ..commons.schemas import SuccessResponse, PaginatedSuccessResponse
+
+from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse
+
 
 class CheckUserResourceScope(BaseModel):
     """Check user resource scope."""
 
     resource_type: str
     entity_id: Optional[str] = None
-    scope: str # Only One Scope
+    scope: str  # Only One Scope
+
 
 class PermissionCreate(BaseModel):
     user_id: UUID
@@ -62,27 +65,27 @@ class ProjectPermissionCreate(BaseModel):
 
 
 class ProjectPermissionBase(BaseModel):
-    """Base model for project permission"""
+    """Base model for project permission."""
 
     id: UUID
     permissions: List[PermissionList]
 
 
 class ProjectPermissionList(ProjectPermissionBase):
-    """Project permissions list"""
+    """Project permissions list."""
 
     name: str
 
 
 class PermissionListResponse(BaseModel):
-    """Permission list response to client schema"""
+    """Permission list response to client schema."""
 
     global_scopes: List[PermissionList]
     project_scopes: List[ProjectPermissionList]
 
 
 class ProjectPermissionUpdate(BaseModel):
-    """Project permission update"""
+    """Project permission update."""
 
     user_id: UUID
     project_id: UUID
