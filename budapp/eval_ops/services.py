@@ -8,14 +8,11 @@ from budapp.commons import logging
 from budapp.commons.constants import WorkflowTypeEnum
 from budapp.commons.exceptions import ClientException
 from budapp.eval_ops.models import (
-    Evaluation as EvaluationModel,
-)
-from budapp.eval_ops.models import (
-    EvaluationStatusEnum,
     ExperimentStatusEnum,
     RunStatusEnum,
 )
 from budapp.eval_ops.models import ExpDataset as DatasetModel
+from budapp.eval_ops.models import ExpDatasetVersion
 from budapp.eval_ops.models import Experiment as ExperimentModel
 from budapp.eval_ops.models import (
     ExpMetric as MetricModel,
@@ -31,22 +28,14 @@ from budapp.eval_ops.models import (
 from budapp.eval_ops.schemas import (
     CreateDatasetRequest,
     CreateExperimentRequest,
-    CreateRunRequest,
     DatasetFilter,
     ExperimentWorkflowResponse,
     ExperimentWorkflowStepData,
     ExperimentWorkflowStepRequest,
     TraitBasic,
     UpdateDatasetRequest,
-    UpdateEvaluationRequest,
     UpdateExperimentRequest,
     UpdateRunRequest,
-)
-from budapp.eval_ops.schemas import (
-    Evaluation as EvaluationSchema,
-)
-from budapp.eval_ops.schemas import (
-    EvaluationWithResults as EvaluationWithResultsSchema,
 )
 from budapp.eval_ops.schemas import (
     ExpDataset as DatasetSchema,
@@ -58,7 +47,7 @@ from budapp.eval_ops.schemas import (
     Run as RunSchema,
 )
 from budapp.eval_ops.schemas import (
-    RunWithEvaluations as RunWithEvaluationsSchema,
+    RunWithResults as RunWithResultsSchema,
 )
 from budapp.eval_ops.schemas import (
     Trait as TraitSchema,
@@ -75,18 +64,14 @@ class ExperimentService:
     """Service layer for Experiment operations.
 
     Methods:
-        - create_experiment: create and persist a new Experiment.
+        - create_experiment: create and persist a new Experiment with automatic run creation.
         - list_experiments: retrieve all non-deleted Experiments for a user.
         - update_experiment: apply updates to an existing Experiment.
         - delete_experiment: perform a soft delete on an Experiment.
-        - create_run: create a run with multiple evaluations.
         - list_runs: list runs for an experiment.
-        - get_run_with_evaluations: get a run with its evaluations.
+        - get_run_with_results: get a run with its metrics and results.
         - update_run: update a run.
         - delete_run: delete a run.
-        - list_evaluations: list evaluations within a run.
-        - get_evaluation_with_results: get an evaluation with metrics and results.
-        - update_evaluation: update an evaluation.
         - list_traits: list Trait entries with optional filters and pagination.
         - get_dataset_by_id: get a dataset by ID with associated traits.
         - list_datasets: list datasets with optional filters and pagination.
@@ -104,10 +89,10 @@ class ExperimentService:
         self.session = session
 
     def create_experiment(self, req: CreateExperimentRequest, user_id: uuid.UUID) -> ExperimentSchema:
-        """Create a new Experiment record.
+        """Create a new Experiment record with automatic run creation.
 
         Parameters:
-            req (CreateExperimentRequest): Payload containing name, description, project_id.
+            req (CreateExperimentRequest): Payload containing name, description, project_id, model_ids, dataset_ids.
             user_id (uuid.UUID): ID of the user creating the experiment.
 
         Returns:
@@ -126,8 +111,43 @@ class ExperimentService:
         )
         try:
             self.session.add(ev)
+            self.session.flush()  # Get the experiment ID without committing
+            
+            # Create runs for each model-dataset combination
+            run_index = 1
+            for model_id in req.model_ids:
+                for dataset_id in req.dataset_ids:
+                    # Note: Assuming dataset_id maps to a dataset_version_id
+                    # You might need to query the latest version of the dataset here
+                    dataset_version = (
+                        self.session.query(ExpDatasetVersion)
+                        .filter(ExpDatasetVersion.dataset_id == dataset_id)
+                        .order_by(ExpDatasetVersion.created_at.desc())
+                        .first()
+                    )
+                    
+                    if not dataset_version:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"No version found for dataset {dataset_id}"
+                        )
+                    
+                    run = RunModel(
+                        experiment_id=ev.id,
+                        run_index=run_index,
+                        model_id=model_id,
+                        dataset_version_id=dataset_version.id,
+                        status=RunStatusEnum.PENDING.value,
+                        config={}
+                    )
+                    self.session.add(run)
+                    run_index += 1
+            
             self.session.commit()
             self.session.refresh(ev)
+        except HTTPException:
+            self.session.rollback()
+            raise
         except Exception as e:
             self.session.rollback()
             logger.debug(f"Failed to create experiment: {e}", exc_info=True)
@@ -297,88 +317,6 @@ class ExperimentService:
 
     # ------------------------ Run Methods ------------------------
 
-    def create_run(self, experiment_id: uuid.UUID, req: CreateRunRequest, user_id: uuid.UUID) -> RunWithEvaluationsSchema:
-        """Create a new run with multiple evaluations.
-
-        Parameters:
-            experiment_id (uuid.UUID): ID of the parent experiment.
-            req (CreateRunRequest): Payload containing run details and evaluations.
-            user_id (uuid.UUID): ID of the user creating the run.
-
-        Returns:
-            RunWithEvaluationsSchema: Pydantic schema of the created run with evaluations.
-
-        Raises:
-            HTTPException(status_code=404): If experiment not found or access denied.
-            HTTPException(status_code=500): If database insertion fails.
-        """
-        # Check experiment exists and user has access
-        ev = self.session.get(ExperimentModel, experiment_id)
-        if not ev or ev.created_by != user_id or ev.status == "deleted":
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Experiment not found or access denied"
-            )
-
-        try:
-            # Create the run
-            run = RunModel(
-                experiment_id=experiment_id,
-                name=req.name,
-                description=req.description,
-                status=RunStatusEnum.PENDING.value,
-            )
-            self.session.add(run)
-            self.session.flush()  # Get the run ID
-
-            # Create evaluations
-            evaluations = []
-            for eval_req in req.evaluations:
-                evaluation = EvaluationModel(
-                    run_id=run.id,
-                    model_id=eval_req.model_id,
-                    dataset_version_id=eval_req.dataset_version_id,
-                    status=EvaluationStatusEnum.PENDING.value,
-                    config=eval_req.config,
-                )
-                self.session.add(evaluation)
-                evaluations.append(evaluation)
-
-            self.session.commit()
-            self.session.refresh(run)
-
-            # Convert to schema with evaluations
-            evaluation_schemas = [
-                EvaluationWithResultsSchema(
-                    id=eval.id,
-                    run_id=eval.run_id,
-                    model_id=eval.model_id,
-                    dataset_version_id=eval.dataset_version_id,
-                    status=EvaluationStatusEnum(eval.status),
-                    config=eval.config,
-                    metrics=[],
-                    raw_results=None,
-                )
-                for eval in evaluations
-            ]
-
-            return RunWithEvaluationsSchema(
-                id=run.id,
-                experiment_id=run.experiment_id,
-                name=run.name,
-                description=run.description,
-                status=RunStatusEnum(run.status),
-                evaluations=evaluation_schemas,
-            )
-
-        except Exception as e:
-            self.session.rollback()
-            logger.debug(f"Failed to create run: {e}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create run"
-            ) from e
-
     def list_runs(self, experiment_id: uuid.UUID, user_id: uuid.UUID) -> List[RunSchema]:
         """List all runs for a given experiment.
 
@@ -410,15 +348,15 @@ class ExperimentService:
         )
         return [RunSchema.from_orm(r) for r in runs]
 
-    def get_run_with_evaluations(self, run_id: uuid.UUID, user_id: uuid.UUID) -> RunWithEvaluationsSchema:
-        """Get a run with its evaluations and results.
+    def get_run_with_results(self, run_id: uuid.UUID, user_id: uuid.UUID) -> RunWithResultsSchema:
+        """Get a run with its metrics and results.
 
         Parameters:
             run_id (uuid.UUID): ID of the run.
             user_id (uuid.UUID): ID of the user.
 
         Returns:
-            RunWithEvaluationsSchema: Run schema with evaluations.
+            RunWithResultsSchema: Run schema with metrics and results.
 
         Raises:
             HTTPException(status_code=404): If run not found or access denied.
@@ -430,58 +368,39 @@ class ExperimentService:
                 detail="Run not found or access denied"
             )
 
-        # Get evaluations with metrics and results
-        evaluations = (
-            self.session.query(EvaluationModel)
-            .filter(EvaluationModel.run_id == run_id)
+        # Get metrics for this run
+        metrics = (
+            self.session.query(MetricModel)
+            .filter(MetricModel.run_id == run_id)
             .all()
         )
+        metrics_data = [
+            {
+                "metric_name": metric.metric_name,
+                "mode": metric.mode,
+                "metric_value": float(metric.metric_value),
+            }
+            for metric in metrics
+        ]
 
-        evaluation_schemas = []
-        for eval in evaluations:
-            # Get metrics for this evaluation
-            metrics = (
-                self.session.query(MetricModel)
-                .filter(MetricModel.evaluation_id == eval.id)
-                .all()
-            )
-            metrics_data = [
-                {
-                    "metric_name": metric.metric_name,
-                    "mode": metric.mode,
-                    "metric_value": float(metric.metric_value),
-                }
-                for metric in metrics
-            ]
+        # Get raw results for this run
+        raw_result = (
+            self.session.query(RawResultModel)
+            .filter(RawResultModel.run_id == run_id)
+            .first()
+        )
+        raw_results_data = raw_result.preview_results if raw_result else None
 
-            # Get raw results for this evaluation
-            raw_result = (
-                self.session.query(RawResultModel)
-                .filter(RawResultModel.evaluation_id == eval.id)
-                .first()
-            )
-            raw_results_data = raw_result.preview_results if raw_result else None
-
-            evaluation_schemas.append(
-                EvaluationWithResultsSchema(
-                    id=eval.id,
-                    run_id=eval.run_id,
-                    model_id=eval.model_id,
-                    dataset_version_id=eval.dataset_version_id,
-                    status=EvaluationStatusEnum(eval.status),
-                    config=eval.config,
-                    metrics=metrics_data,
-                    raw_results=raw_results_data,
-                )
-            )
-
-        return RunWithEvaluationsSchema(
+        return RunWithResultsSchema(
             id=run.id,
             experiment_id=run.experiment_id,
-            name=run.name,
-            description=run.description,
+            run_index=run.run_index,
+            model_id=run.model_id,
+            dataset_version_id=run.dataset_version_id,
             status=RunStatusEnum(run.status),
-            evaluations=evaluation_schemas,
+            config=run.config,
+            metrics=metrics_data,
+            raw_results=raw_results_data,
         )
 
     def update_run(
@@ -511,12 +430,10 @@ class ExperimentService:
                 detail="Run not found or access denied"
             )
 
-        if req.name is not None:
-            run.name = req.name
-        if req.description is not None:
-            run.description = req.description
         if req.status is not None:
             run.status = req.status.value
+        if req.config is not None:
+            run.config = req.config
 
         try:
             self.session.commit()
@@ -555,171 +472,6 @@ class ExperimentService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to delete run"
             ) from e
-
-    # ------------------------ Evaluation Methods ------------------------
-
-    def list_evaluations(self, run_id: uuid.UUID, user_id: uuid.UUID) -> List[EvaluationWithResultsSchema]:
-        """List evaluations within a run.
-
-        Parameters:
-            run_id (uuid.UUID): ID of the run.
-            user_id (uuid.UUID): ID of the user.
-
-        Returns:
-            List[EvaluationWithResultsSchema]: List of evaluations with results.
-
-        Raises:
-            HTTPException(status_code=404): If run not found or access denied.
-        """
-        run = self.session.get(RunModel, run_id)
-        if not run or run.experiment.created_by != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Run not found or access denied"
-            )
-
-        evaluations = (
-            self.session.query(EvaluationModel)
-            .filter(EvaluationModel.run_id == run_id)
-            .all()
-        )
-
-        evaluation_schemas = []
-        for eval in evaluations:
-            # Get metrics for this evaluation
-            metrics = (
-                self.session.query(MetricModel)
-                .filter(MetricModel.evaluation_id == eval.id)
-                .all()
-            )
-            metrics_data = [
-                {
-                    "metric_name": metric.metric_name,
-                    "mode": metric.mode,
-                    "metric_value": float(metric.metric_value),
-                }
-                for metric in metrics
-            ]
-
-            # Get raw results for this evaluation
-            raw_result = (
-                self.session.query(RawResultModel)
-                .filter(RawResultModel.evaluation_id == eval.id)
-                .first()
-            )
-            raw_results_data = raw_result.preview_results if raw_result else None
-
-            evaluation_schemas.append(
-                EvaluationWithResultsSchema(
-                    id=eval.id,
-                    run_id=eval.run_id,
-                    model_id=eval.model_id,
-                    dataset_version_id=eval.dataset_version_id,
-                    status=EvaluationStatusEnum(eval.status),
-                    config=eval.config,
-                    metrics=metrics_data,
-                    raw_results=raw_results_data,
-                )
-            )
-
-        return evaluation_schemas
-
-    def get_evaluation_with_results(self, evaluation_id: uuid.UUID, user_id: uuid.UUID) -> EvaluationWithResultsSchema:
-        """Get an evaluation with metrics and results.
-
-        Parameters:
-            evaluation_id (uuid.UUID): ID of the evaluation.
-            user_id (uuid.UUID): ID of the user.
-
-        Returns:
-            EvaluationWithResultsSchema: Evaluation schema with results.
-
-        Raises:
-            HTTPException(status_code=404): If evaluation not found or access denied.
-        """
-        evaluation = self.session.get(EvaluationModel, evaluation_id)
-        if not evaluation or evaluation.run.experiment.created_by != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Evaluation not found or access denied"
-            )
-
-        # Get metrics for this evaluation
-        metrics = (
-            self.session.query(MetricModel)
-            .filter(MetricModel.evaluation_id == evaluation_id)
-            .all()
-        )
-        metrics_data = [
-            {
-                "metric_name": metric.metric_name,
-                "mode": metric.mode,
-                "metric_value": float(metric.metric_value),
-            }
-            for metric in metrics
-        ]
-
-        # Get raw results for this evaluation
-        raw_result = (
-            self.session.query(RawResultModel)
-            .filter(RawResultModel.evaluation_id == evaluation_id)
-            .first()
-        )
-        raw_results_data = raw_result.preview_results if raw_result else None
-
-        return EvaluationWithResultsSchema(
-            id=evaluation.id,
-            run_id=evaluation.run_id,
-            model_id=evaluation.model_id,
-            dataset_version_id=evaluation.dataset_version_id,
-            status=EvaluationStatusEnum(evaluation.status),
-            config=evaluation.config,
-            metrics=metrics_data,
-            raw_results=raw_results_data,
-        )
-
-    def update_evaluation(
-        self,
-        evaluation_id: uuid.UUID,
-        req: UpdateEvaluationRequest,
-        user_id: uuid.UUID,
-    ) -> EvaluationSchema:
-        """Update an evaluation.
-
-        Parameters:
-            evaluation_id (uuid.UUID): ID of the evaluation to update.
-            req (UpdateEvaluationRequest): Payload with optional fields to update.
-            user_id (uuid.UUID): ID of the user attempting the update.
-
-        Returns:
-            EvaluationSchema: Pydantic schema of the updated evaluation.
-
-        Raises:
-            HTTPException(status_code=404): If evaluation not found or access denied.
-            HTTPException(status_code=500): If database update fails.
-        """
-        evaluation = self.session.get(EvaluationModel, evaluation_id)
-        if not evaluation or evaluation.run.experiment.created_by != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Evaluation not found or access denied"
-            )
-
-        if req.status is not None:
-            evaluation.status = req.status.value
-        if req.config is not None:
-            evaluation.config = req.config
-
-        try:
-            self.session.commit()
-            self.session.refresh(evaluation)
-        except Exception as e:
-            self.session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update evaluation"
-            ) from e
-        return EvaluationSchema.from_orm(evaluation)
 
     # ------------------------ Dataset Methods (Keep existing) ------------------------
 
@@ -1501,31 +1253,53 @@ class ExperimentWorkflowService:
         self.session.add(experiment)
         self.session.flush()
 
-        # Create initial run with evaluations
-        run = RunModel(
-            experiment_id=experiment.id,
-            name=combined_data.run_name or "Initial Run",
-            description=combined_data.run_description or "Initial evaluation run",
-            status=RunStatusEnum.PENDING.value,
-        )
-        self.session.add(run)
-        self.session.flush()
+        # Get datasets from traits if dataset_ids is empty but trait_ids exists
+        dataset_ids_to_use = combined_data.dataset_ids or []
+        if combined_data.trait_ids and not dataset_ids_to_use:
+            # Fetch all datasets associated with the selected traits
+            dataset_ids_from_traits = (
+                self.session.query(PivotModel.dataset_id)
+                .filter(PivotModel.trait_id.in_(combined_data.trait_ids))
+                .distinct()
+                .all()
+            )
+            dataset_ids_to_use = [str(dataset_id[0]) for dataset_id in dataset_ids_from_traits]
+            logger.info(f"Found {len(dataset_ids_to_use)} datasets from {len(combined_data.trait_ids)} traits")
 
-        # Create evaluations for each model-dataset combination
-        # This is a simplified version - you might want to be more sophisticated about dataset selection
-        if combined_data.model_ids and combined_data.dataset_ids:
+        # Create runs for each model-dataset combination
+        if combined_data.model_ids and dataset_ids_to_use:
+            run_index = 1
             for model_id in combined_data.model_ids:
-                for dataset_id in combined_data.dataset_ids:
-                    # Note: This assumes dataset_id is actually a dataset_version_id
-                    # You might need to adapt this based on your actual data structure
-                    evaluation = EvaluationModel(
-                        run_id=run.id,
-                        model_id=model_id,
-                        dataset_version_id=dataset_id,
-                        status=EvaluationStatusEnum.PENDING.value,
+                # Convert model_id to UUID if it's a string
+                try:
+                    model_uuid = uuid.UUID(str(model_id))
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Invalid model ID format: {model_id}, skipping")
+                    continue
+                
+                for dataset_id in dataset_ids_to_use:
+                    # Get the latest version of the dataset
+                    dataset_version = (
+                        self.session.query(ExpDatasetVersion)
+                        .filter(ExpDatasetVersion.dataset_id == dataset_id)
+                        .order_by(ExpDatasetVersion.created_at.desc())
+                        .first()
+                    )
+                    
+                    if not dataset_version:
+                        logger.warning(f"No version found for dataset {dataset_id}, skipping")
+                        continue
+                    
+                    run = RunModel(
+                        experiment_id=experiment.id,
+                        run_index=run_index,
+                        model_id=model_uuid,
+                        dataset_version_id=dataset_version.id,
+                        status=RunStatusEnum.PENDING.value,
                         config=combined_data.evaluation_config,
                     )
-                    self.session.add(evaluation)
+                    self.session.add(run)
+                    run_index += 1
 
         self.session.commit()
         return experiment.id

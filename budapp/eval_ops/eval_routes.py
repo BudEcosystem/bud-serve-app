@@ -10,23 +10,17 @@ from budapp.commons.schemas import ErrorResponse
 from budapp.eval_ops.schemas import (
     CreateExperimentRequest,
     CreateExperimentResponse,
-    CreateRunRequest,
-    CreateRunResponse,
     DatasetFilter,
     DeleteExperimentResponse,
     DeleteRunResponse,
     ExperimentWorkflowResponse,
     ExperimentWorkflowStepRequest,
     GetDatasetResponse,
-    GetEvaluationResponse,
     GetRunResponse,
     ListDatasetsResponse,
-    ListEvaluationsResponse,
     ListExperimentsResponse,
     ListRunsResponse,
     ListTraitsResponse,
-    UpdateEvaluationRequest,
-    UpdateEvaluationResponse,
     UpdateExperimentRequest,
     UpdateExperimentResponse,
     UpdateRunRequest,
@@ -287,46 +281,6 @@ async def review_experiment_workflow(
         raise HTTPException(status_code=500, detail="Failed to review workflow") from e
 
 
-@router.post(
-    "/{experiment_id}/runs",
-    response_model=CreateRunResponse,
-    status_code=status.HTTP_201_CREATED,
-    responses={
-        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
-        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
-    },
-)
-def create_run(
-    experiment_id: Annotated[uuid.UUID, Path(..., description="Experiment ID")],
-    request: Annotated[CreateRunRequest, Depends()],
-    session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    """Create a run with multiple model→dataset evaluations.
-
-    - **experiment_id**: UUID of the parent experiment.
-    - **request**: Payload containing run details and list of evaluations.
-    - **session**: Database session dependency.
-    - **current_user**: The authenticated user creating the run.
-
-    Returns a `CreateRunResponse` with the created run and evaluations.
-    """
-    try:
-        run = ExperimentService(session).create_run(experiment_id, request, current_user.id)
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        logger.debug(f"Failed to create run: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to create run") from e
-
-    return CreateRunResponse(
-        code=status.HTTP_201_CREATED,
-        object="run.create",
-        message="Successfully created run with evaluations",
-        run=run,
-    )
-
 
 @router.get(
     "/{experiment_id}/runs",
@@ -385,7 +339,7 @@ def get_run(
     Returns a `GetRunResponse` with the run and its evaluations.
     """
     try:
-        run = ExperimentService(session).get_run_with_evaluations(run_id, current_user.id)
+        run = ExperimentService(session).get_run_with_results(run_id, current_user.id)
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -474,119 +428,6 @@ def delete_run(
         message="Successfully deleted run",
     )
 
-
-@router.get(
-    "/runs/{run_id}/evaluations",
-    response_model=ListEvaluationsResponse,
-    status_code=status.HTTP_200_OK,
-    responses={
-        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
-    },
-)
-def list_evaluations(
-    run_id: Annotated[uuid.UUID, Path(..., description="Run ID")],
-    session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    """List evaluations within a run.
-
-    - **run_id**: UUID of the run.
-    - **session**: Database session dependency.
-    - **current_user**: The authenticated user.
-
-    Returns a `ListEvaluationsResponse` containing evaluations with results.
-    """
-    try:
-        evaluations = ExperimentService(session).list_evaluations(run_id, current_user.id)
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to list evaluations") from e
-
-    return ListEvaluationsResponse(
-        code=status.HTTP_200_OK,
-        object="evaluation.list",
-        message="Successfully listed evaluations",
-        evaluations=evaluations,
-    )
-
-
-@router.get(
-    "/evaluations/{evaluation_id}",
-    response_model=GetEvaluationResponse,
-    status_code=status.HTTP_200_OK,
-    responses={
-        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
-    },
-)
-def get_evaluation(
-    evaluation_id: Annotated[uuid.UUID, Path(..., description="Evaluation ID")],
-    session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    """Get detailed evaluation with metrics and results.
-
-    - **evaluation_id**: UUID of the evaluation.
-    - **session**: Database session dependency.
-    - **current_user**: The authenticated user.
-
-    Returns a `GetEvaluationResponse` with the evaluation and its results.
-    """
-    try:
-        evaluation = ExperimentService(session).get_evaluation_with_results(evaluation_id, current_user.id)
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to get evaluation") from e
-
-    return GetEvaluationResponse(
-        code=status.HTTP_200_OK,
-        object="evaluation.get",
-        message="Successfully retrieved evaluation",
-        evaluation=evaluation,
-    )
-
-
-@router.patch(
-    "/evaluations/{evaluation_id}",
-    response_model=UpdateEvaluationResponse,
-    status_code=status.HTTP_200_OK,
-    responses={
-        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
-        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
-    },
-)
-def update_evaluation(
-    evaluation_id: Annotated[uuid.UUID, Path(..., description="Evaluation ID")],
-    request: Annotated[UpdateEvaluationRequest, Depends()],
-    session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    """Update evaluation status or config.
-
-    - **evaluation_id**: UUID of the evaluation to update.
-    - **request**: Payload with optional fields to update.
-    - **session**: Database session dependency.
-    - **current_user**: The authenticated user performing the update.
-
-    Returns an `UpdateEvaluationResponse` with the updated evaluation.
-    """
-    try:
-        evaluation = ExperimentService(session).update_evaluation(evaluation_id, request, current_user.id)
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to update evaluation") from e
-
-    return UpdateEvaluationResponse(
-        code=status.HTTP_200_OK,
-        object="evaluation.update",
-        message="Successfully updated evaluation",
-        evaluation=evaluation,
-    )
 
 
 @router.get(

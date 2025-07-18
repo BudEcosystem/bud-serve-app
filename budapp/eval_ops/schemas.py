@@ -5,7 +5,7 @@ from typing import List, Optional
 from pydantic import UUID4, BaseModel, Field
 
 from budapp.commons.schemas import SuccessResponse
-from budapp.eval_ops.models import EvaluationStatusEnum, RunStatusEnum
+from budapp.eval_ops.models import RunStatusEnum
 
 
 # ------------------------ Experiment Schemas ------------------------
@@ -18,6 +18,8 @@ class CreateExperimentRequest(BaseModel):
     description: Optional[str] = Field(None, description="The description of the experiment.")
     project_id: UUID4 = Field(..., description="The project ID for the experiment.")
     tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
+    model_ids: List[UUID4] = Field(..., description="List of model IDs to evaluate.")
+    dataset_ids: List[UUID4] = Field(..., description="List of dataset IDs to evaluate against.")
 
 
 class Experiment(BaseModel):
@@ -66,115 +68,19 @@ class DeleteExperimentResponse(SuccessResponse):
     pass
 
 
-# ------------------------ Evaluation Schemas ------------------------
-
-
-class CreateEvaluationRequest(BaseModel):
-    """Request to create an evaluation (model→dataset mapping)."""
-
-    model_id: UUID4 = Field(..., description="The UUID of the model to evaluate.")
-    dataset_version_id: UUID4 = Field(..., description="The UUID of the dataset version to use.")
-    config: Optional[dict] = Field(None, description="Evaluation-specific configuration.")
-
-
-class Evaluation(BaseModel):
-    """Represents an evaluation (model→dataset mapping within a run)."""
-
-    id: UUID4 = Field(..., description="The UUID of the evaluation.")
-    run_id: UUID4 = Field(..., description="The UUID of the parent run.")
-    model_id: UUID4 = Field(..., description="The UUID of the model being evaluated.")
-    dataset_version_id: UUID4 = Field(..., description="The UUID of the dataset version.")
-    status: EvaluationStatusEnum = Field(..., description="Current status of the evaluation.")
-    config: Optional[dict] = Field(None, description="Evaluation-specific configuration.")
-
-    class Config:
-        """Pydantic model configuration."""
-
-        from_attributes = True
-
-
-class EvaluationWithResults(BaseModel):
-    """Evaluation with metrics and results included."""
-
-    id: UUID4 = Field(..., description="The UUID of the evaluation.")
-    run_id: UUID4 = Field(..., description="The UUID of the parent run.")
-    model_id: UUID4 = Field(..., description="The UUID of the model being evaluated.")
-    dataset_version_id: UUID4 = Field(..., description="The UUID of the dataset version.")
-    status: EvaluationStatusEnum = Field(..., description="Current status of the evaluation.")
-    config: Optional[dict] = Field(None, description="Evaluation-specific configuration.")
-    metrics: List[dict] = Field([], description="List of metrics for this evaluation.")
-    raw_results: Optional[dict] = Field(None, description="Raw results data.")
-
-    class Config:
-        """Pydantic model configuration."""
-
-        from_attributes = True
-
-
-class UpdateEvaluationRequest(BaseModel):
-    """Request to update an evaluation."""
-
-    status: Optional[EvaluationStatusEnum] = Field(None, description="New status of the evaluation.")
-    config: Optional[dict] = Field(None, description="Updated evaluation configuration.")
-
-
-class UpdateEvaluationResponse(SuccessResponse):
-    """Response after updating an evaluation."""
-
-    evaluation: Evaluation = Field(..., description="The updated evaluation.")
-
-
-class ListEvaluationsResponse(SuccessResponse):
-    """Response schema for listing evaluations."""
-
-    evaluations: List[EvaluationWithResults] = Field(..., description="List of evaluations with results.")
-
-
-class GetEvaluationResponse(SuccessResponse):
-    """Response schema for getting a single evaluation."""
-
-    evaluation: EvaluationWithResults = Field(..., description="The evaluation with results.")
-
-
 # ------------------------ Run Schemas ------------------------
 
 
-class CreateRunRequest(BaseModel):
-    """Request to create a run with multiple evaluations."""
-
-    name: Optional[str] = Field(None, description="Optional name for the run.")
-    description: Optional[str] = Field(None, description="Optional description for the run.")
-    evaluations: List[CreateEvaluationRequest] = Field(..., description="List of evaluations to create in this run.")
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "name": "GPT-4 vs Claude on Math Tasks",
-                "description": "Comparing performance of GPT-4 and Claude on mathematical reasoning datasets",
-                "evaluations": [
-                    {
-                        "model_id": "550e8400-e29b-41d4-a716-446655440000",
-                        "dataset_version_id": "550e8400-e29b-41d4-a716-446655440001",
-                        "config": {"temperature": 0.7, "max_tokens": 1000},
-                    },
-                    {
-                        "model_id": "550e8400-e29b-41d4-a716-446655440002",
-                        "dataset_version_id": "550e8400-e29b-41d4-a716-446655440001",
-                        "config": {"temperature": 0.7, "max_tokens": 1000},
-                    },
-                ],
-            }
-        }
-
-
 class Run(BaseModel):
-    """Represents a run within an experiment."""
+    """Represents a run (model-dataset evaluation pair) within an experiment."""
 
     id: UUID4 = Field(..., description="The UUID of the run.")
     experiment_id: UUID4 = Field(..., description="The UUID of the parent experiment.")
-    name: Optional[str] = Field(None, description="Optional name for the run.")
-    description: Optional[str] = Field(None, description="Optional description for the run.")
+    run_index: int = Field(..., description="Auto-incrementing index within the experiment.")
+    model_id: UUID4 = Field(..., description="The UUID of the model being evaluated.")
+    dataset_version_id: UUID4 = Field(..., description="The UUID of the dataset version.")
     status: RunStatusEnum = Field(..., description="Current status of the run.")
+    config: Optional[dict] = Field(None, description="Run-specific configuration.")
 
     class Config:
         """Pydantic model configuration."""
@@ -182,15 +88,18 @@ class Run(BaseModel):
         from_attributes = True
 
 
-class RunWithEvaluations(BaseModel):
-    """Run with detailed evaluation information."""
+class RunWithResults(BaseModel):
+    """Run with metrics and results included."""
 
     id: UUID4 = Field(..., description="The UUID of the run.")
     experiment_id: UUID4 = Field(..., description="The UUID of the parent experiment.")
-    name: Optional[str] = Field(None, description="Optional name for the run.")
-    description: Optional[str] = Field(None, description="Optional description for the run.")
+    run_index: int = Field(..., description="Auto-incrementing index within the experiment.")
+    model_id: UUID4 = Field(..., description="The UUID of the model being evaluated.")
+    dataset_version_id: UUID4 = Field(..., description="The UUID of the dataset version.")
     status: RunStatusEnum = Field(..., description="Current status of the run.")
-    evaluations: List[EvaluationWithResults] = Field([], description="List of evaluations in this run.")
+    config: Optional[dict] = Field(None, description="Run-specific configuration.")
+    metrics: List[dict] = Field([], description="List of metrics for this run.")
+    raw_results: Optional[dict] = Field(None, description="Raw results for this run.")
 
     class Config:
         """Pydantic model configuration."""
@@ -198,10 +107,6 @@ class RunWithEvaluations(BaseModel):
         from_attributes = True
 
 
-class CreateRunResponse(SuccessResponse):
-    """Response after creating a run."""
-
-    run: RunWithEvaluations = Field(..., description="The created run with evaluations.")
 
 
 class ListRunsResponse(SuccessResponse):
@@ -213,15 +118,14 @@ class ListRunsResponse(SuccessResponse):
 class GetRunResponse(SuccessResponse):
     """Response schema for getting a single run."""
 
-    run: RunWithEvaluations = Field(..., description="The run with evaluations.")
+    run: RunWithResults = Field(..., description="The run with results.")
 
 
 class UpdateRunRequest(BaseModel):
     """Request to update a run."""
 
-    name: Optional[str] = Field(None, description="Updated name for the run.")
-    description: Optional[str] = Field(None, description="Updated description for the run.")
     status: Optional[RunStatusEnum] = Field(None, description="New status of the run.")
+    config: Optional[dict] = Field(None, description="Updated configuration for the run.")
 
 
 class UpdateRunResponse(SuccessResponse):

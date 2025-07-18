@@ -28,17 +28,10 @@ class RunStatusEnum(PyEnum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
-    DELETED = "deleted"
-
-
-class EvaluationStatusEnum(PyEnum):
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
     SKIPPED = "skipped"
     DELETED = "deleted"
+
+
 
 
 class ModalityEnum(PyEnum):
@@ -74,47 +67,30 @@ class Experiment(Base, TimestampMixin):
 
 
 class Run(Base, TimestampMixin):
-    """Runs are evaluation sessions within an experiment, containing multiple evaluations."""
+    """Runs represent individual model-dataset evaluation pairs within an experiment."""
 
     __tablename__ = "runs"
+    __table_args__ = (UniqueConstraint("experiment_id", "run_index", name="uq_run_experiment_index"),)
 
     id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     experiment_id: Mapped[uuid4] = mapped_column(ForeignKey("experiments.id"), nullable=False)
-    name: Mapped[str] = mapped_column(String, nullable=True)
-    description: Mapped[str] = mapped_column(String, nullable=True)
+    run_index: Mapped[int] = mapped_column(Integer, nullable=False)  # Auto-incrementing index per experiment
+    model_id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    dataset_version_id: Mapped[uuid4] = mapped_column(ForeignKey("exp_dataset_versions.id"), nullable=False)
     status: Mapped[str] = mapped_column(
         PG_ENUM(*[e.value for e in RunStatusEnum], name="run_status_enum"),
         nullable=False,
         default=RunStatusEnum.PENDING.value,
     )
+    config: Mapped[dict] = mapped_column(JSONB, nullable=True)  # Run-specific configuration
 
     # Relationships
     experiment = relationship("Experiment", back_populates="runs")
-    evaluations = relationship("Evaluation", back_populates="run", cascade="all, delete-orphan")
+    dataset_version = relationship("ExpDatasetVersion", back_populates="runs")
+    metrics = relationship("ExpMetric", back_populates="run", cascade="all, delete-orphan")
+    raw_results = relationship("ExpRawResult", back_populates="run", cascade="all, delete-orphan")
 
 
-class Evaluation(Base, TimestampMixin):
-    """Evaluations are individual model→dataset mappings within a run."""
-
-    __tablename__ = "evaluations"
-
-    id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    run_id: Mapped[uuid4] = mapped_column(ForeignKey("runs.id"), nullable=False)
-    model_id: Mapped[uuid4] = mapped_column(ForeignKey("exp_models.id"), nullable=False)
-    dataset_version_id: Mapped[uuid4] = mapped_column(ForeignKey("exp_dataset_versions.id"), nullable=False)
-    status: Mapped[str] = mapped_column(
-        PG_ENUM(*[e.value for e in EvaluationStatusEnum], name="evaluation_status_enum"),
-        nullable=False,
-        default=EvaluationStatusEnum.PENDING.value,
-    )
-    config: Mapped[dict] = mapped_column(JSONB, nullable=True)  # Evaluation-specific configuration
-
-    # Relationships
-    run = relationship("Run", back_populates="evaluations")
-    model = relationship("ExpModel", back_populates="evaluations")
-    dataset_version = relationship("ExpDatasetVersion", back_populates="evaluations")
-    metrics = relationship("ExpMetric", back_populates="evaluation", cascade="all, delete-orphan")
-    raw_results = relationship("ExpRawResult", back_populates="evaluation", cascade="all, delete-orphan")
 
 
 # ------------------------ Lookup Tables ------------------------
@@ -129,7 +105,7 @@ class ExpModel(Base, TimestampMixin):
     model_in_db: Mapped[str] = mapped_column(String, nullable=False)  # Should be valid_endpoint_id
 
     # Relationships
-    evaluations = relationship("Evaluation", back_populates="model", cascade="all, delete-orphan")
+    # Note: No longer has relationship with runs table
 
 
 class ExpTrait(Base, TimestampMixin):
@@ -207,7 +183,7 @@ class ExpDatasetVersion(Base, TimestampMixin):
 
     # Relationships
     dataset = relationship("ExpDataset", back_populates="versions")
-    evaluations = relationship("Evaluation", back_populates="dataset_version", cascade="all, delete-orphan")
+    runs = relationship("Run", back_populates="dataset_version", cascade="all, delete-orphan")
 
 
 # ------------------------ Evaluation Results ------------------------
@@ -216,30 +192,30 @@ class ExpDatasetVersion(Base, TimestampMixin):
 class ExpMetric(Base):
     __tablename__ = "exp_metrics"
     __table_args__ = (
-        UniqueConstraint("evaluation_id", "metric_name", "mode", name="uq_expmetrics_evaluation_metric_mode"),
+        UniqueConstraint("run_id", "metric_name", "mode", name="uq_expmetrics_run_metric_mode"),
     )
 
     id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    evaluation_id: Mapped[uuid4] = mapped_column(ForeignKey("evaluations.id"), nullable=False)
+    run_id: Mapped[uuid4] = mapped_column(ForeignKey("runs.id"), nullable=False)
     metric_name: Mapped[str] = mapped_column(String, nullable=False)
     mode: Mapped[str] = mapped_column(String, nullable=False)
     metric_value: Mapped[float] = mapped_column(NUMERIC(6, 2), nullable=False)
 
     # Relationships
-    evaluation = relationship("Evaluation", back_populates="metrics")
+    run = relationship("Run", back_populates="metrics")
 
 
 class ExpRawResult(Base, TimestampMixin):
     __tablename__ = "exp_raw_results"
-    __table_args__ = (UniqueConstraint("evaluation_id", name="uq_exprawresults_evaluation"),)
+    __table_args__ = (UniqueConstraint("run_id", name="uq_exprawresults_run"),)
 
     id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    evaluation_id: Mapped[uuid4] = mapped_column(ForeignKey("evaluations.id"), nullable=False)
+    run_id: Mapped[uuid4] = mapped_column(ForeignKey("runs.id"), nullable=False)
     preview_results: Mapped[dict] = mapped_column(JSONB, nullable=False)
     full_results_uri: Mapped[str] = mapped_column(Text, nullable=True)
 
     # Relationships
-    evaluation = relationship("Evaluation", back_populates="raw_results")
+    run = relationship("Run", back_populates="raw_results")
 
 
 # ------------------------ Sync State Table ------------------------
