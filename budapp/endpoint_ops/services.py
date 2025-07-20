@@ -2336,27 +2336,16 @@ class EndpointService(SessionMixin):
         )
 
         # Create the proxy model configuration
-        # Note: We need to use the alias "_api_key" when constructing the model
-        config_data = {
-            "routing": [provider_enum],
-            "providers": {provider_enum: provider_config},
-            "endpoints": endpoints,
-        }
-        if model_api_key is not None:
-            config_data["_api_key"] = model_api_key
-            
-        model_config = ProxyModelConfig(**config_data)
-
-        # Debug log to verify api_key is set
-        if model_api_key:
-            logger.debug(f"Setting api_key for endpoint {endpoint_id}, provider: {provider_enum}")
-
-        # Dump the model for Redis storage
-        model_dict = model_config.model_dump(exclude_none=True, by_alias=True)
+        model_config = ProxyModelConfig(
+            routing=[provider_enum],
+            providers={provider_enum: provider_config},
+            endpoints=endpoints,
+            api_key=model_api_key,
+        )
 
         redis_service = RedisService()
         await redis_service.set(
-            f"model_table:{endpoint_id}", json.dumps({str(endpoint_id): model_dict})
+            f"model_table:{endpoint_id}", json.dumps({str(endpoint_id): model_config.model_dump(exclude_none=True)})
         )
 
     async def delete_model_from_proxy_cache(self, endpoint_id: UUID) -> None:

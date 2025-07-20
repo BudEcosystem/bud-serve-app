@@ -3594,12 +3594,11 @@ class ModelService(SessionMixin):
             raise ClientException("Direct endpoint creation is only supported for cloud models")
 
         # Generate namespace and deployment URL
-        timestamp = int(datetime.now().timestamp())
-        namespace = f"model-{model_id}-{timestamp}"
+        # Use model.uri as namespace for cloud models
+        namespace = db_model.uri
 
-        # Construct deployment URL - using the pattern from existing endpoints
-        base_url = app_settings.base_deployment_url if hasattr(app_settings, "base_deployment_url") else ""
-        deployment_url = f"{base_url}/{namespace}" if base_url else namespace
+        # Use the proxy service URL for cloud models
+        deployment_url = "budproxy-service.svc.cluster.local"
 
         # For cloud models, we set replicas to 1 as they are API-based
         replicas = deploy_config.replicas if hasattr(deploy_config, "replicas") else 1

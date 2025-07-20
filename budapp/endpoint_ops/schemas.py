@@ -19,7 +19,7 @@ from enum import Enum
 from typing import Any, Optional, Union
 from uuid import UUID
 
-from pydantic import UUID4, BaseModel, ConfigDict, Field, model_validator
+from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from budapp.cluster_ops.schemas import ClusterResponse
 from budapp.commons.constants import AdapterStatusEnum, EndpointStatusEnum, ModelEndpointEnum, ProxyProviderEnum
@@ -301,6 +301,10 @@ class OpenAIConfig(BaseModel):
 
     type: str = "openai"
     model_name: str
+    api_key: Optional[str] = None
+    api_key_location: Optional[str] = None
+    api_base: Optional[str] = None
+    organization: Optional[str] = None
 
 
 class AnthropicConfig(BaseModel):
@@ -308,6 +312,8 @@ class AnthropicConfig(BaseModel):
 
     type: str = "anthropic"
     model_name: str
+    api_key: Optional[str] = None
+    api_key_location: Optional[str] = None
 
 
 class AWSBedrockConfig(BaseModel):
@@ -316,6 +322,10 @@ class AWSBedrockConfig(BaseModel):
     type: str = "aws_bedrock"
     model_id: str
     region: str
+    aws_access_key_id: Optional[str] = None
+    aws_secret_access_key: Optional[str] = None
+    aws_session_token: Optional[str] = None
+    api_key_location: Optional[str] = None
 
 
 class AWSSageMakerConfig(BaseModel):
@@ -326,6 +336,10 @@ class AWSSageMakerConfig(BaseModel):
     region: str
     model_name: str
     hosted_provider: str
+    aws_access_key_id: Optional[str] = None
+    aws_secret_access_key: Optional[str] = None
+    aws_session_token: Optional[str] = None
+    api_key_location: Optional[str] = None
 
 
 class AzureConfig(BaseModel):
@@ -334,6 +348,13 @@ class AzureConfig(BaseModel):
     type: str = "azure"
     deployment_id: str
     endpoint: str
+    api_key: Optional[str] = None
+    api_key_location: Optional[str] = None
+    api_version: Optional[str] = None
+    azure_ad_token: Optional[str] = None
+    tenant_id: Optional[str] = None
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
 
 
 class DeepSeekConfig(BaseModel):
@@ -341,6 +362,8 @@ class DeepSeekConfig(BaseModel):
 
     type: str = "deepseek"
     model_name: str
+    api_key: Optional[str] = None
+    api_key_location: Optional[str] = None
 
 
 class FireworksConfig(BaseModel):
@@ -348,6 +371,8 @@ class FireworksConfig(BaseModel):
 
     type: str = "fireworks"
     model_name: str
+    api_key: Optional[str] = None
+    api_key_location: Optional[str] = None
 
 
 class GCPVertexConfig(BaseModel):
@@ -357,6 +382,9 @@ class GCPVertexConfig(BaseModel):
     project_id: str
     region: str
     model_name: str
+    vertex_credentials: Optional[str] = None
+    vertex_location: Optional[str] = None
+    api_key_location: Optional[str] = None
 
 
 class GoogleAIStudioConfig(BaseModel):
@@ -364,6 +392,8 @@ class GoogleAIStudioConfig(BaseModel):
 
     type: str = "google-ai-studio"
     model_name: str
+    api_key: Optional[str] = None
+    api_key_location: Optional[str] = None
 
 
 class HyperbolicConfig(BaseModel):
@@ -371,6 +401,8 @@ class HyperbolicConfig(BaseModel):
 
     type: str = "hyperbolic"
     model_name: str
+    api_key: Optional[str] = None
+    api_key_location: Optional[str] = None
 
 
 class MistralConfig(BaseModel):
@@ -378,6 +410,8 @@ class MistralConfig(BaseModel):
 
     type: str = "mistral"
     model_name: str
+    api_key: Optional[str] = None
+    api_key_location: Optional[str] = None
 
 
 class TogetherConfig(BaseModel):
@@ -385,6 +419,8 @@ class TogetherConfig(BaseModel):
 
     type: str = "together"
     model_name: str
+    api_key: Optional[str] = None
+    api_key_location: Optional[str] = None
 
 
 class XAIConfig(BaseModel):
@@ -392,6 +428,8 @@ class XAIConfig(BaseModel):
 
     type: str = "xai"
     model_name: str
+    api_key: Optional[str] = None
+    api_key_location: Optional[str] = None
 
 
 ProviderConfig = Union[
@@ -418,3 +456,4 @@ class ProxyModelConfig(BaseModel):
     routing: list[ProxyProviderEnum]
     providers: dict[ProxyProviderEnum, ProviderConfig]
     endpoints: list[str]
+    api_key: Optional[str] = None
