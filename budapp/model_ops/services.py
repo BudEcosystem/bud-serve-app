@@ -39,6 +39,7 @@ from budapp.commons.exceptions import ClientException, MinioException
 from budapp.commons.helpers import assign_random_colors_to_names, normalize_value
 from budapp.commons.schemas import Tag, Task
 from budapp.credential_ops.crud import ProprietaryCredentialDataManager
+from budapp.credential_ops.models import ProprietaryCredential
 from budapp.credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
 from budapp.credential_ops.services import CredentialService
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
@@ -3633,6 +3634,26 @@ class ModelService(SessionMixin):
 
         logger.info(f"Successfully created endpoint {db_endpoint.id} for cloud model {model_id}")
 
+        # Fetch credential details if credential_id is provided
+        credential_data = None
+        if credential_id:
+            # Fetch the credential
+            db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_by_fields(
+                ProprietaryCredential, {"id": credential_id}
+            )
+
+            # Decrypt the credential data
+            if db_credential.other_provider_creds:
+                credential_data = {}
+                for key, value in db_credential.other_provider_creds.items():
+                    try:
+                        # Decrypt each credential field
+                        credential_data[key] = await RSAHandler().decrypt(value)
+                    except Exception as e:
+                        logger.warning(f"Failed to decrypt credential field {key}: {e}")
+                        # Skip fields that fail to decrypt
+                        continue
+
         # Update proxy cache for the endpoint
         # For cloud models, we use the model source as the model type
         model_type = db_model.source.lower() if db_model.source else "openai"
@@ -3648,6 +3669,7 @@ class ModelService(SessionMixin):
             model_type=model_type,
             api_base=deployment_url,
             supported_endpoints=supported_endpoints,
+            credential_data=credential_data,
         )
 
         # Update proxy cache for the project
