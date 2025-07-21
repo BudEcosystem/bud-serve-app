@@ -3634,24 +3634,16 @@ class ModelService(SessionMixin):
         logger.info(f"Successfully created endpoint {db_endpoint.id} for cloud model {model_id}")
 
         # Fetch credential details if credential_id is provided
-        credential_data = None
+        encrypted_credential_data = None
         if credential_id:
             # Fetch the credential
             db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_by_fields(
                 ProprietaryCredential, {"id": credential_id}
             )
 
-            # Decrypt the credential data
+            # Pass the encrypted credential data directly
             if db_credential.other_provider_creds:
-                credential_data = {}
-                for key, value in db_credential.other_provider_creds.items():
-                    try:
-                        # Decrypt each credential field
-                        credential_data[key] = await RSAHandler().decrypt(value)
-                    except Exception as e:
-                        logger.warning(f"Failed to decrypt credential field {key}: {e}")
-                        # Skip fields that fail to decrypt
-                        continue
+                encrypted_credential_data = db_credential.other_provider_creds
 
         # Update proxy cache for the endpoint
         # For cloud models, we use the model source as the model type
@@ -3668,7 +3660,7 @@ class ModelService(SessionMixin):
             model_type=model_type,
             api_base=deployment_url,
             supported_endpoints=supported_endpoints,
-            credential_data=credential_data,
+            encrypted_credential_data=encrypted_credential_data,
         )
 
         # Update proxy cache for the project

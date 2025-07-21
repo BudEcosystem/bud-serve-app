@@ -82,13 +82,15 @@ def upgrade() -> None:
             nullable=True,
         ),
     )
-    
+
     # Set default value for existing rows
-    op.execute("UPDATE endpoint SET supported_endpoints = ARRAY['/v1/chat/completions']::model_endpoint_enum[] WHERE supported_endpoints IS NULL")
-    
+    op.execute(
+        "UPDATE endpoint SET supported_endpoints = ARRAY['/v1/chat/completions']::model_endpoint_enum[] WHERE supported_endpoints IS NULL"
+    )
+
     # Now make it non-nullable
     op.alter_column("endpoint", "supported_endpoints", nullable=False)
-    
+
     op.alter_column(
         "model",
         "modality",

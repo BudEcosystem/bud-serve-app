@@ -2119,16 +2119,16 @@ class EndpointService(SessionMixin):
         model_name: str,
         endpoint_id: UUID,
         api_base: str,
-        credential_data: Optional[dict] = None,
+        encrypted_credential_data: Optional[dict] = None,
     ) -> tuple[Any, Optional[str]]:
         """Create provider configuration based on provider type.
 
         Returns:
-            Tuple of (provider_config, api_key) where api_key is extracted for _api_key field
+            Tuple of (provider_config, encrypted_api_key) where encrypted_api_key is stored for _api_key field
         """
         # Base configuration parameters
         config_params = {"model_name": model_name}
-        api_key = None
+        encrypted_api_key = None
 
         # Handle API key for providers that use simple api_key field
         if provider_enum in [
@@ -2143,9 +2143,9 @@ class EndpointService(SessionMixin):
             ProxyProviderEnum.XAI,
             ProxyProviderEnum.AZURE,
         ]:
-            if credential_data:
-                api_key = credential_data.get("api_key")
-                if api_key is not None:
+            if encrypted_credential_data:
+                encrypted_api_key = encrypted_credential_data.get("api_key")
+                if encrypted_api_key is not None:
                     config_params["api_key_location"] = f"dynamic::store_{endpoint_id}"
 
         # Provider-specific configurations
@@ -2155,31 +2155,31 @@ class EndpointService(SessionMixin):
             ), None
 
         elif provider_enum == ProxyProviderEnum.OPENAI:
-            if credential_data:
-                if api_base_val := credential_data.get("api_base"):
+            if encrypted_credential_data:
+                if api_base_val := encrypted_credential_data.get("api_base"):
                     config_params["api_base"] = api_base_val
-                if org := credential_data.get("organization"):
+                if org := encrypted_credential_data.get("organization"):
                     config_params["organization"] = org
-            return OpenAIConfig(**config_params), api_key
+            return OpenAIConfig(**config_params), encrypted_api_key
 
         elif provider_enum == ProxyProviderEnum.ANTHROPIC:
-            return AnthropicConfig(**config_params), api_key
+            return AnthropicConfig(**config_params), encrypted_api_key
 
         elif provider_enum == ProxyProviderEnum.AWS_BEDROCK:
             config_params["model_id"] = model_name
             config_params["region"] = "us-east-1"  # Default
-            if credential_data:
-                if region := credential_data.get("aws_region_name"):
+            if encrypted_credential_data:
+                if region := encrypted_credential_data.get("aws_region_name"):
                     config_params["region"] = region
-                if access_key := credential_data.get("aws_access_key_id"):
+                if access_key := encrypted_credential_data.get("aws_access_key_id"):
                     config_params["api_key_location"] = f"dynamic::store_{endpoint_id}"
                     config_params["aws_access_key_id"] = access_key
-                    api_key = access_key  # Store for _api_key field
-                if secret_key := credential_data.get("aws_secret_access_key"):
+                    encrypted_api_key = access_key  # Store encrypted key for _api_key field
+                if secret_key := encrypted_credential_data.get("aws_secret_access_key"):
                     config_params["aws_secret_access_key"] = secret_key
-                if session_token := credential_data.get("aws_session_token"):
+                if session_token := encrypted_credential_data.get("aws_session_token"):
                     config_params["aws_session_token"] = session_token
-            return AWSBedrockConfig(**config_params), api_key
+            return AWSBedrockConfig(**config_params), encrypted_api_key
 
         elif provider_enum == ProxyProviderEnum.AWS_SAGEMAKER:
             config_params.update(
@@ -2189,20 +2189,20 @@ class EndpointService(SessionMixin):
                     "hosted_provider": "openai",
                 }
             )
-            if credential_data:
-                if region := credential_data.get("aws_region_name"):
+            if encrypted_credential_data:
+                if region := encrypted_credential_data.get("aws_region_name"):
                     config_params["region"] = region
-                if hosted := credential_data.get("hosted_provider"):
+                if hosted := encrypted_credential_data.get("hosted_provider"):
                     config_params["hosted_provider"] = hosted
-                if access_key := credential_data.get("aws_access_key_id"):
+                if access_key := encrypted_credential_data.get("aws_access_key_id"):
                     config_params["api_key_location"] = f"dynamic::store_{endpoint_id}"
                     config_params["aws_access_key_id"] = access_key
-                    api_key = access_key
-                if secret_key := credential_data.get("aws_secret_access_key"):
+                    encrypted_api_key = access_key
+                if secret_key := encrypted_credential_data.get("aws_secret_access_key"):
                     config_params["aws_secret_access_key"] = secret_key
-                if session_token := credential_data.get("aws_session_token"):
+                if session_token := encrypted_credential_data.get("aws_session_token"):
                     config_params["aws_session_token"] = session_token
-            return AWSSageMakerConfig(**config_params), api_key
+            return AWSSageMakerConfig(**config_params), encrypted_api_key
 
         elif provider_enum == ProxyProviderEnum.AZURE:
             config_params.update(
@@ -2211,22 +2211,22 @@ class EndpointService(SessionMixin):
                     "endpoint": api_base,
                 }
             )
-            if credential_data:
-                if api_base_cred := credential_data.get("api_base"):
+            if encrypted_credential_data:
+                if api_base_cred := encrypted_credential_data.get("api_base"):
                     config_params["endpoint"] = api_base_cred
-                if deployment_id := credential_data.get("deployment_id"):
+                if deployment_id := encrypted_credential_data.get("deployment_id"):
                     config_params["deployment_id"] = deployment_id
-                if api_version := credential_data.get("api_version"):
+                if api_version := encrypted_credential_data.get("api_version"):
                     config_params["api_version"] = api_version
-                if azure_ad_token := credential_data.get("azure_ad_token"):
+                if azure_ad_token := encrypted_credential_data.get("azure_ad_token"):
                     config_params["azure_ad_token"] = azure_ad_token
-                if tenant_id := credential_data.get("tenant_id"):
+                if tenant_id := encrypted_credential_data.get("tenant_id"):
                     config_params["tenant_id"] = tenant_id
-                if client_id := credential_data.get("client_id"):
+                if client_id := encrypted_credential_data.get("client_id"):
                     config_params["client_id"] = client_id
-                if client_secret := credential_data.get("client_secret"):
+                if client_secret := encrypted_credential_data.get("client_secret"):
                     config_params["client_secret"] = client_secret
-            return AzureConfig(**config_params), api_key
+            return AzureConfig(**config_params), encrypted_api_key
 
         elif provider_enum == ProxyProviderEnum.GCP_VERTEX:
             config_params.update(
@@ -2235,40 +2235,40 @@ class EndpointService(SessionMixin):
                     "region": "us-central1",
                 }
             )
-            if credential_data:
-                if vertex_project := credential_data.get("vertex_project"):
+            if encrypted_credential_data:
+                if vertex_project := encrypted_credential_data.get("vertex_project"):
                     config_params["project_id"] = vertex_project
-                elif project_id := credential_data.get("project_id"):
+                elif project_id := encrypted_credential_data.get("project_id"):
                     config_params["project_id"] = project_id
-                if vertex_location := credential_data.get("vertex_location"):
+                if vertex_location := encrypted_credential_data.get("vertex_location"):
                     config_params["region"] = vertex_location
                     config_params["vertex_location"] = vertex_location
-                if vertex_creds := credential_data.get("vertex_credentials"):
+                if vertex_creds := encrypted_credential_data.get("vertex_credentials"):
                     config_params["api_key_location"] = f"dynamic::store_{endpoint_id}"
                     config_params["vertex_credentials"] = vertex_creds
-                    api_key = vertex_creds  # Store for _api_key field
-            return GCPVertexConfig(**config_params), api_key
+                    encrypted_api_key = vertex_creds  # Store encrypted key for _api_key field
+            return GCPVertexConfig(**config_params), encrypted_api_key
 
         elif provider_enum == ProxyProviderEnum.DEEPSEEK:
-            return DeepSeekConfig(**config_params), api_key
+            return DeepSeekConfig(**config_params), encrypted_api_key
 
         elif provider_enum == ProxyProviderEnum.FIREWORKS:
-            return FireworksConfig(**config_params), api_key
+            return FireworksConfig(**config_params), encrypted_api_key
 
         elif provider_enum == ProxyProviderEnum.GOOGLE_AI_STUDIO:
-            return GoogleAIStudioConfig(**config_params), api_key
+            return GoogleAIStudioConfig(**config_params), encrypted_api_key
 
         elif provider_enum == ProxyProviderEnum.HYPERBOLIC:
-            return HyperbolicConfig(**config_params), api_key
+            return HyperbolicConfig(**config_params), encrypted_api_key
 
         elif provider_enum == ProxyProviderEnum.MISTRAL:
-            return MistralConfig(**config_params), api_key
+            return MistralConfig(**config_params), encrypted_api_key
 
         elif provider_enum == ProxyProviderEnum.TOGETHER:
-            return TogetherConfig(**config_params), api_key
+            return TogetherConfig(**config_params), encrypted_api_key
 
         elif provider_enum == ProxyProviderEnum.XAI:
-            return XAIConfig(**config_params), api_key
+            return XAIConfig(**config_params), encrypted_api_key
 
         else:
             # Default fallback to VLLM
@@ -2304,7 +2304,7 @@ class EndpointService(SessionMixin):
         model_type: str,
         api_base: str,
         supported_endpoints: Union[List[str], Dict[str, bool]],
-        credential_data: Optional[dict] = None,
+        encrypted_credential_data: Optional[dict] = None,
     ) -> None:
         """Add model to proxy cache for a project.
 
@@ -2314,7 +2314,7 @@ class EndpointService(SessionMixin):
             model_type: The model type (e.g., "openai", "aws-bedrock", etc.)
             api_base: The base API URL
             supported_endpoints: List of supported endpoints
-            credential_data: Optional decrypted credential data from ProprietaryCredential.other_provider_creds
+            encrypted_credential_data: Optional encrypted credential data from ProprietaryCredential.other_provider_creds
         """
         endpoints = []
 
@@ -2331,8 +2331,8 @@ class EndpointService(SessionMixin):
         provider_enum = self.PROVIDER_MAPPING.get(model_type.lower(), ProxyProviderEnum.VLLM)
 
         # Create the appropriate provider config using helper method
-        provider_config, model_api_key = self._create_provider_config(
-            provider_enum, model_name, endpoint_id, api_base, credential_data
+        provider_config, encrypted_model_api_key = self._create_provider_config(
+            provider_enum, model_name, endpoint_id, api_base, encrypted_credential_data
         )
 
         # Create the proxy model configuration
@@ -2340,7 +2340,7 @@ class EndpointService(SessionMixin):
             routing=[provider_enum],
             providers={provider_enum: provider_config},
             endpoints=endpoints,
-            api_key=model_api_key,
+            api_key=encrypted_model_api_key,
         )
 
         redis_service = RedisService()
