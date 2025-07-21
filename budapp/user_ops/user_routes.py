@@ -40,6 +40,7 @@ from budapp.user_ops.schemas import (
     ResetPasswordRequest,
     ResetPasswordResponse,
     User,
+    UserCreate,
     UserListFilter,
     UserListResponse,
     UserPermissions,
@@ -47,6 +48,7 @@ from budapp.user_ops.schemas import (
     UserUpdate,
 )
 from budapp.user_ops.services import UserService
+from budapp.auth.services import AuthService
 
 from ..permissions.schemas import CheckUserResourceScope
 from ..permissions.service import PermissionService
@@ -348,6 +350,49 @@ async def get_all_users(
         object="users.list",
         code=status.HTTP_200_OK,
     ).to_http_response()
+
+
+@user_router.post(
+    "/",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": UserResponse,
+            "description": "Successfully created user",
+        },
+    },
+    description="Create a new user with email and password",
+)
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
+async def create_user(
+    user: UserCreate,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)]
+) -> Union[UserResponse, ErrorResponse]:
+    """Create a new user with email and password."""
+    try:
+        db_user = await AuthService(session).register_user(user)
+        return UserResponse(
+            object="user.create",
+            code=status.HTTP_200_OK,
+            message="User created successfully",
+            user=db_user
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"ClientException: {e}")
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Exception: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Something went wrong"
+        ).to_http_response()
 
 
 @user_router.get(

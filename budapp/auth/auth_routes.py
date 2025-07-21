@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
+from budapp.commons.constants import UserTypeEnum
 from budapp.commons.dependencies import get_session
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse
@@ -68,6 +69,8 @@ async def register_user(
 ) -> Union[UserRegisterResponse, ErrorResponse]:
     """Register a user with email and password."""
     try:
+        # Force user_type to CLIENT for public registration
+        user.user_type = UserTypeEnum.CLIENT
         await AuthService(session).register_user(user)
         return UserRegisterResponse(
             code=status.HTTP_200_OK,
