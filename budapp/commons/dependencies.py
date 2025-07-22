@@ -83,7 +83,7 @@ async def get_current_user(
     try:
         realm_name = app_settings.default_realm_name
 
-        logger.debug(f"::USER:: Validating token for realm: {realm_name}")
+        # logger.debug(f"::USER:: Validating token for realm: {realm_name}")
 
         tenant = await UserDataManager(session).retrieve_by_fields(
             Tenant, {"realm_name": realm_name, "is_active": True}, missing_ok=True
@@ -92,7 +92,7 @@ async def get_current_user(
         if not tenant:
             raise credentials_exception
 
-        logger.debug(f"::USER:: Tenant found: {tenant.id}")
+        # logger.debug(f"::USER:: Tenant found: {tenant.id}")
 
         tenant_client = await UserDataManager(session).retrieve_by_fields(
             TenantClient, {"tenant_id": tenant.id}, missing_ok=True
@@ -110,9 +110,9 @@ async def get_current_user(
 
         manager = KeycloakManager()
 
-        logger.debug(f"::USER:: Token: {token.credentials}")
+        # logger.debug(f"::USER:: Token: {token.credentials}")
         payload = await manager.validate_token(token.credentials, realm_name, credentials)
-        logger.debug(f"::USER:: Token validated: {payload}")
+        # logger.debug(f"::USER:: Token validated: {payload}")
 
         auth_id: str = payload.get("sub")
         if not auth_id:
@@ -125,7 +125,7 @@ async def get_current_user(
 
         db_user.raw_token = token.credentials
 
-        logger.debug(f"::USER:: User: {db_user.raw_token}")
+        # logger.debug(f"::USER:: User: {db_user.raw_token}")
 
         return db_user
 

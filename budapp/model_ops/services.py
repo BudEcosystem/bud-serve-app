@@ -434,6 +434,18 @@ class CloudModelWorkflowService(SessionMixin):
                 db_latest_workflow_step, {"data": execution_status_data}
             )
 
+            # Extract cloud model metadata if this is a cloud model
+            if db_cloud_model:
+                logger.info(f"Extracting metadata for cloud model: {db_cloud_model.uri}")
+                provider = await ProviderDataManager(self.session).retrieve_by_fields(ProviderModel, {"id": db_cloud_model.provider_id})
+                extracted_metadata = await self._extract_cloud_model_metadata(db_cloud_model, provider, db_model.id)
+
+                if extracted_metadata:
+                    # Update model with extracted metadata
+                    await self._update_model_with_extracted_metadata(db_model, extracted_metadata)
+                else:
+                    logger.warning(f"Failed to extract metadata for cloud model: {db_cloud_model.uri}")
+
             if db_cloud_model:
                 await CloudModelDataManager(self.session).update_by_fields(
                     db_cloud_model, {"is_present_in_model": True}
@@ -478,6 +490,95 @@ class CloudModelWorkflowService(SessionMixin):
             await BudNotifyService().send_notification(notification_request)
 
         return db_model
+
+    async def _extract_cloud_model_metadata(
+        self, cloud_model: CloudModel, provider: ProviderModel, model_id: UUID
+    ) -> Dict[str, Any]:
+        """Extract metadata for cloud model using budmodel service."""
+        cloud_model_extraction_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/model-info/cloud-model/extract"
+        )
+
+        extraction_request = {
+            "model_uri": cloud_model.uri,
+            # "provider_type": "cloud_model",
+            # "provider_name": provider.name
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(cloud_model_extraction_endpoint, json=extraction_request) as response:
+                    response_data = await response.json()
+                    if response.status >= 400:
+                        logger.error(f"Failed to extract cloud model metadata: {response_data}")
+                        return None
+                    return response_data.get("model_info", {})
+        except Exception as e:
+            logger.error(f"Failed to extract cloud model metadata: {e}")
+            return None
+
+    async def _update_model_with_extracted_metadata(self, model: Model, extracted_metadata: Dict[str, Any]) -> Model:
+        """Update model with extracted metadata from budmodel service."""
+        update_fields = {}
+
+        # Map basic fields
+        if extracted_metadata.get("description"):
+            update_fields["description"] = extracted_metadata["description"]
+
+        if extracted_metadata.get("use_cases"):
+            update_fields["use_cases"] = extracted_metadata["use_cases"]
+
+        if extracted_metadata.get("strengths"):
+            update_fields["strengths"] = extracted_metadata["strengths"]
+
+        if extracted_metadata.get("limitations"):
+            update_fields["limitations"] = extracted_metadata["limitations"]
+
+        if extracted_metadata.get("languages"):
+            update_fields["languages"] = extracted_metadata["languages"]
+
+        # Update tags if provided
+        if extracted_metadata.get("tags"):
+            update_fields["tags"] = extracted_metadata["tags"]
+
+        # Update tasks if provided
+        if extracted_metadata.get("tasks"):
+            update_fields["tasks"] = extracted_metadata["tasks"]
+
+        # Update URLs if provided
+        if extracted_metadata.get("github_url"):
+            update_fields["github_url"] = extracted_metadata["github_url"]
+
+        if extracted_metadata.get("website_url"):
+            update_fields["website_url"] = extracted_metadata["website_url"]
+
+        # Update model with extracted metadata
+        if update_fields:
+            model = await ModelDataManager(self.session).update_by_fields(model, update_fields)
+            logger.info(f"Updated model {model.id} with extracted metadata fields: {list(update_fields.keys())}")
+
+        # Handle papers if provided
+        if extracted_metadata.get("papers"):
+            await self._create_papers_from_extracted_metadata(extracted_metadata["papers"], model.id)
+
+        return model
+
+    async def _create_papers_from_extracted_metadata(self, papers_data: List[Dict], model_id: UUID) -> None:
+        """Create paper records from extracted metadata."""
+        try:
+            for paper_info in papers_data:
+                if isinstance(paper_info, dict) and paper_info.get("title"):
+                    paper_data = {
+                        "title": paper_info.get("title"),
+                        "url": paper_info.get("url"),
+                        "summary": paper_info.get("summary"),
+                        "authors": paper_info.get("authors", []),
+                        "model_id": model_id,
+                    }
+                    await PaperDataManager(self.session).insert_one(Paper(**paper_data))
+            logger.info(f"Created {len(papers_data)} paper records for model {model_id}")
+        except Exception as e:
+            logger.error(f"Failed to create papers from extracted metadata: {e}")
 
     async def _validate_duplicate_source_uri_model(
         self, source: str, uri: str, db_workflow_steps: List[WorkflowStepModel], current_step_number: int
