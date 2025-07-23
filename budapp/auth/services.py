@@ -350,7 +350,7 @@ class AuthService(SessionMixin):
             await UserDataManager(self.session).insert_one(tenant_user_mapping)
             logger.info(f"User {db_user.email} mapped to tenant {tenant.name}")
 
-            # await BudNotifyHandler().create_subscriber(subscriber_data)
+            await BudNotifyHandler().create_subscriber(subscriber_data)
             logger.info("User added to budnotify subscriber")
 
             _ = await UserDataManager(self.session).update_subscriber_status(user_ids=[db_user.id], is_subscriber=True)
