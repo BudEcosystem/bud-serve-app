@@ -44,7 +44,7 @@ async def test_create_endpoint_directly_for_cloud_model():
     cloud_model_id = uuid4()
 
     # Mock model data
-    mock_model = MagicMock(spec=Model)
+    mock_model = MagicMock()
     mock_model.id = model_id
     mock_model.provider_type = ModelProviderTypeEnum.CLOUD_MODEL
     mock_model.status = ModelStatusEnum.ACTIVE
@@ -53,7 +53,7 @@ async def test_create_endpoint_directly_for_cloud_model():
     mock_model.provider_id = uuid4()
 
     # Mock cloud model data
-    mock_cloud_model = MagicMock(spec=CloudModel)
+    mock_cloud_model = MagicMock()
     mock_cloud_model.id = cloud_model_id
     mock_cloud_model.supported_endpoints = ["chat", "completion"]
 
@@ -63,13 +63,13 @@ async def test_create_endpoint_directly_for_cloud_model():
     )
 
     # Mock endpoint
-    mock_endpoint = MagicMock(spec=EndpointModel)
+    mock_endpoint = MagicMock()
     mock_endpoint.id = uuid4()
     mock_endpoint.url = "https://example.com/model-namespace"
     mock_endpoint.status = EndpointStatusEnum.RUNNING
 
     # Create service with mocked session
-    mock_session = AsyncMock()
+    mock_session = MagicMock()
     service = ModelService(session=mock_session)
 
     # Mock database operations
@@ -78,7 +78,7 @@ async def test_create_endpoint_directly_for_cloud_model():
     ) as mock_cloud_model_manager, patch(
         "budapp.endpoint_ops.crud.EndpointDataManager"
     ) as mock_endpoint_manager, patch("budapp.commons.config.app_settings") as mock_settings, patch(
-        "budapp.model_ops.services.EndpointService"
+        "budapp.endpoint_ops.services.EndpointService"
     ) as mock_endpoint_service, patch("budapp.credential_ops.services.CredentialService") as mock_credential_service:
         # Configure mocks
         mock_settings.base_deployment_url = "https://example.com"
