@@ -280,9 +280,10 @@ async def test_update_deployment_settings_partial_update():
         assert result.retry_config.num_retries == 5  # Updated
 
         # Verify database update
+        mock_endpoint_manager.update_by_fields.assert_called_once()
         update_call = mock_endpoint_manager.update_by_fields.call_args[0]
-        assert update_call[1] == {"id": endpoint_id}
-        updated_config = update_call[2]["deployment_config"]
+        # First argument should be the endpoint instance, second should be the fields dict
+        updated_config = update_call[1]["deployment_config"]
         assert updated_config["deployment_settings"]["retry_config"]["num_retries"] == 5
         assert updated_config["deployment_settings"]["rate_limits"]["requests_per_second"] == 10
 

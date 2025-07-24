@@ -2444,8 +2444,7 @@ class EndpointService(SessionMixin):
 
         # Update endpoint
         await endpoint_manager.update_by_fields(
-            EndpointModel,
-            {"id": endpoint_id},
+            db_endpoint,
             {"deployment_config": deployment_config},
         )
 
