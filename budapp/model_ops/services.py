@@ -437,7 +437,9 @@ class CloudModelWorkflowService(SessionMixin):
             # Extract cloud model metadata if this is a cloud model
             if db_cloud_model:
                 logger.info(f"Extracting metadata for cloud model: {db_cloud_model.uri}")
-                provider = await ProviderDataManager(self.session).retrieve_by_fields(ProviderModel, {"id": db_cloud_model.provider_id})
+                provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                    ProviderModel, {"id": db_cloud_model.provider_id}
+                )
                 extracted_metadata = await self._extract_cloud_model_metadata(db_cloud_model, provider, db_model.id)
 
                 if extracted_metadata:
@@ -495,9 +497,7 @@ class CloudModelWorkflowService(SessionMixin):
         self, cloud_model: CloudModel, provider: ProviderModel, model_id: UUID
     ) -> Dict[str, Any]:
         """Extract metadata for cloud model using budmodel service."""
-        cloud_model_extraction_endpoint = (
-            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/model-info/cloud-model/extract"
-        )
+        cloud_model_extraction_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/model-info/cloud-model/extract"
 
         extraction_request = {
             "model_uri": cloud_model.uri,

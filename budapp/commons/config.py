@@ -283,7 +283,7 @@ class SecretsConfig(BaseSecretsConfig):
                 public_key_file = Path(self.public_key_path)
             else:
                 public_key_file = Path(os.path.join(self.vault_path, self.public_key_path))
-            
+
             # Read the public key from PEM file
             public_pem_bytes = public_key_file.read_bytes()
 
@@ -303,7 +303,7 @@ class SecretsConfig(BaseSecretsConfig):
                 private_key_file = Path(self.private_key_path)
             else:
                 private_key_file = Path(os.path.join(self.vault_path, self.private_key_path))
-            
+
             # Read the private key from PEM file
             private_pem_bytes = private_key_file.read_bytes()
 
