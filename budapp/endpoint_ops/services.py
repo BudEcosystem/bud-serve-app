@@ -18,8 +18,11 @@
 
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 from uuid import UUID, uuid4
+
+if TYPE_CHECKING:
+    from .schemas import DeploymentSettingsConfig, UpdateDeploymentSettingsRequest
 
 import aiohttp
 from fastapi import status
@@ -2383,6 +2386,12 @@ class EndpointService(SessionMixin):
         # Extract deployment settings if they exist
         deployment_settings_data = deployment_config.get("deployment_settings", {})
 
+        # Log if we're returning defaults (helps with debugging)
+        if not deployment_settings_data:
+            logger.info(f"No deployment settings found for endpoint {endpoint_id}, returning defaults")
+        else:
+            logger.info(f"Found deployment settings for endpoint {endpoint_id}")
+
         # Create DeploymentSettingsConfig from data
         return DeploymentSettingsConfig(**deployment_settings_data)
 
@@ -2441,12 +2450,17 @@ class EndpointService(SessionMixin):
 
         # Update deployment_config with new settings
         deployment_config["deployment_settings"] = new_settings.model_dump()
+        
+        logger.info(f"Updated deployment settings for endpoint {endpoint_id}")
 
         # Update endpoint
         await endpoint_manager.update_by_fields(
             db_endpoint,
             {"deployment_config": deployment_config},
         )
+        
+        # Ensure the changes are immediately available for subsequent reads
+        self.session.flush()
 
         # Publish to cache for gateway
         await self._publish_deployment_settings_to_cache(db_endpoint, new_settings)
