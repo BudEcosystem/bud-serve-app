@@ -666,15 +666,9 @@ async def get_deployment_settings(
     """Get deployment settings for an endpoint."""
     try:
         deployment_settings = await EndpointService(session).get_deployment_settings(endpoint_id)
-        response = DeploymentSettingsResponse(
+        return DeploymentSettingsResponse(
             endpoint_id=endpoint_id,
             deployment_settings=deployment_settings,
-        )
-        return SuccessResponse(
-            message="Successfully retrieved deployment settings",
-            code=status.HTTP_200_OK,
-            object="endpoint.deployment_settings",
-            result=response.model_dump(),
         ).to_http_response()
     except ClientException as e:
         logger.exception(f"Failed to get deployment settings: {e}")
@@ -724,15 +718,9 @@ async def update_deployment_settings(
             settings=request,
             current_user_id=current_user.id,
         )
-        response = DeploymentSettingsResponse(
+        return DeploymentSettingsResponse(
             endpoint_id=endpoint_id,
             deployment_settings=deployment_settings,
-        )
-        return SuccessResponse(
-            message="Successfully updated deployment settings",
-            code=status.HTTP_200_OK,
-            object="endpoint.deployment_settings",
-            result=response.model_dump(),
         ).to_http_response()
     except ClientException as e:
         logger.exception(f"Failed to update deployment settings: {e}")

@@ -526,13 +526,14 @@ class DeploymentSettingsConfig(BaseModel):
     fallback_config: Optional[FallbackConfig] = None
 
 
-class DeploymentSettingsResponse(BaseModel):
+class DeploymentSettingsResponse(SuccessResponse):
     """Response schema for deployment settings."""
 
     model_config = ConfigDict(from_attributes=True)
 
     endpoint_id: UUID4
     deployment_settings: DeploymentSettingsConfig
+    object: str = "endpoint.deployment_settings"
 
 
 class UpdateDeploymentSettingsRequest(BaseModel):
