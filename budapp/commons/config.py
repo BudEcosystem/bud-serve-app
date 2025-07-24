@@ -253,6 +253,8 @@ class SecretsConfig(BaseSecretsConfig):
 
     # Encryption
     private_key_password: str = "bud_encryption_password"
+    private_key_path: str = Field(alias="PRIVATE_KEY_PATH", default="private_key.pem")
+    public_key_path: str = Field(alias="PUBLIC_KEY_PATH", default="public_key.pem")
     aes_key_hex: str = ""
 
     # Minio store
@@ -276,8 +278,14 @@ class SecretsConfig(BaseSecretsConfig):
     def public_key(self) -> PublicKeyTypes:
         """Return Public key loaded from the PEM file."""
         try:
+            # Use absolute path if provided, otherwise relative to vault_path
+            if os.path.isabs(self.public_key_path):
+                public_key_file = Path(self.public_key_path)
+            else:
+                public_key_file = Path(os.path.join(self.vault_path, self.public_key_path))
+
             # Read the public key from PEM file
-            public_pem_bytes = Path(os.path.join(self.vault_path, "public_key.pem")).read_bytes()
+            public_pem_bytes = public_key_file.read_bytes()
 
             # Load the public key
             public_key_from_pem = serialization.load_pem_public_key(public_pem_bytes)
@@ -290,8 +298,14 @@ class SecretsConfig(BaseSecretsConfig):
     def private_key(self) -> PrivateKeyTypes:
         """Return Private key loaded from the PEM file."""
         try:
+            # Use absolute path if provided, otherwise relative to vault_path
+            if os.path.isabs(self.private_key_path):
+                private_key_file = Path(self.private_key_path)
+            else:
+                private_key_file = Path(os.path.join(self.vault_path, self.private_key_path))
+
             # Read the private key from PEM file
-            private_pem_bytes = Path(os.path.join(self.vault_path, "private_key.pem")).read_bytes()
+            private_pem_bytes = private_key_file.read_bytes()
 
             # Load the private key
             private_key_from_pem = serialization.load_pem_private_key(

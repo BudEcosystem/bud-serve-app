@@ -18,7 +18,7 @@
 
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import UUID
 
 import aiohttp
@@ -71,11 +71,24 @@ from .schemas import (
     AddAdapterWorkflowStepData,
     AddWorkerRequest,
     AddWorkerWorkflowStepData,
+    AnthropicConfig,
+    AWSBedrockConfig,
+    AWSSageMakerConfig,
+    AzureConfig,
+    DeepSeekConfig,
     EndpointCreate,
+    FireworksConfig,
+    GCPVertexConfig,
+    GoogleAIStudioConfig,
+    HyperbolicConfig,
+    MistralConfig,
     ModelClusterDetail,
+    OpenAIConfig,
     ProxyModelConfig,
+    TogetherConfig,
     VLLMConfig,
     WorkerInfoFilter,
+    XAIConfig,
 )
 
 
@@ -139,11 +152,65 @@ class EndpointService(SessionMixin):
         )
         logger.debug(f"Delete endpoint workflow {db_workflow.id} created")
 
+        # Check if this is a cloud model without cluster - handle immediate deletion
+        is_cloud_model = db_endpoint.model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL
+        has_cluster = db_endpoint.cluster and db_endpoint.cluster.cluster_id
+
+        if is_cloud_model and not has_cluster:
+            # For cloud models without cluster, perform immediate deletion
+            logger.debug(f"Performing immediate deletion for cloud model endpoint {db_endpoint.id}")
+
+            # Delete endpoint details from redis
+            try:
+                await self.delete_model_from_proxy_cache(db_endpoint.id)
+                await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+                logger.debug(f"Updated proxy cache for project {db_endpoint.project_id}")
+            except (RedisException, Exception) as e:
+                logger.error(f"Failed to delete endpoint details from redis: {e}")
+
+            # Mark endpoint as deleted immediately
+            await EndpointDataManager(self.session).update_by_fields(
+                db_endpoint, {"status": EndpointStatusEnum.DELETED}
+            )
+            logger.debug(f"Cloud model endpoint {db_endpoint.id} marked as deleted")
+
+            # Mark workflow as completed
+            await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"status": WorkflowStatusEnum.COMPLETED}
+            )
+            logger.debug(f"Workflow {db_workflow.id} marked as completed")
+
+            # Send notification to workflow creator
+            notification_request = (
+                NotificationBuilder()
+                .set_content(
+                    title=db_endpoint.name,
+                    message="Deployment Deleted",
+                    icon=model_icon,
+                    result=NotificationResult(target_id=db_endpoint.project.id, target_type="project").model_dump(
+                        exclude_none=True, exclude_unset=True
+                    ),
+                )
+                .set_payload(
+                    workflow_id=str(db_workflow.id), type=NotificationTypeEnum.DEPLOYMENT_DELETION_SUCCESS.value
+                )
+                .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+                .build()
+            )
+            await BudNotifyService().send_notification(notification_request)
+
+            return db_workflow
+
+        # For non-cloud models or cloud models with cluster, follow the existing workflow process
         try:
             # Perform delete endpoint request to bud_cluster app
-            bud_cluster_response = await self._perform_bud_cluster_delete_endpoint_request(
-                db_endpoint.cluster.cluster_id, db_endpoint.namespace, current_user_id, db_workflow.id
-            )
+            if has_cluster:
+                bud_cluster_response = await self._perform_bud_cluster_delete_endpoint_request(
+                    db_endpoint.cluster.cluster_id, db_endpoint.namespace, current_user_id, db_workflow.id
+                )
+            else:
+                # For cloud models without cluster, skip bud_cluster deletion
+                bud_cluster_response = {"status": "success", "message": "Cloud model endpoint deleted"}
         except ClientException as e:
             await WorkflowDataManager(self.session).update_by_fields(
                 db_workflow, {"status": WorkflowStatusEnum.FAILED}
@@ -181,7 +248,7 @@ class EndpointService(SessionMixin):
         await EndpointDataManager(self.session).update_by_fields(db_endpoint, {"status": EndpointStatusEnum.DELETING})
         logger.debug(f"Endpoint {db_endpoint.id} status updated to {EndpointStatusEnum.DELETING.value}")
 
-        # Delete endpoint details with pattern “router_config:*:<endpoint_name>“,
+        # Delete endpoint details with pattern "router_config:*:<endpoint_name>",
         try:
             await self.delete_model_from_proxy_cache(db_endpoint.id)
             await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
@@ -192,7 +259,7 @@ class EndpointService(SessionMixin):
         return db_workflow
 
     async def _perform_bud_cluster_delete_endpoint_request(
-        self, bud_cluster_id: UUID, namespace: str, current_user_id: UUID, workflow_id: UUID
+        self, bud_cluster_id: Optional[UUID], namespace: str, current_user_id: UUID, workflow_id: UUID
     ) -> Dict:
         """Perform delete endpoint request to bud_cluster app.
 
@@ -200,6 +267,11 @@ class EndpointService(SessionMixin):
             bud_cluster_id: The ID of the cluster being served by the endpoint to delete.
             namespace: The namespace of the cluster endpoint to delete.
         """
+        if not bud_cluster_id:
+            logger.warning(
+                f"Skipping bud cluster delete request - no bud_cluster_id provided for namespace {namespace}"
+            )
+            return {}
         delete_endpoint_url = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/delete"
         )
@@ -365,14 +437,16 @@ class EndpointService(SessionMixin):
 
         logger.debug("Collected required data from workflow steps")
 
-        # Get cluster id
-        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-            ClusterModel, {"cluster_id": required_data["cluster_id"]}, missing_ok=True
-        )
+        # Get cluster id (optional for cloud models)
+        db_cluster = None
+        if "cluster_id" in required_data and required_data["cluster_id"]:
+            db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+                ClusterModel, {"cluster_id": required_data["cluster_id"]}, missing_ok=True
+            )
 
-        if not db_cluster:
-            logger.error(f"Cluster with id {required_data['cluster_id']} not found")
-            return
+            if not db_cluster:
+                logger.error(f"Cluster with id {required_data['cluster_id']} not found")
+                return
 
         db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
 
@@ -394,7 +468,7 @@ class EndpointService(SessionMixin):
         endpoint_data = EndpointCreate(
             model_id=required_data["model_id"],
             project_id=required_data["project_id"],
-            cluster_id=db_cluster.id,
+            cluster_id=db_cluster.id if db_cluster else None,
             bud_cluster_id=required_data["cluster_id"],
             name=required_data["endpoint_name"],
             url=deployment_url,
@@ -462,9 +536,10 @@ class EndpointService(SessionMixin):
         # Create request to trigger endpoint status update periodic task
         is_cloud_model = db_endpoint.model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL
 
-        await self._perform_endpoint_status_update_request(
-            db_endpoint.bud_cluster_id, db_endpoint.namespace, is_cloud_model
-        )
+        if db_endpoint.bud_cluster_id:
+            await self._perform_endpoint_status_update_request(
+                db_endpoint.bud_cluster_id, db_endpoint.namespace, is_cloud_model
+            )
 
         return db_endpoint
 
@@ -609,7 +684,7 @@ class EndpointService(SessionMixin):
         filters_dict = filters.model_dump(exclude_none=True)
         payload = {
             "namespace": db_endpoint.namespace,
-            "cluster_id": str(db_endpoint.bud_cluster_id),
+            "cluster_id": str(db_endpoint.bud_cluster_id) if db_endpoint.bud_cluster_id else "",
             "page": page,
             "limit": limit,
             "order_by": order_by or [],
@@ -703,12 +778,16 @@ class EndpointService(SessionMixin):
         # model_detail_json_response = await ModelService(self.session).retrieve_model(model_id)
         # model_detail = json.loads(model_detail_json_response.body.decode("utf-8"))
         cluster_id = db_endpoint.cluster_id
-        cluster_detail = await ClusterService(self.session).get_cluster_details(cluster_id)
+        cluster_detail = None
+        if cluster_id:
+            cluster_detail = await ClusterService(self.session).get_cluster_details(cluster_id)
 
         # Get running and crashed worker count
-        running_worker_count, crashed_worker_count = await self.get_endpoint_worker_count(
-            db_endpoint.namespace, str(db_endpoint.bud_cluster_id)
-        )
+        running_worker_count, crashed_worker_count = None, None
+        if db_endpoint.bud_cluster_id:
+            running_worker_count, crashed_worker_count = await self.get_endpoint_worker_count(
+                db_endpoint.namespace, str(db_endpoint.bud_cluster_id)
+            )
 
         # An endpoint always have at least one worker
         if running_worker_count == 0 and crashed_worker_count == 0:
@@ -1177,7 +1256,9 @@ class EndpointService(SessionMixin):
             "input_tokens": deployment_config["avg_context_length"],
             "output_tokens": deployment_config["avg_sequence_length"],
             "concurrency": data["additional_concurrency"],
-            "cluster_id": str(db_endpoint.cluster.cluster_id),
+            "cluster_id": str(db_endpoint.cluster.cluster_id)
+            if db_endpoint.cluster
+            else str(db_endpoint.bud_cluster_id),
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
@@ -1282,7 +1363,7 @@ class EndpointService(SessionMixin):
             deploy_model_uri = db_model.local_path
 
         add_worker_payload = {
-            "cluster_id": str(db_endpoint.bud_cluster_id),
+            "cluster_id": str(db_endpoint.bud_cluster_id) if db_endpoint.bud_cluster_id else "",
             "simulator_id": data["simulator_id"],
             "endpoint_name": db_endpoint.name,
             "model": deploy_model_uri,
@@ -1655,11 +1736,17 @@ class EndpointService(SessionMixin):
                 required_data["adapter_model_uri"],
             )
 
-            db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
-                ClusterModel, {"id": db_endpoint.cluster_id}
-            )
-            required_data["ingress_url"] = db_cluster.ingress_url
-            required_data["cluster_id"] = str(db_cluster.cluster_id)
+            db_cluster = None
+            if db_endpoint.cluster_id:
+                db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+                    ClusterModel, {"id": db_endpoint.cluster_id}
+                )
+                required_data["ingress_url"] = db_cluster.ingress_url
+                required_data["cluster_id"] = str(db_cluster.cluster_id)
+            else:
+                # For cloud models without cluster
+                required_data["ingress_url"] = ""
+                required_data["cluster_id"] = str(db_endpoint.bud_cluster_id) if db_endpoint.bud_cluster_id else ""
 
             try:
                 # Perform model quantization
@@ -1909,12 +1996,12 @@ class EndpointService(SessionMixin):
         # Create request payload
         payload = {
             "endpoint_name": db_endpoint.name,
-            "ingress_url": db_endpoint.cluster.ingress_url,
+            "ingress_url": db_endpoint.cluster.ingress_url if db_endpoint.cluster else "",
             "adapter_path": db_adapter.model.local_path,
             "adapter_name": db_adapter.deployment_name,
             "adapters": adapters,
             "namespace": db_endpoint.namespace,
-            "cluster_id": str(db_endpoint.bud_cluster_id),
+            "cluster_id": str(db_endpoint.bud_cluster_id) if db_endpoint.bud_cluster_id else "",
             "adapter_id": str(adapter_id),
             "action": "delete",
             "notification_metadata": {
@@ -2026,6 +2113,190 @@ class EndpointService(SessionMixin):
         )
         await BudNotifyService().send_notification(notification_request)
 
+    def _create_provider_config(
+        self,
+        provider_enum: ProxyProviderEnum,
+        model_name: str,
+        endpoint_id: UUID,
+        api_base: str,
+        encrypted_credential_data: Optional[dict] = None,
+    ) -> tuple[Any, Optional[str]]:
+        """Create provider configuration based on provider type.
+
+        Returns:
+            Tuple of (provider_config, encrypted_api_key) where encrypted_api_key is stored for _api_key field
+        """
+        # Base configuration parameters
+        config_params = {"model_name": model_name}
+        encrypted_api_key = None
+
+        # Handle API key for providers that use simple api_key field
+        if provider_enum in [
+            ProxyProviderEnum.OPENAI,
+            ProxyProviderEnum.ANTHROPIC,
+            ProxyProviderEnum.DEEPSEEK,
+            ProxyProviderEnum.FIREWORKS,
+            ProxyProviderEnum.GOOGLE_AI_STUDIO,
+            ProxyProviderEnum.HYPERBOLIC,
+            ProxyProviderEnum.MISTRAL,
+            ProxyProviderEnum.TOGETHER,
+            ProxyProviderEnum.XAI,
+            ProxyProviderEnum.AZURE,
+        ]:
+            if encrypted_credential_data:
+                encrypted_api_key = encrypted_credential_data.get("api_key")
+                if encrypted_api_key is not None:
+                    config_params["api_key_location"] = f"dynamic::store_{endpoint_id}"
+
+        # Provider-specific configurations
+        if provider_enum == ProxyProviderEnum.VLLM:
+            return VLLMConfig(
+                type=model_name, model_name=model_name, api_base=api_base + "/v1", api_key_location="none"
+            ), None
+
+        elif provider_enum == ProxyProviderEnum.OPENAI:
+            if encrypted_credential_data:
+                if api_base_val := encrypted_credential_data.get("api_base"):
+                    config_params["api_base"] = api_base_val
+                if org := encrypted_credential_data.get("organization"):
+                    config_params["organization"] = org
+            return OpenAIConfig(**config_params), encrypted_api_key
+
+        elif provider_enum == ProxyProviderEnum.ANTHROPIC:
+            return AnthropicConfig(**config_params), encrypted_api_key
+
+        elif provider_enum == ProxyProviderEnum.AWS_BEDROCK:
+            config_params["model_id"] = model_name
+            config_params["region"] = "us-east-1"  # Default
+            if encrypted_credential_data:
+                if region := encrypted_credential_data.get("aws_region_name"):
+                    config_params["region"] = region
+                if access_key := encrypted_credential_data.get("aws_access_key_id"):
+                    config_params["api_key_location"] = f"dynamic::store_{endpoint_id}"
+                    config_params["aws_access_key_id"] = access_key
+                    encrypted_api_key = access_key  # Store encrypted key for _api_key field
+                if secret_key := encrypted_credential_data.get("aws_secret_access_key"):
+                    config_params["aws_secret_access_key"] = secret_key
+                if session_token := encrypted_credential_data.get("aws_session_token"):
+                    config_params["aws_session_token"] = session_token
+            return AWSBedrockConfig(**config_params), encrypted_api_key
+
+        elif provider_enum == ProxyProviderEnum.AWS_SAGEMAKER:
+            config_params.update(
+                {
+                    "endpoint_name": model_name,
+                    "region": "us-east-1",
+                    "hosted_provider": "openai",
+                }
+            )
+            if encrypted_credential_data:
+                if region := encrypted_credential_data.get("aws_region_name"):
+                    config_params["region"] = region
+                if hosted := encrypted_credential_data.get("hosted_provider"):
+                    config_params["hosted_provider"] = hosted
+                if access_key := encrypted_credential_data.get("aws_access_key_id"):
+                    config_params["api_key_location"] = f"dynamic::store_{endpoint_id}"
+                    config_params["aws_access_key_id"] = access_key
+                    encrypted_api_key = access_key
+                if secret_key := encrypted_credential_data.get("aws_secret_access_key"):
+                    config_params["aws_secret_access_key"] = secret_key
+                if session_token := encrypted_credential_data.get("aws_session_token"):
+                    config_params["aws_session_token"] = session_token
+            return AWSSageMakerConfig(**config_params), encrypted_api_key
+
+        elif provider_enum == ProxyProviderEnum.AZURE:
+            config_params.update(
+                {
+                    "deployment_id": model_name,
+                    "endpoint": api_base,
+                }
+            )
+            if encrypted_credential_data:
+                if api_base_cred := encrypted_credential_data.get("api_base"):
+                    config_params["endpoint"] = api_base_cred
+                if deployment_id := encrypted_credential_data.get("deployment_id"):
+                    config_params["deployment_id"] = deployment_id
+                if api_version := encrypted_credential_data.get("api_version"):
+                    config_params["api_version"] = api_version
+                if azure_ad_token := encrypted_credential_data.get("azure_ad_token"):
+                    config_params["azure_ad_token"] = azure_ad_token
+                if tenant_id := encrypted_credential_data.get("tenant_id"):
+                    config_params["tenant_id"] = tenant_id
+                if client_id := encrypted_credential_data.get("client_id"):
+                    config_params["client_id"] = client_id
+                if client_secret := encrypted_credential_data.get("client_secret"):
+                    config_params["client_secret"] = client_secret
+            return AzureConfig(**config_params), encrypted_api_key
+
+        elif provider_enum == ProxyProviderEnum.GCP_VERTEX:
+            config_params.update(
+                {
+                    "project_id": "default-project",
+                    "region": "us-central1",
+                }
+            )
+            if encrypted_credential_data:
+                if vertex_project := encrypted_credential_data.get("vertex_project"):
+                    config_params["project_id"] = vertex_project
+                elif project_id := encrypted_credential_data.get("project_id"):
+                    config_params["project_id"] = project_id
+                if vertex_location := encrypted_credential_data.get("vertex_location"):
+                    config_params["region"] = vertex_location
+                    config_params["vertex_location"] = vertex_location
+                if vertex_creds := encrypted_credential_data.get("vertex_credentials"):
+                    config_params["api_key_location"] = f"dynamic::store_{endpoint_id}"
+                    config_params["vertex_credentials"] = vertex_creds
+                    encrypted_api_key = vertex_creds  # Store encrypted key for _api_key field
+            return GCPVertexConfig(**config_params), encrypted_api_key
+
+        elif provider_enum == ProxyProviderEnum.DEEPSEEK:
+            return DeepSeekConfig(**config_params), encrypted_api_key
+
+        elif provider_enum == ProxyProviderEnum.FIREWORKS:
+            return FireworksConfig(**config_params), encrypted_api_key
+
+        elif provider_enum == ProxyProviderEnum.GOOGLE_AI_STUDIO:
+            return GoogleAIStudioConfig(**config_params), encrypted_api_key
+
+        elif provider_enum == ProxyProviderEnum.HYPERBOLIC:
+            return HyperbolicConfig(**config_params), encrypted_api_key
+
+        elif provider_enum == ProxyProviderEnum.MISTRAL:
+            return MistralConfig(**config_params), encrypted_api_key
+
+        elif provider_enum == ProxyProviderEnum.TOGETHER:
+            return TogetherConfig(**config_params), encrypted_api_key
+
+        elif provider_enum == ProxyProviderEnum.XAI:
+            return XAIConfig(**config_params), encrypted_api_key
+
+        else:
+            # Default fallback to VLLM
+            return VLLMConfig(
+                type=model_name, model_name=model_name, api_base=api_base + "/v1", api_key_location="none"
+            ), None
+
+    # Provider mapping constant
+    PROVIDER_MAPPING = {
+        "openai": ProxyProviderEnum.OPENAI,
+        "anthropic": ProxyProviderEnum.ANTHROPIC,
+        "aws-bedrock": ProxyProviderEnum.AWS_BEDROCK,
+        "bedrock": ProxyProviderEnum.AWS_BEDROCK,
+        "aws-sagemaker": ProxyProviderEnum.AWS_SAGEMAKER,
+        "sagemaker": ProxyProviderEnum.AWS_SAGEMAKER,
+        "azure": ProxyProviderEnum.AZURE,
+        "deepseek": ProxyProviderEnum.DEEPSEEK,
+        "fireworks": ProxyProviderEnum.FIREWORKS,
+        "gcp-vertex": ProxyProviderEnum.GCP_VERTEX,
+        "vertex-ai": ProxyProviderEnum.GCP_VERTEX,
+        "google-ai-studio": ProxyProviderEnum.GOOGLE_AI_STUDIO,
+        "hyperbolic": ProxyProviderEnum.HYPERBOLIC,
+        "mistral": ProxyProviderEnum.MISTRAL,
+        "together": ProxyProviderEnum.TOGETHER,
+        "xai": ProxyProviderEnum.XAI,
+        "vllm": ProxyProviderEnum.VLLM,
+    }
+
     async def add_model_to_proxy_cache(
         self,
         endpoint_id: UUID,
@@ -2033,8 +2304,18 @@ class EndpointService(SessionMixin):
         model_type: str,
         api_base: str,
         supported_endpoints: Union[List[str], Dict[str, bool]],
+        encrypted_credential_data: Optional[dict] = None,
     ) -> None:
-        """Add model to proxy cache for a project."""
+        """Add model to proxy cache for a project.
+
+        Args:
+            endpoint_id: The endpoint ID
+            model_name: The model name
+            model_type: The model type (e.g., "openai", "aws-bedrock", etc.)
+            api_base: The base API URL
+            supported_endpoints: List of supported endpoints
+            encrypted_credential_data: Optional encrypted credential data from ProprietaryCredential.other_provider_creds
+        """
         endpoints = []
 
         for support_endpoint in supported_endpoints:
@@ -2045,19 +2326,26 @@ class EndpointService(SessionMixin):
             except ValueError:
                 logger.debug(f"Support endpoint {support_endpoint} is not a valid ModelEndpointEnum")
         logger.debug(f"Supported Endpoints: {endpoints}")
+
+        # Get the provider enum, default to VLLM if not found
+        provider_enum = self.PROVIDER_MAPPING.get(model_type.lower(), ProxyProviderEnum.VLLM)
+
+        # Create the appropriate provider config using helper method
+        provider_config, encrypted_model_api_key = self._create_provider_config(
+            provider_enum, model_name, endpoint_id, api_base, encrypted_credential_data
+        )
+
+        # Create the proxy model configuration
         model_config = ProxyModelConfig(
-            routing=[ProxyProviderEnum.VLLM.value],
-            providers={
-                ProxyProviderEnum.VLLM.value: VLLMConfig(
-                    type=model_type, model_name=model_name, api_base=api_base + "/v1", api_key_location="none"
-                )
-            },
+            routing=[provider_enum],
+            providers={provider_enum: provider_config},
             endpoints=endpoints,
+            api_key=encrypted_model_api_key,
         )
 
         redis_service = RedisService()
         await redis_service.set(
-            f"model_table:{endpoint_id}", json.dumps({str(endpoint_id): model_config.model_dump()})
+            f"model_table:{endpoint_id}", json.dumps({str(endpoint_id): model_config.model_dump(exclude_none=True)})
         )
 
     async def delete_model_from_proxy_cache(self, endpoint_id: UUID) -> None:

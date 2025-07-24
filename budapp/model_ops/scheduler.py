@@ -150,7 +150,7 @@ class CloudModelSyncScheduler:
                     CloudModelCreate(
                         provider_id=provider_type_id_mapper[provider["provider_type"]],
                         uri=cloud_model["uri"],
-                        name=cloud_model["uri"],
+                        name=cloud_model["uri"].split("/")[-1],
                         modality=cloud_model["modality"],
                         source=provider["provider_type"],
                         max_input_tokens=max_input_tokens,

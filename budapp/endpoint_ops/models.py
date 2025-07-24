@@ -45,8 +45,8 @@ class Endpoint(Base, TimestampMixin):
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id", ondelete="CASCADE"), nullable=False)
     cache_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     cache_config: Mapped[str] = mapped_column(String, nullable=True)
-    cluster_id: Mapped[UUID] = mapped_column(ForeignKey("cluster.id", ondelete="CASCADE"), nullable=False)
-    bud_cluster_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    cluster_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("cluster.id", ondelete="CASCADE"), nullable=True)
+    bud_cluster_id: Mapped[Optional[UUID]] = mapped_column(Uuid, nullable=True)
     url: Mapped[str] = mapped_column(String, nullable=False)
     namespace: Mapped[str] = mapped_column(String, nullable=False)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
@@ -88,7 +88,7 @@ class Endpoint(Base, TimestampMixin):
     # )
     project: Mapped[Project] = relationship("Project", back_populates="endpoints", foreign_keys=[project_id])
 
-    cluster: Mapped[Cluster] = relationship("Cluster", back_populates="endpoints", foreign_keys=[cluster_id])
+    cluster: Mapped[Optional[Cluster]] = relationship("Cluster", back_populates="endpoints", foreign_keys=[cluster_id])
     adapters: Mapped[list["Adapter"]] = relationship(back_populates="endpoint")
     created_user: Mapped["User"] = relationship(back_populates="created_endpoints", foreign_keys=[created_by])
     credential: Mapped[Optional["ProprietaryCredential"]] = relationship(
@@ -113,7 +113,8 @@ class Endpoint(Base, TimestampMixin):
             "model_id": str(self.model_id),
             "cache_enabled": self.cache_enabled,
             "cache_config": self.cache_config_dict,
-            "cluster_id": str(self.cluster_id),
+            "cluster_id": str(self.cluster_id) if self.cluster_id else None,
+            "bud_cluster_id": str(self.bud_cluster_id) if self.bud_cluster_id else None,
             "url": self.url,
             "namespace": self.namespace,
             "replicas": self.replicas,
@@ -130,7 +131,8 @@ class Endpoint(Base, TimestampMixin):
             model_id=UUID(data.get("model_id")),
             cache_enabled=data.get("cache_enabled"),
             cache_config=json.dumps(data.get("cache_config")),
-            cluster_id=UUID(data.get("cluster_id")),
+            cluster_id=UUID(data.get("cluster_id")) if data.get("cluster_id") else None,
+            bud_cluster_id=UUID(data.get("bud_cluster_id")) if data.get("bud_cluster_id") else None,
             url=data.get("url"),
             namespace=data.get("namespace"),
             replicas=data.get("replicas"),

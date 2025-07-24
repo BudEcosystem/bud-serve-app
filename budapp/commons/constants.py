@@ -713,6 +713,18 @@ class ProxyProviderEnum(StrEnum):
 
     VLLM = "vllm"
     OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    AWS_BEDROCK = "aws-bedrock"
+    AWS_SAGEMAKER = "aws-sagemaker"
+    AZURE = "azure"
+    DEEPSEEK = "deepseek"
+    FIREWORKS = "fireworks"
+    GCP_VERTEX = "gcp-vertex"
+    GOOGLE_AI_STUDIO = "google-ai-studio"
+    HYPERBOLIC = "hyperbolic"
+    MISTRAL = "mistral"
+    TOGETHER = "together"
+    XAI = "xai"
 
 
 # class ModelTemplateTypeEnum(StrEnum):
@@ -2875,7 +2887,7 @@ class ModelEndpointEnum(Enum):
     AUDIO_SPEECH = "/v1/audio/speech"
     EMBEDDING = "/v1/embeddings"
     BATCH = "/v1/batch"
-    RESPONSE = "/v1/responses"
+    RESPONSES = "/v1/responses"
     RERANK = "/v1/rerank"  # https://docs.litellm.ai/docs/rerank
     MODERATION = "/v1/moderations"  # https://docs.litellm.ai/docs/moderation
 
@@ -2901,7 +2913,7 @@ class ModelEndpointEnum(Enum):
             cls.AUDIO_SPEECH: "Speech generation",
             cls.EMBEDDING: "Embeddings",
             cls.BATCH: "Batch",
-            cls.RESPONSE: "Responses",
+            cls.RESPONSES: "Responses",
             cls.RERANK: "Reranking",
             cls.MODERATION: "Moderation",
         }

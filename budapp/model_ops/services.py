@@ -19,6 +19,7 @@
 import os
 import re
 import tempfile
+from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional, Tuple
 from urllib.parse import unquote, urlparse
 from urllib.request import ProxyHandler, Request, build_opener
@@ -38,7 +39,9 @@ from budapp.commons.exceptions import ClientException, MinioException
 from budapp.commons.helpers import assign_random_colors_to_names, normalize_value
 from budapp.commons.schemas import Tag, Task
 from budapp.credential_ops.crud import ProprietaryCredentialDataManager
+from budapp.credential_ops.models import ProprietaryCredential
 from budapp.credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
+from budapp.credential_ops.services import CredentialService
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
@@ -88,6 +91,7 @@ from ..core.models import ModelTemplate as ModelTemplateModel
 from ..core.schemas import NotificationPayload, NotificationResult
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..endpoint_ops.schemas import EndpointCreate
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
 from ..shared.minio_store import ModelStore
@@ -430,6 +434,20 @@ class CloudModelWorkflowService(SessionMixin):
                 db_latest_workflow_step, {"data": execution_status_data}
             )
 
+            # Extract cloud model metadata if this is a cloud model
+            if db_cloud_model:
+                logger.info(f"Extracting metadata for cloud model: {db_cloud_model.uri}")
+                provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                    ProviderModel, {"id": db_cloud_model.provider_id}
+                )
+                extracted_metadata = await self._extract_cloud_model_metadata(db_cloud_model, provider, db_model.id)
+
+                if extracted_metadata:
+                    # Update model with extracted metadata
+                    await self._update_model_with_extracted_metadata(db_model, extracted_metadata)
+                else:
+                    logger.warning(f"Failed to extract metadata for cloud model: {db_cloud_model.uri}")
+
             if db_cloud_model:
                 await CloudModelDataManager(self.session).update_by_fields(
                     db_cloud_model, {"is_present_in_model": True}
@@ -474,6 +492,93 @@ class CloudModelWorkflowService(SessionMixin):
             await BudNotifyService().send_notification(notification_request)
 
         return db_model
+
+    async def _extract_cloud_model_metadata(
+        self, cloud_model: CloudModel, provider: ProviderModel, model_id: UUID
+    ) -> Dict[str, Any]:
+        """Extract metadata for cloud model using budmodel service."""
+        cloud_model_extraction_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/model-info/cloud-model/extract"
+
+        extraction_request = {
+            "model_uri": cloud_model.uri,
+            # "provider_type": "cloud_model",
+            # "provider_name": provider.name
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(cloud_model_extraction_endpoint, json=extraction_request) as response:
+                    response_data = await response.json()
+                    if response.status >= 400:
+                        logger.error(f"Failed to extract cloud model metadata: {response_data}")
+                        return None
+                    return response_data.get("model_info", {})
+        except Exception as e:
+            logger.error(f"Failed to extract cloud model metadata: {e}")
+            return None
+
+    async def _update_model_with_extracted_metadata(self, model: Model, extracted_metadata: Dict[str, Any]) -> Model:
+        """Update model with extracted metadata from budmodel service."""
+        update_fields = {}
+
+        # Map basic fields
+        if extracted_metadata.get("description"):
+            update_fields["description"] = extracted_metadata["description"]
+
+        if extracted_metadata.get("use_cases"):
+            update_fields["use_cases"] = extracted_metadata["use_cases"]
+
+        if extracted_metadata.get("strengths"):
+            update_fields["strengths"] = extracted_metadata["strengths"]
+
+        if extracted_metadata.get("limitations"):
+            update_fields["limitations"] = extracted_metadata["limitations"]
+
+        if extracted_metadata.get("languages"):
+            update_fields["languages"] = extracted_metadata["languages"]
+
+        # Update tags if provided
+        if extracted_metadata.get("tags"):
+            update_fields["tags"] = extracted_metadata["tags"]
+
+        # Update tasks if provided
+        if extracted_metadata.get("tasks"):
+            update_fields["tasks"] = extracted_metadata["tasks"]
+
+        # Update URLs if provided
+        if extracted_metadata.get("github_url"):
+            update_fields["github_url"] = extracted_metadata["github_url"]
+
+        if extracted_metadata.get("website_url"):
+            update_fields["website_url"] = extracted_metadata["website_url"]
+
+        # Update model with extracted metadata
+        if update_fields:
+            model = await ModelDataManager(self.session).update_by_fields(model, update_fields)
+            logger.info(f"Updated model {model.id} with extracted metadata fields: {list(update_fields.keys())}")
+
+        # Handle papers if provided
+        if extracted_metadata.get("papers"):
+            await self._create_papers_from_extracted_metadata(extracted_metadata["papers"], model.id)
+
+        return model
+
+    async def _create_papers_from_extracted_metadata(self, papers_data: List[Dict], model_id: UUID) -> None:
+        """Create paper records from extracted metadata."""
+        try:
+            for paper_info in papers_data:
+                if isinstance(paper_info, dict) and paper_info.get("title"):
+                    paper_data = {
+                        "title": paper_info.get("title"),
+                        "url": paper_info.get("url"),
+                        "summary": paper_info.get("summary"),
+                        "authors": paper_info.get("authors", []),
+                        "model_id": model_id,
+                    }
+                    await PaperDataManager(self.session).insert_one(Paper(**paper_data))
+            logger.info(f"Created {len(papers_data)} paper records for model {model_id}")
+        except Exception as e:
+            logger.error(f"Failed to create papers from extracted metadata: {e}")
 
     async def _validate_duplicate_source_uri_model(
         self, source: str, uri: str, db_workflow_steps: List[WorkflowStepModel], current_step_number: int
@@ -3241,18 +3346,15 @@ class ModelService(SessionMixin):
                     if key in db_workflow_step.data:
                         required_data[key] = db_workflow_step.data[key]
 
+            # Base required keys for all deployments
             required_keys = [
                 "model_id",
                 "project_id",
-                "cluster_id",
-                # "created_by",
-                # "replicas",
                 "endpoint_name",
-                "simulator_id",
                 "deploy_config",
-                "scaling_specification",
             ]
 
+            # Check model type to determine additional required keys
             if "model_id" in required_data:
                 db_model = await ModelDataManager(self.session).retrieve_by_fields(
                     Model,
@@ -3260,7 +3362,11 @@ class ModelService(SessionMixin):
                 )
 
                 if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+                    # Cloud models need credential but not cluster/simulator
                     required_keys.append("credential_id")
+                else:
+                    # Local models need cluster and simulator info
+                    required_keys.extend(["cluster_id", "simulator_id", "scaling_specification"])
 
             # Check if all required keys are present
             missing_keys = [key for key in required_keys if key not in required_data]
@@ -3282,35 +3388,87 @@ class ModelService(SessionMixin):
             if db_endpoint:
                 raise ClientException("An endpoint with this name already exists in this project")
 
-            # Trigger model deployment and get deployment events
-            model_deployment_response = await self._initiate_model_deployment(
-                cluster_id=UUID(required_data["cluster_id"]),
-                endpoint_name=required_data["endpoint_name"],
-                simulator_id=UUID(required_data["simulator_id"]),
-                model_id=UUID(required_data["model_id"]),
-                deploy_config=DeploymentTemplateCreate(**required_data["deploy_config"]),
-                workflow_id=db_workflow.id,
-                subscriber_id=current_user_id,
-                credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
-                scaling_specification=required_data["scaling_specification"],
+            # Check if this is a cloud model that should use direct endpoint creation
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model,
+                {"id": required_data["model_id"], "status": ModelStatusEnum.ACTIVE},
             )
-            model_deployment_events = {
-                "budserve_cluster_events": model_deployment_response,
-            }
 
-            # Update or create next workflow step
-            db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                db_workflow.id, current_step_number, model_deployment_events
-            )
-            logger.debug(f"Workflow step updated {db_workflow_step.id}")
+            if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+                # Direct endpoint creation for cloud models
+                logger.info("Using direct endpoint creation for cloud model deployment")
 
-            # Update workflow progress
-            model_deployment_response["progress_type"] = "budserve_cluster_events"
-            db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-                db_workflow,
-                {"progress": model_deployment_response, "current_step": workflow_current_step},
-            )
-            logger.debug("Successfully triggered model deployment")
+                # Create endpoint directly without calling budcluster
+                # For cloud models, cluster_id is optional
+                cluster_id = UUID(required_data["cluster_id"]) if "cluster_id" in required_data else None
+
+                db_endpoint = await self._create_endpoint_directly(
+                    model_id=UUID(required_data["model_id"]),
+                    project_id=UUID(required_data["project_id"]),
+                    cluster_id=cluster_id,
+                    endpoint_name=required_data["endpoint_name"],
+                    deploy_config=DeploymentTemplateCreate(**required_data["deploy_config"]),
+                    workflow_id=db_workflow.id,
+                    current_user_id=current_user_id,
+                    credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
+                )
+
+                # Create deployment events for workflow tracking
+                model_deployment_events = {
+                    "budserve_cluster_events": {
+                        "status": "completed",
+                        "endpoint_id": str(db_endpoint.id),
+                        "endpoint_url": db_endpoint.url,
+                        "message": "Cloud model endpoint created successfully",
+                    }
+                }
+
+                # Update workflow status to completed
+                db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                    db_workflow,
+                    {
+                        "status": WorkflowStatusEnum.COMPLETED,
+                        "current_step": workflow_current_step,
+                        "progress": model_deployment_events["budserve_cluster_events"],
+                    },
+                )
+
+                # Update or create workflow step with endpoint details
+                db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                    db_workflow.id, current_step_number, model_deployment_events
+                )
+                logger.info(f"Cloud model endpoint {db_endpoint.id} created successfully")
+
+            else:
+                # Existing flow for local models - trigger model deployment via budcluster
+                model_deployment_response = await self._initiate_model_deployment(
+                    cluster_id=UUID(required_data["cluster_id"]),
+                    endpoint_name=required_data["endpoint_name"],
+                    simulator_id=UUID(required_data["simulator_id"]),
+                    model_id=UUID(required_data["model_id"]),
+                    deploy_config=DeploymentTemplateCreate(**required_data["deploy_config"]),
+                    workflow_id=db_workflow.id,
+                    subscriber_id=current_user_id,
+                    credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
+                    scaling_specification=required_data["scaling_specification"],
+                )
+                model_deployment_events = {
+                    "budserve_cluster_events": model_deployment_response,
+                }
+
+                # Update or create next workflow step
+                db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                    db_workflow.id, current_step_number, model_deployment_events
+                )
+                logger.debug(f"Workflow step updated {db_workflow_step.id}")
+
+                # Update workflow progress
+                model_deployment_response["progress_type"] = "budserve_cluster_events"
+                db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                    db_workflow,
+                    {"progress": model_deployment_response, "current_step": workflow_current_step},
+                )
+                logger.debug("Successfully triggered model deployment")
 
         return db_workflow
 
@@ -3486,6 +3644,131 @@ class ModelService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to perform model deployment: {e}")
             raise ClientException("Unable to perform model deployment") from e
+
+    async def _create_endpoint_directly(
+        self,
+        model_id: UUID,
+        project_id: UUID,
+        cluster_id: Optional[UUID],
+        endpoint_name: str,
+        deploy_config: DeploymentTemplateCreate,
+        workflow_id: UUID,
+        current_user_id: UUID,
+        credential_id: Optional[UUID] = None,
+    ) -> EndpointModel:
+        """Create endpoint directly for cloud/proprietary models without calling budcluster.
+
+        Args:
+            model_id: The model ID to deploy
+            project_id: The project ID for the endpoint
+            cluster_id: Optional cluster ID (not required for cloud models)
+            endpoint_name: The name of the endpoint
+            deploy_config: Deployment configuration
+            workflow_id: The workflow ID for tracking
+            current_user_id: The user creating the endpoint
+            credential_id: Optional credential ID for cloud models
+
+        Returns:
+            The created endpoint model
+        """
+        logger.info(f"Creating endpoint directly for cloud model {model_id}")
+
+        # Retrieve the model
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
+        )
+
+        # For cloud models, get the cloud model details for supported endpoints
+        if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
+                CloudModel,
+                fields={
+                    "status": CloudModelStatusEnum.ACTIVE,
+                    "source": db_model.source,
+                    "uri": db_model.uri,
+                    "provider_id": db_model.provider_id,
+                },
+            )
+            supported_endpoints = db_cloud_model.supported_endpoints if db_cloud_model else []
+        else:
+            # This should not happen as this method is only for cloud models
+            raise ClientException("Direct endpoint creation is only supported for cloud models")
+
+        # Generate namespace and deployment URL
+        # Use model.uri as namespace for cloud models
+        namespace = db_model.uri
+
+        # Use the proxy service URL for cloud models
+        deployment_url = "budproxy-service.svc.cluster.local"
+
+        # For cloud models, we set replicas to 1 as they are API-based
+        replicas = deploy_config.replicas if hasattr(deploy_config, "replicas") else 1
+
+        # For cloud models without a cluster, use None for both cluster_id and bud_cluster_id
+
+        # Prepare endpoint data
+        endpoint_data = EndpointCreate(
+            project_id=project_id,
+            model_id=model_id,
+            cluster_id=cluster_id,  # None for cloud models
+            bud_cluster_id=None,  # None for cloud models
+            name=endpoint_name,
+            url=deployment_url,
+            namespace=namespace,
+            status=EndpointStatusEnum.RUNNING,  # Cloud models are immediately available
+            created_by=current_user_id,
+            status_sync_at=datetime.now(),
+            credential_id=credential_id,
+            active_replicas=replicas,
+            total_replicas=replicas,
+            number_of_nodes=1,  # Cloud models run on 1 virtual node
+            deployment_config=deploy_config.model_dump(),
+            node_list=[],  # Empty for cloud models
+            supported_endpoints=supported_endpoints,
+        )
+
+        # Create the endpoint in database
+        db_endpoint = await EndpointDataManager(self.session).insert_one(
+            EndpointModel(**endpoint_data.model_dump(exclude_unset=True, exclude_none=True))
+        )
+
+        logger.info(f"Successfully created endpoint {db_endpoint.id} for cloud model {model_id}")
+
+        # Fetch credential details if credential_id is provided
+        encrypted_credential_data = None
+        if credential_id:
+            # Fetch the credential
+            db_credential = await ProprietaryCredentialDataManager(self.session).retrieve_by_fields(
+                ProprietaryCredential, {"id": credential_id}
+            )
+
+            # Pass the encrypted credential data directly
+            if db_credential.other_provider_creds:
+                encrypted_credential_data = db_credential.other_provider_creds
+
+        # Update proxy cache for the endpoint
+        # For cloud models, we use the model source as the model type
+        model_type = db_model.source.lower() if db_model.source else "openai"
+
+        # Add model to proxy cache
+        # Import here to avoid circular import
+        from ..endpoint_ops.services import EndpointService
+
+        endpoint_service = EndpointService(self.session)
+        await endpoint_service.add_model_to_proxy_cache(
+            endpoint_id=db_endpoint.id,
+            model_name=namespace,
+            model_type=model_type,
+            api_base=deployment_url,
+            supported_endpoints=supported_endpoints,
+            encrypted_credential_data=encrypted_credential_data,
+        )
+
+        # Update proxy cache for the project
+        await CredentialService(self.session).update_proxy_cache(project_id)
+        logger.info(f"Updated proxy cache for project {project_id}")
+
+        return db_endpoint
 
 
 class ModelServiceUtil(SessionMixin):
