@@ -534,6 +534,7 @@ class DeploymentSettingsResponse(SuccessResponse):
     endpoint_id: UUID4
     deployment_settings: DeploymentSettingsConfig
     object: str = "endpoint.deployment_settings"
+    message: Optional[str] = "Successfully retrieved deployment settings"
 
 
 class UpdateDeploymentSettingsRequest(BaseModel):

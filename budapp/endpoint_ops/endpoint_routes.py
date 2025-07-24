@@ -669,6 +669,7 @@ async def get_deployment_settings(
         return DeploymentSettingsResponse(
             endpoint_id=endpoint_id,
             deployment_settings=deployment_settings,
+            message="Successfully retrieved deployment settings",
         ).to_http_response()
     except ClientException as e:
         logger.exception(f"Failed to get deployment settings: {e}")
@@ -721,6 +722,7 @@ async def update_deployment_settings(
         return DeploymentSettingsResponse(
             endpoint_id=endpoint_id,
             deployment_settings=deployment_settings,
+            message="Successfully updated deployment settings",
         ).to_http_response()
     except ClientException as e:
         logger.exception(f"Failed to update deployment settings: {e}")
