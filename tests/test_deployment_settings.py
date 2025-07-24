@@ -131,7 +131,7 @@ async def test_get_deployment_settings_default_values():
     # Mock endpoint without deployment settings
     mock_endpoint = MagicMock()
     mock_endpoint.id = endpoint_id
-    mock_endpoint.deployment_config = {}
+    mock_endpoint.deployment_settings = {}
 
     with patch("budapp.endpoint_ops.services.EndpointDataManager") as mock_endpoint_manager_class:
         mock_endpoint_manager = MagicMock()
@@ -156,18 +156,16 @@ async def test_get_deployment_settings_with_existing_config():
     # Mock endpoint with deployment settings
     mock_endpoint = MagicMock()
     mock_endpoint.id = endpoint_id
-    mock_endpoint.deployment_config = {
-        "deployment_settings": {
-            "rate_limits": {
-                "algorithm": "token_bucket",
-                "requests_per_second": 10,
-                "enabled": True,
-            },
-            "retry_config": {
-                "num_retries": 3,
-                "max_delay_s": 5.0,
-            },
-        }
+    mock_endpoint.deployment_settings = {
+        "rate_limits": {
+            "algorithm": "token_bucket",
+            "requests_per_second": 10,
+            "enabled": True,
+        },
+        "retry_config": {
+            "num_retries": 3,
+            "max_delay_s": 5.0,
+        },
     }
 
     with patch("budapp.endpoint_ops.services.EndpointDataManager") as mock_endpoint_manager_class:
@@ -218,18 +216,16 @@ async def test_update_deployment_settings_partial_update():
     mock_endpoint.id = endpoint_id
     mock_endpoint.project_id = project_id
     mock_endpoint.name = "test-endpoint"
-    mock_endpoint.deployment_config = {
-        "deployment_settings": {
-            "rate_limits": {
-                "algorithm": "token_bucket",
-                "requests_per_second": 10,
-                "enabled": True,
-            },
-            "retry_config": {
-                "num_retries": 3,
-                "max_delay_s": 5.0,
-            },
-        }
+    mock_endpoint.deployment_settings = {
+        "rate_limits": {
+            "algorithm": "token_bucket",
+            "requests_per_second": 10,
+            "enabled": True,
+        },
+        "retry_config": {
+            "num_retries": 3,
+            "max_delay_s": 5.0,
+        },
     }
 
     # Only update retry config
@@ -283,9 +279,9 @@ async def test_update_deployment_settings_partial_update():
         mock_endpoint_manager.update_by_fields.assert_called_once()
         update_call = mock_endpoint_manager.update_by_fields.call_args[0]
         # First argument should be the endpoint instance, second should be the fields dict
-        updated_config = update_call[1]["deployment_config"]
-        assert updated_config["deployment_settings"]["retry_config"]["num_retries"] == 5
-        assert updated_config["deployment_settings"]["rate_limits"]["requests_per_second"] == 10
+        updated_settings = update_call[1]["deployment_settings"]
+        assert updated_settings["retry_config"]["num_retries"] == 5
+        assert updated_settings["rate_limits"]["requests_per_second"] == 10
 
 
 @pytest.mark.asyncio
@@ -303,7 +299,7 @@ async def test_update_deployment_settings_invalid_fallback_model():
     mock_endpoint.id = endpoint_id
     mock_endpoint.project_id = project_id
     mock_endpoint.model_id = model_id
-    mock_endpoint.deployment_config = {}
+    mock_endpoint.deployment_settings = {}
 
     # Mock primary model
     mock_primary_model = MagicMock()
@@ -349,7 +345,7 @@ async def test_update_deployment_settings_fallback_same_as_primary():
     mock_endpoint.id = endpoint_id
     mock_endpoint.project_id = project_id
     mock_endpoint.model_id = model_id
-    mock_endpoint.deployment_config = {}
+    mock_endpoint.deployment_settings = {}
 
     # Mock primary model
     mock_primary_model = MagicMock()

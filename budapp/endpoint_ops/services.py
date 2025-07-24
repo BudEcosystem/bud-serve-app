@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 from uuid import UUID, uuid4
 
+
 if TYPE_CHECKING:
     from .schemas import DeploymentSettingsConfig, UpdateDeploymentSettingsRequest
 
@@ -2380,11 +2381,8 @@ class EndpointService(SessionMixin):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        # Get deployment_config from endpoint, default to empty dict
-        deployment_config = db_endpoint.deployment_config or {}
-
-        # Extract deployment settings if they exist
-        deployment_settings_data = deployment_config.get("deployment_settings", {})
+        # Get deployment_settings from endpoint, default to empty dict
+        deployment_settings_data = db_endpoint.deployment_settings or {}
 
         # Log if we're returning defaults (helps with debugging)
         if not deployment_settings_data:
@@ -2426,11 +2424,8 @@ class EndpointService(SessionMixin):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        # Get current deployment_config
-        deployment_config = db_endpoint.deployment_config or {}
-
         # Get existing deployment settings
-        existing_settings_data = deployment_config.get("deployment_settings", {})
+        existing_settings_data = db_endpoint.deployment_settings or {}
         existing_settings = DeploymentSettingsConfig(**existing_settings_data)
 
         # Merge settings - only update provided fields
@@ -2448,17 +2443,14 @@ class EndpointService(SessionMixin):
         # Validate deployment settings
         await self._validate_deployment_settings(new_settings, db_endpoint)
 
-        # Update deployment_config with new settings
-        deployment_config["deployment_settings"] = new_settings.model_dump()
-        
         logger.info(f"Updated deployment settings for endpoint {endpoint_id}")
 
-        # Update endpoint
+        # Update endpoint with new deployment settings
         await endpoint_manager.update_by_fields(
             db_endpoint,
-            {"deployment_config": deployment_config},
+            {"deployment_settings": new_settings.model_dump()},
         )
-        
+
         # Ensure the changes are immediately available for subsequent reads
         self.session.flush()
 

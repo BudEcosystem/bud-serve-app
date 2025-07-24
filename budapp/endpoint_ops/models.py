@@ -65,6 +65,7 @@ class Endpoint(Base, TimestampMixin):
     total_replicas: Mapped[int] = mapped_column(Integer, nullable=False)
     number_of_nodes: Mapped[int] = mapped_column(Integer, nullable=False)
     deployment_config: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    deployment_settings: Mapped[dict] = mapped_column(JSONB, nullable=True)
     node_list: Mapped[list[str]] = mapped_column(JSONB, nullable=True)
     is_deprecated: Mapped[bool] = mapped_column(Boolean, default=False)
     supported_endpoints: Mapped[List[str]] = mapped_column(
