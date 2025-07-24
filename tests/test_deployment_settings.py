@@ -244,7 +244,7 @@ async def test_update_deployment_settings_partial_update():
         mock_endpoint_manager_class.return_value = mock_endpoint_manager
 
         mock_model_manager = MagicMock()
-        mock_model_manager.retrieve_many_by_fields = AsyncMock(return_value=[])
+        mock_model_manager.get_all_by_fields = AsyncMock(return_value=[])
         mock_model_manager.retrieve_by_fields = AsyncMock(return_value=None)
         mock_model_manager_class.return_value = mock_model_manager
 
@@ -320,7 +320,7 @@ async def test_update_deployment_settings_invalid_fallback_model():
         mock_endpoint_manager_class.return_value = mock_endpoint_manager
 
         mock_model_manager = MagicMock()
-        mock_model_manager.retrieve_many_by_fields = AsyncMock(return_value=[mock_model1])
+        mock_model_manager.get_all_by_fields = AsyncMock(return_value=[mock_model1])
         mock_model_manager_class.return_value = mock_model_manager
 
         with pytest.raises(ClientException) as exc_info:
@@ -366,7 +366,7 @@ async def test_update_deployment_settings_fallback_same_as_primary():
         mock_endpoint_manager_class.return_value = mock_endpoint_manager
 
         mock_model_manager = MagicMock()
-        mock_model_manager.retrieve_many_by_fields = AsyncMock(return_value=[mock_model1])
+        mock_model_manager.get_all_by_fields = AsyncMock(return_value=[mock_model1])
         mock_model_manager_class.return_value = mock_model_manager
 
         with pytest.raises(ClientException) as exc_info:

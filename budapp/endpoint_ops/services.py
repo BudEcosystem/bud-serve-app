@@ -2497,7 +2497,7 @@ class EndpointService(SessionMixin):
         if settings.fallback_config and settings.fallback_config.fallback_models:
             # Get all available models for the project
             model_manager = ModelDataManager(self.session)
-            project_models = await model_manager.retrieve_many_by_fields(
+            project_models = await model_manager.get_all_by_fields(
                 ModelsModel,
                 {"project_id": endpoint.project_id, "status": ModelStatusEnum.ACTIVE},
             )
