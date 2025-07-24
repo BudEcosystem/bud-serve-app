@@ -17,7 +17,7 @@
 """Tests for cloud model delete functionality."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -26,11 +26,45 @@ from budapp.commons.constants import (
     ModelProviderTypeEnum,
     WorkflowStatusEnum,
 )
-from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.endpoint_ops.services import EndpointService
-from budapp.model_ops.models import Model
-from budapp.project_ops.models import Project
-from budapp.workflow_ops.models import Workflow
+
+
+class MockProject:
+    """Mock project object with required attributes."""
+    def __init__(self, id, name):
+        self.id = id
+        self.name = name
+
+
+class MockModel:
+    """Mock model object with required attributes."""
+    def __init__(self, id, provider_type, icon, provider_id=None):
+        self.id = id
+        self.provider_type = provider_type
+        self.icon = icon
+        self.provider_id = provider_id
+        self.source = "openai"
+        self.uri = "gpt-4"
+
+
+class MockCluster:
+    """Mock cluster object with required attributes."""
+    def __init__(self, cluster_id):
+        self.cluster_id = cluster_id
+
+
+class MockEndpoint:
+    """Mock endpoint object with required attributes."""
+    def __init__(self, id, project_id, model_id, model, project, name, status, cluster=None, namespace=None):
+        self.id = id
+        self.project_id = project_id
+        self.model_id = model_id
+        self.model = model
+        self.project = project
+        self.name = name
+        self.status = status
+        self.cluster = cluster
+        self.namespace = namespace
 
 
 @pytest.mark.asyncio
@@ -43,30 +77,24 @@ async def test_delete_cloud_model_endpoint_immediate_deletion():
     model_id = uuid4()
     workflow_id = uuid4()
 
-    # Mock model data
-    mock_model = MagicMock()
-    mock_model.id = model_id
-    mock_model.provider_type = ModelProviderTypeEnum.CLOUD_MODEL
-    mock_model.source = "openai"
-    mock_model.uri = "gpt-4"
-    mock_model.icon = "test-icon"
-
-    # Mock project data
-    mock_project = MagicMock()
-    mock_project.id = project_id
-    mock_project.name = "test-project"
-    mock_project.name = "test-project"
-
-    # Mock endpoint data
-    mock_endpoint = MagicMock()
-    mock_endpoint.id = endpoint_id
-    mock_endpoint.project_id = project_id
-    mock_endpoint.model_id = model_id
-    mock_endpoint.model = mock_model
-    mock_endpoint.project = mock_project
-    mock_endpoint.name = "test-endpoint"
-    mock_endpoint.status = EndpointStatusEnum.RUNNING
-    mock_endpoint.cluster = None  # No cluster for cloud model
+    # Create mock objects with actual attributes
+    mock_project = MockProject(id=project_id, name="test-project")
+    mock_model = MockModel(
+        id=model_id,
+        provider_type=ModelProviderTypeEnum.CLOUD_MODEL,
+        icon="test-icon",
+        provider_id=None
+    )
+    mock_endpoint = MockEndpoint(
+        id=endpoint_id,
+        project_id=project_id,
+        model_id=model_id,
+        model=mock_model,
+        project=mock_project,
+        name="test-endpoint",
+        status=EndpointStatusEnum.RUNNING,
+        cluster=None
+    )
 
     # Mock workflow data
     mock_workflow = MagicMock()
@@ -82,7 +110,8 @@ async def test_delete_cloud_model_endpoint_immediate_deletion():
     with patch("budapp.endpoint_ops.crud.EndpointDataManager") as mock_endpoint_manager, \
          patch("budapp.workflow_ops.crud.WorkflowDataManager") as mock_workflow_manager, \
          patch("budapp.shared.notification_service.BudNotifyService") as mock_notify_service, \
-         patch("budapp.credential_ops.services.CredentialService") as mock_credential_service:
+         patch("budapp.credential_ops.services.CredentialService") as mock_credential_service, \
+         patch("budapp.model_ops.crud.ProviderDataManager") as mock_provider_manager:
         
         # Configure endpoint manager
         mock_endpoint_manager_instance = AsyncMock()
@@ -93,7 +122,12 @@ async def test_delete_cloud_model_endpoint_immediate_deletion():
         # Configure workflow manager
         mock_workflow_manager_instance = AsyncMock()
         mock_workflow_manager.return_value = mock_workflow_manager_instance
-        mock_workflow_manager_instance.update_by_fields.return_value = mock_workflow
+        # Update the workflow status to COMPLETED when it's updated
+        async def mock_update_workflow(workflow, updates):
+            if "status" in updates:
+                workflow.status = updates["status"]
+            return workflow
+        mock_workflow_manager_instance.update_by_fields.side_effect = mock_update_workflow
 
         # Mock notification service
         mock_notify_service_instance = AsyncMock()
@@ -146,8 +180,12 @@ async def test_delete_cloud_model_endpoint_immediate_deletion():
                         break
                 assert workflow_call is not None, "Workflow should be marked as COMPLETED"
 
+                # Since we're not mocking provider manager, we don't need to check it was called
+
                 # Verify Redis cache was updated
                 mock_delete_proxy.assert_called_once_with(endpoint_id)
+
+                # Verify credential service was called to update proxy cache
                 mock_credential_service_instance.update_proxy_cache.assert_called_once_with(project_id)
 
                 # Verify notification was sent
@@ -165,31 +203,29 @@ async def test_delete_regular_model_endpoint_workflow_deletion():
     workflow_id = uuid4()
     cluster_id = uuid4()
 
-    # Mock model data (non-cloud model)
-    mock_model = MagicMock()
-    mock_model.id = model_id
-    mock_model.provider_type = ModelProviderTypeEnum.HUGGING_FACE  # Not a cloud model
-    mock_model.icon = "test-icon"
-
-    # Mock cluster data
-    mock_cluster = MagicMock()
-    mock_cluster.cluster_id = cluster_id
-
-    # Mock project data
-    mock_project = MagicMock()
-    mock_project.id = project_id
-    mock_project.name = "test-project"
-
-    # Mock endpoint data
-    mock_endpoint = MagicMock()
-    mock_endpoint.id = endpoint_id
-    mock_endpoint.project_id = project_id
-    mock_endpoint.model_id = model_id
-    mock_endpoint.model = mock_model
-    mock_endpoint.project = mock_project
-    mock_endpoint.name = "test-endpoint"
-    mock_endpoint.status = EndpointStatusEnum.RUNNING
-    mock_endpoint.cluster = mock_cluster
+    # Create mock objects with actual attributes
+    mock_project = MockProject(id=project_id, name="test-project")
+    mock_model = MockModel(
+        id=model_id,
+        provider_type=ModelProviderTypeEnum.HUGGING_FACE,
+        icon="test-icon",
+        provider_id=uuid4()
+    )
+    mock_provider = MagicMock()
+    mock_provider.icon = "provider-icon"
+    
+    mock_cluster = MockCluster(cluster_id=cluster_id)
+    mock_endpoint = MockEndpoint(
+        id=endpoint_id,
+        project_id=project_id,
+        model_id=model_id,
+        model=mock_model,
+        project=mock_project,
+        name="test-endpoint",
+        status=EndpointStatusEnum.RUNNING,
+        cluster=mock_cluster,
+        namespace="test-namespace"
+    )
 
     # Mock workflow data
     mock_workflow = MagicMock()
@@ -204,7 +240,11 @@ async def test_delete_regular_model_endpoint_workflow_deletion():
     # Mock database operations and services
     with patch("budapp.endpoint_ops.crud.EndpointDataManager") as mock_endpoint_manager, \
          patch("budapp.workflow_ops.crud.WorkflowDataManager") as mock_workflow_manager, \
-         patch.object(service, '_perform_bud_cluster_delete_endpoint_request') as mock_bud_cluster_delete:
+         patch("budapp.workflow_ops.crud.WorkflowStepDataManager") as mock_workflow_step_manager, \
+         patch("budapp.model_ops.crud.ProviderDataManager") as mock_provider_manager, \
+         patch("budapp.credential_ops.services.CredentialService") as mock_credential_service, \
+         patch.object(service, '_perform_bud_cluster_delete_endpoint_request') as mock_bud_cluster_delete, \
+         patch.object(service, 'delete_model_from_proxy_cache') as mock_delete_proxy:
         
         # Configure endpoint manager
         mock_endpoint_manager_instance = AsyncMock()
@@ -217,8 +257,30 @@ async def test_delete_regular_model_endpoint_workflow_deletion():
         mock_workflow_manager.return_value = mock_workflow_manager_instance
         mock_workflow_manager_instance.update_by_fields.return_value = mock_workflow
 
-        # Mock bud cluster delete response
-        mock_bud_cluster_delete.return_value = {"status": "success"}
+        # Configure provider manager
+        mock_provider_manager_instance = AsyncMock()
+        mock_provider_manager.return_value = mock_provider_manager_instance
+        mock_provider_manager_instance.retrieve_by_fields.return_value = mock_provider
+
+        # Configure workflow step manager
+        mock_workflow_step_manager_instance = AsyncMock()
+        mock_workflow_step_manager.return_value = mock_workflow_step_manager_instance
+        mock_workflow_step_manager_instance.insert_one.return_value = None
+
+        # Configure credential service
+        mock_credential_service_instance = AsyncMock()
+        mock_credential_service.return_value = mock_credential_service_instance
+        mock_credential_service_instance.update_proxy_cache.return_value = None
+
+        # Mock Redis operations
+        mock_delete_proxy.return_value = None
+
+        # Mock bud cluster delete response with required fields
+        mock_bud_cluster_delete.return_value = {
+            "status": "success",
+            "steps": [],
+            "workflow_id": str(uuid4())
+        }
 
         # Mock workflow creation
         with patch("budapp.workflow_ops.services.WorkflowService") as mock_workflow_service:
@@ -254,10 +316,12 @@ async def test_delete_regular_model_endpoint_workflow_deletion():
                 if call[0][1].get("status") == WorkflowStatusEnum.COMPLETED:
                     workflow_completed_call = call
                     break
-            assert workflow_completed_call is None, "Workflow should NOT be marked as COMPLETED for regular models"
+            assert workflow_completed_call is None, "Workflow should NOT be marked as COMPLETED"
 
-            # Verify bud cluster delete was called
-            mock_bud_cluster_delete.assert_called_once()
+            # Verify bud_cluster delete was called with expected parameters
+            mock_bud_cluster_delete.assert_called_once_with(
+                cluster_id, mock_endpoint.namespace, user_id, workflow_id
+            )
 
 
 @pytest.mark.asyncio
@@ -271,31 +335,26 @@ async def test_delete_cloud_model_endpoint_with_cluster_follows_workflow():
     workflow_id = uuid4()
     cluster_id = uuid4()
 
-    # Mock model data (cloud model)
-    mock_model = MagicMock()
-    mock_model.id = model_id
-    mock_model.provider_type = ModelProviderTypeEnum.CLOUD_MODEL  # Cloud model
-    mock_model.icon = "test-icon"
-
-    # Mock cluster data (cloud model with cluster)
-    mock_cluster = MagicMock()
-    mock_cluster.cluster_id = cluster_id
-
-    # Mock project data
-    mock_project = MagicMock()
-    mock_project.id = project_id
-    mock_project.name = "test-project"
-
-    # Mock endpoint data
-    mock_endpoint = MagicMock()
-    mock_endpoint.id = endpoint_id
-    mock_endpoint.project_id = project_id
-    mock_endpoint.model_id = model_id
-    mock_endpoint.model = mock_model
-    mock_endpoint.project = mock_project
-    mock_endpoint.name = "test-endpoint"
-    mock_endpoint.status = EndpointStatusEnum.RUNNING
-    mock_endpoint.cluster = mock_cluster  # Has cluster
+    # Create mock objects with actual attributes
+    mock_project = MockProject(id=project_id, name="test-project")
+    mock_model = MockModel(
+        id=model_id,
+        provider_type=ModelProviderTypeEnum.CLOUD_MODEL,
+        icon="test-icon",
+        provider_id=None
+    )
+    mock_cluster = MockCluster(cluster_id=cluster_id)
+    mock_endpoint = MockEndpoint(
+        id=endpoint_id,
+        project_id=project_id,
+        model_id=model_id,
+        model=mock_model,
+        project=mock_project,
+        name="test-endpoint",
+        status=EndpointStatusEnum.RUNNING,
+        cluster=mock_cluster,
+        namespace="test-namespace"
+    )
 
     # Mock workflow data
     mock_workflow = MagicMock()
@@ -310,7 +369,10 @@ async def test_delete_cloud_model_endpoint_with_cluster_follows_workflow():
     # Mock database operations and services
     with patch("budapp.endpoint_ops.crud.EndpointDataManager") as mock_endpoint_manager, \
          patch("budapp.workflow_ops.crud.WorkflowDataManager") as mock_workflow_manager, \
-         patch.object(service, '_perform_bud_cluster_delete_endpoint_request') as mock_bud_cluster_delete:
+         patch("budapp.workflow_ops.crud.WorkflowStepDataManager") as mock_workflow_step_manager, \
+         patch("budapp.credential_ops.services.CredentialService") as mock_credential_service, \
+         patch.object(service, '_perform_bud_cluster_delete_endpoint_request') as mock_bud_cluster_delete, \
+         patch.object(service, 'delete_model_from_proxy_cache') as mock_delete_proxy:
         
         # Configure endpoint manager
         mock_endpoint_manager_instance = AsyncMock()
@@ -323,8 +385,25 @@ async def test_delete_cloud_model_endpoint_with_cluster_follows_workflow():
         mock_workflow_manager.return_value = mock_workflow_manager_instance
         mock_workflow_manager_instance.update_by_fields.return_value = mock_workflow
 
-        # Mock bud cluster delete response
-        mock_bud_cluster_delete.return_value = {"status": "success"}
+        # Configure workflow step manager
+        mock_workflow_step_manager_instance = AsyncMock()
+        mock_workflow_step_manager.return_value = mock_workflow_step_manager_instance
+        mock_workflow_step_manager_instance.insert_one.return_value = None
+
+        # Configure credential service
+        mock_credential_service_instance = AsyncMock()
+        mock_credential_service.return_value = mock_credential_service_instance
+        mock_credential_service_instance.update_proxy_cache.return_value = None
+
+        # Mock Redis operations
+        mock_delete_proxy.return_value = None
+
+        # Mock bud cluster delete response with required fields
+        mock_bud_cluster_delete.return_value = {
+            "status": "success",
+            "steps": [],
+            "workflow_id": str(uuid4())
+        }
 
         # Mock workflow creation
         with patch("budapp.workflow_ops.services.WorkflowService") as mock_workflow_service:
@@ -360,7 +439,9 @@ async def test_delete_cloud_model_endpoint_with_cluster_follows_workflow():
                 if call[0][1].get("status") == WorkflowStatusEnum.COMPLETED:
                     workflow_completed_call = call
                     break
-            assert workflow_completed_call is None, "Workflow should NOT be marked as COMPLETED for cloud models with clusters"
+            assert workflow_completed_call is None, "Workflow should NOT be marked as COMPLETED"
 
-            # Verify bud cluster delete was called
-            mock_bud_cluster_delete.assert_called_once()
+            # Verify bud_cluster delete was called with expected parameters
+            mock_bud_cluster_delete.assert_called_once_with(
+                cluster_id, mock_endpoint.namespace, user_id, workflow_id
+            )
