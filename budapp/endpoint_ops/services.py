@@ -2369,7 +2369,7 @@ class EndpointService(SessionMixin):
 
         # Retrieve endpoint
         endpoint_manager = EndpointDataManager(self.session)
-        db_endpoint = await endpoint_manager.retrieve_by_field(EndpointModel, "id", endpoint_id)
+        db_endpoint = await endpoint_manager.retrieve_by_fields(EndpointModel, {"id": endpoint_id})
 
         if not db_endpoint:
             raise ClientException(
@@ -2409,7 +2409,7 @@ class EndpointService(SessionMixin):
 
         # Retrieve endpoint
         endpoint_manager = EndpointDataManager(self.session)
-        db_endpoint = await endpoint_manager.retrieve_by_field(EndpointModel, "id", endpoint_id)
+        db_endpoint = await endpoint_manager.retrieve_by_fields(EndpointModel, {"id": endpoint_id})
 
         if not db_endpoint:
             raise ClientException(
@@ -2528,7 +2528,7 @@ class EndpointService(SessionMixin):
         try:
             # Get model information
             model_manager = ModelDataManager(self.session)
-            model = await model_manager.retrieve_by_field(ModelsModel, "id", endpoint.model_id)
+            model = await model_manager.retrieve_by_fields(ModelsModel, {"id": endpoint.model_id})
 
             if not model:
                 logger.warning(f"Model not found for endpoint {endpoint.id}")

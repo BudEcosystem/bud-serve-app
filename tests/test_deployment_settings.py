@@ -111,7 +111,7 @@ async def test_get_deployment_settings_endpoint_not_found():
 
     with patch("budapp.endpoint_ops.services.EndpointDataManager") as mock_endpoint_manager_class:
         mock_endpoint_manager = MagicMock()
-        mock_endpoint_manager.retrieve_by_field = AsyncMock(return_value=None)
+        mock_endpoint_manager.retrieve_by_fields = AsyncMock(return_value=None)
         mock_endpoint_manager_class.return_value = mock_endpoint_manager
 
         with pytest.raises(ClientException) as exc_info:
@@ -135,7 +135,7 @@ async def test_get_deployment_settings_default_values():
 
     with patch("budapp.endpoint_ops.services.EndpointDataManager") as mock_endpoint_manager_class:
         mock_endpoint_manager = MagicMock()
-        mock_endpoint_manager.retrieve_by_field = AsyncMock(return_value=mock_endpoint)
+        mock_endpoint_manager.retrieve_by_fields = AsyncMock(return_value=mock_endpoint)
         mock_endpoint_manager_class.return_value = mock_endpoint_manager
 
         settings = await service.get_deployment_settings(endpoint_id)
@@ -172,7 +172,7 @@ async def test_get_deployment_settings_with_existing_config():
 
     with patch("budapp.endpoint_ops.services.EndpointDataManager") as mock_endpoint_manager_class:
         mock_endpoint_manager = MagicMock()
-        mock_endpoint_manager.retrieve_by_field = AsyncMock(return_value=mock_endpoint)
+        mock_endpoint_manager.retrieve_by_fields = AsyncMock(return_value=mock_endpoint)
         mock_endpoint_manager_class.return_value = mock_endpoint_manager
 
         settings = await service.get_deployment_settings(endpoint_id)
@@ -194,7 +194,7 @@ async def test_update_deployment_settings_endpoint_not_found():
 
     with patch("budapp.endpoint_ops.services.EndpointDataManager") as mock_endpoint_manager_class:
         mock_endpoint_manager = MagicMock()
-        mock_endpoint_manager.retrieve_by_field = AsyncMock(return_value=None)
+        mock_endpoint_manager.retrieve_by_fields = AsyncMock(return_value=None)
         mock_endpoint_manager_class.return_value = mock_endpoint_manager
 
         with pytest.raises(ClientException) as exc_info:
@@ -243,13 +243,13 @@ async def test_update_deployment_settings_partial_update():
         "budapp.endpoint_ops.services.NotificationBuilder"
     ) as mock_notification_builder_class, patch("budapp.endpoint_ops.services.uuid4") as mock_uuid4:
         mock_endpoint_manager = MagicMock()
-        mock_endpoint_manager.retrieve_by_field = AsyncMock(return_value=mock_endpoint)
+        mock_endpoint_manager.retrieve_by_fields = AsyncMock(return_value=mock_endpoint)
         mock_endpoint_manager.update_by_fields = AsyncMock()
         mock_endpoint_manager_class.return_value = mock_endpoint_manager
 
         mock_model_manager = MagicMock()
         mock_model_manager.retrieve_many_by_fields = AsyncMock(return_value=[])
-        mock_model_manager.retrieve_by_field = AsyncMock(return_value=None)
+        mock_model_manager.retrieve_by_fields = AsyncMock(return_value=None)
         mock_model_manager_class.return_value = mock_model_manager
 
         mock_redis = MagicMock()
@@ -319,7 +319,7 @@ async def test_update_deployment_settings_invalid_fallback_model():
         "budapp.endpoint_ops.services.ModelDataManager"
     ) as mock_model_manager_class:
         mock_endpoint_manager = MagicMock()
-        mock_endpoint_manager.retrieve_by_field = AsyncMock(return_value=mock_endpoint)
+        mock_endpoint_manager.retrieve_by_fields = AsyncMock(return_value=mock_endpoint)
         mock_endpoint_manager_class.return_value = mock_endpoint_manager
 
         mock_model_manager = MagicMock()
@@ -365,7 +365,7 @@ async def test_update_deployment_settings_fallback_same_as_primary():
         "budapp.endpoint_ops.services.ModelDataManager"
     ) as mock_model_manager_class:
         mock_endpoint_manager = MagicMock()
-        mock_endpoint_manager.retrieve_by_field = AsyncMock(return_value=mock_endpoint)
+        mock_endpoint_manager.retrieve_by_fields = AsyncMock(return_value=mock_endpoint)
         mock_endpoint_manager_class.return_value = mock_endpoint_manager
 
         mock_model_manager = MagicMock()
@@ -414,7 +414,7 @@ async def test_cache_publishing_with_deployment_settings():
         "budapp.endpoint_ops.services.RedisService"
     ) as mock_redis_class:
         mock_model_manager = MagicMock()
-        mock_model_manager.retrieve_by_field = AsyncMock(return_value=mock_model)
+        mock_model_manager.retrieve_by_fields = AsyncMock(return_value=mock_model)
         mock_model_manager_class.return_value = mock_model_manager
 
         mock_redis = MagicMock()
