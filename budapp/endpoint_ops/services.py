@@ -2496,7 +2496,7 @@ class EndpointService(SessionMixin):
         # Validate fallback endpoints if provided
         if settings.fallback_config and settings.fallback_config.fallback_models:
             endpoint_manager = EndpointDataManager(self.session)
-            
+
             for fallback_endpoint_id in settings.fallback_config.fallback_models:
                 try:
                     # Parse as UUID
@@ -2506,27 +2506,27 @@ class EndpointService(SessionMixin):
                         message=f"Invalid fallback endpoint ID: '{fallback_endpoint_id}' (must be a valid UUID)",
                         status_code=status.HTTP_400_BAD_REQUEST,
                     )
-                
+
                 # Validate endpoint exists in the same project
                 fallback_endpoint = await endpoint_manager.retrieve_by_fields(
                     EndpointModel,
                     {"id": fallback_uuid, "project_id": endpoint.project_id},
                     missing_ok=True
                 )
-                
+
                 if not fallback_endpoint:
                     raise ClientException(
                         message=f"Fallback endpoint '{fallback_endpoint_id}' not found in project",
                         status_code=status.HTTP_400_BAD_REQUEST,
                     )
-                
+
                 # Ensure fallback endpoint is not the same as current endpoint
                 if str(fallback_uuid) == str(endpoint.id):
                     raise ClientException(
                         message="Fallback endpoint cannot be the same as current endpoint",
                         status_code=status.HTTP_400_BAD_REQUEST,
                     )
-                
+
                 # Ensure fallback endpoint is running
                 if fallback_endpoint.status != EndpointStatusEnum.RUNNING:
                     raise ClientException(

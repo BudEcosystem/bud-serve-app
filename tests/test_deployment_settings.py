@@ -327,7 +327,7 @@ async def test_update_deployment_settings_invalid_fallback_model():
             await service.update_deployment_settings(endpoint_id, settings, user_id)
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Fallback model 'nonexistent-model' not found in project" in str(exc_info.value)
+        assert "Invalid fallback endpoint ID: 'nonexistent-model' (must be a valid UUID)" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -373,7 +373,7 @@ async def test_update_deployment_settings_fallback_same_as_primary():
             await service.update_deployment_settings(endpoint_id, settings, user_id)
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Fallback model cannot be the same as primary model" in str(exc_info.value)
+        assert "Invalid fallback endpoint ID: 'primary-model' (must be a valid UUID)" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
