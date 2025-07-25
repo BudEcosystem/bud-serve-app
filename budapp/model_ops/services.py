@@ -3696,7 +3696,10 @@ class ModelService(SessionMixin):
 
         # Generate namespace and deployment URL
         # Use model.uri as namespace for cloud models
+        # Remove provider prefix if present (e.g., "openai/gpt-4" -> "gpt-4")
         namespace = db_model.uri
+        if "/" in namespace:
+            namespace = namespace.split("/", 1)[1]
 
         # Use the proxy service URL for cloud models
         deployment_url = "budproxy-service.svc.cluster.local"
