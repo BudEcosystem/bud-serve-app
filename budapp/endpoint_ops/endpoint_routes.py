@@ -43,9 +43,11 @@ from .schemas import (
     AddAdapterRequest,
     AddWorkerRequest,
     DeleteWorkerRequest,
+    DeploymentSettingsResponse,
     EndpointFilter,
     EndpointPaginatedResponse,
     ModelClusterDetailResponse,
+    UpdateDeploymentSettingsRequest,
     WorkerDetailResponse,
     WorkerInfoFilter,
     WorkerInfoResponse,
@@ -632,4 +634,101 @@ async def delete_adapter_from_endpoint(
         logger.exception(f"Failed to delete adapter from endpoint: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete adapter from endpoint"
+        ).to_http_response()
+
+
+@endpoint_router.get(
+    "/{endpoint_id}/deployment-settings",
+    responses={
+        status.HTTP_200_OK: {
+            "model": DeploymentSettingsResponse,
+            "description": "Successfully retrieved deployment settings",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Endpoint not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to get deployment settings",
+        },
+    },
+    description="Get deployment settings for an endpoint",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_deployment_settings(
+    endpoint_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
+) -> Union[DeploymentSettingsResponse, ErrorResponse]:
+    """Get deployment settings for an endpoint."""
+    try:
+        deployment_settings = await EndpointService(session).get_deployment_settings(endpoint_id)
+        return DeploymentSettingsResponse(
+            endpoint_id=endpoint_id,
+            deployment_settings=deployment_settings,
+            message="Successfully retrieved deployment settings",
+        ).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to get deployment settings: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get deployment settings: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get deployment settings"
+        ).to_http_response()
+
+
+@endpoint_router.put(
+    "/{endpoint_id}/deployment-settings",
+    responses={
+        status.HTTP_200_OK: {
+            "model": DeploymentSettingsResponse,
+            "description": "Successfully updated deployment settings",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid deployment settings",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Endpoint not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to update deployment settings",
+        },
+    },
+    description="Update deployment settings for an endpoint",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def update_deployment_settings(
+    endpoint_id: UUID,
+    request: UpdateDeploymentSettingsRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
+) -> Union[DeploymentSettingsResponse, ErrorResponse]:
+    """Update deployment settings for an endpoint."""
+    try:
+        deployment_settings = await EndpointService(session).update_deployment_settings(
+            endpoint_id=endpoint_id,
+            settings=request,
+            current_user_id=current_user.id,
+        )
+        return DeploymentSettingsResponse(
+            endpoint_id=endpoint_id,
+            deployment_settings=deployment_settings,
+            message="Successfully updated deployment settings",
+        ).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to update deployment settings: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to update deployment settings: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update deployment settings"
         ).to_http_response()

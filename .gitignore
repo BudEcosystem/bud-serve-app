@@ -74,3 +74,6 @@ checkpoints/
 .aider*
 
 .gitpod.yml
+# RSA keys for testing
+private_key.pem
+public_key.pem

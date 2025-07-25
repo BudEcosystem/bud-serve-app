@@ -18,8 +18,12 @@
 
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple, Union
-from uuid import UUID
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from uuid import UUID, uuid4
+
+
+if TYPE_CHECKING:
+    from .schemas import DeploymentSettingsConfig, UpdateDeploymentSettingsRequest
 
 import aiohttp
 from fastapi import status
@@ -2352,3 +2356,253 @@ class EndpointService(SessionMixin):
         """Delete model from proxy cache for a project."""
         redis_service = RedisService()
         await redis_service.delete_keys_by_pattern(f"model_table:{endpoint_id}*")
+
+    async def get_deployment_settings(self, endpoint_id: UUID) -> "DeploymentSettingsConfig":
+        """Get deployment settings for an endpoint.
+
+        Args:
+            endpoint_id: The endpoint ID
+
+        Returns:
+            DeploymentSettingsConfig with current settings or defaults
+
+        Raises:
+            ClientException: If endpoint not found
+        """
+        from .schemas import DeploymentSettingsConfig
+
+        # Retrieve endpoint
+        endpoint_manager = EndpointDataManager(self.session)
+        db_endpoint = await endpoint_manager.retrieve_by_fields(EndpointModel, {"id": endpoint_id})
+
+        if not db_endpoint:
+            raise ClientException(
+                message=f"Endpoint with id {endpoint_id} not found",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Get deployment_settings from endpoint, default to empty dict
+        deployment_settings_data = db_endpoint.deployment_settings or {}
+
+        # Log if we're returning defaults (helps with debugging)
+        if not deployment_settings_data:
+            logger.info(f"No deployment settings found for endpoint {endpoint_id}, returning defaults")
+        else:
+            logger.info(f"Found deployment settings for endpoint {endpoint_id}")
+
+        # Create DeploymentSettingsConfig from data
+        return DeploymentSettingsConfig(**deployment_settings_data)
+
+    async def update_deployment_settings(
+        self,
+        endpoint_id: UUID,
+        settings: "UpdateDeploymentSettingsRequest",
+        current_user_id: UUID,
+    ) -> "DeploymentSettingsConfig":
+        """Update deployment settings for an endpoint.
+
+        Args:
+            endpoint_id: The endpoint ID
+            settings: The new deployment settings
+            current_user_id: The ID of the current user
+
+        Returns:
+            Updated DeploymentSettingsConfig
+
+        Raises:
+            ClientException: If endpoint not found or validation fails
+        """
+        from .schemas import DeploymentSettingsConfig, UpdateDeploymentSettingsRequest
+
+        # Retrieve endpoint
+        endpoint_manager = EndpointDataManager(self.session)
+        db_endpoint = await endpoint_manager.retrieve_by_fields(EndpointModel, {"id": endpoint_id})
+
+        if not db_endpoint:
+            raise ClientException(
+                message=f"Endpoint with id {endpoint_id} not found",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Get existing deployment settings
+        existing_settings_data = db_endpoint.deployment_settings or {}
+        existing_settings = DeploymentSettingsConfig(**existing_settings_data)
+
+        # Merge settings - only update provided fields
+        update_data = settings.model_dump(exclude_none=True)
+
+        # Create merged settings
+        merged_settings_data = existing_settings.model_dump()
+        for key, value in update_data.items():
+            if value is not None:
+                merged_settings_data[key] = value
+
+        # Create new settings object to validate
+        new_settings = DeploymentSettingsConfig(**merged_settings_data)
+
+        # Validate deployment settings
+        await self._validate_deployment_settings(new_settings, db_endpoint)
+
+        logger.info(f"Updated deployment settings for endpoint {endpoint_id}")
+
+        # Update endpoint with new deployment settings
+        await endpoint_manager.update_by_fields(
+            db_endpoint,
+            {"deployment_settings": new_settings.model_dump()},
+        )
+
+        # Ensure the changes are immediately available for subsequent reads
+        self.session.flush()
+
+        # Publish to cache for gateway
+        await self._publish_deployment_settings_to_cache(db_endpoint, new_settings)
+
+        # Send notification about settings update
+        notification_request = (
+            NotificationBuilder()
+            .set_content(
+                title="Deployment Settings Updated",
+                message=f"Deployment settings for endpoint {db_endpoint.name} have been updated",
+                icon=APP_ICONS["general"]["deployment_mono"],
+                result=NotificationResult(target_id=db_endpoint.id, target_type="endpoint").model_dump(
+                    exclude_none=True, exclude_unset=True
+                ),
+            )
+            .set_payload(
+                workflow_id=str(uuid4()),  # Generate a unique ID for this notification
+                type=NotificationTypeEnum.DEPLOYMENT_SUCCESS.value,
+            )
+            .set_notification_request(subscriber_ids=[str(current_user_id)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)
+
+        return new_settings
+
+    async def _validate_deployment_settings(
+        self,
+        settings: "DeploymentSettingsConfig",
+        endpoint: EndpointModel,
+    ) -> None:
+        """Validate deployment settings.
+
+        Args:
+            settings: The deployment settings to validate
+            endpoint: The endpoint model
+
+        Raises:
+            ClientException: If validation fails
+        """
+        # Validate fallback endpoints if provided
+        if settings.fallback_config and settings.fallback_config.fallback_models:
+            endpoint_manager = EndpointDataManager(self.session)
+
+            for fallback_endpoint_id in settings.fallback_config.fallback_models:
+                try:
+                    # Parse as UUID
+                    fallback_uuid = UUID(fallback_endpoint_id)
+                except ValueError:
+                    raise ClientException(
+                        message=f"Invalid fallback endpoint ID: '{fallback_endpoint_id}' (must be a valid UUID)",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Validate endpoint exists in the same project
+                fallback_endpoint = await endpoint_manager.retrieve_by_fields(
+                    EndpointModel, {"id": fallback_uuid, "project_id": endpoint.project_id}, missing_ok=True
+                )
+
+                if not fallback_endpoint:
+                    raise ClientException(
+                        message=f"Fallback endpoint '{fallback_endpoint_id}' not found in project",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Ensure fallback endpoint is not the same as current endpoint
+                if str(fallback_uuid) == str(endpoint.id):
+                    raise ClientException(
+                        message="Fallback endpoint cannot be the same as current endpoint",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Ensure fallback endpoint is running
+                if fallback_endpoint.status != EndpointStatusEnum.RUNNING:
+                    raise ClientException(
+                        message=f"Fallback endpoint '{fallback_endpoint_id}' is not in RUNNING state",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+
+    async def _publish_deployment_settings_to_cache(
+        self,
+        endpoint: EndpointModel,
+        settings: "DeploymentSettingsConfig",
+    ) -> None:
+        """Publish deployment settings to cache in gateway format.
+
+        Args:
+            endpoint: The endpoint model
+            settings: The deployment settings
+        """
+        try:
+            # Get model information
+            model_manager = ModelDataManager(self.session)
+            model = await model_manager.retrieve_by_fields(ModelsModel, {"id": endpoint.model_id})
+
+            if not model:
+                logger.warning(f"Model not found for endpoint {endpoint.id}")
+                return
+
+            # Get existing cache data if any
+            redis_service = RedisService()
+            cache_key = f"model_table:{endpoint.id}"
+            existing_data = await redis_service.get(cache_key)
+
+            if existing_data:
+                model_data = json.loads(existing_data)
+                endpoint_data = model_data.get(str(endpoint.id), {})
+            else:
+                # If no existing data, we need to construct basic model data
+                endpoint_data = {
+                    "routing": [],
+                    "endpoints": [ep.value for ep in endpoint.supported_endpoints],
+                    "providers": {},
+                }
+
+            # Add deployment settings to the model data
+            if settings.fallback_config:
+                if settings.fallback_config.fallback_models:
+                    endpoint_data["fallback_models"] = settings.fallback_config.fallback_models
+                else:
+                    # Explicitly remove fallback_models if the list is empty
+                    endpoint_data.pop("fallback_models", None)
+
+            if settings.retry_config:
+                endpoint_data["retry_config"] = {
+                    "num_retries": settings.retry_config.num_retries,
+                    "max_delay_s": settings.retry_config.max_delay_s,
+                }
+
+            if settings.rate_limits:
+                endpoint_data["rate_limits"] = {
+                    "algorithm": settings.rate_limits.algorithm,
+                    "requests_per_second": settings.rate_limits.requests_per_second,
+                    "requests_per_minute": settings.rate_limits.requests_per_minute,
+                    "requests_per_hour": settings.rate_limits.requests_per_hour,
+                    "burst_size": settings.rate_limits.burst_size,
+                    "enabled": settings.rate_limits.enabled,
+                    "cache_ttl_ms": 200,
+                    "local_allowance": 0.8,
+                    "sync_interval_ms": 100,
+                }
+
+            # Update cache
+            await redis_service.set(
+                cache_key,
+                json.dumps({str(endpoint.id): endpoint_data}),
+            )
+
+            logger.info(f"Published deployment settings to cache for endpoint {endpoint.id}")
+
+        except Exception as e:
+            logger.error(f"Failed to publish deployment settings to cache: {e}")
+            # Don't raise exception - cache update failure shouldn't block settings update

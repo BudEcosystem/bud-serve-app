@@ -16,7 +16,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 from uuid import UUID
 
 from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -457,3 +457,89 @@ class ProxyModelConfig(BaseModel):
     providers: dict[ProxyProviderEnum, ProviderConfig]
     endpoints: list[str]
     api_key: Optional[str] = None
+
+
+class RateLimitConfig(BaseModel):
+    """Rate limiting configuration for endpoints."""
+
+    algorithm: str = "token_bucket"
+    requests_per_second: Optional[int] = None
+    requests_per_minute: Optional[int] = None
+    requests_per_hour: Optional[int] = None
+    burst_size: Optional[int] = None
+    enabled: bool = True
+
+    @field_validator("algorithm")
+    def validate_algorithm(cls, v):
+        allowed_algorithms = ["token_bucket", "fixed_window", "sliding_window"]
+        if v not in allowed_algorithms:
+            raise ValueError(f"Algorithm must be one of {allowed_algorithms}")
+        return v
+
+    @field_validator("requests_per_second", "requests_per_minute", "requests_per_hour", "burst_size")
+    def validate_positive_integers(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("Rate limit values must be positive integers")
+        return v
+
+
+class RetryConfig(BaseModel):
+    """Retry configuration for failed requests."""
+
+    num_retries: int = 0
+    max_delay_s: float = 1.0
+
+    @field_validator("num_retries")
+    def validate_num_retries(cls, v):
+        if v < 0:
+            raise ValueError("Number of retries cannot be negative")
+        if v > 10:
+            raise ValueError("Number of retries cannot exceed 10")
+        return v
+
+    @field_validator("max_delay_s")
+    def validate_max_delay(cls, v):
+        if v <= 0:
+            raise ValueError("Max delay must be positive")
+        if v > 60:
+            raise ValueError("Max delay cannot exceed 60 seconds")
+        return v
+
+
+class FallbackConfig(BaseModel):
+    """Fallback endpoint configuration for primary endpoint failures."""
+
+    fallback_models: List[str] = []  # Endpoint IDs (UUIDs)
+
+    @field_validator("fallback_models")
+    def validate_fallback_models(cls, v):
+        if len(v) > 5:
+            raise ValueError("Cannot have more than 5 fallback models")
+        return v
+
+
+class DeploymentSettingsConfig(BaseModel):
+    """Main deployment settings configuration for endpoints."""
+
+    rate_limits: Optional[RateLimitConfig] = None
+    retry_config: Optional[RetryConfig] = None
+    fallback_config: Optional[FallbackConfig] = None
+
+
+class DeploymentSettingsResponse(SuccessResponse):
+    """Response schema for deployment settings."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    endpoint_id: UUID4
+    deployment_settings: DeploymentSettingsConfig
+    object: str = "endpoint.deployment_settings"
+    message: Optional[str] = "Successfully retrieved deployment settings"
+
+
+class UpdateDeploymentSettingsRequest(BaseModel):
+    """Request schema for updating deployment settings."""
+
+    rate_limits: Optional[RateLimitConfig] = None
+    retry_config: Optional[RetryConfig] = None
+    fallback_config: Optional[FallbackConfig] = None
