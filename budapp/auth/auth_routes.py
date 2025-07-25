@@ -77,7 +77,7 @@ async def register_user(
 ) -> Union[UserRegisterResponse, ErrorResponse]:
     """Register a user with email and password."""
     try:
-        # Force user_type to CLIENT for public registration
+        # Force user_type to CLIENT for public registration to prevent privilege escalation
         user.user_type = UserTypeEnum.CLIENT
         await AuthService(session).register_user(user)
         return UserRegisterResponse(

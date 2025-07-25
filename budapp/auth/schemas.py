@@ -128,7 +128,7 @@ class UserCreate(UserBase):
     role: UserRoleEnum
     company: str | None = Field(None, max_length=255, description="Company name")
     purpose: str | None = Field(None, max_length=255, description="Purpose of using the platform")
-    user_type: UserTypeEnum = Field(UserTypeEnum.ADMIN, description="Type of user (admin or client)")
+    user_type: UserTypeEnum = Field(UserTypeEnum.CLIENT, description="Type of user (admin or client)")
 
     @field_validator("password")
     @classmethod

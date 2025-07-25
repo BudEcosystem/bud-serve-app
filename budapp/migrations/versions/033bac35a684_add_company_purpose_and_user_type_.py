@@ -23,7 +23,11 @@ def upgrade() -> None:
     sa.Enum('admin', 'client', name='user_type_enum').create(op.get_bind())
     op.add_column('user', sa.Column('company', sa.String(length=255), nullable=True))
     op.add_column('user', sa.Column('purpose', sa.String(length=255), nullable=True))
-    op.add_column('user', sa.Column('user_type', postgresql.ENUM('admin', 'client', name='user_type_enum', create_type=False), nullable=False, server_default='admin'))
+    # Add column with default 'client' but initially nullable to handle existing rows
+    op.add_column('user', sa.Column('user_type', postgresql.ENUM('admin', 'client', name='user_type_enum', create_type=False), nullable=False, server_default='client'))
+    
+    # Update all existing users to 'admin' type
+    op.execute("UPDATE \"user\" SET user_type = 'admin'")
     # ### end Alembic commands ###
 
 

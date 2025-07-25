@@ -72,7 +72,7 @@ class User(Base, TimestampMixin):
             name="user_type_enum",
             values_callable=lambda x: [e.value for e in x],
         ),
-        default=UserTypeEnum.ADMIN.value,
+        default=UserTypeEnum.CLIENT.value,
     )
 
     permission: Mapped["Permission"] = relationship(back_populates="user")  # one-to-one
