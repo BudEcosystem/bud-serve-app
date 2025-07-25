@@ -2509,9 +2509,7 @@ class EndpointService(SessionMixin):
 
                 # Validate endpoint exists in the same project
                 fallback_endpoint = await endpoint_manager.retrieve_by_fields(
-                    EndpointModel,
-                    {"id": fallback_uuid, "project_id": endpoint.project_id},
-                    missing_ok=True
+                    EndpointModel, {"id": fallback_uuid, "project_id": endpoint.project_id}, missing_ok=True
                 )
 
                 if not fallback_endpoint:
