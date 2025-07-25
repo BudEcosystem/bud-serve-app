@@ -2571,8 +2571,12 @@ class EndpointService(SessionMixin):
                 }
 
             # Add deployment settings to the model data
-            if settings.fallback_config and settings.fallback_config.fallback_models:
-                endpoint_data["fallback_models"] = settings.fallback_config.fallback_models
+            if settings.fallback_config:
+                if settings.fallback_config.fallback_models:
+                    endpoint_data["fallback_models"] = settings.fallback_config.fallback_models
+                else:
+                    # Explicitly remove fallback_models if the list is empty
+                    endpoint_data.pop("fallback_models", None)
 
             if settings.retry_config:
                 endpoint_data["retry_config"] = {
