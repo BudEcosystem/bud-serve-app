@@ -302,7 +302,8 @@ def get_param_range(num_params: int) -> tuple[int, int]:
 def generate_valid_password(min_length: int = 8) -> str:
     """Generates a valid password string that meets the following criteria:
     - Contains at least one digit.
-    - Contains at least one alphabetic character.
+    - Contains at least one uppercase letter.
+    - Contains at least one lowercase letter.
     - Contains at least one special character from the set `!@#$%^&*`.
     - Has a minimum length of `min_length`.
 
@@ -314,18 +315,20 @@ def generate_valid_password(min_length: int = 8) -> str:
     """
     # Define character pools
     digits = string.digits
-    alphabets = string.ascii_letters
+    uppercase_letters = string.ascii_uppercase
+    lowercase_letters = string.ascii_lowercase
     special_chars = "!@#$%^&*"
 
-    # Ensure the string contains at least one digit, alphabet, and special character
+    # Ensure the string contains at least one digit, uppercase, lowercase, and special character
     mandatory_chars = [
         random.choice(digits),
-        random.choice(alphabets),
+        random.choice(uppercase_letters),
+        random.choice(lowercase_letters),
         random.choice(special_chars),
     ]
 
     # Combine all allowed characters (excluding whitespaces)
-    all_chars = digits + alphabets + special_chars
+    all_chars = digits + uppercase_letters + lowercase_letters + special_chars
 
     # Fill the rest of the string with random characters from the combined pool
     remaining_length = min_length - len(mandatory_chars)
@@ -344,7 +347,8 @@ def generate_valid_password(min_length: int = 8) -> str:
 def validate_password_string(password: str) -> Union[bool, Tuple[bool, str]]:
     """Validate the password based on the following conditions:
     - Contains at least one digit
-    - Contains at least one alphabet character
+    - Contains at least one uppercase letter
+    - Contains at least one lowercase letter
     - Contains at least one special character
     - Contains no whitespace.
 
@@ -357,8 +361,10 @@ def validate_password_string(password: str) -> Union[bool, Tuple[bool, str]]:
     """
     if not re.search(r"\d", password):
         return False, "Password must contain at least one digit."
-    if not re.search(r"[a-zA-Z]", password):
-        return False, "Password must contain at least one alphabet character."
+    if not re.search(r"[A-Z]", password):
+        return False, "Password must contain at least one uppercase letter."
+    if not re.search(r"[a-z]", password):
+        return False, "Password must contain at least one lowercase letter."
     if not re.search(f"[{re.escape(string.punctuation)}]", password):
         return False, "Password must contain at least one special character."
     if re.search(r"\s", password):

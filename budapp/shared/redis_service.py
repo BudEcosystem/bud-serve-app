@@ -102,6 +102,24 @@ class RedisService:
                 return len(matching_keys)
             return 0
 
+    async def incr(self, name: KeyT) -> ResponseT:
+        """Increment a value in Redis."""
+        async with self.redis_singleton as redis:
+            try:
+                return await redis.incr(name)
+            except Exception as e:
+                logger.exception(f"Error incrementing Redis key: {e}")
+                raise RedisException(f"Error incrementing Redis key {name}") from e
+
+    async def ttl(self, name: KeyT) -> ResponseT:
+        """Get the TTL of a key in Redis."""
+        async with self.redis_singleton as redis:
+            try:
+                return await redis.ttl(name)
+            except Exception as e:
+                logger.exception(f"Error getting TTL for Redis key: {e}")
+                raise RedisException(f"Error getting TTL for Redis key {name}") from e
+
 
 def cache(
     key_func: Callable[[Any, Any], str],

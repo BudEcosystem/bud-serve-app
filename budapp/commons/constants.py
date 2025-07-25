@@ -371,6 +371,21 @@ class UserColorEnum(Enum):
         return random.choice(colors).value
 
 
+class UserTypeEnum(StrEnum):
+    """Enumeration of user types in the system.
+    
+    This enum defines the different types of users that can exist in the application.
+    It helps differentiate between administrative users and regular client users.
+    
+    Attributes:
+        ADMIN: Administrative user with elevated privileges.
+        CLIENT: Regular client user with standard privileges.
+    """
+    
+    ADMIN = auto()
+    CLIENT = auto()
+
+
 class PermissionEnum(Enum):
     """Enumeration of system permissions.
 
@@ -391,6 +406,7 @@ class PermissionEnum(Enum):
         USER_MANAGE (str): Permission to manage users.
         BENCHMARK_VIEW (str): Permission to view benchmarks.
         BENCHMARK_MANAGE (str): Permission to manage benchmarks.
+        CLIENT_ACCESS (str): Permission for client user access to the system.
     """
 
     MODEL_VIEW = "model:view"
@@ -411,6 +427,7 @@ class PermissionEnum(Enum):
 
     BENCHMARK_VIEW = "benchmark:view"
     BENCHMARK_MANAGE = "benchmark:manage"
+    CLIENT_ACCESS = "client:access"
 
     @classmethod
     def get_global_permissions(cls) -> List[str]:
@@ -480,6 +497,13 @@ class PermissionEnum(Enum):
         """Return project-level protected scope values in a list."""
         return [
             cls.ENDPOINT_VIEW.value,
+        ]
+
+    @classmethod
+    def get_client_permissions(cls) -> List[str]:
+        """Return client-specific permission values in a list."""
+        return [
+            cls.CLIENT_ACCESS.value,
         ]
 
 

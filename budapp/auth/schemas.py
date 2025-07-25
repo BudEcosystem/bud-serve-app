@@ -21,7 +21,7 @@ from typing import Any, List
 
 from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from budapp.commons.constants import TokenTypeEnum, UserRoleEnum
+from budapp.commons.constants import TokenTypeEnum, UserRoleEnum, UserTypeEnum
 from budapp.commons.helpers import validate_password_string
 from budapp.commons.schemas import SuccessResponse
 from budapp.permissions.schemas import PermissionList
@@ -126,6 +126,9 @@ class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=100)
     permissions: List[PermissionList] | None = None
     role: UserRoleEnum
+    company: str | None = Field(None, max_length=255, description="Company name")
+    purpose: str | None = Field(None, max_length=255, description="Purpose of using the platform")
+    user_type: UserTypeEnum = Field(UserTypeEnum.CLIENT, description="Type of user (admin or client)")
 
     @field_validator("password")
     @classmethod

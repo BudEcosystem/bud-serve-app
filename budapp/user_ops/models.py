@@ -23,7 +23,7 @@ from sqlalchemy import ARRAY, Boolean, DateTime, Enum, ForeignKey, Integer, Stri
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from budapp.cluster_ops.models import Cluster
-from budapp.commons.constants import UserRoleEnum, UserStatusEnum
+from budapp.commons.constants import UserRoleEnum, UserStatusEnum, UserTypeEnum
 from budapp.commons.database import Base, TimestampMixin
 from budapp.endpoint_ops.models import Endpoint
 from budapp.model_ops.models import Model
@@ -64,6 +64,16 @@ class User(Base, TimestampMixin):
     first_login: Mapped[bool] = mapped_column(Boolean, default=True)
     is_subscriber: Mapped[bool] = mapped_column(Boolean, default=False)
     reset_password_attempt: Mapped[int] = mapped_column(Integer, default=0)
+    company: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    purpose: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    user_type: Mapped[str] = mapped_column(
+        Enum(
+            UserTypeEnum,
+            name="user_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        default=UserTypeEnum.CLIENT.value,
+    )
 
     permission: Mapped["Permission"] = relationship(back_populates="user")  # one-to-one
     created_models: Mapped[list[Model]] = relationship(back_populates="created_user")

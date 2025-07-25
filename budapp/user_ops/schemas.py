@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from budapp.commons.constants import UserRoleEnum, UserStatusEnum
+from budapp.commons.constants import UserRoleEnum, UserStatusEnum, UserTypeEnum
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 
 from ..commons.helpers import validate_password_string
@@ -44,6 +44,9 @@ class UserInfo(UserBase):
     color: str
     role: UserRoleEnum
     status: UserStatusEnum
+    company: str | None = None
+    purpose: str | None = None
+    user_type: UserTypeEnum
 
 
 class User(UserInfo):
@@ -81,6 +84,9 @@ class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=100)
     permissions: List[PermissionList] | None = None
     role: UserRoleEnum
+    company: str | None = Field(None, max_length=255, description="Company name")
+    purpose: str | None = Field(None, max_length=255, description="Purpose of using the platform")
+    user_type: UserTypeEnum = Field(UserTypeEnum.CLIENT, description="Type of user (admin or client)")
 
     @field_validator("password")
     @classmethod
@@ -112,6 +118,9 @@ class UserUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
     password: str | None = Field(None, min_length=8, max_length=100)
     role: Optional[UserRoleEnum] = None
+    company: str | None = Field(None, max_length=255, description="Company name")
+    purpose: str | None = Field(None, max_length=255, description="Purpose of using the platform")
+    user_type: Optional[UserTypeEnum] = Field(None, description="Type of user (admin or client)")
 
     @field_validator("password")
     @classmethod
@@ -155,6 +164,7 @@ class UserListFilter(UserFilter):
     """Filter user list schema."""
 
     status: UserStatusEnum | None = None
+    user_type: UserTypeEnum | None = Field(None, description="Filter users by type (admin or client)")
 
 
 class ResetPasswordResponse(SuccessResponse):

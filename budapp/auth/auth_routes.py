@@ -18,13 +18,15 @@
 
 from typing import Union
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
+from budapp.commons.constants import UserTypeEnum
 from budapp.commons.dependencies import get_session
 from budapp.commons.exceptions import ClientException
+from budapp.commons.rate_limiter import rate_limit
 from budapp.commons.schemas import ErrorResponse
 
 from .schemas import (
@@ -60,14 +62,23 @@ auth_router = APIRouter(prefix="/auth", tags=["auth"])
             "model": UserRegisterResponse,
             "description": "Successfully registered user",
         },
+        status.HTTP_429_TOO_MANY_REQUESTS: {
+            "model": ErrorResponse,
+            "description": "Too many registration attempts",
+        },
     },
     description="Register a user with email and password",
 )
+@rate_limit(max_requests=3, window_seconds=3600)  # 3 requests per hour
 async def register_user(
-    user: UserCreate, session: Annotated[Session, Depends(get_session)]
+    request: Request,
+    user: UserCreate, 
+    session: Annotated[Session, Depends(get_session)]
 ) -> Union[UserRegisterResponse, ErrorResponse]:
     """Register a user with email and password."""
     try:
+        # Force user_type to CLIENT for public registration to prevent privilege escalation
+        user.user_type = UserTypeEnum.CLIENT
         await AuthService(session).register_user(user)
         return UserRegisterResponse(
             code=status.HTTP_200_OK,
@@ -98,11 +109,18 @@ async def register_user(
             "model": UserLoginResponse,
             "description": "Successfully logged in user",
         },
+        status.HTTP_429_TOO_MANY_REQUESTS: {
+            "model": ErrorResponse,
+            "description": "Too many login attempts",
+        },
     },
     description="Login a user with email and password",
 )
+@rate_limit(max_requests=10, window_seconds=60)  # 10 requests per minute
 async def login_user(
-    user: UserLogin, session: Annotated[Session, Depends(get_session)]
+    request: Request,
+    user: UserLogin, 
+    session: Annotated[Session, Depends(get_session)]
 ) -> Union[UserLoginResponse, ErrorResponse]:
     """Login a user with email and password."""
     try:
@@ -172,11 +190,18 @@ async def logout_user(
             "model": RefreshTokenResponse,
             "description": "Successfully refreshed user's access token",
         },
+        status.HTTP_429_TOO_MANY_REQUESTS: {
+            "model": ErrorResponse,
+            "description": "Too many token refresh attempts",
+        },
     },
     description="Refresh a user's access token using their refresh token",
 )
+@rate_limit(max_requests=20, window_seconds=60, use_user_id=True)  # 20 requests per minute per user
 async def refresh_token(
-    token: RefreshTokenRequest, session: Annotated[Session, Depends(get_session)]
+    request: Request,
+    token: RefreshTokenRequest, 
+    session: Annotated[Session, Depends(get_session)]
 ) -> Union[RefreshTokenResponse, ErrorResponse]:
     """Refresh a user's access token using their refresh token."""
     try:

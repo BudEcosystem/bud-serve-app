@@ -328,6 +328,11 @@ class KeycloakManager:
             "enabled": True,
             "emailVerified": True,
             "credentials": [{"type": "password", "value": user.password, "temporary": False}],
+            "attributes": {
+                "company": [user.company] if user.company else [],
+                "purpose": [user.purpose] if user.purpose else [],
+                "user_type": [user.user_type.value] if user.user_type else [],
+            },
         }
 
         try:

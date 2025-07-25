@@ -21,7 +21,7 @@ from fastapi import status
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import UserColorEnum, UserStatusEnum
+from budapp.commons.constants import UserColorEnum, UserStatusEnum, UserTypeEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
 from budapp.commons.keycloak import KeycloakManager
@@ -281,6 +281,20 @@ class AuthService(SessionMixin):
             )
             if not tenant_client:
                 raise ClientException("Default tenant client not found")
+
+            # Set default permissions for CLIENT users
+            if user.user_type == UserTypeEnum.CLIENT:
+                # Assign CLIENT_ACCESS permission to client users
+                client_permission = PermissionList(name=PermissionEnum.CLIENT_ACCESS, has_permission=True)
+                if user.permissions:
+                    # Add to existing permissions if not already present
+                    permission_names = {p.name for p in user.permissions}
+                    if PermissionEnum.CLIENT_ACCESS not in permission_names:
+                        user.permissions.append(client_permission)
+                else:
+                    # Set as the only permission for client users
+                    user.permissions = [client_permission]
+                logger.debug("Assigned CLIENT_ACCESS permission to client user: %s", user.email)
 
             # Process permissions to add implicit view permissions for manage permissions
             if user.permissions:
