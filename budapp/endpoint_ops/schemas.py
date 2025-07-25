@@ -507,9 +507,9 @@ class RetryConfig(BaseModel):
 
 
 class FallbackConfig(BaseModel):
-    """Fallback model configuration for primary model failures."""
+    """Fallback endpoint configuration for primary endpoint failures."""
 
-    fallback_models: List[str] = []
+    fallback_models: List[str] = []  # Endpoint IDs (UUIDs)
 
     @field_validator("fallback_models")
     def validate_fallback_models(cls, v):

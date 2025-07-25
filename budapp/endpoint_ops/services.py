@@ -2493,29 +2493,44 @@ class EndpointService(SessionMixin):
         Raises:
             ClientException: If validation fails
         """
-        # Validate fallback models if provided
+        # Validate fallback endpoints if provided
         if settings.fallback_config and settings.fallback_config.fallback_models:
-            # Get all available models for the project
-            model_manager = ModelDataManager(self.session)
-            project_models = await model_manager.get_all_by_fields(
-                ModelsModel,
-                {"project_id": endpoint.project_id, "status": ModelStatusEnum.ACTIVE},
-            )
-
-            available_model_names = {model.name for model in project_models}
-
-            # Check if all fallback models exist
-            for fallback_model in settings.fallback_config.fallback_models:
-                if fallback_model not in available_model_names:
+            endpoint_manager = EndpointDataManager(self.session)
+            
+            for fallback_endpoint_id in settings.fallback_config.fallback_models:
+                try:
+                    # Parse as UUID
+                    fallback_uuid = UUID(fallback_endpoint_id)
+                except ValueError:
                     raise ClientException(
-                        message=f"Fallback model '{fallback_model}' not found in project",
+                        message=f"Invalid fallback endpoint ID: '{fallback_endpoint_id}' (must be a valid UUID)",
                         status_code=status.HTTP_400_BAD_REQUEST,
                     )
-
-                # Ensure fallback model is not the same as primary model
-                if endpoint.model and fallback_model == endpoint.model.name:
+                
+                # Validate endpoint exists in the same project
+                fallback_endpoint = await endpoint_manager.retrieve_by_fields(
+                    EndpointModel,
+                    {"id": fallback_uuid, "project_id": endpoint.project_id},
+                    missing_ok=True
+                )
+                
+                if not fallback_endpoint:
                     raise ClientException(
-                        message="Fallback model cannot be the same as primary model",
+                        message=f"Fallback endpoint '{fallback_endpoint_id}' not found in project",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+                
+                # Ensure fallback endpoint is not the same as current endpoint
+                if str(fallback_uuid) == str(endpoint.id):
+                    raise ClientException(
+                        message="Fallback endpoint cannot be the same as current endpoint",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+                
+                # Ensure fallback endpoint is running
+                if fallback_endpoint.status != EndpointStatusEnum.RUNNING:
+                    raise ClientException(
+                        message=f"Fallback endpoint '{fallback_endpoint_id}' is not in RUNNING state",
                         status_code=status.HTTP_400_BAD_REQUEST,
                     )
 
@@ -2573,6 +2588,9 @@ class EndpointService(SessionMixin):
                     "requests_per_hour": settings.rate_limits.requests_per_hour,
                     "burst_size": settings.rate_limits.burst_size,
                     "enabled": settings.rate_limits.enabled,
+                    "cache_ttl_ms": 200,
+                    "local_allowance": 0.8,
+                    "sync_interval_ms": 100,
                 }
 
             # Update cache
